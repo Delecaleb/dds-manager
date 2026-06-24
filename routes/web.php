@@ -29,5 +29,14 @@ Route::get('huddle', function () {
 Route::get('operations', function () {
     return view('operations.index');
 })->name('operations.index');
+Route::get('calendar', function () {
+    return view('calendar.index');
+})->name('calendar.index');
+Route::get('snapshot', function () {
+    return view('snapshot.index');
+})->name('snapshot.index');
+Route::get('front-office', function () {
+    return view('front-office.index');
+})->name('front-office.index');
 
 require __DIR__.'/auth.php';

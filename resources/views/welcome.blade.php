@@ -31,7 +31,7 @@
             <!-- WORKSPACE INTERFACE CONTAINER -->
             <main class="p-6 space-y-6 max-w-7xl w-full mx-auto">
                 
-                <!-- JARVIS SPECIFIC KPI HEADER ROW -->
+                <!-- DDS Manager SPECIFIC KPI HEADER ROW -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                         <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Gross Production (MTD)</div>
@@ -74,7 +74,7 @@
                                 <div class="grid grid-cols-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 p-3">
                                     <div>Metric Pillar</div>
                                     <div>Open Dental Ledger Value</div>
-                                    <div class="text-right">Jarvis Target Allocation</div>
+                                    <div class="text-right">DDS Manager Target Allocation</div>
                                 </div>
                                 <div class="divide-y divide-slate-100 text-sm text-slate-700">
                                     <div class="grid grid-cols-3 p-3">

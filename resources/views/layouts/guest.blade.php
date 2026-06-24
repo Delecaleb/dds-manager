@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jarvis Analytics - Practice Portal Registration</title>
+    <title>DDS Manager - Practice Portal Registration</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* Exact input framework overrides from the Jarvis EOD/Huddle layouts */
-        .jarvis-input {
+        /* Exact input framework overrides from the DDS Manager EOD/Huddle layouts */
+        .app-input {
             border: 1px solid #0ea5e9; /* Teal-blue border profile */
             padding: 0.625rem 0.75rem;
             font-size: 0.875rem;
@@ -20,7 +20,7 @@
             width: 100%;
             transition: all 0.15s ease;
         }
-        .jarvis-input:focus {
+        .app-input:focus {
             outline: none;
             border-color: #0284c7;
             box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);

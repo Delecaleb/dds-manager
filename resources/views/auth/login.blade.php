@@ -35,7 +35,7 @@
                             Identity Username / Email <span class="text-red-500">*</span>
                         </label>
                         <div class="relative">
-                            <input type="email" placeholder="username@unifieddental.com" class="jarvis-input pl-9" required>
+                            <input type="email" placeholder="username@unifieddental.com" class="app-input pl-9" required>
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                 <i data-lucide="user" class="w-3.5 h-3.5"></i>
                             </div>
@@ -51,7 +51,7 @@
                             <a href="#" class="text-[10px] font-bold text-sky-600 hover:underline">Forgot?</a>
                         </div>
                         <div class="relative">
-                            <input type="password" placeholder="••••••••" class="jarvis-input pl-9" required>
+                            <input type="password" placeholder="••••••••" class="app-input pl-9" required>
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                 <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
                             </div>

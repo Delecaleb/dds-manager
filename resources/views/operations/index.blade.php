@@ -1,8 +1,7 @@
 <x-app-layout>
-    <div class="bg-[#f8fafc] text-[#475569] font-sans antialiased text-[13px]" onload="switchTab('offices')">
+    <div class="bg-[#f8fafc] text-[#475569] font-sans antialiased text-[13px]">
         <div class="p-6 space-y-5 max-w-[1600px] mx-auto w-full">
 
-            <!-- TOP BAR (image_8f2ecb.png) -->
             <div class="flex items-center justify-between">
                 <h1 class="text-3xl font-bold text-black tracking-tight">Operations</h1>
                 <button class="bg-[#00bfa5] hover:bg-[#00a892] text-white font-bold px-4 py-2 rounded-full flex items-center gap-2 shadow-sm text-xs transition-colors">
@@ -11,7 +10,6 @@
                 </button>
             </div>
 
-            <!-- CONTROL FILTERS BAR (image_8db30b.png) -->
             <div class="flex flex-wrap items-center gap-2.5">
                 <div class="flex items-center border border-slate-300 rounded px-3 py-1.5 bg-white shadow-sm min-w-[210px]">
                     <i data-lucide="calendar" class="w-4 h-4 text-slate-400 mr-2"></i>
@@ -32,22 +30,19 @@
                 <button class="bg-white border border-[#00bfa5] text-[#00bfa5] font-bold px-5 py-1.5 rounded shadow-sm text-xs">Refresh</button>
             </div>
 
-            <!-- DYNAMIC WORKSPACE ROUTER TABS -->
             <div class="border-b border-slate-200 w-full flex flex-wrap gap-x-6 gap-y-2 text-slate-400 font-medium text-sm pt-2">
-                <button onclick="switchTab('offices')" id="btn-offices" class="pb-2 border-b-2 border-transparent">Offices</button>
-                <button onclick="switchTab('production')" id="btn-production" class="pb-2 border-b-2 border-transparent">Production Details</button>
-                <button onclick="switchTab('payors')" id="btn-payors" class="pb-2 border-b-2 border-transparent">Payors</button>
-                <button onclick="switchTab('performance')" id="btn-performance" class="pb-2 border-b-2 border-transparent">Performance</button>
-                <button onclick="switchTab('providers')" id="btn-providers" class="pb-2 border-b-2 border-transparent">Providers</button>
-                <button onclick="switchTab('services')" id="btn-services" class="pb-2 border-b-2 border-transparent">Services</button>
-                <button onclick="switchTab('trends')" id="btn-trends" class="pb-2 border-b-2 border-transparent">Trends</button>
-                <button onclick="switchTab('cancellations')" id="btn-cancellations" class="pb-2 border-b-2 border-transparent">Cancellations</button>
+                <button onclick="switchTab('offices')" id="btn-offices" class="pb-2 border-b-2 transition-all duration-150">Offices</button>
+                <button onclick="switchTab('production')" id="btn-production" class="pb-2 border-b-2 transition-all duration-150">Production Details</button>
+                <button onclick="switchTab('performance')" id="btn-performance" class="pb-2 border-b-2 transition-all duration-150">Performance</button>
+                <button onclick="switchTab('cancellations')" id="btn-cancellations" class="pb-2 border-b-2 transition-all duration-150">Cancellations</button>
+                <button onclick="switchTab('payors')" id="btn-payors" class="pb-2 border-b-2 transition-all duration-150">Payors</button>
+                <button onclick="switchTab('providers')" id="btn-providers" class="pb-2 border-b-2 transition-all duration-150">Providers</button>
+                <button onclick="switchTab('services')" id="btn-services" class="pb-2 border-b-2 transition-all duration-150">Services</button>
+                <button onclick="switchTab('trends')" id="btn-trends" class="pb-2 border-b-2 transition-all duration-150">Trends</button>
             </div>
 
-            <!-- SHARED BASE CARD FRAME -->
             <div class="bg-white border border-slate-200 rounded shadow-sm p-4 space-y-4">
                 
-                <!-- COMMON LEGEND BAR FOR TABLES (Not visible on Services tab layout) -->
                 <div id="common-table-controls" class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
                     <div class="flex items-center gap-1.5 text-slate-700 font-medium text-[11px]">
                         <span class="bg-[#c8f7dc] text-[#1e4620] px-2.5 py-1 rounded font-bold">Top 20%</span>
@@ -63,8 +58,7 @@
                     </div>
                 </div>
 
-                <!-- ================= TAB: OFFICES (image_8f2ecb.png) ================= -->
-                <div id="tab-content-offices" class="hidden-tab space-y-4">
+                <div id="tab-content-offices" class="tab-pane hidden space-y-4">
                     <div class="overflow-x-auto border border-slate-200 rounded table-container">
                         <table class="w-full text-left border-collapse whitespace-nowrap">
                             <thead>
@@ -91,8 +85,7 @@
                     </div>
                 </div>
 
-                <!-- ================= TAB: PRODUCTION DETAILS (image_8dc5b5.png) ================= -->
-                <div id="tab-content-production" class="hidden-tab space-y-4">
+                <div id="tab-content-production" class="tab-pane hidden space-y-4">
                     <div class="flex items-center gap-6 bg-slate-50 p-2.5 rounded border border-slate-200 text-xs font-medium">
                         <div class="flex items-center gap-2">
                             <div class="relative inline-block w-8 h-4 select-none transition duration-200 ease-in">
@@ -135,8 +128,7 @@
                     </div>
                 </div>
 
-                <!-- ================= TAB: PAYORS (image_8dc28c.png) ================= -->
-                <div id="tab-content-payors" class="hidden-tab space-y-4">
+                <div id="tab-content-payors" class="tab-pane hidden space-y-4">
                     <div class="overflow-x-auto border border-slate-200 rounded table-container">
                         <table class="w-full text-left border-collapse whitespace-nowrap text-xs">
                             <thead>
@@ -155,9 +147,7 @@
                     </div>
                 </div>
 
-                <!-- ================= TAB: PERFORMANCE (image_8dc20c.png) ================= -->
-                <div id="tab-content-performance" class="hidden-tab space-y-6">
-                    <!-- Dropdown selector strip -->
+                <div id="tab-content-performance" class="tab-pane hidden space-y-6">
                     <div class="relative max-w-[180px]">
                         <select class="w-full appearance-none bg-white border border-slate-300 rounded px-2 py-1 font-semibold text-slate-700 pr-8 shadow-sm">
                             <option>PROVIDERS 0 selected</option>
@@ -165,7 +155,6 @@
                         <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-400"><i data-lucide="chevron-down" class="w-3.5 h-3.5"></i></div>
                     </div>
 
-                    <!-- Core visual progress graphs grid -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div class="border border-slate-200 rounded p-3 bg-slate-50/50 space-y-2">
                             <div class="font-bold text-slate-800 text-sm">Production</div>
@@ -202,8 +191,7 @@
                     </div>
                 </div>
 
-                <!-- ================= TAB: PROVIDERS (image_8dbf08.png) ================= -->
-                <div id="tab-content-providers" class="hidden-tab space-y-4">
+                <div id="tab-content-providers" class="tab-pane hidden space-y-4">
                     <div class="overflow-x-auto border border-slate-200 rounded table-container">
                         <table class="w-full text-left border-collapse whitespace-nowrap text-xs">
                             <thead>
@@ -240,9 +228,7 @@
                     </div>
                 </div>
 
-                <!-- ================= TAB: SERVICES (image_8dbe49.png) ================= -->
-                <div id="tab-content-services" class="hidden-tab space-y-6">
-                    <!-- Filters row -->
+                <div id="tab-content-services" class="tab-pane hidden space-y-6">
                     <div class="flex items-center gap-3">
                         <div class="relative min-w-[160px]">
                             <select class="w-full appearance-none bg-white border border-slate-300 rounded px-2 py-1 font-semibold text-slate-700 pr-8 shadow-sm text-xs"><option>Providers 0 selected</option></select>
@@ -254,9 +240,7 @@
                         </div>
                     </div>
 
-                    <!-- Content Grid Mocking Infographics -->
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                        <!-- Left: Top 10 Services donut simulation -->
                         <div class="border border-slate-200 rounded p-4 space-y-4 bg-white">
                             <div class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2">Top 10 Services | Count</div>
                             <div class="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-100 rounded bg-slate-50/50">
@@ -269,7 +253,6 @@
                             </div>
                         </div>
 
-                        <!-- Center: Target comparison lists -->
                         <div class="border border-slate-200 rounded p-4 space-y-4 bg-white lg:col-span-1">
                             <div class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2">New Patient Visit vs Goal</div>
                             <div class="space-y-4 py-2">
@@ -286,7 +269,6 @@
                             </div>
                         </div>
 
-                        <!-- Right: Age demographics summary table -->
                         <div class="border border-slate-200 rounded p-4 space-y-2 bg-white">
                             <div class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2">Age Brackets</div>
                             <table class="w-full text-[12px]">
@@ -295,94 +277,60 @@
                                     <tr><td class="p-1.5 text-slate-700">0-9</td><td class="p-1.5 text-right font-semibold">46</td><td class="p-1.5 text-right text-slate-500">3.68%</td></tr>
                                     <tr><td class="p-1.5 text-slate-700">10-19</td><td class="p-1.5 text-right font-semibold">352</td><td class="p-1.5 text-right text-slate-500">28.14%</td></tr>
                                     <tr><td class="p-1.5 text-slate-700">20-29</td><td class="p-1.5 text-right font-semibold">228</td><td class="p-1.5 text-right text-slate-500">18.23%</td></tr>
-                                    <tr class="bg-slate-50 font-bold"><td class="p-1.5 text-slate-900">Total:</td><td class="p-1.5 text-right text-slate-900">1,251</td><td class="p-1.5 text-right text-slate-900">100.00%</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
 
-                <!-- ================= TAB: TRENDS (image_8dbae5.png) ================= -->
-                <div id="tab-content-trends" class="hidden-tab space-y-4">
-                    <div class="bg-sky-50 border border-sky-200 rounded p-3 text-sky-800 font-medium flex items-start gap-2.5">
-                        <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5 text-sky-600"></i>
-                        <p class="text-xs">BYO Production: The total production presented by office (BYO) based on a given date range. Please note, the provider-specific metrics ignore the Line of Business filter.</p>
-                    </div>
-                    <!-- Linear Chart Mock Area -->
-                    <div class="border border-slate-200 rounded p-4 bg-white space-y-2">
-                        <div class="flex items-center gap-2"><span class="w-3 h-3 bg-teal-400 rounded-sm"></span><span class="font-bold text-slate-800 text-xs">8 Mile</span></div>
-                        <div class="h-44 flex items-end justify-between px-4 pt-4 border-b border-l border-slate-200 bg-slate-50/50 relative">
-                            <!-- Chart Line Trace Simulation -->
-                            <div class="absolute inset-x-4 bottom-8 h-20 border-t border-dashed border-teal-300"></div>
-                            <span class="text-[10px] text-slate-400 absolute left-2 top-2">175k</span>
-                            <span class="text-[10px] text-slate-400 absolute left-2 top-16">100k</span>
-                            
-                            <!-- Mini Peak Points -->
-                            <div class="flex flex-col items-center w-12"><div class="w-2 h-2 bg-teal-400 rounded-full mb-1"></div><span class="text-[9px] text-slate-400 font-mono">Jun 2025</span></div>
-                            <div class="flex flex-col items-center w-12"><div class="w-2 h-2 bg-teal-400 rounded-full mb-14"></div><span class="text-[9px] text-slate-400 font-mono">Sep 2025</span></div>
-                            <div class="flex flex-col items-center w-12"><div class="w-2 h-2 bg-teal-400 rounded-full mb-8"></div><span class="text-[9px] text-slate-400 font-mono">Dec 2025</span></div>
-                            <div class="flex flex-col items-center w-12"><div class="w-2 h-2 bg-teal-400 rounded-full mb-24"></div><span class="text-[9px] text-slate-400 font-mono">Feb 2026</span></div>
-                            <div class="flex flex-col items-center w-12"><div class="w-2 h-2 bg-teal-400 rounded-full mb-6"></div><span class="text-[9px] text-slate-400 font-mono">Jun 2026</span></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ================= TAB: CANCELLATIONS (image_8db30b.png) ================= -->
-                <div id="tab-content-cancellations" class="hidden-tab space-y-4">
-                    <div class="overflow-x-auto border border-slate-200 rounded table-container">
-                        <table class="w-full text-left border-collapse whitespace-nowrap text-xs">
-                            <thead>
-                                <tr class="bg-[#e2e8f0] text-slate-600 font-semibold border-b border-slate-300">
-                                    <th class="p-2 border-r border-slate-300">Location</th><th class="p-2 border-r border-slate-300 text-right">Cancellation</th><th class="p-2 border-r border-slate-300 text-right">Cancellation $</th><th class="p-2 border-r border-slate-300 text-right">Cancellation Rescheduled</th><th class="p-2 border-r border-slate-300 text-right">Cancellation Rescheduled $</th><th class="p-2 border-r border-slate-300 text-right">% Cancellation</th><th class="p-2 border-r border-slate-300 text-right">% Rescheduled</th><th class="p-2 text-right">Total Appointments Count</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr class="bg-white border-b border-slate-200 font-medium">
-                                    <td class="p-2.5 font-semibold border-r border-slate-200">8 Mile</td>
-                                    <td class="p-2.5 text-right border-r border-slate-200 bg-[#fecdd3] text-red-900">115</td>
-                                    <td class="p-2.5 text-right border-r border-slate-200 bg-[#fecdd3] text-red-900">$ 100.00</td>
-                                    <td class="p-2.5 text-right border-r border-slate-200 bg-[#fecdd3] text-red-900">0</td>
-                                    <td class="p-2.5 text-right border-r border-slate-200 bg-[#fecdd3] text-red-900">$ 0</td>
-                                    <td class="p-2.5 text-right border-r border-slate-200 bg-[#fecdd3] text-red-900">36.74%</td>
-                                    <td class="p-2.5 text-right border-r border-slate-200 bg-[#fecdd3] text-red-900">0.00%</td>
-                                    <td class="p-2.5 text-right bg-[#c8f7dc] text-emerald-900">313</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <div id="tab-content-trends" class="tab-pane hidden p-8 text-center text-slate-400 font-medium">Trends Workspace View Blueprint</div>
+                <div id="tab-content-cancellations" class="tab-pane hidden p-8 text-center text-slate-400 font-medium">Cancellations Workspace View Blueprint</div>
 
             </div>
-
         </div>
     </div>
-    <!-- SPA VIEW SWITCHER ROUTER INLINE ENGINE -->
-    <script>
-        const tabsList = ['offices', 'production', 'payors', 'performance', 'providers', 'services', 'trends', 'cancellations'];
 
-        function switchTab(targetId) {
-            tabsList.forEach(id => {
-                const contentBlock = document.getElementById(`tab-content-${id}`);
-                const tabButton = document.getElementById(`btn-${id}`);
-                
-                if (id === targetId) {
-                    contentBlock.classList.remove('hidden-tab');
-                    tabButton.className = "pb-2 text-slate-900 font-bold border-b-3 border-[#00bfa5]";
-                } else {
-                    contentBlock.classList.add('hidden-tab');
-                    tabButton.className = "pb-2 text-slate-400 font-medium border-b-2 border-transparent hover:text-slate-600 transition-colors";
-                }
+    <script>
+        function switchTab(tabId) {
+            // 1. Hide all tab panes
+            document.querySelectorAll('.tab-pane').forEach(el => {
+                el.classList.add('hidden');
             });
 
-            // Adjust search controls bar visibility contextually
-            const commonControls = document.getElementById('common-table-controls');
-            if (targetId === 'services' || targetId === 'performance') {
-                commonControls.classList.add('hidden-tab');
-            } else {
-                commonControls.classList.remove('hidden-tab');
+            // 2. Show selected target tab pane if it exists
+            const activePane = document.getElementById('tab-content-' + tabId);
+            if (activePane) {
+                activePane.classList.remove('hidden');
             }
+
+            // 3. Dynamically manage the visibility of the common legend bar controls frame
+            const commonControls = document.getElementById('common-table-controls');
+            if (commonControls) {
+                if (tabId === 'services' || tabId === 'performance' || tabId === 'trends' || tabId === 'cancellations') {
+                    commonControls.classList.add('hidden');
+                } else {
+                    commonControls.classList.remove('hidden');
+                }
+            }
+
+            // 4. Update visual style indicators on tab items
+            const activeStyles = ['border-[#00bfa5]', 'text-black', 'text-slate-900', 'font-bold'];
+            const inactiveStyles = ['border-transparent', 'text-slate-400'];
+
+            document.querySelectorAll('[id^="btn-"]').forEach(button => {
+                if (button.id === 'btn-' + tabId) {
+                    button.classList.remove(...inactiveStyles);
+                    button.classList.add(...activeStyles);
+                } else {
+                    button.classList.remove(...activeStyles);
+                    button.classList.add(...inactiveStyles);
+                }
+            });
         }
-        
-        lucide.createIcons();
+
+        // Initialize view safely on layout completion
+        window.addEventListener('DOMContentLoaded', () => {
+            switchTab('offices');
+        });
     </script>
 </x-app-layout>

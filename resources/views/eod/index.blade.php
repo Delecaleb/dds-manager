@@ -100,82 +100,82 @@
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Date:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input jarvis-input-left" value="18-Jun-2026" readonly>
+                                <input type="text" class="app-input app-input-left" value="18-Jun-2026" readonly>
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Office:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input jarvis-input-left" value="8 Mile" readonly>
+                                <input type="text" class="app-input app-input-left" value="8 Mile" readonly>
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Monthly Booked Production:</span>
-                                <input type="text" class="jarvis-input" value="$30,569.15">
+                                <input type="text" class="app-input" value="$30,569.15">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Daily Net Production:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input font-bold" value="$0">
+                                <input type="text" class="app-input font-bold" value="$0">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Daily Gross Production:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input font-bold" value="$0">
+                                <input type="text" class="app-input font-bold" value="$0">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Office Adjusted Daily Production (ADP):</span>
-                                <input type="text" class="jarvis-input" value="$0">
+                                <input type="text" class="app-input" value="$0">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Office Scheduled VS Goal (monthly):</span>
-                                <input type="text" class="jarvis-input" value="22.64%">
+                                <input type="text" class="app-input" value="22.64%">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Oral Surgery:</span>
-                                <input type="text" class="jarvis-input" value="$0">
+                                <input type="text" class="app-input" value="$0">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Total Adjustment:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="$0">
+                                <input type="text" class="app-input" value="$0">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Daily Collections:</span>
-                                <input type="text" class="jarvis-input" value="$0">
+                                <input type="text" class="app-input" value="$0">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Number of Providers:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="0">
+                                <input type="text" class="app-input" value="0">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Case Acceptance:</span>
-                                <input type="text" class="jarvis-input" value="0.00%">
+                                <input type="text" class="app-input" value="0.00%">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">New Patients:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="0">
+                                <input type="text" class="app-input" value="0">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Total Patients Seen:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="0">
+                                <input type="text" class="app-input" value="0">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Patients w/ Missing Referral:</span>
-                                <input type="text" class="jarvis-input" value="0">
+                                <input type="text" class="app-input" value="0">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium"># Of unsched treatment calls made today:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="0">
+                                <input type="text" class="app-input" value="0">
                             </div>
 
                             <div class="flex items-center justify-between gap-4 pt-1">
@@ -198,42 +198,42 @@
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Office MTD Adjust Production VS Goal:</span>
-                                <input type="text" class="jarvis-input" value="21.99%">
+                                <input type="text" class="app-input" value="21.99%">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Office MTD Collections VS Goal:</span>
-                                <input type="text" class="jarvis-input" value="33.46%">
+                                <input type="text" class="app-input" value="33.46%">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Net Production:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="$29,679.15">
+                                <input type="text" class="app-input" value="$29,679.15">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Gross Production:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="$32,565.00">
+                                <input type="text" class="app-input" value="$32,565.00">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Adjustment:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input text-red-600" value="-$2,885.85">
+                                <input type="text" class="app-input text-red-600" value="-$2,885.85">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Collection:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="$45,165.78">
+                                <input type="text" class="app-input" value="$45,165.78">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">New Patients:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="8">
+                                <input type="text" class="app-input" value="8">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Total Patients:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="88">
+                                <input type="text" class="app-input" value="88">
                             </div>
 
                             <div class="bg-slate-50 p-1.5 font-bold text-slate-700 border-b border-slate-200 mt-2">
@@ -242,27 +242,27 @@
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Monthly Production Goal:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="$135,000.00">
+                                <input type="text" class="app-input" value="$135,000.00">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Scheduled Production:</span>
-                                <input type="text" class="jarvis-input" value="$890.00">
+                                <input type="text" class="app-input" value="$890.00">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Production Needed to Achieve goal:</span>
-                                <input type="text" class="jarvis-input" value="$105,320.85">
+                                <input type="text" class="app-input" value="$105,320.85">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Remaining days to EOM:<span class="text-red-500">*</span></span>
-                                <input type="text" class="jarvis-input" value="12">
+                                <input type="text" class="app-input" value="12">
                             </div>
 
                             <div class="flex items-center justify-between gap-4">
                                 <span class="font-medium">Project daily production needed to achieve goal:</span>
-                                <input type="text" class="jarvis-input" value="$8,776.74">
+                                <input type="text" class="app-input" value="$8,776.74">
                             </div>
                         </div>
 
