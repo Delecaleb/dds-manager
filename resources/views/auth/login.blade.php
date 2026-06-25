@@ -27,19 +27,22 @@
                 </div>
 
                 <!-- MAIN EXECUTION FORM ACTION -->
-                <form class="space-y-4">
+                <form method="POST" action="{{ route('login') }}" class="space-y-4">
                     @csrf
                     <!-- USER IDENTITY INPUT ROW -->
                     <div class="space-y-1">
                         <label class="block font-bold text-slate-500 uppercase tracking-wider text-[10px]">
-                            Identity Username / Email <span class="text-red-500">*</span>
+                            Identity Username <span class="text-red-500">*</span>
                         </label>
                         <div class="relative">
-                            <input type="email" placeholder="username@unifieddental.com" class="app-input pl-9" required>
+                            <input id="username" name="username" type="text" value="{{ old('username') }}" placeholder="user" class="app-input pl-9" required autofocus>
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                 <i data-lucide="user" class="w-3.5 h-3.5"></i>
                             </div>
                         </div>
+                        @error('username')
+                            <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <!-- PASSKEY ACCESS MATRIX ROW -->
@@ -51,11 +54,14 @@
                             <a href="#" class="text-[10px] font-bold text-sky-600 hover:underline">Forgot?</a>
                         </div>
                         <div class="relative">
-                            <input type="password" placeholder="••••••••" class="app-input pl-9" required>
+                            <input id="password" name="password" type="password" placeholder="••••••••" class="app-input pl-9" required>
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                 <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
                             </div>
                         </div>
+                        @error('password')
+                            <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <!-- PERSISTENCE SYSTEM CONFIG CHECKBOX -->

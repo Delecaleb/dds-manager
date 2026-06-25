@@ -58,12 +58,6 @@
                     Join hundreds of synchronized clinics managing daily operational net production targets, clinical team logs, treatment plans, and automatic end-of-day reporting engines through a single interface token.
                 </p>
                 
-                <!-- Micro Metric Badges Mimicking Table UI Indicators -->
-                <div class="pt-4 flex items-center gap-6 border-t border-white/10 font-mono text-[11px] text-slate-400">
-                    <div>INTEGRATION: <span class="text-emerald-400 font-bold">PLUG & PLAY</span></div>
-                    <div>SECURITY: <span class="text-emerald-400 font-bold">HIPAA COMPLIANT</span></div>
-                    <div>SETUP TIME: <span class="text-sky-400 font-bold">&lt; 10 MINS</span></div>
-                </div>
             </div>
 
             <!-- Footer Compliance Notation Component -->
