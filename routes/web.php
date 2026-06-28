@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PatientController;
 
 Route::get('/', function () {
     return auth()->check()
@@ -18,9 +19,10 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    Route::get('patients', function () {
-        return view('patients.index');
-    })->name('patients.index');
+
+    Route::get('patients', [PatientController::class, 'index'])->name('patients.index');
+    Route::get('patients/data', [PatientController::class, 'data'])->name('patients.data');
+    
     Route::get('eod', function () {
         return view('eod.index');
     })->name('eod.index');

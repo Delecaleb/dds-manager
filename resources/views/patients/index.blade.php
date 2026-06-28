@@ -21,7 +21,7 @@
                         <i data-lucide="chevron-down" class="w-4 h-4"></i>
                     </div>
                 </div>
-                <button class="border border-emerald-500 text-slate-800 text-sm font-semibold px-5 py-1.5 rounded bg-white hover:bg-slate-50 transition-colors">
+                <button id="refreshPatients" class="border border-emerald-500 text-slate-800 text-sm font-semibold px-5 py-1.5 rounded bg-white hover:bg-slate-50 transition-colors">
                     Refresh
                 </button>
             </div>
@@ -86,10 +86,12 @@
                 
                 <!-- STICKY HORIZONTAL SCROLL CONTAINER -->
                 <div class="overflow-x-auto custom-table-scrollbar relative">
-                    <table class="w-full text-left border-collapse table-auto">
+                    {{-- skeleton loader --}}
+                    <x-table-skeleton />
+                    <table id="patientsTable" class="w-full text-left border-collapse table-auto">
                         <thead>
                             <tr class="bg-slate-50 text-slate-700 font-bold text-xs border-b border-slate-200">
-                                
+                                 
                                 <!-- FIXED AXIS: COMBINED CHECKBOX & PATIENT NAME COLUMN -->
                                 <th class="p-3 bg-slate-50 sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] border-r border-slate-200 min-w-[260px] max-w-[260px]">
                                     <div class="flex items-center gap-3">
@@ -113,117 +115,6 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-xs text-slate-700 bg-white">
                             
-                            <!-- Patient Data Row 1 -->
-                            <tr class="hover:bg-slate-50/80 transition-colors group">
-                                <!-- FIXED COLUMN SECTION -->
-                                <td class="p-3 bg-white sticky left-0 group-hover:bg-slate-50/80 z-10 border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                                    <div class="flex items-center justify-between w-full">
-                                        <div class="flex items-center gap-3">
-                                            <input type="checkbox" checked class="w-4 h-4 accent-emerald-500 rounded focus:ring-0">
-                                            <span class="font-medium text-slate-900">Akinbode, Erioluwa</span>
-                                        </div>
-                                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-slate-300 hover:text-blue-600 cursor-pointer"></i>
-                                    </div>
-                                </td>
-                                <!-- MOBILE FIELDS -->
-                                <td class="p-3 whitespace-nowrap">22057</td>
-                                <td class="p-3 whitespace-nowrap">Akinbode, Erioluwa</td>
-                                <td class="p-3 whitespace-nowrap">22057</td>
-                                <td class="p-3 whitespace-nowrap">31</td>
-                                <td class="p-3 whitespace-nowrap">Male</td>
-                                <td class="p-3 whitespace-nowrap text-slate-500">633 n dexter dr</td>
-                                <td class="p-3 whitespace-nowrap"></td>
-                                <td class="p-3 whitespace-nowrap"></td>
-                            </tr>
-
-                            <!-- Patient Data Row 2 -->
-                            <tr class="hover:bg-slate-50/80 transition-colors group">
-                                <!-- FIXED COLUMN SECTION -->
-                                <td class="p-3 bg-white sticky left-0 group-hover:bg-slate-50/80 z-10 border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                                    <div class="flex items-center justify-between w-full">
-                                        <div class="flex items-center gap-3">
-                                            <input type="checkbox" checked class="w-4 h-4 accent-emerald-500 rounded focus:ring-0">
-                                            <span class="font-medium text-slate-900">Ayers-Nelson, Riley</span>
-                                        </div>
-                                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-slate-300 hover:text-blue-600 cursor-pointer"></i>
-                                    </div>
-                                </td>
-                                <td class="p-3 whitespace-nowrap">22048</td>
-                                <td class="p-3 whitespace-nowrap">Ayers-Nelson, Riley</td>
-                                <td class="p-3 whitespace-nowrap">22048</td>
-                                <td class="p-3 whitespace-nowrap">9</td>
-                                <td class="p-3 whitespace-nowrap">Female</td>
-                                <td class="p-3 whitespace-nowrap text-slate-500">3946 fairview</td>
-                                <td class="p-3 whitespace-nowrap">Detroit</td>
-                                <td class="p-3 whitespace-nowrap">MI</td>
-                            </tr>
-
-                            <!-- Patient Data Row 3 -->
-                            <tr class="hover:bg-slate-50/80 transition-colors group">
-                                <!-- FIXED COLUMN SECTION -->
-                                <td class="p-3 bg-white sticky left-0 group-hover:bg-slate-50/80 z-10 border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                                    <div class="flex items-center justify-between w-full">
-                                        <div class="flex items-center gap-3">
-                                            <input type="checkbox" checked class="w-4 h-4 accent-emerald-500 rounded focus:ring-0">
-                                            <span class="font-medium text-slate-900">Davis, Melissa</span>
-                                        </div>
-                                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-slate-300 hover:text-blue-600 cursor-pointer"></i>
-                                    </div>
-                                </td>
-                                <td class="p-3 whitespace-nowrap">22016</td>
-                                <td class="p-3 whitespace-nowrap">Davis, Melissa</td>
-                                <td class="p-3 whitespace-nowrap">22016</td>
-                                <td class="p-3 whitespace-nowrap">51</td>
-                                <td class="p-3 whitespace-nowrap">Female</td>
-                                <td class="p-3 whitespace-nowrap text-slate-500"></td>
-                                <td class="p-3 whitespace-nowrap"></td>
-                                <td class="p-3 whitespace-nowrap"></td>
-                            </tr>
-
-                            <!-- Patient Data Row 4 -->
-                            <tr class="hover:bg-slate-50/80 transition-colors group">
-                                <!-- FIXED COLUMN SECTION -->
-                                <td class="p-3 bg-white sticky left-0 group-hover:bg-slate-50/80 z-10 border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                                    <div class="flex items-center justify-between w-full">
-                                        <div class="flex items-center gap-3">
-                                            <input type="checkbox" class="w-4 h-4 text-emerald-500 border-slate-300 rounded focus:ring-0">
-                                            <span class="font-medium text-slate-900">Dunwoodie-Sewald, Miya</span>
-                                        </div>
-                                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-slate-300 hover:text-blue-600 cursor-pointer"></i>
-                                    </div>
-                                </td>
-                                <td class="p-3 whitespace-nowrap">22861</td>
-                                <td class="p-3 whitespace-nowrap">Dunwoodie-Sewald, Miya</td>
-                                <td class="p-3 whitespace-nowrap">22861</td>
-                                <td class="p-3 whitespace-nowrap">12</td>
-                                <td class="p-3 whitespace-nowrap">Other</td>
-                                <td class="p-3 whitespace-nowrap text-slate-500"></td>
-                                <td class="p-3 whitespace-nowrap"></td>
-                                <td class="p-3 whitespace-nowrap"></td>
-                            </tr>
-
-                            <!-- Patient Data Row 5 -->
-                            <tr class="hover:bg-slate-50/80 transition-colors group">
-                                <!-- FIXED COLUMN SECTION -->
-                                <td class="p-3 bg-white sticky left-0 group-hover:bg-slate-50/80 z-10 border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                                    <div class="flex items-center justify-between w-full">
-                                        <div class="flex items-center gap-3">
-                                            <input type="checkbox" class="w-4 h-4 text-emerald-500 border-slate-300 rounded focus:ring-0">
-                                            <span class="font-medium text-slate-900">Files, Shaterricka</span>
-                                        </div>
-                                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-slate-300 hover:text-blue-600 cursor-pointer"></i>
-                                    </div>
-                                </td>
-                                <td class="p-3 whitespace-nowrap">22054</td>
-                                <td class="p-3 whitespace-nowrap">Files, Shaterricka</td>
-                                <td class="p-3 whitespace-nowrap">22054</td>
-                                <td class="p-3 whitespace-nowrap">32</td>
-                                <td class="p-3 whitespace-nowrap">Female</td>
-                                <td class="p-3 whitespace-nowrap text-slate-500"></td>
-                                <td class="p-3 whitespace-nowrap"></td>
-                                <td class="p-3 whitespace-nowrap"></td>
-                            </tr>
-
                         </tbody>
                     </table>
                 </div>
@@ -232,4 +123,222 @@
         </div>
 
     </div>
+    <script>
+
+    let table;
+
+
+    $(document).ready(function(){
+
+
+table = $('#patientsTable').DataTable({
+
+
+processing:true,
+
+serverSide:true,
+
+
+ajax:{
+
+
+url:"{{ route('patients.data') }}",
+
+type:"GET",
+
+
+beforeSend:function(){
+
+$("#tableSkeleton").removeClass('hidden');
+
+},
+
+
+complete:function(){
+
+$("#tableSkeleton").addClass('hidden');
+
+}
+
+},
+
+columns:[
+
+
+{
+data:'name',
+
+render:function(data,row){
+
+return `
+
+<div class="p-3 bg-white sticky left-0 group-hover:bg-slate-50/80 z-10 border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+
+<input type="checkbox">
+
+<span class="font-medium">
+
+${data}
+
+</span>
+
+
+<button onclick="openPatient(${row.id})">
+
+<i data-lucide="arrow-up-right"></i>
+
+</button>
+
+
+</div>
+
+`;
+
+}
+
+},
+
+
+
+{
+data:'id',
+title:'Patient ID'
+},
+
+
+
+{
+data:'phone'
+},
+
+
+
+{
+data:'email'
+},
+
+
+
+{
+data:'birthdate'
+},
+
+
+
+{
+data:'city'
+},
+
+
+
+{
+data:'state'
+},
+
+
+
+{
+data:'first_visit'
+},
+
+
+
+{
+data:'last_visit'
+},
+
+
+
+{
+data:'lifetime_production',
+
+render:function(data){
+
+return '$'+Number(data).toLocaleString();
+
+}
+
+}
+
+
+],
+
+
+order:[[0,'asc']],
+
+
+
+drawCallback:function(){
+
+lucide.createIcons();
+
+}
+});
+});
+
+function openPatient(id){
+
+
+$.ajax({
+
+url:'/patients/'+id,
+
+type:'GET',
+
+
+beforeSend(){
+
+// open modal loader
+
+},
+
+
+success:function(response){
+
+
+// populate patient modal
+
+
+}
+
+
+});
+
+
+}
+
+$("#refreshPatients").click(function(){
+
+
+table.ajax.reload();
+
+
+});
+$("#exportBtn").click(function(){
+
+
+$.ajax({
+
+url:'/patients/export',
+
+method:'POST',
+
+data:{
+_token:"{{csrf_token()}}"
+},
+
+success:function(file){
+
+
+window.location=file.url;
+
+
+}
+
+
+});
+
+
+});
+</script>
 </x-app-layout>
