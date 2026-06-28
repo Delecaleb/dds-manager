@@ -223,10 +223,7 @@ return [
 'id'=>$patientId,
 
 
-'name'=>
-($patient['FName']??'')
-.' '
-.($patient['LName']??''),
+'name'=> ($patient['LName']??'').' '.($patient['FName']??''),
 
 
 'phone'=>$patient['WirelessPhone']??'',

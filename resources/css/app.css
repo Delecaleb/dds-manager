@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* DataTables pagination styling */
+.dataTables_paginate {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+}
+.dataTables_paginate .paginate_button {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    background: #fff;
+    color: #111827;
+}
+.dataTables_paginate .paginate_button.current {
+    background: #0f172a;
+    color: #fff;
+}

@@ -63,13 +63,8 @@
             <button class="border border-emerald-500 text-slate-800 text-xs font-bold px-4 py-2 rounded bg-white">
                 Reset
             </button>
-            <div class="relative w-48">
-                <input type="text" placeholder="Search" class="w-full pl-3 pr-8 py-2 border border-slate-300 rounded text-xs focus:outline-none focus:border-emerald-500">
-                <span class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400">
-                    <i data-lucide="search" class="w-3.5 h-3.5"></i>
-                </span>
-            </div>
-            <button class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-6 py-2 rounded transition-colors">
+            <input type="text" id="searchInput" placeholder="Search" class="w-full pl-3 pr-8 py-2 border border-slate-300 rounded text-xs focus:outline-none focus:border-emerald-500">
+<button id="searchBtn" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-6 py-2 rounded transition-colors">
                 Search
             </button>
             <button class="border border-slate-300 text-slate-700 text-xs font-bold px-4 py-2 rounded bg-white hover:bg-slate-50">
@@ -103,14 +98,15 @@
                                 </th>
                                 
                                 <!-- SCROLLABLE COLUMNS FROM IMAGE -->
-                                <th class="p-3 min-w-[110px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Patient ID</span></th>
-                                <th class="p-3 min-w-[160px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Guarantor</span></th>
-                                <th class="p-3 min-w-[120px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Guarantor ID</span></th>
-                                <th class="p-3 min-w-[80px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Age</span></th>
-                                <th class="p-3 min-w-[100px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Gender</span></th>
-                                <th class="p-3 min-w-[200px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Address</span></th>
+                                <th class="p-3 min-w-[100px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Patient ID</span></th>
+                                <th class="p-3 min-w-[120px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Phone</span></th>
+                                <th class="p-3 min-w-[160px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Email</span></th>
+                                <th class="p-3 min-w-[100px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Birthdate</span></th>
                                 <th class="p-3 min-w-[120px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> City</span></th>
-                                <th class="p-3 min-w-[90px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> State</span></th>
+                                <th class="p-3 min-w-[80px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> State</span></th>
+                                <th class="p-3 min-w-[120px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> First Visit</span></th>
+                                <th class="p-3 min-w-[120px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Last Visit</span></th>
+                                <th class="p-3 min-w-[150px] text-xs font-bold"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Lifetime Prod</span></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-xs text-slate-700 bg-white">
@@ -136,7 +132,7 @@ table = $('#patientsTable').DataTable({
 
 processing:true,
 
-serverSide:true,
+serverSide:true, paging:true, pageLength:10, lengthChange:false, pagingType:'simple_numbers', searching:true, info:false,
 
 
 ajax:{
@@ -314,6 +310,17 @@ table.ajax.reload();
 
 
 });
+
+// Custom search functionality
+$("#searchBtn").on('click', function(){
+    table.search($("#searchInput").val()).draw();
+});
+$("#searchInput").on('keypress', function(e){
+    if(e.which == 13){
+        $("#searchBtn").click();
+    }
+});
+
 $("#exportBtn").click(function(){
 
 

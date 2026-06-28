@@ -16,7 +16,7 @@
     <div class="flex h-screen overflow-hidden">
         
         <!-- SIDEBAR (Houses the exact 20 DDS Manager Modules) -->
-        <aside class="w-64 bg-white border-r border-slate-200 flex flex-col justify-between hidden md:flex shrink-0">
+        <aside class="w-42 bg-white border-r border-slate-200 flex flex-col justify-between hidden md:flex shrink-0">
             <div class="overflow-y-auto flex-1 chunk-scrollbar">
                 <!-- App Brand Header -->
                 <div class="h-16 flex items-center px-6 border-b border-slate-200 gap-2 sticky top-0 bg-white z-10">
