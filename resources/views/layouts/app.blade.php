@@ -4,30 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DDS Manager Multi-Location Dental Engine</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://cdn.datatables.net/2.0.8/css/dataTables.tailwind.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.tailwindcss.css">
     <script src="https://code.jquery.com/jquery-4.0.0.min.js" integrity="sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao=" crossorigin="anonymous"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased">
 
-    <div class="flex h-screen overflow-hidden">
+    <div id="overlay-menu" class="fixed inset-0 z-50 hidden">
+        <div id="menu-backdrop" class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
         
-        <!-- SIDEBAR (Houses the exact 20 DDS Manager Modules) -->
-        <aside class="w-42 bg-white border-r border-slate-200 flex flex-col justify-between hidden md:flex shrink-0">
+        <aside class="absolute inset-y-0 left-0 w-64 bg-white shadow-2xl flex flex-col justify-between h-full transform transition-transform duration-300">
             <div class="overflow-y-auto flex-1 chunk-scrollbar">
-                <!-- App Brand Header -->
-                <div class="h-16 flex items-center px-6 border-b border-slate-200 gap-2 sticky top-0 bg-white z-10">
-                    <i data-lucide="bar-chart-big" class="text-blue-600 w-6 h-6"></i>
-                    <span class="font-bold text-lg tracking-tight text-slate-900">DDS Manager<span class="text-blue-600 font-medium"></span></span>
+                <div class="h-16 flex items-center justify-between px-6 border-b border-slate-200 sticky top-0 bg-white z-10">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="bar-chart-big" class="text-blue-600 w-6 h-6"></i>
+                        <span class="font-bold text-lg tracking-tight text-slate-900">DDS Manager</span>
+                    </div>
+                    <button id="close-menu-btn" class="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 focus:outline-none">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
                 </div>
                 
-                <!-- Complete DDS Manager Menu Architecture -->
                 <div class="p-3 space-y-4">
-                    
-                    <!-- CORE VIEW -->
                     <div>
                         <nav class="space-y-0.5">
                             <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('dashboard') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}" @if(request()->routeIs('dashboard')) aria-current="page" @endif>
@@ -51,7 +51,6 @@
                         </nav>
                     </div>
 
-                    <!-- CLINICAL & PATIENT OPERATION -->
                     <div>
                         <nav class="space-y-0.5">
                             <a href="{{ route('front-office.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('front-office.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}" @if(request()->routeIs('front-office.index')) aria-current="page" @endif>
@@ -66,7 +65,6 @@
                         </nav>
                     </div>
 
-                    <!-- FINANCIALS & RCM -->
                     <div>
                         <nav class="space-y-0.5">
                             <span class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
@@ -78,14 +76,12 @@
                             <span class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
                                 <i data-lucide="hourglass" class="w-4 h-4"></i> Aging
                             </span>
-                            
                             <span class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
                                 <i data-lucide="landmark" class="w-4 h-4"></i> RCM
                             </span>
                         </nav>
                     </div>
 
-                    <!-- PORTALS & CONFIG -->
                     <div>
                         <nav class="space-y-0.5">
                             <span class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
@@ -96,11 +92,9 @@
                             </span>
                         </nav>
                     </div>
-
                 </div>
             </div>
 
-            <!-- Open Dental Database Real-time Bridge status -->
             <div class="p-4 border-t border-slate-200 bg-slate-50 sticky bottom-0">
                 <div class="flex items-center justify-between text-xs text-slate-500">
                     <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> OD LiveSync Active</span>
@@ -108,17 +102,46 @@
                 </div>
             </div>
         </aside>
-
-        <!-- MAIN VIEWPORT -->
-        <div class="flex-1 flex flex-col overflow-y-auto">
-            {{$slot}}
-        </div>
     </div>
 
-    <!-- Lucide Script -->
+    <div class="flex flex-col h-screen overflow-hidden">
+        
+        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-30">
+            <div class="flex items-center gap-4">
+                <button id="menu-toggle-btn" class="p-2 rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+                <div class="flex items-center gap-2">
+                    <i data-lucide="bar-chart-big" class="text-blue-600 w-5 h-5"></i>
+                    <span class="font-bold text-md tracking-tight text-slate-900">DDS Manager Dashboard</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-3"></div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto">
+            {{$slot}}
+        </main>
+    </div>
+
     <script>
         lucide.createIcons();
+
+        // JavaScript Interaction Logic for Overlay
+        const menuToggleBtn = document.getElementById('menu-toggle-btn');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const overlayMenu = document.getElementById('overlay-menu');
+        const menuBackdrop = document.getElementById('menu-backdrop');
+
+        function toggleMenu() {
+            overlayMenu.classList.toggle('hidden');
+        }
+
+        menuToggleBtn.addEventListener('click', toggleMenu);
+        closeMenuBtn.addEventListener('click', toggleMenu);
+        menuBackdrop.addEventListener('click', toggleMenu);
     </script>
-    <script src="https://cdn.datatables.net/2.0.8/js/dataTables.js"></script>
+<script src="https://cdn.datatables.net/2.0.8/js/dataTables.js"></script>
+<script src="https://cdn.datatables.net/2.0.8/js/dataTables.tailwind.js"></script>
 </body>
 </html>

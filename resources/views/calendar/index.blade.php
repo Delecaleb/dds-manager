@@ -17,7 +17,6 @@
 
       <select class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700 min-w-[120px]">
         <option>8 Mile</option>
-        <option>Detroit Main</option>
       </select>
 
       <select class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">

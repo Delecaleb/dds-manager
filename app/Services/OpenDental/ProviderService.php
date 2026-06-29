@@ -2,7 +2,8 @@
 
 namespace App\Services\OpenDental;
 
-class PatientService
+
+class ProviderService
 {
 
     public function __construct(
@@ -15,7 +16,7 @@ class PatientService
     {
 
         return $this->client->get(
-            'patients'
+            'providers'
         );
 
     }
@@ -24,22 +25,27 @@ class PatientService
     {
 
         return $this->client->get(
-            "patients/$id"
+            "providers/$id"
         );
 
     }
 
     public function findMany($ids)
     {
+
+
         return collect(
             $this->all()
         )
         ->whereIn(
-            'PatNum',
+            'ProvNum',
             $ids
         )
         ->values();
 
+
     }
+
+
 
 }

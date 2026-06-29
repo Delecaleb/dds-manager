@@ -3,6 +3,8 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PatientController;
+use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\DashboardController;
 
 Route::get('/', function () {
     return auth()->check()
@@ -11,9 +13,7 @@ Route::get('/', function () {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -32,9 +32,7 @@ Route::middleware('auth')->group(function () {
     Route::get('operations', function () {
         return view('operations.index');
     })->name('operations.index');
-    Route::get('calendar', function () {
-        return view('calendar.index');
-    })->name('calendar.index');
+    Route::get('calendar', [CalendarController::class, 'index'])->name('calendar.index');
     Route::get('snapshot', function () {
         return view('snapshot.index');
     })->name('snapshot.index');

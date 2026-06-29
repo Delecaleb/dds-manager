@@ -5,10 +5,8 @@
                     <!-- Global Multi-Location Context Switcher -->
                     <div class="relative">
                         <select class="appearance-none bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-10 py-1.5 text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white cursor-pointer transition-colors">
-                            <option value="all">All Locations (Consolidated)</option>
-                            <option value="downtown" selected>Downtown Dental Care</option>
-                            <option value="northside">Northside Endodontics</option>
-                            <option value="south">Southwest Ortho Clinic</option>
+                            <option value="all">All Locations</option>
+                            <option value="downtown" selected>8 Mile</option>
                         </select>
                         <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500">
                             <i data-lucide="chevron-down" class="w-4 h-4"></i>
@@ -35,7 +33,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                         <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Gross Production (MTD)</div>
-                        <div class="text-3xl font-extrabold text-slate-900">$142,380</div>
+                        <div class="text-3xl font-extrabold text-slate-900">${{number_format($production->mtd)}}</div>
                         <div class="text-xs text-emerald-600 mt-2 font-medium flex items-center gap-1">
                             <i data-lucide="trending-up" class="w-3 h-3"></i> +4.2% vs target huddle model
                         </div>

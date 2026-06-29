@@ -5,7 +5,7 @@ namespace App\Services\OpenDental;
 use Illuminate\Support\Facades\Cache;
 
 
-class ProcedureService
+class PaymentService
 {
 
 
@@ -15,16 +15,16 @@ class ProcedureService
 
 
 
+
     public function all()
     {
 
         return Cache::remember(
-            'od_procedures',
-
+            'od_payments',
             now()->addHours(12),
 
-            fn()=> $this->client->get(
-                'procedurelogs'
+            fn() => $this->client->get(
+                'payments'
             )
         );
 
@@ -38,7 +38,7 @@ class ProcedureService
     {
 
 
-        $key = "od_procedures_{$start}_{$end}";
+        $key = "od_payments_{$start}_{$end}";
 
 
         return Cache::remember(
@@ -53,7 +53,7 @@ class ProcedureService
 
                 return $this->client->get(
 
-                    'procedurelogs',
+                    'payments',
 
                     [
 
@@ -76,11 +76,12 @@ class ProcedureService
 
 
 
+
     public function find($id)
     {
 
         return $this->client->get(
-            "procedurelogs/$id"
+            "payments/$id"
         );
 
     }
