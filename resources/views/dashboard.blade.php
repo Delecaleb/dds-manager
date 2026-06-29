@@ -33,30 +33,29 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                         <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Gross Production (MTD)</div>
-                        <div class="text-3xl font-extrabold text-slate-900">${{number_format($production->mtd)}}</div>
+                        <div class="text-3xl font-extrabold text-slate-900">${{ number_format($data['production']['mtd']) }}</div>
                         <div class="text-xs text-emerald-600 mt-2 font-medium flex items-center gap-1">
                             <i data-lucide="trending-up" class="w-3 h-3"></i> +4.2% vs target huddle model
                         </div>
                     </div>
                     <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Net Collection Rate</div>
-                        <div class="text-3xl font-extrabold text-slate-900">97.4%</div>
-                        <div class="text-xs text-slate-500 mt-2">Adjusted inside RCM system</div>
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Collection Rate</div>
+                        <div class="text-3xl font-extrabold text-slate-900">{{ $data['collection']['rate'] }}%</div>
                     </div>
                     <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Tx Acceptance Ratio</div>
-                        <div class="text-3xl font-extrabold text-slate-900">41.8%</div>
-                        <div class="text-xs text-blue-600 mt-2 font-medium">Pulled via Tx Miner engine</div>
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Treatment Acceptance</div>
+                        <div class="text-3xl font-extrabold text-slate-900">{{ $data['treatment_acceptance']['rate'] }}%</div>
                     </div>
                     <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                         <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Overdue Aging (>90)</div>
-                        <div class="text-3xl font-extrabold text-red-600">$18,450</div>
+                        <div class="text-3xl font-extrabold text-red-600">${{ number_format($data['aging']['over_90']) }}</div>
                         <div class="text-xs text-red-500 mt-2 font-medium">Requires front office batch</div>
                     </div>
                 </div>
 
                 <!-- MAIN INTERACTIVE LAYOUT STRIPS -->
-                <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <p class="text-red-500">EOD TABLE UNDER UPDATE</p>
+                {{-- <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     
                     <!-- LIVE EOD MONITOR (Cloned tracking concept) -->
                     <div class="bg-white border border-slate-200 rounded-xl xl:col-span-2 shadow-sm flex flex-col">
@@ -121,7 +120,7 @@
                         </div>
                     </div>
 
-                </div>
+                </div> --}}
 
             </main>
 </x-app-layout>

@@ -37,40 +37,15 @@ class PaymentService
     public function byDate($start,$end)
     {
 
-
-        $key = "od_payments_{$start}_{$end}";
-
-
-        return Cache::remember(
-
-            $key,
-
-            now()->addHours(12),
-
-
-            function() use($start,$end){
-
-
                 return $this->client->get(
 
                     'payments',
 
                     [
-
-                        'dateStart'=>$start,
-
-                        'dateEnd'=>$end
-
+                        'DateEntry'=>$start,          //no start - end but from the DateEntry upward
                     ]
 
                 );
-
-
-            }
-
-        );
-
-
     }
 
 

@@ -145,10 +145,11 @@ return [
 private function collectionRate()
 {
 
+   
 
 $payments = collect(
     $this->payments->byDate(
-        now()->startOfMonth(),
+        now()->now()->startOfMonth()->format('Y-m-d'),
         now()->endOfMonth()
     )
 );
@@ -156,7 +157,6 @@ $payments = collect(
 
 
 $amountCollected = $payments->sum('PayAmt');
-
 $production =
 $this->production()['mtd'];
 
