@@ -15,38 +15,31 @@ class PatientDataTableTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        app()->instance(PatientService::class, new class {
-            public function all(): array
-            {
-                return [[
-                    'PatNum' => 1,
-                    'FName' => 'Ada',
-                    'LName' => 'Lovelace',
-                    'WirelessPhone' => '123',
-                    'Email' => 'ada@example.com',
-                    'Birthdate' => '2001-01-01',
-                    'Address' => '1 Main',
-                    'Address2' => '',
-                    'City' => 'Detroit',
-                    'Zip' => '48201',
-                    'State' => 'MI',
-                ]];
-            }
-        });
+        $patientsMock = $this->createMock(PatientService::class);
+        $patientsMock->method('all')->willReturn([
+            [
+                'PatNum' => 1,
+                'FName' => 'Ada',
+                'LName' => 'Lovelace',
+                'WirelessPhone' => '123',
+                'Email' => 'ada@example.com',
+                'Birthdate' => '2001-01-01',
+                'Address' => '1 Main',
+                'Address2' => '',
+                'City' => 'Detroit',
+                'Zip' => '48201',
+                'State' => 'MI',
+            ]
+        ]);
+        app()->instance(PatientService::class, $patientsMock);
 
-        app()->instance(AppointmentService::class, new class {
-            public function all(): array
-            {
-                return [];
-            }
-        });
+        $appointmentsMock = $this->createMock(AppointmentService::class);
+        $appointmentsMock->method('all')->willReturn([]);
+        app()->instance(AppointmentService::class, $appointmentsMock);
 
-        app()->instance(ProcedureService::class, new class {
-            public function all(): array
-            {
-                return [];
-            }
-        });
+        $proceduresMock = $this->createMock(ProcedureService::class);
+        $proceduresMock->method('all')->willReturn([]);
+        app()->instance(ProcedureService::class, $proceduresMock);
 
         $response = $this->getJson(route('patients.data'));
 

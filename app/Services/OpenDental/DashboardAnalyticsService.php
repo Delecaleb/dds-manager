@@ -3,284 +3,288 @@
 namespace App\Services\OpenDental;
 
 
-use Carbon\Carbon;
 use App\Services\OpenDental\ProcedureService;
 use App\Services\OpenDental\PaymentService;
-use App\Services\OpenDental\TreatmentPlanService;
-use Illuminate\Support\Facades\Log;
-
 
 
 class DashboardAnalyticsService
 {
 
 
-public function __construct(
+    public function __construct(
 
-    protected ProcedureService $procedures,
+        protected ProcedureService $procedures,
 
-    protected PaymentService $payments,
+        protected PaymentService $payments
 
-    protected TreatmentPlanService $treatments
+    ) {
+    }
 
-){}
 
 
 
+    public function metrics()
+    {
 
-public function metrics()
-{
 
+        return [
 
-return [
+            "production" =>
+                $this->production(),
 
 
-    "production" =>
-        $this->production(),
+            "collection" =>
+                $this->collectionRate(),
 
 
+            "patients" =>
+                $this->patientMetrics(),
 
-    "collection" =>
-        $this->collectionRate(),
 
+            "aging" =>
+                $this->aging()
 
 
-    "treatment_acceptance" =>
-        $this->treatmentAcceptance(),
+        ];
 
 
+    }
 
-    "aging" =>
-        $this->aging()
 
-];
 
 
-}
+    /*
+    |--------------------------------------------------------------------------
+    | Production MTD
+    |--------------------------------------------------------------------------
+    */
 
 
+    private function production()
+    {
 
 
+        $start = now()
+            ->startOfMonth()
+            ->format('Y-m-d');
 
-/*
-|--------------------------------------------------------------------------
-| Gross Production MTD
-|--------------------------------------------------------------------------
-*/
 
+        $end = now()
+            ->format('Y-m-d');
 
-private function production()
-{
 
 
-$start = now()
-    ->startOfMonth()
-    ->format('Y-m-d');
+        $procedures = collect(
 
+            $this->procedures
+                ->byDate($start, $end)
 
-$end = now()
-    ->endOfMonth()
-    ->format('Y-m-d');
+        );
 
 
-Log::info("Fetching procedures from OpenDental API for date range: {$start} to {$end}");
-$procedures = collect(
-    $this->procedures
-    ->byDate($start,$end)
-);
 
+        $gross = $procedures
 
+            ->filter(function ($item) {
 
-$total = $procedures
+                return $item['ProcStatus'] == "Complete";
 
-->filter(function($proc){
+            })
 
-    return $proc['ProcStatus']=="C";
+            ->sum('ProcFee');
 
-})
 
-->sum('ProcFee');
 
+        return [
 
 
+            "gross" =>
+                round($gross, 2),
 
-return [
 
 
-    "mtd" =>
-        floatval($total),
+            "net" =>
 
+                // temporary
+                // until adjustments API/query is available
 
+                round($gross, 2)
 
-    "target" =>
-        150000,
 
+        ];
 
 
-    "percentage" =>
-        round(
-            ($total / 150000) * 100,
-            1
-        )
+    }
 
 
-];
 
 
-}
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | Collection Rate
+    |--------------------------------------------------------------------------
+    */
 
 
+    private function collectionRate()
+    {
 
 
 
-/*
-|--------------------------------------------------------------------------
-| Net Collection Rate
-|--------------------------------------------------------------------------
-*/
+        $start =
+            now()
+                ->startOfMonth()
+                ->format('Y-m-d');
 
 
-private function collectionRate()
-{
+        $end =
+            now()
+                ->format('Y-m-d');
 
-   
 
-$payments = collect(
-    $this->payments->byDate(
-        now()->now()->startOfMonth()->format('Y-m-d'),
-        now()->endOfMonth()
-    )
-);
 
+        $payments = collect(
 
+            $this->payments
+                ->byDate($start, $end)
 
-$amountCollected = $payments->sum('PayAmt');
-$production =
-$this->production()['mtd'];
+        );
 
 
 
+        $collected =
+            $payments
+                ->sum('PayAmt');
 
-return [
 
 
-"rate" =>
+        $production =
+            $this->production()['gross'];
 
-$production > 0
 
-?
 
-round(
-($amountCollected/$production)*100,
-1
-)
+        return [
 
-:
 
-0
+            "collected" =>
+                round($collected, 2),
 
 
-];
 
+            "rate" =>
 
-}
 
-/*
-|--------------------------------------------------------------------------
-| Treatment Acceptance
-|--------------------------------------------------------------------------
-*/
+                $production > 0
 
+                ?
 
-private function treatmentAcceptance()
-{
+                round(
+                    ($collected / $production) * 100,
+                    1
+                )
 
+                :
 
-$treatments = collect(
-    $this->treatments->all()
-);
+                0
 
 
+        ];
 
-$presented =
-$treatments->sum('Fee');
 
+    }
 
 
-$accepted =
-$treatments
 
-->where(
-    'Status',
-    'Accepted'
-)
 
-->sum('Fee');
 
-return [
+    /*
+    |--------------------------------------------------------------------------
+    | Patient Metrics
+    |--------------------------------------------------------------------------
+    */
 
 
-"rate" =>
+    private function patientMetrics()
+    {
 
-$presented > 0
 
-?
+        $start =
+            now()
+                ->subMonths(24)
+                ->format('Y-m-d');
 
-round(
-($accepted/$presented)*100,
-1
-)
 
-:
 
-0
+        $procedures = collect(
 
+            $this->procedures
+                ->byDate($start, now()->format('Y-m-d'))
 
-];
+        );
 
-}
 
-/*
-|--------------------------------------------------------------------------
-| Aging > 90 Days
-|--------------------------------------------------------------------------
-*/
 
+        $activePatients =
 
-private function aging()
-{
+            $procedures
 
+                ->filter(function ($proc) {
 
-$patients = collect(
-    app(\App\Services\OpenDental\PatientService::class)
-    ->all()
-);
+                    return
+                        $proc['ProcStatus'] == "Complete";
 
+                })
 
+                ->pluck('PatNum')
 
-$total = $patients
+                ->unique()
 
-->filter(function($patient){
+                ->count();
 
 
-return
-isset($patient['Bal_30_60_90'])
-&&
-$patient['Bal_30_60_90'] > 90;
 
+        return [
 
-})
 
-->sum('Bal_30_60_90');
+            "active_patients" =>
+                $activePatients
 
-return [
 
-"over_90" =>
-$total
+        ];
 
-];
+    }
 
-}
+
+
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Aging placeholder
+    |--------------------------------------------------------------------------
+    */
+
+
+    private function aging()
+    {
+
+
+        return [
+
+
+            "over_90" => 0,
+
+
+            "message" =>
+                "Requires ledger/query access"
+
+
+        ];
+
+
+    }
+
+
 }

@@ -22,7 +22,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('patients', [PatientController::class, 'index'])->name('patients.index');
     Route::get('patients/data', [PatientController::class, 'data'])->name('patients.data');
-    
+    Route::get('patients/{id}', [PatientController::class, 'show'])->name('patients.show');
+
     Route::get('eod', function () {
         return view('eod.index');
     })->name('eod.index');
@@ -41,4 +42,4 @@ Route::middleware('auth')->group(function () {
     })->name('front-office.index');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

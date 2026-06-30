@@ -11,7 +11,13 @@ class AppointmentService
 
     public function __construct(
         protected OpenDentalClient $client
-    ){}
+    ) {
+    }
+
+    public function all()
+    {
+        return $this->client->get('appointments');
+    }
 
 
 
@@ -35,14 +41,14 @@ class AppointmentService
             now()->addHours(12),
 
 
-            function() use ($start,$end){
+            function () use ($start, $end) {
 
-            Log::info("Fetching appointments from OpenDental API for date range: {$start} to {$end}");
+                Log::info("Fetching appointments from OpenDental API for date range: {$start} to {$end}");
                 return $this->client->get(
                     'appointments',
                     [
-                        'dateStart'=>$start,
-                        'dateEnd'=>$end
+                        'dateStart' => $start,
+                        'dateEnd' => $end
                     ]
                 );
 

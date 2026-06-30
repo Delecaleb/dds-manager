@@ -17,22 +17,22 @@ class OpenDentalClient
     public function get($endpoint, $params = [])
     {
         return Http::withHeaders([
-            'Authorization' => 
+            'Authorization' =>
                 'ODFHIR '
-                .config('opendental.developer_key')
-                .'/'
-                .config('opendental.customer_key'),
+                . config('opendental.developer_key')
+                . '/'
+                . config('opendental.customer_key'),
 
-            'Content-Type'=>'application/json'
+            'Content-Type' => 'application/json'
 
         ])
-        ->timeout(30)
-        ->get(
-            $this->baseUrl.'/'.$endpoint,
-            $params
-        )
-        ->throw()
-        ->json();
+            ->timeout(60)
+            ->get(
+                $this->baseUrl . '/' . $endpoint,
+                $params
+            )
+            ->throw()
+            ->json();
     }
 
 
@@ -41,20 +41,20 @@ class OpenDentalClient
     {
 
         return Http::withHeaders([
-            'Authorization'=>'ODFHIR '
-                .config('opendental.developer_key')
-                .'/'
-                .config('opendental.customer_key'),
+            'Authorization' => 'ODFHIR '
+                . config('opendental.developer_key')
+                . '/'
+                . config('opendental.customer_key'),
 
-            'Content-Type'=>'application/json'
+            'Content-Type' => 'application/json'
 
         ])
-        ->post(
-            $this->baseUrl.'/'.$endpoint,
-            $data
-        )
-        ->throw()
-        ->json();
+            ->post(
+                $this->baseUrl . '/' . $endpoint,
+                $data
+            )
+            ->throw()
+            ->json();
 
     }
 }
