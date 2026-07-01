@@ -500,7 +500,7 @@
                         <p class="text-xs font-bold text-slate-800 mb-4">Accounts Receivable Summary</p>
                         {{-- Summary stats --}}
                         <div class="border border-slate-200 rounded-lg p-4 mb-4">
-                            <div class="grid grid-cols-7 gap-3 text-xs" id="card-grid">
+                            <div class="grid grid-cols-7 gap-3 text-xs" id="ar-card-grid">
                                 <div>
                                     <p class="text-slate-400 mb-0.5">Total</p>
                                     <p class="font-bold text-slate-800" id="ar-total">$ 0</p>
@@ -677,6 +677,7 @@
     </style>
 
     <script>
+        const baseUrl = "{{ url('') }}";
         let table;
         let currentPatientId = null;
 
@@ -798,7 +799,7 @@
                 $("#exportModal").addClass('hidden'); // Hide popup interface immediately
 
                 $.ajax({
-                    url: '/patients/export',
+                    url: baseUrl + '/patients/export',
                     method: 'POST',
                     data: {
                         _token: "{{csrf_token()}}",
@@ -823,8 +824,16 @@
             $('#patientModalName').text('Loading...');
             $('#patientAvatar').text('…');
 
+            // Reset lazy-loaded tabs so stale data from a previous patient never shows
+            $('#pm-family-body').html('<tr><td colspan="6" class="p-4 text-center text-slate-400">No Data</td></tr>');
+            $('#pm-employer-name').text('—');
+            ['ar-total','ar-insurance','ar-estimated','ar-current','ar-30','ar-60','ar-90'].forEach(function(id){
+                $('#' + id).text('$ 0');
+            });
+            $('#pm-ar-body').html('<tr><td colspan="5" class="p-4 text-center text-slate-400">No Data</td></tr>');
+
             $.ajax({
-                url: '/patients/' + id,
+                url: baseUrl + '/patients/' + id,
                 type: 'GET',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 success: function (p) {
@@ -884,27 +893,6 @@
                     $('#ov-apt-broken-pct').text((broken.percent || '0.00') + '%');
                     $('#ov-apt-broken-cnt').text(broken.count || 0);
 
-                    // ---- Family Tab ----
-                    const family = p.family || [];
-                    if (family.length > 0) {
-                        let rows = '';
-                        family.forEach(function (m) {
-                            rows += `<tr class="border-t border-slate-100">
-                                <td class="p-3">${m.name || '—'}</td>
-                                <td class="p-3">${m.status || '—'}</td>
-                                <td class="p-3">${m.gender || '—'}</td>
-                                <td class="p-3">${m.last_visit || '—'}</td>
-                                <td class="p-3">${m.next_visit || '—'}</td>
-                                <td class="p-3">${m.hygiene_due || '—'}</td>
-                            </tr>`;
-                        });
-                        $('#pm-family-body').html(rows);
-                    } else {
-                        $('#pm-family-body').html('<tr><td colspan="6" class="p-4 text-center text-slate-400">No Data</td></tr>');
-                    }
-
-                    // ---- Employer Tab ----
-                    $('#pm-employer-name').text(p.employer || 'No employer information available.');
 
                     // ---- Ledger Tab ----
                     const ledger = p.ledger || [];
@@ -924,33 +912,6 @@
                         $('#pm-ledger-body').html(rows);
                     } else {
                         $('#pm-ledger-body').html('<tr><td colspan="7" class="p-4 text-center text-slate-400">No Data</td></tr>');
-                    }
-
-                    // ---- AR Summary Tab ----
-                    const ar = p.ar || {};
-                    $('#ar-total').text(ar.total || '$ 0.00');
-                    $('#ar-insurance').text(ar.insurance || '$ 0.00');
-                    $('#ar-estimated').text(ar.estimated || '$ 0.00');
-                    $('#ar-current').text(ar.current || '$ 0.00');
-                    $('#ar-30').text(ar.thirty || '$ 0.00');
-                    $('#ar-60').text(ar.sixty || '$ 0.00');
-                    $('#ar-90').text(ar.ninety || '$ 0.00');
-
-                    const arTx = ar.transactions || [];
-                    if (arTx.length > 0) {
-                        let rows = '';
-                        arTx.forEach(function (itm) {
-                            rows += `<tr class="border-t border-slate-100 hover:bg-slate-50/50">
-                                <td class="p-3 text-slate-500">${itm.description || '—'}</td>
-                                <td class="p-3 font-medium">${itm.code || '—'}</td>
-                                <td class="p-3 font-semibold">${itm.amount || '—'}</td>
-                                <td class="p-3">${itm.provider || '—'}</td>
-                                <td class="p-3 text-slate-500">${itm.date || '—'}</td>
-                            </tr>`;
-                        });
-                        $('#pm-ar-body').html(rows);
-                    } else {
-                        $('#pm-ar-body').html('<tr><td colspan="5" class="p-4 text-center text-slate-400">No Data</td></tr>');
                     }
 
                     // ---- Activities & Notes Tab ----
@@ -977,7 +938,7 @@
 
         function loadPatientTXPlans(patientId) {
             $.ajax({
-                url: '/patients/' + patientId + '/treatment-plans',
+                url: baseUrl + '/patients/' + patientId + '/treatment-plans',
                 type: 'GET',
                 beforeSend: function () {
                     $('#pm-txplans-body').html(txSkeletonRows());
@@ -1020,55 +981,119 @@
             });
         }
 
+        function arCardSkeleton() {
+            return Array(7).fill(0).map(function() {
+                return '<div><div class="h-3 w-14 bg-slate-200 rounded animate-pulse mb-2"></div><div class="h-4 w-20 bg-slate-200 rounded animate-pulse"></div></div>';
+            }).join('');
+        }
+
+        function arTableSkeleton() {
+            let rows = '';
+            for (let i = 0; i < 5; i++) {
+                rows += '<tr class="border-t border-slate-100">';
+                for (let j = 0; j < 5; j++) {
+                    rows += '<td class="p-3"><div class="h-3 ' + (j === 0 ? 'w-28' : 'w-16') + ' bg-slate-200 rounded animate-pulse"></div></td>';
+                }
+                rows += '</tr>';
+            }
+            return rows;
+        }
+
         function loadPatientAR(patientId) {
+            $('#ar-card-grid').html(arCardSkeleton());
+            $('#pm-ar-body').html(arTableSkeleton());
+
             $.ajax({
-                url: '/patients/' + patientId + '/ar',
+                url: baseUrl + '/patients/' + patientId + '/ar',
                 type: 'GET',
-                beforeSend: function () {
-                    $('#pm-ar-body').html(txSkeletonRows());
-                },
-                success: function (data) {
-                    const ar = data || [];
-                    console.log(ar);
-                    if (ar.length > 0) {
-                        $('#ar-total').text(ar.total);
-                        $('#ar-insurance').text(ar.insurance_claims);
-                        $('#ar-estimated').text(ar.estimated_patient);
-                        $('#ar-current').text(ar.current);
-                        $('#ar-30-days').text(ar.thirty_days);
-                        $('#ar-60-days').text(ar.sixty_days);
-                        $('#ar-90-days').text(ar.ninety_days);
+                success: function (ar) {
+                    $('#ar-card-grid').html(`
+                        <div><p class="text-slate-400 mb-0.5">Total</p><p class="font-bold text-slate-800" id="ar-total">$ ${ar.total}</p></div>
+                        <div><p class="text-slate-400 mb-0.5">Insurance Claims</p><p class="font-bold text-slate-800" id="ar-insurance">$ ${ar.insurance_claims}</p></div>
+                        <div><p class="text-slate-400 mb-0.5">Estimated Patients</p><p class="font-bold text-slate-800" id="ar-estimated">$ ${ar.estimated_patient}</p></div>
+                        <div><p class="text-slate-400 mb-0.5">Current</p><p class="font-bold text-slate-800" id="ar-current">$ ${ar.current}</p></div>
+                        <div><p class="text-slate-400 mb-0.5">30+ Days</p><p class="font-bold text-slate-800" id="ar-30">$ ${ar.thirty_days}</p></div>
+                        <div><p class="text-slate-400 mb-0.5">60+ Days</p><p class="font-bold text-slate-800" id="ar-60">$ ${ar.sixty_days}</p></div>
+                        <div><p class="text-slate-400 mb-0.5">90+ Days</p><p class="font-bold text-slate-800" id="ar-90">$ ${ar.ninety_days}</p></div>
+                    `);
+
+                    const txs = ar.transactions || [];
+                    if (txs.length > 0) {
                         let rows = '';
-                        ar.forEach(function (itm) {
-                            let statusBadge = '';
-                            if (itm.status === 'Completed') {
-                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Completed</span>';
-                            } else if (itm.status === 'Scheduled') {
-                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">Scheduled</span>';
-                            } else {
-                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-600 border border-slate-200">Unscheduled</span>';
-                            }
+                        txs.forEach(function (itm) {
                             rows += `<tr class="border-t border-slate-100 hover:bg-slate-50/50">
-                                <td class="p-3 font-medium">${itm.code || '—'}</td>
                                 <td class="p-3 text-slate-500">${itm.description || '—'}</td>
-                                <td class="p-3 text-center">${itm.tooth || '—'}</td>
-                                <td class="p-3 text-center">${itm.surface || '—'}</td>
+                                <td class="p-3 font-medium">${itm.code || '—'}</td>
                                 <td class="p-3 font-semibold">${itm.amount || '—'}</td>
                                 <td class="p-3">${itm.provider || '—'}</td>
-                                <td class="p-3">${statusBadge}</td>
-                                <td class="p-3 text-slate-500">${itm.date_planned || '—'}</td>
-                                <td class="p-3 text-slate-500">${itm.date_scheduled || '—'}</td>
-                                <td class="p-3 text-slate-500">${itm.date_completed || '—'}</td>
-                                <td class="p-3 text-slate-500">${itm.date_created || '—'}</td>
+                                <td class="p-3 text-slate-500">${itm.date || '—'}</td>
                             </tr>`;
                         });
-                        $('#pm-txplans-body').html(rows);
+                        $('#pm-ar-body').html(rows);
                     } else {
-                        $('#pm-txplans-body').html('<tr><td colspan="11" class="p-4 text-center text-slate-400">No Data</td></tr>');
+                        $('#pm-ar-body').html('<tr><td colspan="5" class="p-4 text-center text-slate-400">No Data</td></tr>');
                     }
                 },
                 error: function () {
-                    $('#pm-txplans-body').html('<tr><td colspan="11" class="p-4 text-center text-slate-400">Failed to load data</td></tr>');
+                    $('#ar-card-grid').html('<p class="text-xs text-slate-400 col-span-7">Failed to load AR data.</p>');
+                    $('#pm-ar-body').html('<tr><td colspan="5" class="p-4 text-center text-slate-400">Failed to load data</td></tr>');
+                }
+            });
+        }
+
+        function loadPatientFamily(patientId) {
+            let skeleton = '';
+            for (let i = 0; i < 3; i++) {
+                skeleton += '<tr class="border-t border-slate-100">';
+                for (let j = 0; j < 6; j++) {
+                    skeleton += '<td class="p-3"><div class="h-3 ' + (j === 0 ? 'w-28' : 'w-16') + ' bg-slate-200 rounded animate-pulse"></div></td>';
+                }
+                skeleton += '</tr>';
+            }
+            $('#pm-family-body').html(skeleton);
+
+            $.ajax({
+                url: baseUrl + '/patients/' + patientId + '/family',
+                type: 'GET',
+                success: function (family) {
+                    if (family.length > 0) {
+                        let rows = '';
+                        family.forEach(function (m) {
+                            rows += `<tr class="border-t border-slate-100 hover:bg-slate-50/50">
+                                <td class="p-3">${m.name || '—'}</td>
+                                <td class="p-3">${m.status || '—'}</td>
+                                <td class="p-3">${m.gender || '—'}</td>
+                                <td class="p-3">${m.last_visit || '—'}</td>
+                                <td class="p-3">${m.next_visit || '—'}</td>
+                                <td class="p-3">${m.hygiene_due || '—'}</td>
+                            </tr>`;
+                        });
+                        $('#pm-family-body').html(rows);
+                    } else {
+                        $('#pm-family-body').html('<tr><td colspan="6" class="p-4 text-center text-slate-400">No Data</td></tr>');
+                    }
+                },
+                error: function () {
+                    $('#pm-family-body').html('<tr><td colspan="6" class="p-4 text-center text-slate-400">Failed to load data</td></tr>');
+                }
+            });
+        }
+
+        function loadPatientEmployer(patientId) {
+            $('#pm-employer-name').html('<div class="h-4 w-40 bg-slate-200 rounded animate-pulse"></div>');
+
+            $.ajax({
+                url: baseUrl + '/patients/' + patientId + '/employer',
+                type: 'GET',
+                success: function (data) {
+                    $('#pm-employer-name').text(data.name || 'No employer information available.');
+                    // Show employment note if present
+                    if (data.note) {
+                        $('#pm-employer-name').after('<p class="text-xs text-slate-500 mt-2">' + data.note + '</p>');
+                    }
+                },
+                error: function () {
+                    $('#pm-employer-name').text('Failed to load employer data.');
                 }
             });
         }
@@ -1093,6 +1118,12 @@
             }
             if (tab === 'pm-ar' && currentPatientId) {
                 loadPatientAR(currentPatientId);
+            }
+            if (tab === 'pm-family' && currentPatientId) {
+                loadPatientFamily(currentPatientId);
+            }
+            if (tab === 'pm-employer' && currentPatientId) {
+                loadPatientEmployer(currentPatientId);
             }
         });
 

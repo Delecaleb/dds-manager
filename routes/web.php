@@ -1,10 +1,12 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\PatientController;
+use App\Http\Controllers\AgingController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PatientController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\FinancialController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return auth()->check()
@@ -25,6 +27,14 @@ Route::middleware('auth')->group(function () {
     Route::get('patients/{id}', [PatientController::class, 'show'])->name('patients.show');
     Route::get('patients/{id}/treatment-plans', [PatientController::class, 'showTreatment']);
     Route::get('patients/{id}/ar', [PatientController::class, 'showArLive']);
+    Route::get('patients/{id}/family', [PatientController::class, 'showFamily']);
+    Route::get('patients/{id}/employer', [PatientController::class, 'showEmployer']);
+    Route::get('aging', [AgingController::class, 'index'])->name('aging.index');
+    Route::get('aging/data', [AgingController::class, 'data'])->name('aging.data');
+    
+    Route::get('financials', [FinancialController::class, 'index'])->name('financials.index');
+    Route::get('financials/data', [FinancialController::class, 'data'])->name('financials.data');
+    
     Route::get('eod', function () {
         return view('eod.index');
     })->name('eod.index');
@@ -36,6 +46,7 @@ Route::middleware('auth')->group(function () {
     })->name('operations.index');
     Route::get('calendar', [CalendarController::class, 'index'])->name('calendar.index');
     Route::get('calendar/data', [CalendarController::class, 'getData'])->name('calendar.data');
+    Route::get('calendar/resources', [CalendarController::class, 'getResources'])->name('calendar.resources');
     Route::get('snapshot', function () {
         return view('snapshot.index');
     })->name('snapshot.index');

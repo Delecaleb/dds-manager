@@ -129,33 +129,6 @@ class PatientController extends Controller
         $scheduledTPFee = floatval($scheduledTP->sum('ProcFee'));
         $unscheduledTPFee = floatval($unscheduledTP->sum('ProcFee'));
 
-        $guarantorId = $patient->Guarantor ?? null;
-        $familyData = [];
-
-        if ($guarantorId) {
-            $familyMembers = OdPatient::where('Guarantor', $guarantorId)->get();
-
-            $familyData = $familyMembers->map(function ($m) use ($provMap, $genderMap, $statusMap, $nowStr) {
-                $mId = $m->PatNum;
-                $mApts = OdAppointment::where('PatNum', $mId)->get();
-                $mNext = $mApts->filter(fn($apt) => ($apt->AptDateTime ?? '') >= $nowStr)->sortBy('AptDateTime')->first();
-                $mLast = $mApts->filter(fn($apt) => ($apt->AptDateTime ?? '') < $nowStr)->sortByDesc('AptDateTime')->first();
-
-                $mGenderRaw = $m->Gender ?? '';
-                $mGender = is_numeric($mGenderRaw) ? ($genderMap[intval($mGenderRaw)] ?? 'Unknown') : ($mGenderRaw ?: 'Unknown');
-                $mStatusRaw = $m->PatStatus ?? '';
-                $mStatus = is_numeric($mStatusRaw) ? ($statusMap[intval($mStatusRaw)] ?? 'Active') : ($mStatusRaw ?: 'Active');
-
-                return [
-                    'name' => ($m->LName ?? '') . ', ' . ($m->FName ?? ''),
-                    'status' => $mStatus,
-                    'gender' => $mGender,
-                    'last_visit' => $mLast ? date('M d, Y', strtotime($mLast->AptDateTime)) : '—',
-                    'next_visit' => $mNext ? date('M d, Y', strtotime($mNext->AptDateTime)) : '—',
-                    'hygiene_due' => $m->DateRecallDue ?? '—',
-                ];
-            })->toArray();
-        }
 
         $ledgerItems = [];
         foreach ($patientProcedures->where('ProcStatus', 'C') as $proc) {
@@ -226,17 +199,6 @@ class PatientController extends Controller
         }
         usort($txplansItems, fn($a, $b) => $b['timestamp'] <=> $a['timestamp']);
 
-        // ---- AR Summary Tab (Static Backups Removed) ----
-        $arTotal = floatval($patient->BalTotal ?? 0);
-        $arInsurance = floatval($patient->InsEst ?? 0);
-        $arEstimated = $arTotal - $arInsurance;
-        $arCurrent = floatval($patient->Bal_0_30 ?? 0);
-        $ar30 = floatval($patient->Bal_31_60 ?? 0);
-        $ar60 = floatval($patient->Bal_61_90 ?? 0);
-        $ar90 = floatval($patient->BalOver90 ?? 0);
-
-        $employerVal = $patient->EmployerNum ?? null;
-        $employer = $employerVal ? "Employer #" . $employerVal : 'No employer information available.';
         $notes = $patient->AddrNote ?? 'No activities or notes available.';
 
         return response()->json([
@@ -287,20 +249,8 @@ class PatientController extends Controller
                     ],
                 ],
             ],
-            'family' => $familyData,
             'ledger' => $ledgerItems,
             'txplans' => $txplansItems,
-            'ar' => [
-                'total' => '$ ' . number_format($arTotal, 2),
-                'insurance' => '$ ' . number_format($arInsurance, 2),
-                'estimated' => '$ ' . number_format($arEstimated, 2),
-                'current' => '$ ' . number_format($arCurrent, 2),
-                'thirty' => '$ ' . number_format($ar30, 2),
-                'sixty' => '$ ' . number_format($ar60, 2),
-                'ninety' => '$ ' . number_format($ar90, 2),
-                'transactions' => [], // Removed as requested; managed live via showArLive
-            ],
-            'employer' => $employer,
             'notes' => $notes,
         ]);
     }
@@ -379,6 +329,65 @@ class PatientController extends Controller
             ->map(fn($item) => collect($item)->except('timestamp')->all());
 
         return response()->json($items);
+    }
+
+    public function showFamily($patientId)
+    {
+        $patient = OdPatient::where('PatNum', $patientId)->first();
+
+        if (!$patient) {
+            return response()->json([], 404);
+        }
+
+        $guarantorId = $patient->Guarantor ?? null;
+
+        if (!$guarantorId) {
+            return response()->json([]);
+        }
+
+        $genderMap = [0 => 'Male', 1 => 'Female', 2 => 'Unknown'];
+        $statusMap = [0 => 'Active', 1 => 'NonPatient', 2 => 'Inactive', 3 => 'Archived', 4 => 'Deceased', 5 => 'Prospective'];
+        $nowStr = now()->format('Y-m-d H:i:s');
+
+        $familyMembers = OdPatient::where('Guarantor', $guarantorId)->get();
+
+        return response()->json($familyMembers->map(function ($m) use ($genderMap, $statusMap, $nowStr) {
+            $mApts = OdAppointment::where('PatNum', $m->PatNum)->get();
+            $mNext = $mApts->filter(fn($apt) => ($apt->AptDateTime ?? '') >= $nowStr)->sortBy('AptDateTime')->first();
+            $mLast = $mApts->filter(fn($apt) => ($apt->AptDateTime ?? '') < $nowStr)->sortByDesc('AptDateTime')->first();
+
+            $mGenderRaw = $m->Gender ?? '';
+            $mGender = is_numeric($mGenderRaw) ? ($genderMap[intval($mGenderRaw)] ?? 'Unknown') : ($mGenderRaw ?: 'Unknown');
+            $mStatusRaw = $m->PatStatus ?? '';
+            $mStatus = is_numeric($mStatusRaw) ? ($statusMap[intval($mStatusRaw)] ?? 'Active') : ($mStatusRaw ?: 'Active');
+
+            return [
+                'name' => ($m->LName ?? '') . ', ' . ($m->FName ?? ''),
+                'status' => $mStatus,
+                'gender' => $mGender,
+                'last_visit' => $mLast ? date('M d, Y', strtotime($mLast->AptDateTime)) : '—',
+                'next_visit' => $mNext ? date('M d, Y', strtotime($mNext->AptDateTime)) : '—',
+                'hygiene_due' => $m->DateRecallDue ?? '—',
+            ];
+        })->values());
+    }
+
+    public function showEmployer($patientId)
+    {
+        $patient = OdPatient::where('PatNum', $patientId)->first();
+
+        if (!$patient) {
+            return response()->json(['name' => null], 404);
+        }
+
+        $employerNum = $patient->EmployerNum ?? null;
+        $employmentNote = $patient->EmploymentNote ?? null;
+
+        return response()->json([
+            'employer_num' => $employerNum,
+            'name' => $employerNum ? 'Employer #' . $employerNum : null,
+            'note' => $employmentNote,
+        ]);
     }
 
     public function showAR($patientId)
