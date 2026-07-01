@@ -1,0 +1,34 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+
+return new class extends Migration
+{
+
+public function up()
+{
+
+Schema::create('referralcliniclink', function(Blueprint $table){
+
+$table->integer('ReferralClinicLinkNum');
+
+$table->integer('ReferralNum');
+
+$table->integer('ClinicNum');
+
+
+
+});
+
+}
+
+
+public function down()
+{
+Schema::dropIfExists('referralcliniclink');
+}
+
+};

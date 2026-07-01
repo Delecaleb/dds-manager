@@ -678,6 +678,7 @@
 
     <script>
         let table;
+        let currentPatientId = null;
 
         $(document).ready(function () {
             table = $('#patientsTable').DataTable({
@@ -813,6 +814,7 @@
 
         // ---- Patient Modal Logic ----
         function openPatient(id) {
+            currentPatientId = id;
             // Reset to Info tab
             activatePmTab('pm-info');
 
@@ -924,38 +926,6 @@
                         $('#pm-ledger-body').html('<tr><td colspan="7" class="p-4 text-center text-slate-400">No Data</td></tr>');
                     }
 
-                    // ---- TX Plans Tab ----
-                    const txplans = p.txplans || [];
-                    if (txplans.length > 0) {
-                        let rows = '';
-                        txplans.forEach(function (itm) {
-                            let statusBadge = '';
-                            if (itm.status === 'Completed') {
-                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Completed</span>';
-                            } else if (itm.status === 'Scheduled') {
-                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">Scheduled</span>';
-                            } else {
-                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-600 border border-slate-200">Unscheduled</span>';
-                            }
-                            rows += `<tr class="border-t border-slate-100 hover:bg-slate-50/50">
-                                <td class="p-3 font-medium">${itm.code || '—'}</td>
-                                <td class="p-3 text-slate-500">${itm.description || '—'}</td>
-                                <td class="p-3 text-center">${itm.tooth || '—'}</td>
-                                <td class="p-3 text-center">${itm.surface || '—'}</td>
-                                <td class="p-3 font-semibold">${itm.amount || '—'}</td>
-                                <td class="p-3">${itm.provider || '—'}</td>
-                                <td class="p-3">${statusBadge}</td>
-                                <td class="p-3 text-slate-500">${itm.planned || '—'}</td>
-                                <td class="p-3 text-slate-500">${itm.scheduled || '—'}</td>
-                                <td class="p-3 text-slate-500">${itm.completed || '—'}</td>
-                                <td class="p-3 text-slate-500">${itm.date_created || '—'}</td>
-                            </tr>`;
-                        });
-                        $('#pm-txplans-body').html(rows);
-                    } else {
-                        $('#pm-txplans-body').html('<tr><td colspan="11" class="p-4 text-center text-slate-400">No Data</td></tr>');
-                    }
-
                     // ---- AR Summary Tab ----
                     const ar = p.ar || {};
                     $('#ar-total').text(ar.total || '$ 0.00');
@@ -992,6 +962,110 @@
             });
         }
 
+        function txSkeletonRows() {
+            let skeleton = '';
+            for (let i = 0; i < 5; i++) {
+                skeleton += `<tr class="border-t border-slate-100">`;
+                for (let j = 0; j < 11; j++) {
+                    const w = j === 1 ? 'w-28' : 'w-14';
+                    skeleton += `<td class="p-3"><div class="h-3 ${w} bg-slate-200 rounded animate-pulse"></div></td>`;
+                }
+                skeleton += `</tr>`;
+            }
+            return skeleton;
+        }
+
+        function loadPatientTXPlans(patientId) {
+            $.ajax({
+                url: '/patients/' + patientId + '/treatment-plans',
+                type: 'GET',
+                beforeSend: function () {
+                    $('#pm-txplans-body').html(txSkeletonRows());
+                },
+                success: function (data) {
+                    const txplans = data || [];
+                    if (txplans.length > 0) {
+                        let rows = '';
+                        txplans.forEach(function (itm) {
+                            let statusBadge = '';
+                            if (itm.status === 'Completed') {
+                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Completed</span>';
+                            } else if (itm.status === 'Scheduled') {
+                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">Scheduled</span>';
+                            } else {
+                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-600 border border-slate-200">Unscheduled</span>';
+                            }
+                            rows += `<tr class="border-t border-slate-100 hover:bg-slate-50/50">
+                                <td class="p-3 font-medium">${itm.code || '—'}</td>
+                                <td class="p-3 text-slate-500">${itm.description || '—'}</td>
+                                <td class="p-3 text-center">${itm.tooth || '—'}</td>
+                                <td class="p-3 text-center">${itm.surface || '—'}</td>
+                                <td class="p-3 font-semibold">${itm.amount || '—'}</td>
+                                <td class="p-3">${itm.provider || '—'}</td>
+                                <td class="p-3">${statusBadge}</td>
+                                <td class="p-3 text-slate-500">${itm.date_planned || '—'}</td>
+                                <td class="p-3 text-slate-500">${itm.date_scheduled || '—'}</td>
+                                <td class="p-3 text-slate-500">${itm.date_completed || '—'}</td>
+                                <td class="p-3 text-slate-500">${itm.date_created || '—'}</td>
+                            </tr>`;
+                        });
+                        $('#pm-txplans-body').html(rows);
+                    } else {
+                        $('#pm-txplans-body').html('<tr><td colspan="11" class="p-4 text-center text-slate-400">No Data</td></tr>');
+                    }
+                },
+                error: function () {
+                    $('#pm-txplans-body').html('<tr><td colspan="11" class="p-4 text-center text-slate-400">Failed to load data</td></tr>');
+                }
+            });
+        }
+
+        function loadPatientAR(patientId) {
+            $.ajax({
+                url: '/patients/' + patientId + '/ar',
+                type: 'GET',
+                beforeSend: function () {
+                    $('#pm-ar-body').html(txSkeletonRows());
+                },
+                success: function (data) {
+                    const ar = data || [];
+                    console.log(ar);
+                    if (ar.length > 0) {
+                        let rows = '';
+                        ar.forEach(function (itm) {
+                            let statusBadge = '';
+                            if (itm.status === 'Completed') {
+                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Completed</span>';
+                            } else if (itm.status === 'Scheduled') {
+                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">Scheduled</span>';
+                            } else {
+                                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-600 border border-slate-200">Unscheduled</span>';
+                            }
+                            rows += `<tr class="border-t border-slate-100 hover:bg-slate-50/50">
+                                <td class="p-3 font-medium">${itm.code || '—'}</td>
+                                <td class="p-3 text-slate-500">${itm.description || '—'}</td>
+                                <td class="p-3 text-center">${itm.tooth || '—'}</td>
+                                <td class="p-3 text-center">${itm.surface || '—'}</td>
+                                <td class="p-3 font-semibold">${itm.amount || '—'}</td>
+                                <td class="p-3">${itm.provider || '—'}</td>
+                                <td class="p-3">${statusBadge}</td>
+                                <td class="p-3 text-slate-500">${itm.date_planned || '—'}</td>
+                                <td class="p-3 text-slate-500">${itm.date_scheduled || '—'}</td>
+                                <td class="p-3 text-slate-500">${itm.date_completed || '—'}</td>
+                                <td class="p-3 text-slate-500">${itm.date_created || '—'}</td>
+                            </tr>`;
+                        });
+                        $('#pm-txplans-body').html(rows);
+                    } else {
+                        $('#pm-txplans-body').html('<tr><td colspan="11" class="p-4 text-center text-slate-400">No Data</td></tr>');
+                    }
+                },
+                error: function () {
+                    $('#pm-txplans-body').html('<tr><td colspan="11" class="p-4 text-center text-slate-400">Failed to load data</td></tr>');
+                }
+            });
+        }
+
         function activatePmTab(tabId) {
             // Reset all tabs
             $('.pm-tab').removeClass('border-emerald-500 text-slate-900').addClass('border-transparent text-slate-400');
@@ -1004,7 +1078,15 @@
 
         // Tab switching
         $('#patientTabNav').on('click', '.pm-tab', function () {
-            activatePmTab($(this).data('tab'));
+            const tab = $(this).data('tab');
+            activatePmTab(tab);
+
+            if (tab === 'pm-txplans' && currentPatientId) {
+                loadPatientTXPlans(currentPatientId);
+            }
+            if (tab === 'pm-ar' && currentPatientId) {
+                loadPatientAR(currentPatientId);
+            }
         });
 
         // Close modal

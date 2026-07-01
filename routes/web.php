@@ -23,7 +23,8 @@ Route::middleware('auth')->group(function () {
     Route::get('patients', [PatientController::class, 'index'])->name('patients.index');
     Route::get('patients/data', [PatientController::class, 'data'])->name('patients.data');
     Route::get('patients/{id}', [PatientController::class, 'show'])->name('patients.show');
-
+    Route::get('patients/{id}/treatment-plans', [PatientController::class, 'showTreatment']);
+    Route::get('patients/{id}/ar', [PatientController::class, 'showAR']);
     Route::get('eod', function () {
         return view('eod.index');
     })->name('eod.index');
@@ -34,6 +35,7 @@ Route::middleware('auth')->group(function () {
         return view('operations.index');
     })->name('operations.index');
     Route::get('calendar', [CalendarController::class, 'index'])->name('calendar.index');
+    Route::get('calendar/data', [CalendarController::class, 'getData'])->name('calendar.data');
     Route::get('snapshot', function () {
         return view('snapshot.index');
     })->name('snapshot.index');

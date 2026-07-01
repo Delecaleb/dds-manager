@@ -10,7 +10,8 @@ class TreatmentPlanService
 
     public function __construct(
         protected OpenDentalClient $client
-    ){}
+    ) {
+    }
 
 
 
@@ -31,17 +32,42 @@ class TreatmentPlanService
 
     }
 
-
-
     public function find($id)
     {
 
         return $this->client->get(
-            "treatplans/$id"
+            "treatplans",
+            [
+                'PatNum' => $id
+            ]
         );
 
     }
 
+    public function active()
+    {
+        return $this->client->get(
+
+            'treatplans',
+
+            [
+                'TPStatus' => 'Active'
+            ]
+
+        );
+    }
+
+    public function attach($id)
+    {
+        return $this->client->get(
+
+            'treatplanattaches',
+
+            [
+                'TreatPlanNum' => $id
+            ]
+        );
+    }
 
 
 }

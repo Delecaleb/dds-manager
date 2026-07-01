@@ -26,7 +26,11 @@ class OpenDentalClient
             'Content-Type' => 'application/json'
 
         ])
-            ->timeout(60)
+            ->timeout(600)
+            ->retry(
+                3,
+                1000
+            )
             ->get(
                 $this->baseUrl . '/' . $endpoint,
                 $params
