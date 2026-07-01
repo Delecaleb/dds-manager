@@ -500,7 +500,7 @@
                         <p class="text-xs font-bold text-slate-800 mb-4">Accounts Receivable Summary</p>
                         {{-- Summary stats --}}
                         <div class="border border-slate-200 rounded-lg p-4 mb-4">
-                            <div class="grid grid-cols-7 gap-3 text-xs">
+                            <div class="grid grid-cols-7 gap-3 text-xs" id="card-grid">
                                 <div>
                                     <p class="text-slate-400 mb-0.5">Total</p>
                                     <p class="font-bold text-slate-800" id="ar-total">$ 0</p>
@@ -1031,6 +1031,13 @@
                     const ar = data || [];
                     console.log(ar);
                     if (ar.length > 0) {
+                        $('#ar-total').text(ar.total);
+                        $('#ar-insurance').text(ar.insurance_claims);
+                        $('#ar-estimated').text(ar.estimated_patient);
+                        $('#ar-current').text(ar.current);
+                        $('#ar-30-days').text(ar.thirty_days);
+                        $('#ar-60-days').text(ar.sixty_days);
+                        $('#ar-90-days').text(ar.ninety_days);
                         let rows = '';
                         ar.forEach(function (itm) {
                             let statusBadge = '';

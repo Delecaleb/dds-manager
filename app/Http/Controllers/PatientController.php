@@ -10,58 +10,22 @@ use App\Models\OdProcedureLog;
 use App\Models\OdProvider;
 use App\Models\OdTreatmentPlanAttachments;
 use App\Models\TreatmentPlan;
+use App\Services\OpenDental\AccountModuleService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 
 class PatientController extends Controller
 {
+    public function __construct(
+        protected AccountModuleService $ar
+    ) {
+    }
+
     public function index()
     {
         return view('patients.index');
     }
 
-    // public function data()
-    // {
-    //     $query = OdPatient::query()
-    //         ->select('od_patients.*')
-    //         ->selectSub(function ($q) {
-    //             $q->from('od_appointments')
-    //                 ->selectRaw('MIN(AptDateTime)')
-    //                 ->whereColumn('od_appointments.PatNum', 'od_patients.PatNum');
-    //         }, 'first_visit')
-    //         ->selectSub(function ($q) {
-    //             $q->from('od_appointments')
-    //                 ->selectRaw('MAX(AptDateTime)')
-    //                 ->whereColumn('od_appointments.PatNum', 'od_patients.PatNum');
-    //         }, 'last_visit')
-    //         ->selectSub(function ($q) {
-    //             $q->from('od_procedure_logs')
-    //                 ->selectRaw('COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0)')
-    //                 ->whereColumn('od_procedure_logs.PatNum', 'od_patients.PatNum');
-    //         }, 'lifetime_production');
-
-    //     return DataTables::eloquent($query)
-    //         ->addColumn('id', fn($patient) => $patient->PatNum)
-    //         ->addColumn('patient_id', fn($patient) => $patient->PatNum)
-    //         ->addColumn('name', fn($patient) => trim(($patient->LName ?? '') . ' ' . ($patient->FName ?? '')))
-    //         ->addColumn('phone', fn($patient) => $patient->WirelessPhone ?? '')
-    //         ->addColumn('email', fn($patient) => $patient->Email ?? '')
-    //         ->addColumn('birthdate', fn($patient) => $patient->Birthdate ?? '')
-    //         ->addColumn('city', fn($patient) => $patient->City ?? '')
-    //         ->addColumn('state', fn($patient) => $patient->State ?? '')
-    //         ->filterColumn('name', function ($query, $keyword) {
-    //             $query->where(function ($q) use ($keyword) {
-    //                 $q->where('LName', 'like', "%{$keyword}%")
-    //                     ->orWhere('FName', 'like', "%{$keyword}%")
-    //                     ->orWhereRaw("CONCAT(LName, ' ', FName) like ?", ["%{$keyword}%"]);
-    //             });
-    //         })
-    //         ->orderColumn('name', fn($query, $order) => $query->orderBy('LName', $order)->orderBy('FName', $order))
-    //         ->orderColumn('first_visit', fn($query, $order) => $query->orderBy('first_visit', $order))
-    //         ->orderColumn('last_visit', fn($query, $order) => $query->orderBy('last_visit', $order))
-    //         ->orderColumn('lifetime_production', fn($query, $order) => $query->orderBy('lifetime_production', $order))
-    //         ->make(true);
-    // }
     public function data()
     {
         $query = OdPatient::query()
@@ -91,8 +55,6 @@ class PatientController extends Controller
             ->addColumn('birthdate', fn($patient) => $patient->Birthdate ?? '')
             ->addColumn('city', fn($patient) => $patient->City ?? '')
             ->addColumn('state', fn($patient) => $patient->State ?? '')
-
-            // 1. Keep your custom name filter
             ->filterColumn('name', function ($query, $keyword) {
                 $query->where(function ($q) use ($keyword) {
                     $q->where('LName', 'like', "%{$keyword}%")
@@ -100,28 +62,24 @@ class PatientController extends Controller
                         ->orWhereRaw("CONCAT(LName, ' ', FName) like ?", ["%{$keyword}%"]);
                 });
             })
-
-            // 2. FIX: Tell DataTables to ignore subqueries during global search
             ->filterColumn('first_visit', fn($query, $keyword) => null)
             ->filterColumn('last_visit', fn($query, $keyword) => null)
             ->filterColumn('lifetime_production', fn($query, $keyword) => null)
-
             ->orderColumn('name', fn($query, $order) => $query->orderBy('LName', $order)->orderBy('FName', $order))
             ->orderColumn('first_visit', fn($query, $order) => $query->orderBy('first_visit', $order))
             ->orderColumn('last_visit', fn($query, $order) => $query->orderBy('last_visit', $order))
             ->orderColumn('lifetime_production', fn($query, $order) => $query->orderBy('lifetime_production', $order))
             ->make(true);
     }
+
     public function show($id)
     {
-        // ---- Load patient from DB ----
         $patient = OdPatient::where('PatNum', $id)->first();
 
         if (!$patient) {
             return response()->json(['error' => 'Patient not found'], 404);
         }
 
-        // ---- Age & Birthdate ----
         $dobStr = $patient->Birthdate ?? null;
         $age = 'N/A';
         $birthdateFormatted = 'N/A';
@@ -140,12 +98,10 @@ class PatientController extends Controller
         $statusRaw = $patient->PatStatus ?? '';
         $status = is_numeric($statusRaw) ? ($statusMap[intval($statusRaw)] ?? 'Active') : ($statusRaw ?: 'Active');
 
-        // ---- Load related data from DB ----
         $patientAppointments = OdAppointment::where('PatNum', $id)->get();
         $patientProcedures = OdProcedureLog::where('PatNum', $id)->get();
         $provMap = OdProvider::all()->pluck('LName', 'ProvNum')->toArray();
 
-        // ---- Next & Last Appointment ----
         $nowStr = now()->format('Y-m-d H:i:s');
 
         $nextApt = $patientAppointments
@@ -173,7 +129,6 @@ class PatientController extends Controller
         $scheduledTPFee = floatval($scheduledTP->sum('ProcFee'));
         $unscheduledTPFee = floatval($unscheduledTP->sum('ProcFee'));
 
-        // ---- Family Tab ----
         $guarantorId = $patient->Guarantor ?? null;
         $familyData = [];
 
@@ -202,7 +157,6 @@ class PatientController extends Controller
             })->toArray();
         }
 
-        // ---- Ledger Tab ----
         $ledgerItems = [];
         foreach ($patientProcedures->where('ProcStatus', 'C') as $proc) {
             $provNum = $proc->ProvNum ?? null;
@@ -219,10 +173,8 @@ class PatientController extends Controller
             ];
         }
 
-        // Payments are not yet in local DB — placeholder
         usort($ledgerItems, fn($a, $b) => $b['timestamp'] <=> $a['timestamp']);
 
-        // ---- TX Plans Tab ----
         $txplansItems = [];
         foreach ($patientProcedures as $proc) {
             $provNum = $proc->ProvNum ?? null;
@@ -274,7 +226,7 @@ class PatientController extends Controller
         }
         usort($txplansItems, fn($a, $b) => $b['timestamp'] <=> $a['timestamp']);
 
-        // ---- AR Summary Tab ----
+        // ---- AR Summary Tab (Static Backups Removed) ----
         $arTotal = floatval($patient->BalTotal ?? 0);
         $arInsurance = floatval($patient->InsEst ?? 0);
         $arEstimated = $arTotal - $arInsurance;
@@ -283,23 +235,6 @@ class PatientController extends Controller
         $ar60 = floatval($patient->Bal_61_90 ?? 0);
         $ar90 = floatval($patient->BalOver90 ?? 0);
 
-        $arTransactions = [];
-        foreach ($patientProcedures->where('ProcStatus', 'C') as $proc) {
-            if (floatval($proc->ProcFee ?? 0) <= 0) {
-                continue;
-            }
-            $provNum = $proc->ProvNum ?? null;
-            $provName = $provNum && isset($provMap[$provNum]) ? $provMap[$provNum] : '—';
-            $arTransactions[] = [
-                'description' => $proc->Descript ?? 'Procedure',
-                'code' => $proc->ProcCode ?? ($proc->OldCode ?? '—'),
-                'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
-                'provider' => $provName,
-                'date' => isset($proc->ProcDate) ? date('M d, Y', strtotime($proc->ProcDate)) : '—',
-            ];
-        }
-
-        // ---- Employer & Notes ----
         $employerVal = $patient->EmployerNum ?? null;
         $employer = $employerVal ? "Employer #" . $employerVal : 'No employer information available.';
         $notes = $patient->AddrNote ?? 'No activities or notes available.';
@@ -363,7 +298,7 @@ class PatientController extends Controller
                 'thirty' => '$ ' . number_format($ar30, 2),
                 'sixty' => '$ ' . number_format($ar60, 2),
                 'ninety' => '$ ' . number_format($ar90, 2),
-                'transactions' => $arTransactions,
+                'transactions' => [], // Removed as requested; managed live via showArLive
             ],
             'employer' => $employer,
             'notes' => $notes,
@@ -453,61 +388,65 @@ class PatientController extends Controller
         if (!$ar) {
             return response()->json([
                 'total' => 0,
-
                 'insurance_claims' => 0,
-
                 'estimated_patient' => 0,
-
-
                 'aging' => [
-
                     'current' => 0,
-
                     '30_days' => 0,
-
                     '60_days' => 0,
-
                     '90_days' => 0,
-
                 ]
             ], 201);
         }
 
+        return response()->json([
+            'total' => number_format($ar->Total ?? 0, 2),
+            'insurance_claims' => number_format($ar->InsEst ?? 0, 2),
+            'estimated_patient' => number_format($ar->EstBal ?? 0, 2),
+            'aging' => [
+                'current' => number_format($ar->Bal_0_30 ?? 0, 2),
+                '30_days' => number_format($ar->Bal_31_60 ?? 0, 2),
+                '60_days' => number_format($ar->Bal_61_90 ?? 0, 2),
+                '90_days' => number_format($ar->BalOver90 ?? 0, 2),
+            ]
+        ]);
+    }
+
+    public function showArLive($patientId)
+    {
+        // Fetch Live Aging Array from Service
+        $ar = $this->ar->aging($patientId);
+
+        // Fetch Live completed transactions for the sub-log
+        $patientProcedures = OdProcedureLog::where('PatNum', $patientId)->where('ProcStatus', 'C')->get();
+        $provMap = OdProvider::all()->pluck('LName', 'ProvNum')->toArray();
+
+        $arTransactions = [];
+        foreach ($patientProcedures as $proc) {
+            if (floatval($proc->ProcFee ?? 0) <= 0) {
+                continue;
+            }
+            $provNum = $proc->ProvNum ?? null;
+            $provName = $provNum && isset($provMap[$provNum]) ? $provMap[$provNum] : '—';
+
+            $arTransactions[] = [
+                'description' => $proc->Descript ?? 'Procedure',
+                'code' => $proc->ProcCode ?? ($proc->OldCode ?? '—'),
+                'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
+                'provider' => $provName,
+                'date' => isset($proc->ProcDate) ? date('M d, Y', strtotime($proc->ProcDate)) : '—',
+            ];
+        }
 
         return response()->json([
-
-            'total' => number_format($ar->Total ?? 0, 2),
-
-            'insurance_claims' => number_format($ar->InsEst ?? 0, 2),
-
-            'estimated_patient' => number_format($ar->EstBal ?? 0, 2),
-
-
-            'aging' => [
-
-                'current' => number_format(
-                    $ar->Bal_0_30 ?? 0,
-                    2
-                ),
-
-                '30_days' => number_format(
-                    $ar->Bal_31_60 ?? 0,
-                    2
-                ),
-
-                '60_days' => number_format(
-                    $ar->Bal_61_90 ?? 0,
-                    2
-                ),
-
-                '90_days' => number_format(
-                    $ar->BalOver90 ?? 0,
-                    2
-                ),
-
-            ]
-
+            'total' => number_format($ar['Total'] ?? 0, 2),
+            'insurance_claims' => number_format($ar['InsEst'] ?? 0, 2),
+            'estimated_patient' => number_format($ar['EstBal'] ?? 0, 2),
+            'current' => number_format($ar['Bal_0_30'] ?? 0, 2),
+            'thirty_days' => number_format($ar['Bal_31_60'] ?? 0, 2),
+            'sixty_days' => number_format($ar['Bal_61_90'] ?? 0, 2),
+            'ninety_days' => number_format($ar['BalOver90'] ?? 0, 2),
+            'transactions' => $arTransactions
         ]);
-
     }
 }

@@ -24,7 +24,7 @@ Route::middleware('auth')->group(function () {
     Route::get('patients/data', [PatientController::class, 'data'])->name('patients.data');
     Route::get('patients/{id}', [PatientController::class, 'show'])->name('patients.show');
     Route::get('patients/{id}/treatment-plans', [PatientController::class, 'showTreatment']);
-    Route::get('patients/{id}/ar', [PatientController::class, 'showAR']);
+    Route::get('patients/{id}/ar', [PatientController::class, 'showArLive']);
     Route::get('eod', function () {
         return view('eod.index');
     })->name('eod.index');
