@@ -2,63 +2,26 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\OpenDental\FinancialAnalyticsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class FinancialController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    public function __construct(protected FinancialAnalyticsService $analytics) {}
+
     public function index()
     {
-        //
+        return view('financials.index');
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function data(Request $request)
     {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        $start = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $end   = $request->input('end_date',   now()->toDateString());
+        Log::info("FinancialController::data called with start_date={$start} and end_date={$end}");
+        return response()->json(
+            $this->analytics->filterAnalysis($start, $end)
+        );
     }
 }
