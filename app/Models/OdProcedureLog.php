@@ -80,4 +80,35 @@ class OdProcedureLog extends Model
     protected $primaryKey = 'ProcNum';
 
     public $incrementing = false;
+
+    public function patientVisits($start, $end)
+    {
+        return OdProcedureLog::whereBetween('ProcDate', [$start, $end])
+            ->where('ProcStatus', 'C')
+            ->distinct('PatNum')
+            ->count('PatNum');
+    }
+
+    public function newPatientVisits($start, $end)
+    {
+        return OdProcedureLog::select('PatNum')
+            ->selectRaw('MIN(ProcDate) first_visit')
+            ->where('ProcStatus', 'C')
+            ->groupBy('PatNum')
+            ->havingBetween('first_visit', [$start, $end])
+            ->count();
+    }
+
+    public function avgProductionPerPatient($start, $end)
+    {
+        $production = OdProcedureLog::where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end])
+            ->sum('ProcFee');
+
+        $visits = $this->patientVisits($start, $end);
+
+        return $visits
+            ? round($production / $visits, 2)
+            : 0;
+    }
 }

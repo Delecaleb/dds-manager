@@ -2,102 +2,32 @@
 
 namespace App\Services\Sync;
 
-
 use App\Models\OdAdjustment;
-use App\Services\OpenDental\OpenDentalClient;
-use App\Services\OpenDental\PatientService;
 
-
-
-class AdjustmentSyncService
+class AdjustmentSyncService extends BaseQuerySyncService
 {
-
-
-    public function __construct(
-
-        protected OpenDentalClient $client,
-
-        protected PatientService $patients
-
-    ) {
+    protected function table(): string
+    {
+        return 'adjustment';
     }
 
-
-
-    public function sync()
+    protected function model(): string
     {
+        return OdAdjustment::class;
+    }
 
+    protected function primaryKey(): string
+    {
+        return 'AdjNum';
+    }
 
-        $patients = collect(
-            $this->patients->all()
-        );
+    protected function syncMode(): string
+    {
+        return 'timestamp';
+    }
 
-
-
-        foreach ($patients as $patient) {
-
-
-
-            $adjustments = $this->client->get(
-
-                'adjustments',
-
-                [
-
-                    'PatNum' => $patient['PatNum']
-
-                ]
-
-            );
-
-
-
-
-            foreach ($adjustments as $adj) {
-
-
-
-                OdAdjustment::updateOrCreate(
-
-                    [
-                        'AdjNum' => $adj['AdjNum']
-
-                    ],
-
-                    [
-                        'AdjDate' => $adj['AdjDate'],
-
-                        'AdjAmt' => $adj['AdjAmt'],
-
-                        'PatNum' => $adj['PatNum'],
-
-                        'AdjType' => $adj['AdjType'],
-
-                        'ProvNum' => $adj['ProvNum'],
-
-                        'AdjNote' => $adj['AdjNote'],
-
-                        'ProcDate' => $adj['ProcDate'],
-
-                        'ProcNum' => $adj['ProcNum'],
-
-                        'DateEntry' => $adj['DateEntry'],
-
-                        'ClinicNum' => $adj['ClinicNum'],
-
-                        'StatementNum' => $adj['StatementNum'],
-
-                        'SecUserNumEntry' => $adj['SecUserNumEntry'],
-
-                        'SecDateTEdit' => $adj['SecDateTEdit']
-
-                    ]
-
-                );
-
-            }
-
-        }
-
+    protected function syncColumn(): ?string
+    {
+        return 'SecDateEdit';
     }
 }

@@ -13,8 +13,7 @@ class OpenDentalClient
         $this->baseUrl = config('opendental.url');
     }
 
-
-    public function get($endpoint, $params = [])
+    protected function request()
     {
         return Http::withHeaders([
             'Authorization' =>
@@ -22,43 +21,41 @@ class OpenDentalClient
                 . config('opendental.developer_key')
                 . '/'
                 . config('opendental.customer_key'),
-
             'Content-Type' => 'application/json'
-
         ])
-            ->timeout(600)
-            ->retry(
-                3,
-                1000
-            )
-            ->get(
-                $this->baseUrl . '/' . $endpoint,
-                $params
-            )
+            ->baseUrl($this->baseUrl)
+            ->timeout(120);
+    }
+
+    public function get($endpoint, array $params = [])
+    {
+        return $this->request()
+            ->get($endpoint, $params)
             ->throw()
             ->json();
     }
 
-
-
-    public function post($endpoint, $data = [])
+    public function post($endpoint, array $data = [])
     {
-
-        return Http::withHeaders([
-            'Authorization' => 'ODFHIR '
-                . config('opendental.developer_key')
-                . '/'
-                . config('opendental.customer_key'),
-
-            'Content-Type' => 'application/json'
-
-        ])
-            ->post(
-                $this->baseUrl . '/' . $endpoint,
-                $data
-            )
+        return $this->request()
+            ->post($endpoint, $data)
             ->throw()
             ->json();
+    }
 
+    public function put($endpoint, array $data = [])
+    {
+        return $this->request()
+            ->put($endpoint, $data)
+            ->throw()
+            ->json();
+    }
+
+    public function delete($endpoint, array $data = [])
+    {
+        return $this->request()
+            ->delete($endpoint, $data)
+            ->throw()
+            ->json();
     }
 }

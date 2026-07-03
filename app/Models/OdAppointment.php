@@ -48,4 +48,19 @@ class OdAppointment extends Model
     protected $primaryKey = 'AptNum';
 
     public $incrementing = false;
+
+    public function scheduledPatients($start, $end)
+    {
+        return OdAppointment::whereBetween('AptDateTime', [$start, $end])
+            ->distinct('PatNum')
+            ->count('PatNum');
+    }
+
+    public function newPatientsScheduled($start, $end)
+    {
+        return OdAppointment::whereBetween('AptDateTime', [$start, $end])
+            ->where('IsNewPatient', true)
+            ->distinct('PatNum')
+            ->count('PatNum');
+    }
 }

@@ -5,14 +5,44 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
   <style>
-    .flatpickr-day.selected,.flatpickr-day.startRange,.flatpickr-day.endRange,
-    .flatpickr-day.selected:hover,.flatpickr-day.startRange:hover,.flatpickr-day.endRange:hover
-      { background:#059669; border-color:#059669; }
-    .flatpickr-day.inRange
-      { background:#d1fae5; border-color:#d1fae5; box-shadow:-5px 0 0 #d1fae5,5px 0 0 #d1fae5; }
-    .flatpickr-day.today { border-color:#059669; }
-    @keyframes skel-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-    .skel { background:#e5e7eb; border-radius:.375rem; animation:skel-pulse 1.5s ease-in-out infinite; display:inline-block; }
+    .flatpickr-day.selected,
+    .flatpickr-day.startRange,
+    .flatpickr-day.endRange,
+    .flatpickr-day.selected:hover,
+    .flatpickr-day.startRange:hover,
+    .flatpickr-day.endRange:hover {
+      background: #059669;
+      border-color: #059669;
+    }
+
+    .flatpickr-day.inRange {
+      background: #d1fae5;
+      border-color: #d1fae5;
+      box-shadow: -5px 0 0 #d1fae5, 5px 0 0 #d1fae5;
+    }
+
+    .flatpickr-day.today {
+      border-color: #059669;
+    }
+
+    @keyframes skel-pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .4
+      }
+    }
+
+    .skel {
+      background: #e5e7eb;
+      border-radius: .375rem;
+      animation: skel-pulse 1.5s ease-in-out infinite;
+      display: inline-block;
+    }
   </style>
 
   <header class="bg-white border-b border-gray-100 px-8 py-4 flex justify-between items-center">
@@ -26,12 +56,14 @@
       <div class="relative flex items-center border border-gray-300 rounded px-3 py-1.5 bg-white shadow-sm">
         <i class="fa-regular fa-calendar text-gray-400 mr-2 text-sm"></i>
         <input type="text" id="dateRange" readonly placeholder="Select date range&hellip;"
-               class="text-sm bg-white focus:outline-none font-medium text-gray-700 w-52 cursor-pointer">
+          class="text-sm bg-white focus:outline-none font-medium text-gray-700 w-52 cursor-pointer">
       </div>
-      <select class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
+      <select
+        class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
         <option selected>8 Mile</option>
       </select>
-      <button id="updateBtn" class="bg-white border border-emerald-500 text-emerald-600 px-5 py-1.5 rounded text-sm font-semibold hover:bg-emerald-50 transition shadow-sm">
+      <button id="updateBtn"
+        class="bg-white border border-emerald-500 text-emerald-600 px-5 py-1.5 rounded text-sm font-semibold hover:bg-emerald-50 transition shadow-sm">
         Update
       </button>
       <span id="fetchError" class="hidden text-xs text-red-600 font-medium">
@@ -141,7 +173,7 @@
           </div>
         </div>
         <div class="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
-          
+
         </div>
       </div>
 
@@ -158,7 +190,7 @@
           </div>
         </div>
         <div class="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
-          
+
         </div>
       </div>
 
@@ -196,12 +228,29 @@
         </div>
       </div>
 
+      <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-xs flex flex-col justify-between">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-wider text-gray-500">Avg Production / Patient</p>
+            <h4 class="text-3xl font-black text-gray-900 mt-2" id="patient-avg-production">
+              <span class="skel h-8 w-16"></span>
+            </h4>
+          </div>
+          <div class="p-3 bg-gray-50 rounded-lg text-gray-600">
+            <i class="fa-solid fa-dollar-sign text-xl"></i>
+          </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
+          --
+        </div>
+      </div>
+
     </section>
   </main>
 
   <script>
-    const baseUrl      = "{{ url('') }}";
-    const today        = new Date();
+    const baseUrl = "{{ url('') }}";
+    const today = new Date();
     const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
     function fmtDate(d) {
@@ -230,9 +279,12 @@
       $('#adjustment-rate').text(data.adjustment_rate + '%');
       $('#collection-rate').text(data.collection_rate + '%');
       $('#collections-amt').text(fmtMoney(data.collections));
-      if (data.patient_visits         != null) $('#patient-visits').text(data.patient_visits);
-      if (data.patients_scheduled     != null) $('#patients-scheduled').text(data.patients_scheduled);
+
+      if (data.patient_visits != null) $('#patient-visits').text(data.patient_visits);
+      if (data.patient_scheduled != null) $('#patients-scheduled').text(data.patients_scheduled);
       if (data.new_patients_scheduled != null) $('#new-patients-scheduled').text(data.new_patients_scheduled);
+      if (data.new_patient_visit != null) $('#new-patient-visits').text(data.new_patient_visit);
+      if (data.patient_avg_production != null) $('#patient-avg-production').text(fmtMoney(data.patient_avg_production));
     }
 
     function fetchAnalytics(start, end) {
@@ -240,8 +292,8 @@
       $.get(baseUrl + '/financials/data', { start_date: start, end_date: end })
         .done(function (data) { populate(data); })
         .fail(function () {
-          ['#gross-production','#net-production','#adjustment','#collection-rate',
-           '#patient-visits','#patients-scheduled','#new-patients-scheduled']
+          ['#gross-production', '#net-production', '#adjustment', '#collection-rate',
+            '#patient-visits', '#patients-scheduled', '#new-patients-scheduled']
             .forEach(function (id) { $(id).text('--'); });
           $('#adjustment-rate, #collections-amt').text('--');
           $('#fetchError').removeClass('hidden');
