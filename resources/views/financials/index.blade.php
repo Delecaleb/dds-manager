@@ -254,7 +254,12 @@
     const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
     function fmtDate(d) {
-      return d.toISOString().substring(0, 10);
+      // Use local year/month/day — toISOString() converts to UTC and shifts the
+      // date backwards in any timezone behind UTC (e.g. US Eastern = UTC-4/5).
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
     }
     function fmtMoney(v) {
       return '$ ' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -267,7 +272,7 @@
       $('#adjustment-rate').html('<span class="skel h-3 w-14"></span>');
       $('#collection-rate').html('<span class="skel h-8 w-24"></span>');
       $('#collections-amt').html('<span class="skel h-3 w-20"></span>');
-      $('#patient-visits, #patients-scheduled, #new-patients-scheduled')
+      $('#patient-visits, #patients-scheduled, #new-patients-scheduled, #new-patient-visits, #patient-avg-production')
         .html('<span class="skel h-8 w-16"></span>');
       $('#fetchError').addClass('hidden');
     }
@@ -281,7 +286,7 @@
       $('#collections-amt').text(fmtMoney(data.collections));
 
       if (data.patient_visits != null) $('#patient-visits').text(data.patient_visits);
-      if (data.patient_scheduled != null) $('#patients-scheduled').text(data.patients_scheduled);
+      if (data.patient_scheduled != null) $('#patients-scheduled').text(data.patient_scheduled);
       if (data.new_patients_scheduled != null) $('#new-patients-scheduled').text(data.new_patients_scheduled);
       if (data.new_patient_visit != null) $('#new-patient-visits').text(data.new_patient_visit);
       if (data.patient_avg_production != null) $('#patient-avg-production').text(fmtMoney(data.patient_avg_production));
