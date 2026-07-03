@@ -46,6 +46,20 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        //
+        Schema::table('sync_logs', function (Blueprint $table) {
+            $table->dropColumn([
+                'last_primary_key',
+                'total_processed',
+                'retry_count',
+                'status',
+                'last_error',
+                'started_at',
+                'finished_at'
+            ]);
+
+            $table->string('module')->change();
+
+            $table->timestamp('last_synced_at')->change();
+        });
     }
 };

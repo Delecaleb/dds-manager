@@ -50,6 +50,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('adjustments');
+        Schema::dropIfExists('od_adjustments');
     }
 };

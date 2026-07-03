@@ -8,6 +8,13 @@ class SyncLog extends Model
 {
     protected $fillable = [
         'module',
-        'last_synced_at'
+        'last_primary_key',
+        'last_synced_at',
+        'total_processed',
+        'retry_count',
+        'status',
+        'last_error',
+        'started_at',
+        'finished_at'
     ];
 }
