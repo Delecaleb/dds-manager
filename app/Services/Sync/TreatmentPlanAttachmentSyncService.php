@@ -3,52 +3,53 @@
 namespace App\Services\Sync;
 
 use App\Models\OdTreatmentPlanAttachments;
-use App\Models\SyncLog;
-use App\Services\OpenDental\OpenDentalClient;
 
-class TreatmentPlanAttachmentSyncService
+class TreatmentPlanAttachmentSyncService extends BaseQuerySyncService
 {
-    public function __construct(
-        protected OpenDentalClient $client
-    ) {
+    protected function table(): string
+    {
+        return 'treatplanattach';
     }
 
-    public function sync()
+    protected function model(): string
     {
-        $log = SyncLog::firstOrCreate([
-            'module' => 'treatment_plan_attachments'
-        ]);
+        return OdTreatmentPlanAttachments::class;
+    }
 
-        $offset = 0;
-        while (true) {
-            $response = $this->client->get('treatplanattaches', [
-                'Offset' => $offset
-            ]);
+    protected function primaryKey(): string
+    {
+        return 'TreatPlanAttachNum';
+    }
 
-            if (empty($response)) {
-                break;
-            }
+    /**
+     * No incremental sync column exists.
+     */
+    protected function syncColumn(): ?string
+    {
+        return null;
+    }
 
-            foreach ($response as $attach) {
-                OdTreatmentPlanAttachments::updateOrCreate(
-                    ['TreatPlanAttachNum' => $attach['TreatPlanAttachNum']],
-                    [
-                        'TreatPlanNum' => $attach['TreatPlanNum'] ?? null,
-                        'ProcNum' => $attach['ProcNum'] ?? null,
-                        'Priority' => $attach['Priority'] ?? null,
-                    ]
-                );
-            }
+    /**
+     * Pull every column.
+     */
+    protected function select(): string
+    {
+        return '*';
+    }
 
-            if (count($response) < 1000) {
-                break;
-            }
+    /**
+     * Used during full sync.
+     */
+    protected function orderBy(): string
+    {
+        return 'TreatPlanAttachNum';
+    }
 
-            $offset += 1000;
-        }
-
-        $log->update([
-            'last_synced_at' => now()
-        ]);
+    /**
+     * Name used in sync_logs.
+     */
+    protected function module(): string
+    {
+        return 'treatment_plan_attachments';
     }
 }

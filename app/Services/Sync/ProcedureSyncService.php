@@ -3,85 +3,46 @@
 namespace App\Services\Sync;
 
 use App\Models\OdProcedure;
-use App\Models\SyncLog;
-use App\Services\OpenDental\OpenDentalClient;
 
-class ProcedureSyncService
+class ProcedureSyncService extends BaseQuerySyncService
 {
-    public function __construct(
-        protected OpenDentalClient $client
-    ) {
+    protected function table(): string
+    {
+        return 'procedurecode';
     }
 
-    public function sync()
+    protected function model(): string
     {
-        $log = SyncLog::firstOrCreate([
-            'module' => 'procedures'
-        ]);
+        return OdProcedure::class;
+    }
 
-        $offset = 0;
-        while (true) {
-            $response = $this->client->get('procedurecodes', [
-                'Offset' => $offset
-            ]);
+    protected function primaryKey(): string
+    {
+        return 'CodeNum';
+    }
 
-            if (empty($response)) {
-                break;
-            }
+    /**
+     * procedurecode doesn't have SecDateTEdit.
+     * DateTStamp is the closest incremental field.
+     */
+    protected function syncColumn(): ?string
+    {
+        return 'DateTStamp';
+    }
 
-            foreach ($response as $proc) {
-                OdProcedure::updateOrCreate(
-                    ['CodeNum' => $proc['CodeNum']],
-                    [
-                        'ProcCode' => $proc['ProcCode'] ?? null,
-                        'Descript' => $proc['Descript'] ?? null,
-                        'AbbrDesc' => $proc['AbbrDesc'] ?? null,
-                        'ProcTime' => $proc['ProcTime'] ?? null,
-                        'ProcCat' => $proc['ProcCat'] ?? null,
-                        'TreatArea' => $proc['TreatArea'] ?? null,
-                        'NoBillIns' => $proc['NoBillIns'] ?? null,
-                        'IsProsth' => $proc['IsProsth'] ?? null,
-                        'DefaultNote' => $proc['DefaultNote'] ?? null,
-                        'IsHygiene' => $proc['IsHygiene'] ?? null,
-                        'GTypeNum' => $proc['GTypeNum'] ?? null,
-                        'AlternateCode1' => $proc['AlternateCode1'] ?? null,
-                        'MedicalCode' => $proc['MedicalCode'] ?? null,
-                        'IsTaxed' => $proc['IsTaxed'] ?? null,
-                        'PaintType' => $proc['PaintType'] ?? null,
-                        'GraphicColor' => $proc['GraphicColor'] ?? null,
-                        'LaymanTerm' => $proc['LaymanTerm'] ?? null,
-                        'IsCanadianLab' => $proc['IsCanadianLab'] ?? null,
-                        'PreExisting' => $proc['PreExisting'] ?? null,
-                        'BaseUnits' => $proc['BaseUnits'] ?? null,
-                        'SubstitutionCode' => $proc['SubstitutionCode'] ?? null,
-                        'SubstOnlyIf' => $proc['SubstOnlyIf'] ?? null,
-                        'DateTStamp' => $proc['DateTStamp'] ?? null,
-                        'IsMultiVisit' => $proc['IsMultiVisit'] ?? null,
-                        'DrugNDC' => $proc['DrugNDC'] ?? null,
-                        'RevenueCodeDefault' => $proc['RevenueCodeDefault'] ?? null,
-                        'ProvNumDefault' => $proc['ProvNumDefault'] ?? null,
-                        'CanadaTimeUnits' => $proc['CanadaTimeUnits'] ?? null,
-                        'IsRadiology' => $proc['IsRadiology'] ?? null,
-                        'DefaultClaimNote' => $proc['DefaultClaimNote'] ?? null,
-                        'DefaultTPNote' => $proc['DefaultTPNote'] ?? null,
-                        'BypassGlobalLock' => $proc['BypassGlobalLock'] ?? null,
-                        'TaxCode' => $proc['TaxCode'] ?? null,
-                        'PaintText' => $proc['PaintText'] ?? null,
-                        'AreaAlsoToothRange' => $proc['AreaAlsoToothRange'] ?? null,
-                        'DiagnosticCodes' => $proc['DiagnosticCodes'] ?? null,
-                    ]
-                );
-            }
+    /**
+     * Pull all columns.
+     */
+    protected function select(): string
+    {
+        return '*';
+    }
 
-            if (count($response) < 1000) {
-                break;
-            }
-
-            $offset += 1000;
-        }
-
-        $log->update([
-            'last_synced_at' => now()
-        ]);
+    /**
+     * Used during the initial sync.
+     */
+    protected function orderBy(): string
+    {
+        return 'CodeNum';
     }
 }

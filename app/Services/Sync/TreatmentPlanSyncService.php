@@ -3,69 +3,53 @@
 namespace App\Services\Sync;
 
 use App\Models\TreatmentPlan;
-use App\Models\SyncLog;
-use App\Services\OpenDental\OpenDentalClient;
 
-class TreatmentPlanSyncService
+class TreatmentPlanSyncService extends BaseQuerySyncService
 {
-    public function __construct(
-        protected OpenDentalClient $client
-    ) {
+    protected function table(): string
+    {
+        return 'treatplan';
     }
 
-    public function sync()
+    protected function model(): string
     {
-        $log = SyncLog::firstOrCreate([
-            'module' => 'treatment_plans'
-        ]);
+        return TreatmentPlan::class;
+    }
 
-        $offset = 0;
-        while (true) {
-            $response = $this->client->get('treatplans', [
-                'Offset' => $offset
-            ]);
+    protected function primaryKey(): string
+    {
+        return 'TreatPlanNum';
+    }
 
-            if (empty($response)) {
-                break;
-            }
+    /**
+     * Supports incremental sync.
+     */
+    protected function syncColumn(): ?string
+    {
+        return 'SecDateTEdit';
+    }
 
-            foreach ($response as $tp) {
-                TreatmentPlan::updateOrCreate(
-                    ['TreatPlanNum' => $tp['TreatPlanNum']],
-                    [
-                        'PatNum' => $tp['PatNum'] ?? null,
-                        'DateTP' => $tp['DateTP'] ?? null,
-                        'Heading' => $tp['Heading'] ?? null,
-                        'Note' => $tp['Note'] ?? null,
-                        'Signature' => $tp['Signature'] ?? null,
-                        'SigIsTopaz' => $tp['SigIsTopaz'] ?? null,
-                        'ResponsParty' => $tp['ResponsParty'] ?? null,
-                        'DocNum' => $tp['DocNum'] ?? null,
-                        'TPStatus' => $tp['TPStatus'] ?? null,
-                        'SecUserNumEntry' => $tp['SecUserNumEntry'] ?? null,
-                        'SecDateEntry' => $tp['SecDateEntry'] ?? null,
-                        'SecDateTEdit' => $tp['SecDateTEdit'] ?? null,
-                        'UserNumPresenter' => $tp['UserNumPresenter'] ?? null,
-                        'TPType' => $tp['TPType'] ?? null,
-                        'SignaturePractice' => $tp['SignaturePractice'] ?? null,
-                        'DateTSigned' => $tp['DateTSigned'] ?? null,
-                        'DateTPracticeSigned' => $tp['DateTPracticeSigned'] ?? null,
-                        'SignatureText' => $tp['SignatureText'] ?? null,
-                        'SignaturePracticeText' => $tp['SignaturePracticeText'] ?? null,
-                        'MobileAppDeviceNum' => $tp['MobileAppDeviceNum'] ?? null,
-                    ]
-                );
-            }
+    /**
+     * Pull every column.
+     */
+    protected function select(): string
+    {
+        return '*';
+    }
 
-            if (count($response) < 1000) {
-                break;
-            }
+    /**
+     * Used during the initial full sync.
+     */
+    protected function orderBy(): string
+    {
+        return 'TreatPlanNum';
+    }
 
-            $offset += 1000;
-        }
-
-        $log->update([
-            'last_synced_at' => now()
-        ]);
+    /**
+     * Module name stored in sync_logs.
+     */
+    protected function module(): string
+    {
+        return 'treatment_plans';
     }
 }
