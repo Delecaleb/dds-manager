@@ -41,6 +41,11 @@
                                 @if(request()->routeIs('dashboard')) aria-current="page" @endif>
                                 <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
                             </a>
+                            <a href="{{ route('kpis.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('kpis.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('kpis.*')) aria-current="page" @endif>
+                                <i data-lucide="bar-chart-2" class="w-4 h-4"></i> KPIs
+                            </a>
                             <a href="{{ route('calendar.index') }}"
                                 class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('calendar.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
                                 @if(request()->routeIs('calendar.index')) aria-current="page" @endif>
@@ -91,6 +96,11 @@
                                 @if(request()->routeIs('financials.index')) aria-current="page" @endif>
                                 <i data-lucide="dollar-sign" class="w-4 h-4"></i> Financials
                             </a>
+                            <a href="{{ route('deposits.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('deposits.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('deposits.index')) aria-current="page" @endif>
+                                <i data-lucide="file-check-2" class="w-4 h-4"></i> Deposit Slip
+                        </a>
                             <span
                                 class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
                                 <i data-lucide="refresh-cw" class="w-4 h-4"></i> Hygiene Recall
@@ -101,10 +111,7 @@
                     <div>
                         <nav class="space-y-0.5">
                             
-                            <span
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
-                                <i data-lucide="file-check-2" class="w-4 h-4"></i> Deposit Slip
-                            </span>
+                            
                             <span
                                 class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
                                 <i data-lucide="hourglass" class="w-4 h-4"></i> Aging
@@ -118,10 +125,11 @@
 
                     <div>
                         <nav class="space-y-0.5">
-                            <span
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
+                            <a href="{{ route('provider-portal.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('provider-portal.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('provider-portal.*')) aria-current="page" @endif>
                                 <i data-lucide="stethoscope" class="w-4 h-4"></i> Provider Portal
-                            </span>
+                            </a>
                             <span
                                 class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
                                 <i data-lucide="server-cog" class="w-4 h-4"></i> Provisioner

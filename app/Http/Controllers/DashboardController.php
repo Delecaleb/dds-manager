@@ -2,24 +2,254 @@
 
 namespace App\Http\Controllers;
 
-
-use App\Services\OpenDental\DashboardAnalyticsService;
-
-
+use App\Services\OpenDental\FinancialAnalyticsService;
+use App\Services\OpenDental\PatientAnalyticsService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
+    private array $clinicNames = [
+        0 => '8 Mile',
+    ];
 
+    public function index()
+    {
+        return view('dashboard');
+    }
 
-public function index(
-    DashboardAnalyticsService $dashboard
-)
-{
+    public function data(Request $request, FinancialAnalyticsService $financial, PatientAnalyticsService $patients)
+    {
+        $start = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $end   = $request->input('end_date',   now()->toDateString());
 
+        return response()->json(array_merge(
+            $financial->filterAnalysis($start, $end),
+            $patients->getPatientAnalytics($start, $end)
+        ));
+    }
 
-return view('dashboard', ['data'=>$dashboard->metrics()]);
+    public function locationStats(Request $request)
+    {
+        $start = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $end   = $request->input('end_date',   now()->toDateString());
 
-}
+        $rows = DB::table('od_procedure_logs')
+            ->select(
+                'ClinicNum',
+                DB::raw('SUM(ProcFee) AS total_production'),
+                DB::raw('COUNT(DISTINCT PatNum) AS patient_count')
+            )
+            ->where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end])
+            ->groupBy('ClinicNum')
+            ->orderByDesc('total_production')
+            ->get();
 
+        return response()->json(
+            $rows->map(function ($row, $i) {
+                $avg = $row->patient_count > 0
+                    ? round($row->total_production / $row->patient_count, 2)
+                    : 0;
+                return [
+                    'rank'             => $i + 1,
+                    'clinic_num'       => $row->ClinicNum,
+                    'location'         => $this->clinicNames[(int) $row->ClinicNum] ?? 'Location ' . $row->ClinicNum,
+                    'total_production' => round($row->total_production, 2),
+                    'patient_count'    => $row->patient_count,
+                    'avg_production'   => $avg,
+                ];
+            })->values()
+        );
+    }
 
+    public function providerDetails(Request $request, $id)
+    {
+        $start = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $end   = $request->input('end_date',   now()->toDateString());
+
+        $provider = DB::table('od_providers')->where('ProvNum', $id)->first();
+        if (!$provider) {
+            return response()->json(['error' => 'Provider not found'], 404);
+        }
+
+        $specialtyMap = [
+            0 => 'General', 1 => 'Endodontics', 2 => 'Orthodontics',
+            3 => 'Periodontics', 4 => 'Prosthetics', 5 => 'Surgery',
+            6 => 'Pediatric', 7 => 'Denturist', 8 => 'Hygienist',
+            268 => 'Invisalign',
+        ];
+
+        /* ── Aggregate stats ─────────────────────────── */
+        $gross = DB::table('od_procedure_logs')
+            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end])->sum('ProcFee');
+
+        $adjustments = DB::table('od_adjustments')
+            ->where('ProvNum', $id)->whereBetween('AdjDate', [$start, $end])->sum('AdjAmt');
+
+        $writeoffs = DB::table('od_claim_procs')
+            ->where('ProvNum', $id)->whereBetween('ProcDate', [$start, $end])->sum('WriteOff');
+
+        $net = $gross - abs($adjustments) - abs($writeoffs);
+
+        $patientVisits = DB::table('od_procedure_logs')
+            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end])
+            ->distinct('PatNum')->count('PatNum');
+
+        $newPatientVisits = DB::table('od_procedure_logs')
+            ->select('PatNum', DB::raw('MIN(ProcDate) as first_visit'))
+            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->groupBy('PatNum')
+            ->havingBetween('first_visit', [$start, $end])
+            ->count();
+
+        // Avg per work-day (days this provider had completed procedures)
+        $workDays = DB::table('od_procedure_logs')
+            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end])
+            ->distinct('ProcDate')->count('ProcDate');
+
+        $avgPerDay = $workDays > 0 ? round($net / $workDays, 2) : 0;
+        $perVisit  = $patientVisits > 0 ? round($net / $patientVisits, 2) : 0;
+
+        // TX accepted: completed / all (any status) procedures in range
+        $txTotal     = DB::table('od_procedure_logs')
+            ->where('ProvNum', $id)->whereBetween('ProcDate', [$start, $end])->count();
+        $txCompleted = DB::table('od_procedure_logs')
+            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end])->count();
+        $txRate = $txTotal > 0 ? round($txCompleted / $txTotal * 100, 2) : 0;
+
+        /* ── Daily production ────────────────────────── */
+        $dailyProduction = DB::table('od_procedure_logs')
+            ->select(
+                DB::raw("DATE_FORMAT(ProcDate, '%Y-%m-%d') AS date"),
+                DB::raw('SUM(ProcFee) AS production'),
+                DB::raw('COUNT(DISTINCT PatNum) AS patient_count')
+            )
+            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end])
+            ->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m-%d')"))
+            ->orderBy('date')->get()
+            ->map(fn($r) => [
+                'date'      => $r->date,
+                'production'=> round($r->production, 2),
+                'per_visit' => $r->patient_count > 0 ? round($r->production / $r->patient_count, 2) : 0,
+            ]);
+
+        /* ── Daily visits (with new-patient detection) ── */
+        $dailyVisits = DB::select("
+            SELECT
+                DATE_FORMAT(pl.ProcDate, '%Y-%m-%d') AS date,
+                COUNT(DISTINCT pl.PatNum) AS patient_visits,
+                COUNT(DISTINCT CASE WHEN pl.ProcDate = fv.first_date THEN pl.PatNum END) AS new_patient_visits
+            FROM od_procedure_logs pl
+            LEFT JOIN (
+                SELECT PatNum, MIN(ProcDate) AS first_date
+                FROM od_procedure_logs
+                WHERE ProcStatus = 'C'
+                GROUP BY PatNum
+            ) fv ON pl.PatNum = fv.PatNum
+            WHERE pl.ProvNum = ? AND pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ?
+            GROUP BY DATE_FORMAT(pl.ProcDate, '%Y-%m-%d')
+            ORDER BY date
+        ", [$id, $start, $end]);
+
+        /* ── Daily TX accepted rate ──────────────────── */
+        $dailyTx = DB::table('od_procedure_logs')
+            ->select(
+                DB::raw("DATE_FORMAT(ProcDate, '%Y-%m-%d') AS date"),
+                DB::raw("SUM(CASE WHEN ProcStatus = 'C' THEN 1 ELSE 0 END) AS completed"),
+                DB::raw("COUNT(*) AS total")
+            )
+            ->where('ProvNum', $id)
+            ->whereBetween('ProcDate', [$start, $end])
+            ->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m-%d')"))
+            ->orderBy('date')->get()
+            ->map(fn($r) => [
+                'date' => $r->date,
+                'rate' => $r->total > 0 ? round($r->completed / $r->total * 100, 2) : 0,
+            ]);
+
+        return response()->json([
+            'provider' => [
+                'ProvNum'   => $provider->ProvNum,
+                'LName'     => $provider->LName,
+                'PName'     => $provider->PName,
+                'Abbr'      => $provider->Abbr,
+                'Specialty' => $specialtyMap[(int) $provider->Specialty] ?? 'General Dentistry',
+            ],
+            'stats' => [
+                'net_production'         => round($net, 2),
+                'avg_production_per_day' => $avgPerDay,
+                'production_per_visit'   => $perVisit,
+                'patient_visits'         => $patientVisits,
+                'new_patient_visits'     => $newPatientVisits,
+                'tx_accepted_rate'       => $txRate,
+            ],
+            'daily_production' => $dailyProduction,
+            'daily_visits'     => $dailyVisits,
+            'daily_tx'         => $dailyTx,
+        ]);
+    }
+
+    public function providerPerformance(Request $request)
+    {
+        $start  = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $end    = $request->input('end_date',   now()->toDateString());
+        $search = trim($request->input('search', ''));
+
+        $grossSub = DB::table('od_procedure_logs')
+            ->select('ProvNum', DB::raw('SUM(ProcFee) AS gross'))
+            ->where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end])
+            ->groupBy('ProvNum');
+
+        $adjSub = DB::table('od_adjustments')
+            ->select('ProvNum', DB::raw('SUM(AdjAmt) AS adjustments'))
+            ->whereBetween('AdjDate', [$start, $end])
+            ->groupBy('ProvNum');
+
+        $writeoffSub = DB::table('od_claim_procs')
+            ->select('ProvNum', DB::raw('SUM(WriteOff) AS writeoffs'))
+            ->whereBetween('ProcDate', [$start, $end])
+            ->groupBy('ProvNum');
+
+        $collSub = DB::table('od_pay_splits')
+            ->select('ProvNum', DB::raw('SUM(SplitAmt) AS collections'))
+            ->whereBetween('DatePay', [$start, $end])
+            ->groupBy('ProvNum');
+
+        $providers = DB::table('od_providers as p')
+            ->select(
+                'p.ProvNum',
+                'p.LName',
+                'p.PName',
+                'p.Abbr',
+                DB::raw('COALESCE(g.gross, 0) AS gross_production'),
+                DB::raw('COALESCE(a.adjustments, 0) AS adjustments'),
+                DB::raw('COALESCE(w.writeoffs, 0) AS writeoffs'),
+                DB::raw('COALESCE(c.collections, 0) AS collections'),
+                DB::raw('COALESCE(g.gross, 0) - ABS(COALESCE(a.adjustments, 0)) - ABS(COALESCE(w.writeoffs, 0)) AS net_production')
+            )
+            ->leftJoinSub($grossSub,    'g', 'p.ProvNum', '=', 'g.ProvNum')
+            ->leftJoinSub($adjSub,      'a', 'p.ProvNum', '=', 'a.ProvNum')
+            ->leftJoinSub($writeoffSub, 'w', 'p.ProvNum', '=', 'w.ProvNum')
+            ->leftJoinSub($collSub,     'c', 'p.ProvNum', '=', 'c.ProvNum')
+            ->where('p.IsHidden', 'false')
+            ->whereRaw('COALESCE(g.gross, 0) > 0')
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($q2) use ($search) {
+                    $q2->where('p.LName', 'like', "%{$search}%")
+                       ->orWhere('p.PName', 'like', "%{$search}%")
+                       ->orWhere('p.Abbr',  'like', "%{$search}%");
+                });
+            })
+            ->orderByDesc('gross_production')
+            ->get();
+
+        return response()->json($providers->values());
+    }
 }

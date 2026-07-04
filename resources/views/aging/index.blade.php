@@ -69,44 +69,39 @@
       </div>
 
       <!-- Table -->
-      <div class="w-full overflow-x-auto border border-gray-200 rounded-lg max-h-[600px] overflow-y-auto">
-        <table id="agingTable" class="w-full text-left border-collapse min-w-[1200px]">
-          <thead class="sticky top-0 z-30 bg-gray-100 text-gray-700 text-xs font-bold uppercase tracking-wider shadow-xs border-b border-gray-200">
-            <tr>
-              <th class="sticky left-0 bg-gray-100 px-4 py-3 border-r border-gray-300 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] z-40 text-gray-900 font-extrabold min-w-[180px]">
-                <div class="flex items-center justify-between">
-                  <span>Guarantor</span>
-                  <i class="fa-solid fa-arrows-up-down text-[10px] text-gray-400"></i>
-                </div>
-              </th>
-              <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Guarantor ID</th>
-              <th class="px-4 py-3 border-r border-gray-200 min-w-[240px]">Patient(s)</th>
-              <th class="px-4 py-3 border-r border-gray-200 min-w-[140px]">Patient ID(s)</th>
-              <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Current</th>
-              <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 30</th>
-              <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 60</th>
-              <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 90</th>
-              <th class="px-4 py-3 text-emerald-900 bg-emerald-50 min-w-[110px]">Total</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 text-xs font-medium text-gray-600 bg-white">
-            <!-- DataTables fills this -->
-          </tbody>
-          <tfoot>
-            <tr class="bg-gray-100 font-bold text-gray-900 text-xs">
-              <td class="sticky left-0 bg-gray-100 px-4 py-3.5 border-r border-gray-300 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] z-20 text-right">Total:</td>
-              <td class="border-r border-gray-200"></td>
-              <td class="border-r border-gray-200"></td>
-              <td class="border-r border-gray-200"></td>
-              <td id="foot-current" class="px-4 py-3.5 border-r border-gray-200">—</td>
-              <td id="foot-30"      class="px-4 py-3.5 border-r border-gray-200">—</td>
-              <td id="foot-60"      class="px-4 py-3.5 border-r border-gray-200">—</td>
-              <td id="foot-90"      class="px-4 py-3.5 border-r border-gray-200">—</td>
-              <td id="foot-total"   class="px-4 py-3.5">—</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      <x-data-table id="agingTable" min-width="1200px" max-height="600px">
+        <x-slot:head>
+          <tr>
+            <th class="dt-col-sticky px-4 py-3 text-gray-900 font-extrabold min-w-[180px]">
+              <div class="flex items-center justify-between">
+                <span>Guarantor</span>
+                <i class="fa-solid fa-arrows-up-down text-[10px] text-gray-400"></i>
+              </div>
+            </th>
+            <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Guarantor ID</th>
+            <th class="px-4 py-3 border-r border-gray-200 min-w-[240px]">Patient(s)</th>
+            <th class="px-4 py-3 border-r border-gray-200 min-w-[140px]">Patient ID(s)</th>
+            <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Current</th>
+            <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 30</th>
+            <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 60</th>
+            <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 90</th>
+            <th class="px-4 py-3 text-emerald-900 bg-emerald-50 min-w-[110px]">Total</th>
+          </tr>
+        </x-slot:head>
+        <x-slot:foot>
+          <tr class="bg-gray-50 font-bold text-gray-900 text-xs">
+            <td class="dt-col-sticky bg-gray-50 px-4 py-3.5 border-r border-gray-200 text-right">Total:</td>
+            <td class="border-r border-gray-200"></td>
+            <td class="border-r border-gray-200"></td>
+            <td class="border-r border-gray-200"></td>
+            <td id="foot-current" class="px-4 py-3.5 border-r border-gray-200">—</td>
+            <td id="foot-30"      class="px-4 py-3.5 border-r border-gray-200">—</td>
+            <td id="foot-60"      class="px-4 py-3.5 border-r border-gray-200">—</td>
+            <td id="foot-90"      class="px-4 py-3.5 border-r border-gray-200">—</td>
+            <td id="foot-total"   class="px-4 py-3.5">—</td>
+          </tr>
+        </x-slot:foot>
+      </x-data-table>
 
     </div>
   </main>
@@ -179,14 +174,14 @@
             data: 'guarantor_name',
             render: function (data, type, row) {
               if (type !== 'display') return data;
-              return `<div class="flex items-center justify-between">
-                        <span class="font-bold text-gray-900 sticky left-0">${data}</span>
-                        <button class="text-gray-400 hover:text-emerald-600 ml-1">
-                          <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-                        </button>
-                      </div>`;
+              return '<div class="flex items-center justify-between">'
+                + '<span class="font-bold text-gray-900">' + data + '</span>'
+                + '<button onclick="openPatient(' + row.guarantor_id + ')" class="text-gray-400 hover:text-emerald-500 transition-colors p-1 ml-1">'
+                + '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>'
+                + '</button>'
+                + '</div>';
             },
-            className: 'sticky left-0 bg-white px-4 py-3 border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] z-20',
+            className: 'dt-col-sticky px-4 py-3',
           },
           {
             data: 'guarantor_id',
@@ -253,5 +248,7 @@
 
     });
   </script>
+
+  <x-patient-modal />
 
 </x-app-layout>

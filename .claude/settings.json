@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)",
+      "Bash(php -r 'require '\\\\''c:/xampp/htdocs/dds-manager/vendor/autoload.php'\\\\''; $app = require_once '\\\\''c:/xampp/htdocs/dds-manager/bootstrap/app.php'\\\\''; $app->make\\('\\\\''Illuminate\\\\Contracts\\\\Console\\\\Kernel'\\\\''\\)->bootstrap\\(\\); $cols = DB::select\\('\\\\''SHOW COLUMNS FROM od_adjustments'\\\\''\\); foreach\\($cols as $c\\) echo $c->Field . \"\\\\n\";')",
+      "Bash(php -r 'require '\\\\''c:/xampp/htdocs/dds-manager/vendor/autoload.php'\\\\''; $app = require_once '\\\\''c:/xampp/htdocs/dds-manager/bootstrap/app.php'\\\\''; $app->make\\('\\\\''Illuminate\\\\Contracts\\\\Console\\\\Kernel'\\\\''\\)->bootstrap\\(\\); $cols = DB::select\\('\\\\''SHOW COLUMNS FROM od_pay_splits'\\\\''\\); foreach\\($cols as $c\\) echo $c->Field . \"\\\\n\";')",
+      "Bash(php -r 'require '\\\\''c:/xampp/htdocs/dds-manager/vendor/autoload.php'\\\\''; $app = require_once '\\\\''c:/xampp/htdocs/dds-manager/bootstrap/app.php'\\\\''; $app->make\\('\\\\''Illuminate\\\\Contracts\\\\Console\\\\Kernel'\\\\''\\)->bootstrap\\(\\); echo DB::table\\('\\\\''od_defs'\\\\''\\)->limit\\(1\\)->count\\(\\) ? '\\\\''od_defs exists'\\\\'' : '\\\\''missing'\\\\''; ')",
+      "Bash(php -r 'require '\\\\''c:/xampp/htdocs/dds-manager/vendor/autoload.php'\\\\''; $app = require_once '\\\\''c:/xampp/htdocs/dds-manager/bootstrap/app.php'\\\\''; $app->make\\('\\\\''Illuminate\\\\Contracts\\\\Console\\\\Kernel'\\\\''\\)->bootstrap\\(\\); $tbls = DB::select\\('\\\\''SHOW TABLES'\\\\''\\); foreach\\($tbls as $t\\) { $vals = array_values\\(\\(array\\)$t\\); echo $vals[0] . PHP_EOL; }')"
+    ]
+  }
+}
