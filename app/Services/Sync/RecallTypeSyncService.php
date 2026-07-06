@@ -2,32 +2,32 @@
 
 namespace App\Services\Sync;
 
-use App\Models\OdSchedule;
+use App\Models\OdRecallType;
 
-class ScheduleSyncService extends BaseQuerySyncService
+class RecallTypeSyncService extends BaseQuerySyncService
 {
     protected function table(): string
     {
-        return 'schedule';
+        return 'recalltype';
     }
 
     protected function model(): string
     {
-        return OdSchedule::class;
+        return OdRecallType::class;
     }
 
     protected function primaryKey(): string
     {
-        return 'ScheduleNum';
+        return 'RecallTypeNum';
     }
 
     protected function syncColumn(): ?string
     {
-        return 'DateTStamp';
+        return null;
     }
 
     protected function module(): string
     {
-        return 'schedules';
+        return 'recall_types';
     }
 }

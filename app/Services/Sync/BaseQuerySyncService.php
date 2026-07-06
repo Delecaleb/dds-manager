@@ -54,7 +54,7 @@ abstract class BaseQuerySyncService
 
         try {
 
-            if ($log->last_primary_key === null) {
+            if ($log->last_primary_key === null || $this->syncColumn() === null) {
 
                 $this->runInitialSync($log);
 

@@ -2,32 +2,32 @@
 
 namespace App\Services\Sync;
 
-use App\Models\OdSchedule;
+use App\Models\OdPayPlanCharge;
 
-class ScheduleSyncService extends BaseQuerySyncService
+class PayPlanChargeSyncService extends BaseQuerySyncService
 {
     protected function table(): string
     {
-        return 'schedule';
+        return 'payplancharge';
     }
 
     protected function model(): string
     {
-        return OdSchedule::class;
+        return OdPayPlanCharge::class;
     }
 
     protected function primaryKey(): string
     {
-        return 'ScheduleNum';
+        return 'PayPlanChargeNum';
     }
 
     protected function syncColumn(): ?string
     {
-        return 'DateTStamp';
+        return 'SecDateTEdit';
     }
 
     protected function module(): string
     {
-        return 'schedules';
+        return 'payplancharges';
     }
 }

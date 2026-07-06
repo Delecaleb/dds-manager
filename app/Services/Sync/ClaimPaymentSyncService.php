@@ -2,32 +2,32 @@
 
 namespace App\Services\Sync;
 
-use App\Models\OdSchedule;
+use App\Models\OdClaimPayment;
 
-class ScheduleSyncService extends BaseQuerySyncService
+class ClaimPaymentSyncService extends BaseQuerySyncService
 {
     protected function table(): string
     {
-        return 'schedule';
+        return 'claimpayment';
     }
 
     protected function model(): string
     {
-        return OdSchedule::class;
+        return OdClaimPayment::class;
     }
 
     protected function primaryKey(): string
     {
-        return 'ScheduleNum';
+        return 'ClaimPaymentNum';
     }
 
     protected function syncColumn(): ?string
     {
-        return 'DateTStamp';
+        return 'SecDateTEdit';
     }
 
     protected function module(): string
     {
-        return 'schedules';
+        return 'claimpayments';
     }
 }
