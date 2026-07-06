@@ -59,6 +59,11 @@ class OdPatient extends Model
 
     protected $primaryKey = 'PatNum';
 
+    public function getFullNameAttribute(): string
+    {
+        return trim(($this->FName ?? '') . ' ' . ($this->LName ?? ''));
+    }
+
     public $incrementing = false;
 
 

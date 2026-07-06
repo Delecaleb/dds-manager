@@ -64,4 +64,25 @@ class OdAppointment extends Model
             ->distinct('PatNum')
             ->count('PatNum');
     }
+
+    public function patient()
+    {
+        return $this->belongsTo(OdPatient::class, 'PatNum', 'PatNum');
+    }
+
+    public function provider()
+    {
+        return $this->belongsTo(OdProvider::class, 'ProvNum', 'ProvNum');
+    }
+
+    public function procedureLogs()
+    {
+        return $this->hasMany(OdProcedureLog::class, 'AptNum', 'AptNum');
+    }
+
+    public function getDurationMinutesAttribute(): int
+    {
+        $pattern = $this->Pattern ?? '';
+        return strlen($pattern) > 0 ? strlen($pattern) * 10 : 60;
+    }
 }
