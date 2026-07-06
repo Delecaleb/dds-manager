@@ -28,6 +28,6 @@ class AdjustmentSyncService extends BaseQuerySyncService
 
     protected function syncColumn(): ?string
     {
-        return 'SecDateEdit';
+        return 'SecDateTEdit';
     }
 }

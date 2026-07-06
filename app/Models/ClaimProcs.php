@@ -9,6 +9,9 @@ class ClaimProcs extends Model
 {
     /** @use HasFactory<\Database\Factories\ClaimProcsFactory> */
     use HasFactory;
+
+    protected $table = 'od_claim_procs';
+
     protected $fillable = [
         'ClaimProcNum', 
         'ProcNum', 

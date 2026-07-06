@@ -52,7 +52,7 @@ class OdAppointment extends Model
     public function scheduledPatients($start, $end)
     {
         return OdAppointment::whereBetween('AptDateTime', [$start, $end])
-            ->where("AptStatus", "1")
+            ->where('AptStatus', 'Scheduled')
             ->distinct('PatNum')
             ->count('PatNum');
     }
@@ -60,7 +60,7 @@ class OdAppointment extends Model
     public function newPatientsScheduled($start, $end)
     {
         return OdAppointment::whereBetween('AptDateTime', [$start, $end])
-            ->where('IsNewPatient', true)
+            ->where('IsNewPatient', 'true')
             ->distinct('PatNum')
             ->count('PatNum');
     }

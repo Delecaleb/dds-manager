@@ -73,6 +73,15 @@ Route::middleware('auth')->group(function () {
     Route::get('front-office', function () {
         return view('front-office.index');
     })->name('front-office.index');
+    Route::get('hygiene-recall', function () {
+        return view('hygiene-recall.index');
+    })->name('hygiene-recall.index');
+    Route::get('rcm', function () {
+        return view('rcm.index');
+    })->name('rcm.index');
+    Route::get('provisioner', function () {
+        return view('provisioner.index');
+    })->name('provisioner.index');
 });
 
 require __DIR__ . '/auth.php';
