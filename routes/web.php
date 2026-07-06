@@ -9,6 +9,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\FinancialController;
 use App\Http\Controllers\DepositSlipController;
 use App\Http\Controllers\ProviderPortalController;
+use App\Http\Controllers\TxMinerController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -18,10 +19,10 @@ Route::get('/', function () {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard',      [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/dashboard/data',           [DashboardController::class, 'data'])->name('dashboard.data');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/data', [DashboardController::class, 'data'])->name('dashboard.data');
     Route::get('/dashboard/location-stats', [DashboardController::class, 'locationStats'])->name('dashboard.location-stats');
-    Route::get('/dashboard/providers',      [DashboardController::class, 'providerPerformance'])->name('dashboard.providers');
+    Route::get('/dashboard/providers', [DashboardController::class, 'providerPerformance'])->name('dashboard.providers');
     Route::get('/dashboard/providers/{id}', [DashboardController::class, 'providerDetails'])->name('dashboard.provider-details');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -38,20 +39,20 @@ Route::middleware('auth')->group(function () {
     Route::get('patients/{id}/employer', [PatientController::class, 'showEmployer']);
     Route::get('aging', [AgingController::class, 'index'])->name('aging.index');
     Route::get('aging/data', [AgingController::class, 'data'])->name('aging.data');
-    
-    Route::get('kpis',          [KpisController::class, 'index'])->name('kpis.index');
-    Route::get('kpis/hygiene',  [KpisController::class, 'hygiene'])->name('kpis.hygiene');
-    Route::get('kpis/doctor',   [KpisController::class, 'doctor'])->name('kpis.doctor');
-    Route::get('kpis/office',   [KpisController::class, 'office'])->name('kpis.office');
 
-    Route::get('provider-portal',            [ProviderPortalController::class, 'index'])->name('provider-portal.index');
-    Route::get('provider-portal/providers',  [ProviderPortalController::class, 'providers'])->name('provider-portal.providers');
-    Route::get('provider-portal/chart',      [ProviderPortalController::class, 'chart'])->name('provider-portal.chart');
-    Route::get('provider-portal/table',      [ProviderPortalController::class, 'table'])->name('provider-portal.table');
+    Route::get('kpis', [KpisController::class, 'index'])->name('kpis.index');
+    Route::get('kpis/hygiene', [KpisController::class, 'hygiene'])->name('kpis.hygiene');
+    Route::get('kpis/doctor', [KpisController::class, 'doctor'])->name('kpis.doctor');
+    Route::get('kpis/office', [KpisController::class, 'office'])->name('kpis.office');
 
-    Route::get('financials',            [FinancialController::class, 'index'])->name('financials.index');
-    Route::get('financials/data',       [FinancialController::class, 'data'])->name('financials.data');
-    Route::get('financials/breakdown',   [FinancialController::class, 'breakdown'])->name('financials.breakdown');
+    Route::get('provider-portal', [ProviderPortalController::class, 'index'])->name('provider-portal.index');
+    Route::get('provider-portal/providers', [ProviderPortalController::class, 'providers'])->name('provider-portal.providers');
+    Route::get('provider-portal/chart', [ProviderPortalController::class, 'chart'])->name('provider-portal.chart');
+    Route::get('provider-portal/table', [ProviderPortalController::class, 'table'])->name('provider-portal.table');
+
+    Route::get('financials', [FinancialController::class, 'index'])->name('financials.index');
+    Route::get('financials/data', [FinancialController::class, 'data'])->name('financials.data');
+    Route::get('financials/breakdown', [FinancialController::class, 'breakdown'])->name('financials.breakdown');
     Route::get('financials/score-cards', [FinancialController::class, 'scoreCards'])->name('financials.score-cards');
     Route::get('calendar', [CalendarController::class, 'index'])->name('calendar.index');
     Route::get('calendar/data', [CalendarController::class, 'getData'])->name('calendar.data');
@@ -73,6 +74,9 @@ Route::middleware('auth')->group(function () {
     Route::get('front-office', function () {
         return view('front-office.index');
     })->name('front-office.index');
+
+    Route::get('tx-miner', [TxMinerController::class, 'index'])->name('tx-miner.index');
+    Route::get('tx-miner/data', [TxMinerController::class, 'data'])->name('tx-miner.data');
 });
 
 require __DIR__ . '/auth.php';
