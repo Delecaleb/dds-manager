@@ -86,7 +86,7 @@
                                 @if(request()->routeIs('patients.index')) aria-current="page" @endif>
                                 <i data-lucide="user-square" class="w-4 h-4"></i> Patient Portal
                             </a>
-                            <a  href="{{ route('aging.index') }}"
+                            <a href="{{ route('aging.index') }}"
                                 class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('aging.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
                                 @if(request()->routeIs('aging.index')) aria-current="page" @endif>
                                 <i data-lucide="hourglass" class="w-4 h-4"></i> Aging
@@ -100,18 +100,19 @@
                                 class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('deposits.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
                                 @if(request()->routeIs('deposits.index')) aria-current="page" @endif>
                                 <i data-lucide="file-check-2" class="w-4 h-4"></i> Deposit Slip
-                        </a>
-                            <span
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
+                            </a>
+                            <a href="{{ route('hygiene-recall.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('hygiene-recall.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('hygiene-recall.*')) aria-current="page" @endif>
                                 <i data-lucide="refresh-cw" class="w-4 h-4"></i> Hygiene Recall
-                            </span>
+                            </a>
                         </nav>
                     </div>
 
                     <div>
                         <nav class="space-y-0.5">
-                            
-                            
+
+
                             <span
                                 class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
                                 <i data-lucide="hourglass" class="w-4 h-4"></i> Aging

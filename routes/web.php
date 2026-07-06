@@ -57,6 +57,8 @@ Route::middleware('auth')->group(function () {
     Route::get('calendar', [CalendarController::class, 'index'])->name('calendar.index');
     Route::get('calendar/data', [CalendarController::class, 'getData'])->name('calendar.data');
     Route::get('calendar/resources', [CalendarController::class, 'getResources'])->name('calendar.resources');
+    Route::get('calendar/appointments-details-data', [CalendarController::class, 'appointmentsDetailsData'])->name('calendar.appointments-details-data');
+    Route::get('calendar/appointment-capacity-data', [CalendarController::class, 'appointmentCapacityData'])->name('calendar.appointment-capacity-data');
     Route::get('deposits', [DepositSlipController::class, 'index'])->name('deposits.index');
 
     Route::get('eod', function () {
@@ -77,6 +79,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('tx-miner', [TxMinerController::class, 'index'])->name('tx-miner.index');
     Route::get('tx-miner/data', [TxMinerController::class, 'data'])->name('tx-miner.data');
+
+    Route::get('hygiene-recall', [\App\Http\Controllers\HygieneRecallController::class, 'index'])->name('hygiene-recall.index');
+    Route::get('hygiene-recall/data', [\App\Http\Controllers\HygieneRecallController::class, 'data'])->name('hygiene-recall.data');
 });
 
 require __DIR__ . '/auth.php';

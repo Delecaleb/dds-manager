@@ -55,7 +55,9 @@
         </thead>
         @endif
 
-        <tbody class="divide-y divide-gray-100 text-xs font-medium text-gray-600 bg-white"></tbody>
+        <tbody class="divide-y divide-gray-100 text-xs font-medium text-gray-600 bg-white">
+            {{ $slot }}
+        </tbody>
 
         @if(isset($foot) && $foot->isNotEmpty())
         <tfoot>
