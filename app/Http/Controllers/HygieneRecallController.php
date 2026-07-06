@@ -17,8 +17,8 @@ class HygieneRecallController extends Controller
 
     public function data(Request $request)
     {
-        $start = $request->get('start') ?? '2025-01-01';
-        $end = $request->get('end') ?? '2025-12-31';
+        $start = $request->get('start_date') ?? '2025-01-01';
+        $end = $request->get('end_date') ?? '2025-12-31';
 
         // Fetch active providers
         $providers = OdProvider::where('IsHidden', false)->get();

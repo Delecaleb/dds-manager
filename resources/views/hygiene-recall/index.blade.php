@@ -2,20 +2,11 @@
     {{-- Page Title Header --}}
     <div class="bg-white px-6 py-5 flex items-center justify-between border-b border-slate-200">
         <h1 class="text-3xl font-extrabold text-[#0a1128] tracking-tight">Hygiene Recall</h1>
-        <button
-            class="bg-[#22c55e] hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-full flex items-center gap-2 shadow-sm transition">
-            <svg class="w-5 h-5 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253">
-                </path>
-            </svg>
-            Quick Start Guide
-        </button>
     </div>
 
     {{-- Controls Header --}}
     <div class="bg-white px-6 py-4 flex items-center gap-3 border-b border-slate-200">
-        <x-daterange-picker id="hygieneDateRange" />
+        <x-daterange-picker id="hygieneDateRange" on-apply="refreshHygieneTable" />
 
         <select
             class="h-9 border border-slate-300 rounded shadow-sm px-3 font-medium text-slate-700 text-sm focus:outline-emerald-500 w-48">
@@ -171,8 +162,8 @@
                         data: function (d) {
                             var drp = $('#hygieneDateRange').data('daterangepicker');
                             if (drp) {
-                                d.start = drp.startDate.format('YYYY-MM-DD');
-                                d.end = drp.endDate.format('YYYY-MM-DD');
+                                d.start_date = drp.startDate.format('YYYY-MM-DD');
+                                d.end_date = drp.endDate.format('YYYY-MM-DD');
                             }
                         }
                     },
@@ -222,9 +213,9 @@
                     table.search(this.value).draw();
                 });
 
-                $('#hygieneDateRange').on('apply.daterangepicker', function(ev, picker) {
+                window.refreshHygieneTable = function (start, end) {
                     table.ajax.reload();
-                });
+                };
 
                 $('#refreshBtn').on('click', function () {
                     table.ajax.reload();
