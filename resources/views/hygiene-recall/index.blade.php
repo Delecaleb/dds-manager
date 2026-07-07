@@ -153,7 +153,7 @@
 
     @push('scripts')
         <script>
-            $(document.ready(function () {
+            $(document).ready(function () {
                 let table = $('#hygieneRecallTable').DataTable({
                     processing: true,
                     serverSide: true,

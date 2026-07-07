@@ -74,18 +74,21 @@ Route::middleware('auth')->group(function () {
     Route::get('snapshot', function () {
         return view('snapshot.index');
     })->name('snapshot.index');
-    Route::get('front-office', function () {
-        return view('front-office.index');
-    })->name('front-office.index');
-    Route::get('hygiene-recall', function () {
-        return view('hygiene-recall.index');
-    })->name('hygiene-recall.index');
-    Route::get('rcm', function () {
-        return view('rcm.index');
-    })->name('rcm.index');
-    Route::get('provisioner', function () {
-        return view('provisioner.index');
-    })->name('provisioner.index');
+    Route::get('front-office', [\App\Http\Controllers\FrontOfficeController::class, 'index'])->name('front-office.index');
+    Route::get('front-office/stats', [\App\Http\Controllers\FrontOfficeController::class, 'stats'])->name('front-office.stats');
+    Route::get('front-office/broken-appointments', [\App\Http\Controllers\FrontOfficeController::class, 'brokenAppointments'])->name('front-office.broken-appointments');
+    Route::get('front-office/tasks', [\App\Http\Controllers\FrontOfficeController::class, 'tasks'])->name('front-office.tasks');
+    Route::get('front-office/tasks-data', [\App\Http\Controllers\FrontOfficeController::class, 'tasksData'])->name('front-office.tasks-data');
+    Route::get('front-office/collections', [\App\Http\Controllers\FrontOfficeController::class, 'collections'])->name('front-office.collections');
+    Route::get('front-office/collections-data', [\App\Http\Controllers\FrontOfficeController::class, 'collectionsData'])->name('front-office.collections-data');
+    Route::get('front-office/collections-stats', [\App\Http\Controllers\FrontOfficeController::class, 'collectionsStats'])->name('front-office.collections-stats');
+    Route::get('front-office/kpis', [\App\Http\Controllers\FrontOfficeController::class, 'kpis'])->name('front-office.kpis');
+    Route::get('front-office/kpi-data', [\App\Http\Controllers\FrontOfficeController::class, 'kpiData'])->name('front-office.kpi-data');
+    Route::get('front-office/performance', [\App\Http\Controllers\FrontOfficeController::class, 'performance'])->name('front-office.performance');
+    Route::get('front-office/performance-stats', [\App\Http\Controllers\FrontOfficeController::class, 'performanceStats'])->name('front-office.performance-stats');
+    Route::get('front-office/performance-reminders-data', [\App\Http\Controllers\FrontOfficeController::class, 'performanceRemindersData'])->name('front-office.performance-reminders-data');
+    Route::get('front-office/performance-non-reminders-data', [\App\Http\Controllers\FrontOfficeController::class, 'performanceNonRemindersData'])->name('front-office.performance-non-reminders-data');
+    Route::get('front-office/performance-totals-data', [\App\Http\Controllers\FrontOfficeController::class, 'performanceTotalsData'])->name('front-office.performance-totals-data');
 
     Route::get('tx-miner', [TxMinerController::class, 'index'])->name('tx-miner.index');
     Route::get('tx-miner/data', [TxMinerController::class, 'data'])->name('tx-miner.data');
