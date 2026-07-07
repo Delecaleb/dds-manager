@@ -31,30 +31,67 @@ class PatientController extends Controller
         $query = OdPatient::query()
             ->select('od_patients.*')
             ->selectSub(function ($q) {
+                // Fetch Guarantor Full Name via SubQuery Map securely
+                $q->from('od_patients as gp')
+                    ->selectRaw('CONCAT(LName, ", ", FName)')
+                    ->whereColumn('gp.PatNum', 'od_patients.Guarantor')
+                    ->limit(1);
+            }, 'guarantor_name')
+            ->selectSub(function ($q) {
                 $q->from('od_appointments')
                     ->selectRaw('MIN(AptDateTime)')
                     ->whereColumn('od_appointments.PatNum', 'od_patients.PatNum');
             }, 'first_visit')
             ->selectSub(function ($q) {
-                $q->from('od_appointments')
-                    ->selectRaw('MAX(AptDateTime)')
-                    ->whereColumn('od_appointments.PatNum', 'od_patients.PatNum');
-            }, 'last_visit')
-            ->selectSub(function ($q) {
                 $q->from('od_procedure_logs')
                     ->selectRaw('COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0)')
                     ->whereColumn('od_procedure_logs.PatNum', 'od_patients.PatNum');
-            }, 'lifetime_production');
+            }, 'lifetime_production')
+            ->selectSub(function ($q) {
+                $q->from('od_pay_splits')
+                    ->selectRaw('COALESCE(SUM(CAST(SplitAmt AS DECIMAL(12,2))), 0)')
+                    ->whereColumn('od_pay_splits.PatNum', 'od_patients.PatNum');
+            }, 'lifetime_collection');
 
         return DataTables::eloquent($query)
             ->addColumn('id', fn($patient) => $patient->PatNum)
-            ->addColumn('patient_id', fn($patient) => $patient->PatNum)
             ->addColumn('name', fn($patient) => trim(($patient->LName ?? '') . ' ' . ($patient->FName ?? '')))
-            ->addColumn('phone', fn($patient) => $patient->WirelessPhone ?? '')
-            ->addColumn('email', fn($patient) => $patient->Email ?? '')
-            ->addColumn('birthdate', fn($patient) => $patient->Birthdate ?? '')
+            ->addColumn('patient_id', fn($patient) => $patient->PatNum)
+            ->addColumn('guarantor', fn($patient) => $patient->guarantor_name ?? '')
+            ->addColumn('guarantor_id', fn($patient) => $patient->Guarantor ?? '')
+            ->addColumn('age', function ($patient) {
+                $dobStr = $patient->Birthdate ?? null;
+                if ($dobStr && $dobStr !== '0001-01-01' && date_create($dobStr)) {
+                    return (new \DateTime($dobStr))->diff(new \DateTime())->y;
+                }
+                return 'N/A';
+            })
+            ->addColumn('gender', function ($patient) {
+                $genderMap = [0 => 'Male', 1 => 'Female', 2 => 'Unknown'];
+                $raw = $patient->Gender ?? '';
+                return is_numeric($raw) ? ($genderMap[intval($raw)] ?? 'Unknown') : ($raw ?: 'Unknown');
+            })
+            ->addColumn('address', fn($patient) => trim(($patient->Address ?? '') . ' ' . ($patient->Address2 ?? '')))
             ->addColumn('city', fn($patient) => $patient->City ?? '')
             ->addColumn('state', fn($patient) => $patient->State ?? '')
+            ->addColumn('zip', fn($patient) => $patient->Zip ?? '')
+            ->addColumn('work_phone', fn($patient) => $patient->WkPhone ?? '')
+            ->addColumn('home_phone', fn($patient) => $patient->HmPhone ?? '')
+            ->addColumn('mobile_phone', fn($patient) => $patient->WirelessPhone ?? '')
+            ->addColumn('email', fn($patient) => $patient->Email ?? '')
+            ->addColumn('birthdate', function ($patient) {
+                $dobStr = $patient->Birthdate ?? null;
+                if ($dobStr && $dobStr !== '0001-01-01' && date_create($dobStr)) {
+                    return (new \DateTime($dobStr))->format('M d, Y');
+                }
+                return 'N/A';
+            })
+            ->addColumn('first_visit', function ($patient) {
+                return $patient->first_visit ? date('M d, Y', strtotime($patient->first_visit)) : 'N/A';
+            })
+            ->addColumn('lifetime_value_production', fn($patient) => floatval($patient->lifetime_production))
+            ->addColumn('lifetime_value_collection', fn($patient) => floatval($patient->lifetime_collection))
+            ->addColumn('referral_source', fn($patient) => 'N/A')
             ->filterColumn('name', function ($query, $keyword) {
                 $query->where(function ($q) use ($keyword) {
                     $q->where('LName', 'like', "%{$keyword}%")
@@ -62,13 +99,6 @@ class PatientController extends Controller
                         ->orWhereRaw("CONCAT(LName, ' ', FName) like ?", ["%{$keyword}%"]);
                 });
             })
-            ->filterColumn('first_visit', fn($query, $keyword) => null)
-            ->filterColumn('last_visit', fn($query, $keyword) => null)
-            ->filterColumn('lifetime_production', fn($query, $keyword) => null)
-            ->orderColumn('name', fn($query, $order) => $query->orderBy('LName', $order)->orderBy('FName', $order))
-            ->orderColumn('first_visit', fn($query, $order) => $query->orderBy('first_visit', $order))
-            ->orderColumn('last_visit', fn($query, $order) => $query->orderBy('last_visit', $order))
-            ->orderColumn('lifetime_production', fn($query, $order) => $query->orderBy('lifetime_production', $order))
             ->make(true);
     }
 

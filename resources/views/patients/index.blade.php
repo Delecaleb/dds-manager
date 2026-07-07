@@ -110,36 +110,63 @@
                                         </span>
                                     </div>
                                 </th>
-                                <th class="p-3 min-w-[100px] text-xs font-bold"><span
+                                <th class="p-3 min-w-[100px] text-xs font-bold whitespace-nowrap"><span
                                         class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
                                             class="w-3 h-3 text-slate-400"></i> Patient ID</span></th>
-                                <th class="p-3 min-w-[120px] text-xs font-bold"><span
+                                <th class="p-3 min-w-[150px] text-xs font-bold whitespace-nowrap"><span
                                         class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
-                                            class="w-3 h-3 text-slate-400"></i> Phone</span></th>
-                                <th class="p-3 min-w-[160px] text-xs font-bold"><span
+                                            class="w-3 h-3 text-slate-400"></i> Guarantor</span></th>
+                                <th class="p-3 min-w-[110px] text-xs font-bold whitespace-nowrap"><span
                                         class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
-                                            class="w-3 h-3 text-slate-400"></i> Email</span></th>
-                                <th class="p-3 min-w-[100px] text-xs font-bold"><span
+                                            class="w-3 h-3 text-slate-400"></i> Guarantor ID</span></th>
+                                <th class="p-3 min-w-[70px] text-xs font-bold whitespace-nowrap"><span
                                         class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
-                                            class="w-3 h-3 text-slate-400"></i> Birthdate</span></th>
-                                <th class="p-3 min-w-[120px] text-xs font-bold"><span
+                                            class="w-3 h-3 text-slate-400"></i> Age</span></th>
+                                <th class="p-3 min-w-[90px] text-xs font-bold whitespace-nowrap"><span
+                                        class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
+                                            class="w-3 h-3 text-slate-400"></i> Gender</span></th>
+                                <th class="p-3 min-w-[160px] text-xs font-bold whitespace-nowrap"><span
+                                        class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
+                                            class="w-3 h-3 text-slate-400"></i> Address</span></th>
+                                <th class="p-3 min-w-[120px] text-xs font-bold whitespace-nowrap"><span
                                         class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
                                             class="w-3 h-3 text-slate-400"></i> City</span></th>
-                                <th class="p-3 min-w-[80px] text-xs font-bold"><span
+                                <th class="p-3 min-w-[80px] text-xs font-bold whitespace-nowrap"><span
                                         class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
                                             class="w-3 h-3 text-slate-400"></i> State</span></th>
-                                <th class="p-3 min-w-[120px] text-xs font-bold"><span
+                                <th class="p-3 min-w-[90px] text-xs font-bold whitespace-nowrap"><span
+                                        class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
+                                            class="w-3 h-3 text-slate-400"></i> ZIP</span></th>
+                                <th class="p-3 min-w-[120px] text-xs font-bold whitespace-nowrap"><span
+                                        class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
+                                            class="w-3 h-3 text-slate-400"></i> Work Phone</span></th>
+                                <th class="p-3 min-w-[120px] text-xs font-bold whitespace-nowrap"><span
+                                        class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
+                                            class="w-3 h-3 text-slate-400"></i> Home Phone</span></th>
+                                <th class="p-3 min-w-[120px] text-xs font-bold whitespace-nowrap"><span
+                                        class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
+                                            class="w-3 h-3 text-slate-400"></i> Mobile Phone</span></th>
+                                <th class="p-3 min-w-[160px] text-xs font-bold whitespace-nowrap"><span
+                                        class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
+                                            class="w-3 h-3 text-slate-400"></i> Email</span></th>
+                                <th class="p-3 min-w-[100px] text-xs font-bold whitespace-nowrap"><span
+                                        class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
+                                            class="w-3 h-3 text-slate-400"></i> Birth Date</span></th>
+                                <th class="p-3 min-w-[120px] text-xs font-bold whitespace-nowrap"><span
                                         class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
                                             class="w-3 h-3 text-slate-400"></i> First Visit</span></th>
-                                <th class="p-3 min-w-[120px] text-xs font-bold"><span
+                                <th class="p-3 min-w-[180px] text-xs font-bold whitespace-nowrap"><span
                                         class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
-                                            class="w-3 h-3 text-slate-400"></i> Last Visit</span></th>
-                                <th class="p-3 min-w-[150px] text-xs font-bold"><span
+                                            class="w-3 h-3 text-slate-400"></i> Lifetime Value Production</span></th>
+                                <th class="p-3 min-w-[180px] text-xs font-bold whitespace-nowrap"><span
                                         class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
-                                            class="w-3 h-3 text-slate-400"></i> Lifetime Prod</span></th>
+                                            class="w-3 h-3 text-slate-400"></i> Lifetime Value Collection</span></th>
+                                <th class="p-3 min-w-[140px] text-xs font-bold whitespace-nowrap"><span
+                                        class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down"
+                                            class="w-3 h-3 text-slate-400"></i> Referral Source</span></th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100 text-xs text-slate-700 bg-white">
+                        <tbody class="divide-y divide-slate-100 text-xs text-slate-700 bg-white whitespace-nowrap">
                         </tbody>
                     </table>
                 </div>
@@ -251,6 +278,7 @@
                 columns: [
                     {
                         data: 'name',
+                        name: 'name',
                         render: function (data, type, row) {
                             return `
                         <div class="p-3 bg-white sticky left-0 group-hover:bg-slate-50/80 z-10 border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] flex items-center justify-between">
@@ -265,18 +293,36 @@
                         `;
                         }
                     },
-                    { data: 'id' },
-                    { data: 'phone' },
-                    { data: 'email' },
-                    { data: 'birthdate' },
-                    { data: 'city' },
-                    { data: 'state' },
-                    { data: 'first_visit' },
-                    { data: 'last_visit' },
+                    { data: 'patient_id', name: 'PatNum' },
+                    { data: 'guarantor', name: 'guarantor_name', orderable: false, searchable: false },
+                    { data: 'guarantor_id', name: 'Guarantor' },
+                    { data: 'age', name: 'age', orderable: false, searchable: false },
+                    { data: 'gender', name: 'Gender' },
+                    { data: 'address', name: 'Address' },
+                    { data: 'city', name: 'City' },
+                    { data: 'state', name: 'State' },
+                    { data: 'zip', name: 'Zip' },
+                    { data: 'work_phone', name: 'WkPhone' },
+                    { data: 'home_phone', name: 'HmPhone' },
+                    { data: 'mobile_phone', name: 'WirelessPhone' },
+                    { data: 'email', name: 'Email' },
+                    { data: 'birthdate', name: 'Birthdate' },
+                    { data: 'first_visit', name: 'first_visit', orderable: false, searchable: false },
                     {
-                        data: 'lifetime_production',
-                        render: function (data) { return '$' + Number(data).toLocaleString(); }
-                    }
+                        data: 'lifetime_value_production',
+                        name: 'lifetime_production',
+                        orderable: false,
+                        searchable: false,
+                        render: function (data) { return data ? '$' + Number(data).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'; }
+                    },
+                    {
+                        data: 'lifetime_value_collection',
+                        name: 'lifetime_value_collection',
+                        orderable: false,
+                        searchable: false,
+                        render: function (data) { return data ? '$' + Number(data).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'; }
+                    },
+                    { data: 'referral_source', name: 'referral_source', orderable: false, searchable: false }
                 ],
                 order: [[0, 'asc']],
                 drawCallback: function () {
