@@ -90,6 +90,13 @@ Route::middleware('auth')->group(function () {
     Route::get('front-office/performance-non-reminders-data', [\App\Http\Controllers\FrontOfficeController::class, 'performanceNonRemindersData'])->name('front-office.performance-non-reminders-data');
     Route::get('front-office/performance-totals-data', [\App\Http\Controllers\FrontOfficeController::class, 'performanceTotalsData'])->name('front-office.performance-totals-data');
 
+    Route::get('rcm', function () {
+        return view('rcm.index');
+    })->name('rcm.index');
+    Route::get('provisioner', function () {
+        return view('provisioner.index');
+    })->name('provisioner.index');
+
     Route::get('tx-miner', [TxMinerController::class, 'index'])->name('tx-miner.index');
     Route::get('tx-miner/data', [TxMinerController::class, 'data'])->name('tx-miner.data');
 
