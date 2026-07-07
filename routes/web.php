@@ -8,6 +8,7 @@ use App\Http\Controllers\PatientController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\FinancialController;
 use App\Http\Controllers\DepositSlipController;
+use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\ProviderPortalController;
 use App\Http\Controllers\TxMinerController;
 use Illuminate\Support\Facades\Route;
@@ -67,9 +68,9 @@ Route::middleware('auth')->group(function () {
     Route::get('huddle', function () {
         return view('huddle.index');
     })->name('huddle.index');
-    Route::get('operations', function () {
-        return view('operations.index');
-    })->name('operations.index');
+    Route::get('operations', [OperationsController::class, 'index'])->name('operations.index');
+    Route::get('operations/data/{tab}/{subtab?}', [OperationsController::class, 'data'])->name('operations.data');
+    Route::get('operations/{tab}/{subtab?}', [OperationsController::class, 'index'])->name('operations.tab');
     Route::get('snapshot', function () {
         return view('snapshot.index');
     })->name('snapshot.index');

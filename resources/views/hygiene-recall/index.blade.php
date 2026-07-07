@@ -1,8 +1,4 @@
 <x-app-layout>
-<<<<<<< HEAD
-    <x-coming-soon title="Hygiene Recall" icon="refresh-cw" />
-</x-app-layout>
-=======
     {{-- Page Title Header --}}
     <div class="bg-white px-6 py-5 flex items-center justify-between border-b border-slate-200">
         <h1 class="text-3xl font-extrabold text-[#0a1128] tracking-tight">Hygiene Recall</h1>
@@ -228,4 +224,3 @@
         </script>
     @endpush
 </x-app-layout>
->>>>>>> 5a1236dbe57dc6a925c5b371b98c3c6c04061b14

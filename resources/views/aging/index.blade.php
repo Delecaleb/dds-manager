@@ -81,7 +81,6 @@
         </div>
       </div>
 
-<<<<<<< HEAD
       <!-- Each tab is its own table + its own DataTable instance, lazily
            loaded the first time its tab is selected -- not one shared
            table with a mode filter. -->
@@ -268,42 +267,6 @@
         </div>
 
       </div>
-=======
-      <!-- Table -->
-      <x-data-table id="agingTable" min-width="1200px" max-height="600px">
-        <x-slot:head>
-          <tr>
-            <th class="dt-col-sticky px-4 py-3 text-gray-900 font-extrabold min-w-[180px]">
-              <div class="flex items-center justify-between">
-                <span>Guarantor</span>
-                <i class="fa-solid fa-arrows-up-down text-[10px] text-gray-400"></i>
-              </div>
-            </th>
-            <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Guarantor ID</th>
-            <th class="px-4 py-3 border-r border-gray-200 min-w-[240px]">Patient(s)</th>
-            <th class="px-4 py-3 border-r border-gray-200 min-w-[140px]">Patient ID(s)</th>
-            <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Current</th>
-            <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 30</th>
-            <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 60</th>
-            <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 90</th>
-            <th class="px-4 py-3 text-emerald-900 bg-emerald-50 min-w-[110px]">Total</th>
-          </tr>
-        </x-slot:head>
-        <x-slot:foot>
-          <tr class="bg-gray-50 font-bold text-gray-900 text-xs">
-            <td class="dt-col-sticky bg-gray-50 px-4 py-3.5 border-r border-gray-200 text-right">Total:</td>
-            <td class="border-r border-gray-200"></td>
-            <td class="border-r border-gray-200"></td>
-            <td class="border-r border-gray-200"></td>
-            <td id="foot-current" class="px-4 py-3.5 border-r border-gray-200">—</td>
-            <td id="foot-30" class="px-4 py-3.5 border-r border-gray-200">—</td>
-            <td id="foot-60" class="px-4 py-3.5 border-r border-gray-200">—</td>
-            <td id="foot-90" class="px-4 py-3.5 border-r border-gray-200">—</td>
-            <td id="foot-total" class="px-4 py-3.5">—</td>
-          </tr>
-        </x-slot:foot>
-      </x-data-table>
->>>>>>> 5a1236dbe57dc6a925c5b371b98c3c6c04061b14
 
       <!-- By Office Container -->
       <div id="byOfficeContainer" class="hidden">
@@ -492,18 +455,9 @@
   </main>
 
   <style>
-<<<<<<< HEAD
     /* DataTables pagination styling — applies to every tab's table wrapper */
     #agingTabs .dt-layout-row:last-child { padding: 1rem 0 0; }
     #agingTabs .dt-paging button {
-=======
-    /* DataTables pagination styling */
-    #agingTable_wrapper .dt-layout-row:last-child {
-      padding: 1rem 0 0;
-    }
-
-    #agingTable_wrapper .dt-paging button {
->>>>>>> 5a1236dbe57dc6a925c5b371b98c3c6c04061b14
       border: 1px solid #d1d5db;
       border-radius: 0.375rem;
       padding: 0.25rem 0.625rem;
@@ -514,39 +468,15 @@
       margin: 0 1px;
       line-height: 1.4;
     }
-<<<<<<< HEAD
     #agingTabs .dt-paging button.current {
-=======
-
-    #agingTable_wrapper .dt-paging button.current {
->>>>>>> 5a1236dbe57dc6a925c5b371b98c3c6c04061b14
       background: #059669;
       color: #fff;
       border-color: #059669;
     }
-<<<<<<< HEAD
     #agingTabs .dt-paging button:hover:not(.current) { background: #f9fafb; }
     #agingTabs .dt-info { font-size: 0.75rem; color: #6b7280; }
     #agingTabs .dt-length label { font-size: 0.75rem; color: #6b7280; }
     #agingTabs .dt-length select {
-=======
-
-    #agingTable_wrapper .dt-paging button:hover:not(.current) {
-      background: #f9fafb;
-    }
-
-    #agingTable_wrapper .dt-info {
-      font-size: 0.75rem;
-      color: #6b7280;
-    }
-
-    #agingTable_wrapper .dt-length label {
-      font-size: 0.75rem;
-      color: #6b7280;
-    }
-
-    #agingTable_wrapper .dt-length select {
->>>>>>> 5a1236dbe57dc6a925c5b371b98c3c6c04061b14
       border: 1px solid #d1d5db;
       border-radius: 0.375rem;
       padding: 0.125rem 0.375rem;
@@ -687,7 +617,6 @@
           .removeClass('border-transparent')
           .addClass('border-emerald-500 text-emerald-600 font-bold');
 
-<<<<<<< HEAD
         const mode = $(this).data('tab');
         activeMode = mode;
 
@@ -702,347 +631,6 @@
         } else {
           table.columns.adjust();
         }
-=======
-        agingMode = $(this).data('tab');
-
-        if (agingMode === 'by_office') {
-          $('#agingTable_wrapper').hide();
-          $('#byPatientContainer').addClass('hidden');
-          $('#byInsuranceContainer').addClass('hidden');
-          $('#byOfficeContainer').removeClass('hidden');
-          officeTable.ajax.reload();
-        } else if (agingMode === 'by_patient') {
-          $('#agingTable_wrapper').hide();
-          $('#byOfficeContainer').addClass('hidden');
-          $('#byInsuranceContainer').addClass('hidden');
-          $('#byPatientContainer').removeClass('hidden');
-          patientTable.ajax.reload();
-        } else if (agingMode === 'by_insurance') {
-          $('#agingTable_wrapper').hide();
-          $('#byOfficeContainer').addClass('hidden');
-          $('#byPatientContainer').addClass('hidden');
-          $('#byInsuranceContainer').removeClass('hidden');
-          insuranceTable.ajax.reload();
-        } else {
-          $('#byOfficeContainer').addClass('hidden');
-          $('#byPatientContainer').addClass('hidden');
-          $('#byInsuranceContainer').addClass('hidden');
-          $('#agingTable_wrapper').show();
-          agingTable.ajax.reload();
-        }
-      });
-
-      // ── Office Table Initialization ──────────────────────────────────────────
-      const getValClass = (valStr) => {
-        if (!valStr || valStr === '$ 0.00' || valStr === '$ 0') return 'text-gray-500';
-        if (valStr.includes('(')) return 'text-red-700 font-semibold';
-        return 'text-gray-900 font-semibold'; // or could just be black
-      };
-
-      const renderColorBg = (data, isParent) => {
-        let extra = isParent ? ' bg-red-100' : 'bg-white';
-        return `<div class="w-full h-full p-2.5 ${extra}">${data}</div>`;
-      };
-      const renderColorBgGreen = (data, isParent) => {
-        let extra = isParent ? ' bg-emerald-100' : 'bg-white';
-        return `<div class="w-full h-full p-2.5 ${extra}">${data}</div>`;
-      };
-      const renderColorBgNeutral = (data, isParent) => {
-        let extra = isParent ? ' bg-gray-200' : 'bg-white';
-        return `<div class="w-full h-full p-2.5 ${extra}">${data}</div>`;
-      };
-
-      let officeTable = $('#officeTable').DataTable({
-        processing: true,
-        serverSide: true,
-        paging: true,
-        searching: false,
-        ordering: false,
-        pageLength: 20,
-        lengthMenu: [10, 20, 50, 100],
-        createdRow: function (row, data, dataIndex) {
-          // Apply different styling on parent/child rows for 'by_office'
-          $(row).addClass('text-xs border-b border-gray-200');
-          $(row).find('td').addClass('!p-0 border-r border-gray-200 text-right'); // remove internal padding
-          $(row).find('td:nth-child(1), td:nth-child(2)').removeClass('text-right').addClass('text-left');
-        },
-        ajax: {
-          url: baseUrl + '/aging/data',
-          type: 'GET',
-          data: function (d) {
-            d.search = { value: $('#agingSearch').val() };
-            d.mode = 'by_office';
-          },
-          dataSrc: function (json) {
-            if (json.totals) {
-              $('#office-foot-current').text(json.totals.current);
-              $('#office-foot-30').text(json.totals.thirty);
-              $('#office-foot-60').text(json.totals.sixty);
-              $('#office-foot-90').text(json.totals.ninety);
-              $('#office-foot-120').text(json.totals.one_twenty);
-              $('#office-foot-180').text(json.totals.one_eighty);
-              $('#office-foot-240').text(json.totals.two_forty);
-              $('#office-foot-365').text(json.totals.three_sixty_five);
-              $('#office-foot-credit').text(json.totals.credit);
-              $('#office-foot-contract').text(json.totals.contract);
-              $('#office-foot-total').text(json.totals.total);
-            }
-            return json.data;
-          },
-        },
-        columns: [
-          {
-            data: 'row_number',
-            render: function (data, type, row) {
-              return `<div class="w-full h-full p-2.5 bg-gray-50 flex items-center justify-center">${data || ''}</div>`;
-            },
-            className: 'dt-col-sticky'
-          },
-          {
-            data: 'location_name',
-            render: function (data, type, row) {
-              if (row.is_parent) {
-                return `<div class="w-full h-full p-2.5 bg-gray-50 font-bold flex items-center justify-between">
-                            ${data}
-                            <i class="fa-solid fa-arrow-up-right-from-square text-gray-400 ml-2"></i>
-                          </div>`;
-              }
-              return `<div class="w-full h-full p-1.5 pl-4 bg-white text-gray-600">${data}</div>`;
-            },
-            className: 'dt-col-sticky'
-          },
-          {
-            data: 'bal_current',
-            render: (data, t, row) => renderColorBg(data, row.is_parent)
-          },
-          {
-            data: 'bal_30',
-            render: (data, t, row) => renderColorBg(data, row.is_parent)
-          },
-          {
-            data: 'bal_60',
-            render: (data, t, row) => renderColorBg(data, row.is_parent)
-          },
-          {
-            data: 'bal_90',
-            render: (data, t, row) => renderColorBg(data, row.is_parent)
-          },
-          {
-            data: 'bal_120',
-            render: (data, t, row) => renderColorBg(data, row.is_parent)
-          },
-          {
-            data: 'bal_180',
-            render: (data, t, row) => renderColorBg(data, row.is_parent)
-          },
-          {
-            data: 'bal_240',
-            render: (data, t, row) => renderColorBg(data, row.is_parent)
-          },
-          {
-            data: 'bal_365',
-            render: (data, t, row) => renderColorBgGreen(data, row.is_parent)
-          },
-          {
-            data: 'credit_balance',
-            render: (data, t, row) => renderColorBgNeutral(data, row.is_parent)
-          },
-          {
-            data: 'contract',
-            render: (data, t, row) => renderColorBgGreen(data, row.is_parent)
-          },
-          {
-            data: 'total',
-            render: (data, t, row) => `<div class="w-full h-full p-2.5 font-bold ${row.is_parent ? 'bg-red-200' : 'bg-white'}">${data}</div>`
-          }
-        ]
-      });
-
-      // ── Patient Table Initialization ──────────────────────────────────────────
-      const parseAmount = (valStr) => {
-          if (!valStr) return 0;
-          return parseFloat(valStr.replace(/[^0-9.-]+/g,"")) || 0;
-      };
-
-      const renderTierBg = (data, type, row) => {
-          if (type !== 'display') return data;
-          let val = parseAmount(data);
-          // Zero -> green. Low -> yellow. High -> red. (Mocking tier rendering logic)
-          let bgClass = 'bg-emerald-100'; // bottom tier amounts usually green per requirement/image (actually green means good, low balance is good here maybe)
-          
-          if(data && data.includes('(')) {
-              // credits are often red or green depending on view, let's keep it neutral or light green
-              bgClass = 'bg-emerald-100 text-emerald-800'; 
-          } else {
-              if (val > 0 && val <= 100) bgClass = 'bg-amber-100 text-amber-800';
-              else if (val > 100) bgClass = 'bg-red-100 text-red-800';
-              else bgClass = 'bg-emerald-100 text-emerald-800'; 
-          }
-          
-          // Exception for total block (often red in screenshot for highest balances)
-          return `<div class="w-full h-full p-2.5 ${bgClass} text-xs flex items-center font-medium">${data}</div>`;
-      };
-      
-      const renderTierBgTotal = (data, t, row) => {
-          if (t !== 'display') return data;
-          let val = parseAmount(data);
-          let bgClass = 'bg-red-200 text-red-900';
-          if (val === 0 || data.includes('(')) bgClass = 'bg-emerald-100 text-emerald-800';
-          else if (val <= 100) bgClass = 'bg-amber-200 text-amber-900 text-amber-900';
-          return `<div class="w-full h-full p-2.5 ${bgClass} text-xs flex items-center font-bold">${data}</div>`;
-      };
-
-      let patientTable = $('#patientTable').DataTable({
-        processing: true,
-        serverSide: true,
-        paging: true,
-        searching: false,
-        ordering: false,
-        pageLength: 20,
-        lengthMenu: [10, 20, 50, 100],
-        createdRow: function (row, data, dataIndex) {
-            $(row).addClass('text-xs border-b border-gray-200');
-            $(row).find('td').addClass('!p-0 border-r border-gray-200 text-left');
-        },
-        ajax: {
-          url: baseUrl + '/aging/data',
-          type: 'GET',
-          data: function (d) {
-            d.search = { value: $('#agingSearch').val() };
-            d.mode = 'by_patient';
-          },
-          dataSrc: function (json) {
-            if (json.totals) {
-              $('#patient-foot-current').text(json.totals.current);
-              $('#patient-foot-30').text(json.totals.thirty);
-              $('#patient-foot-60').text(json.totals.sixty);
-              $('#patient-foot-90').text(json.totals.ninety);
-              $('#patient-foot-120').text(json.totals.one_twenty);
-              $('#patient-foot-180').text(json.totals.one_eighty);
-              $('#patient-foot-240').text(json.totals.two_forty);
-              $('#patient-foot-365').text(json.totals.three_sixty_five);
-              $('#patient-foot-credit').text(json.totals.credit);
-              $('#patient-foot-contract').text(json.totals.contract);
-              $('#patient-foot-total').text(json.totals.total);
-            }
-            return json.data;
-          },
-        },
-        columns: [
-          {
-            data: 'guarantor_name',
-            render: function (data, type, row) {
-              if (type !== 'display') return data;
-              return `<div class="w-full h-full p-2.5 bg-white text-gray-700 font-medium flex items-center justify-between">
-                        ${data}
-                        <button onclick="openPatient(${row.patient_id || row.guarantor_id})" class="text-gray-400 hover:text-emerald-500 transition-colors p-1 ml-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
-                        </button>
-                      </div>`;
-            },
-            className: 'dt-col-sticky'
-          },
-          {
-            data: 'guarantor_id',
-            render: (d) => `<div class="w-full h-full p-2.5 bg-white text-gray-500 flex items-center">${d}</div>`,
-            className: 'dt-col-sticky'
-          },
-          { data: 'family_names', render: (d) => `<div class="w-full h-full p-2.5 bg-white text-gray-700 flex items-center">${d}</div>` },
-          { data: 'family_ids', render: (d) => `<div class="w-full h-full p-2.5 bg-white text-gray-500 flex items-center">${d}</div>` },
-          { data: 'office', render: (d) => `<div class="w-full h-full p-2.5 bg-white text-gray-500 flex items-center">${d}</div>` },
-          { data: 'bal_current', render: renderTierBg },
-          { data: 'bal_30', render: renderTierBg },
-          { data: 'bal_60', render: renderTierBg },
-          { data: 'bal_90', render: renderTierBg },
-          { data: 'bal_120', render: renderTierBg },
-          { data: 'bal_180', render: renderTierBg },
-          { data: 'bal_240', render: renderTierBg },
-          { data: 'bal_365', render: renderTierBg },
-          { data: 'credit_balance', render: renderTierBg },
-          { data: 'contract', render: renderTierBg },
-          { data: 'total', render: renderTierBgTotal }
-        ]
-      });
-
-      // ── Insurance Table Initialization ─────────────────────────────────────────
-      let insuranceTable = $('#insuranceTable').DataTable({
-        processing: true,
-        serverSide: true,
-        paging: true,
-        searching: false,
-        ordering: false,
-        pageLength: 20,
-        lengthMenu: [10, 20, 50, 100],
-        createdRow: function (row, data, dataIndex) {
-            $(row).addClass('text-xs border-b border-gray-200');
-            $(row).find('td').addClass('!p-0 border-r border-gray-200 text-left');
-        },
-        ajax: {
-          url: baseUrl + '/aging/data',
-          type: 'GET',
-          data: function (d) {
-            // Using separate search input if needed or standard one
-            d.search = { value: $('#insuranceSearch').val() || $('#agingSearch').val() };
-            d.mode = 'by_insurance';
-          },
-          dataSrc: function (json) {
-            if (json.totals) {
-              $('#insurance-foot-current').text(json.totals.current);
-              $('#insurance-foot-30').text(json.totals.thirty);
-              $('#insurance-foot-60').text(json.totals.sixty);
-              $('#insurance-foot-90').text(json.totals.ninety);
-              $('#insurance-foot-120').text(json.totals.one_twenty);
-              $('#insurance-foot-180').text(json.totals.one_eighty);
-              $('#insurance-foot-240').text(json.totals.two_forty);
-              $('#insurance-foot-365').text(json.totals.three_sixty_five);
-              $('#insurance-foot-credit').text(json.totals.credit);
-              $('#insurance-foot-contract').text(json.totals.contract);
-              $('#insurance-foot-total').text(json.totals.total);
-            }
-            return json.data;
-          },
-        },
-        columns: [
-          {
-            data: 'guarantor_name',
-            render: function (data, type, row) {
-              if (type !== 'display') return data;
-              return `<div class="w-full h-full p-2.5 bg-white text-gray-700 font-medium flex items-center justify-between">
-                        ${data}
-                        <button onclick="openPatient(${row.patient_id || row.guarantor_id})" class="text-gray-400 hover:text-emerald-500 transition-colors p-1 ml-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
-                        </button>
-                      </div>`;
-            },
-            className: 'dt-col-sticky'
-          },
-          {
-            data: 'guarantor_id',
-            render: (d) => `<div class="w-full h-full p-2.5 bg-white text-gray-500 flex items-center">${d}</div>`,
-            className: 'dt-col-sticky'
-          },
-          { data: 'family_names', render: (d) => `<div class="w-full h-full p-2.5 bg-white text-gray-700 flex items-center">${d}</div>` },
-          { data: 'family_ids', render: (d) => `<div class="w-full h-full p-2.5 bg-white text-gray-500 flex items-center">${d}</div>` },
-          { data: 'insurance', render: (d) => `<div class="w-full h-full p-2.5 bg-white text-gray-500 flex items-center">${d}</div>` },
-          { data: 'bal_current', render: renderTierBg },
-          { data: 'bal_30', render: renderTierBg },
-          { data: 'bal_60', render: renderTierBg },
-          { data: 'bal_90', render: renderTierBg },
-          { data: 'bal_120', render: renderTierBg },
-          { data: 'bal_180', render: renderTierBg },
-          { data: 'bal_240', render: renderTierBg },
-          { data: 'bal_365', render: renderTierBg },
-          { data: 'credit_balance', render: renderTierBg },
-          { data: 'contract', render: renderTierBg },
-          { data: 'total', render: renderTierBgTotal }
-        ]
-      });
-      
-      let iSearchTimer;
-      $('#insuranceSearch').on('input', function () {
-        clearTimeout(iSearchTimer);
-        iSearchTimer = setTimeout(() => insuranceTable.ajax.reload(), 400);
->>>>>>> 5a1236dbe57dc6a925c5b371b98c3c6c04061b14
       });
 
     });

@@ -33,7 +33,6 @@
                     </button>
                 </div>
 
-<<<<<<< HEAD
                 <div class="p-3">
                     <nav class="space-y-0.5">
                         <a href="{{ route('aging.index') }}"
@@ -117,112 +116,6 @@
                             <i data-lucide="camera" class="w-4 h-4"></i> Snapshot
                         </a>
                     </nav>
-=======
-                <div class="p-3 space-y-4">
-                    <div>
-                        <nav class="space-y-0.5">
-                            <a href="{{ route('dashboard') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('dashboard') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('dashboard')) aria-current="page" @endif>
-                                <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
-                            </a>
-                            <a href="{{ route('kpis.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('kpis.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('kpis.*')) aria-current="page" @endif>
-                                <i data-lucide="bar-chart-2" class="w-4 h-4"></i> KPIs
-                            </a>
-                            <a href="{{ route('calendar.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('calendar.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('calendar.index')) aria-current="page" @endif>
-                                <i data-lucide="calendar" class="w-4 h-4"></i> Calendar
-                            </a>
-                            <a href="{{ route('huddle.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('huddle.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('huddle.index')) aria-current="page" @endif>
-                                <i data-lucide="users-round" class="w-4 h-4"></i> Morning Huddle
-                            </a>
-                            <a href="{{ route('eod.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('eod.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('eod.index')) aria-current="page" @endif>
-                                <i data-lucide="zap" class="w-4 h-4"></i> EOD Live
-                            </a>
-                            <a href="{{ route('operations.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('operations.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('operations.index')) aria-current="page" @endif>
-                                <i data-lucide="briefcase" class="w-4 h-4"></i> Operations
-                            </a>
-                            <a href="{{ route('snapshot.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('snapshot.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('snapshot.index')) aria-current="page" @endif>
-                                <i data-lucide="camera" class="w-4 h-4"></i> Snapshot
-                            </a>
-                        </nav>
-                    </div>
-
-                    <div>
-                        <nav class="space-y-0.5">
-                            <a href="{{ route('front-office.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('front-office.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('front-office.index')) aria-current="page" @endif>
-                                <i data-lucide="monitor" class="w-4 h-4"></i> Front Office
-                            </a>
-                            <a href="{{ route('patients.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('patients.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('patients.index')) aria-current="page" @endif>
-                                <i data-lucide="user-square" class="w-4 h-4"></i> Patient Portal
-                            </a>
-                            <a href="{{ route('aging.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('aging.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('aging.index')) aria-current="page" @endif>
-                                <i data-lucide="hourglass" class="w-4 h-4"></i> Aging
-                            </a>
-                            <a href="{{ route('financials.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('financials.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('financials.index')) aria-current="page" @endif>
-                                <i data-lucide="dollar-sign" class="w-4 h-4"></i> Financials
-                            </a>
-                            <a href="{{ route('deposits.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('deposits.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('deposits.index')) aria-current="page" @endif>
-                                <i data-lucide="file-check-2" class="w-4 h-4"></i> Deposit Slip
-                            </a>
-                            <a href="{{ route('hygiene-recall.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('hygiene-recall.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('hygiene-recall.*')) aria-current="page" @endif>
-                                <i data-lucide="refresh-cw" class="w-4 h-4"></i> Hygiene Recall
-                            </a>
-                        </nav>
-                    </div>
-
-                    <div>
-                        <nav class="space-y-0.5">
-
-
-                            <span
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
-                                <i data-lucide="hourglass" class="w-4 h-4"></i> Aging
-                            </span>
-                            <span
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
-                                <i data-lucide="landmark" class="w-4 h-4"></i> RCM
-                            </span>
-                        </nav>
-                    </div>
-
-                    <div>
-                        <nav class="space-y-0.5">
-                            <a href="{{ route('provider-portal.index') }}"
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('provider-portal.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                                @if(request()->routeIs('provider-portal.*')) aria-current="page" @endif>
-                                <i data-lucide="stethoscope" class="w-4 h-4"></i> Provider Portal
-                            </a>
-                            <span
-                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-400 cursor-not-allowed opacity-50">
-                                <i data-lucide="server-cog" class="w-4 h-4"></i> Provisioner
-                            </span>
-                        </nav>
-                    </div>
->>>>>>> 5a1236dbe57dc6a925c5b371b98c3c6c04061b14
                 </div>
             </div>
 
