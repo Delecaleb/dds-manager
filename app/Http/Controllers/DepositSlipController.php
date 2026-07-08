@@ -11,7 +11,7 @@ class DepositSlipController extends Controller
      */
     public function index()
     {
-        //
+        return view('deposit.index');
     }
 
     /**
@@ -60,5 +60,105 @@ class DepositSlipController extends Controller
     public function destroy(string $id)
     {
         //
+    }
+
+    public function data(Request $request)
+    {
+        $start = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $end = $request->input('end_date', now()->toDateString());
+
+        $paymentTable = (new \App\Models\OdPayment)->getTable();
+        $defTable = (new \App\Models\OdDefinition)->getTable();
+        $patientTable = (new \App\Models\OdPatient)->getTable();
+
+        // Basic query to group payments by PayType in this date range. 
+        $payments = \App\Models\OdPayment::leftJoin($defTable, "{$paymentTable}.PayType", '=', "{$defTable}.DefNum")
+            ->whereBetween("{$paymentTable}.PayDate", [$start, $end])
+            ->select("{$paymentTable}.ClinicNum", "{$defTable}.ItemName as type", \Illuminate\Support\Facades\DB::raw("SUM({$paymentTable}.PayAmt) as amount"))
+            ->groupBy("{$paymentTable}.ClinicNum", "{$defTable}.ItemName")
+            ->get();
+
+        $results = [];
+        $totalAmount = 0;
+        foreach ($payments as $p) {
+            $loc = '8 Mile'; // Hardcoded as per user request: only available clinic is 8 Mile
+            $type = $p->type ?: 'Uncategorized Payment';
+            $amt = (float) $p->amount;
+            $totalAmount += $amt;
+
+            $results[] = [
+                'location' => $loc,
+                'type' => $type,
+                'amount' => $amt
+            ];
+        }
+
+        // Include claim payments to match insurance
+        $claimPayments = \App\Models\OdClaimPayment::whereBetween('CheckDate', [$start, $end])
+            ->select('ClinicNum', \Illuminate\Support\Facades\DB::raw('SUM(CheckAmt) as amount'))
+            ->groupBy('ClinicNum')
+            ->get();
+
+        foreach ($claimPayments as $cp) {
+            $amt = (float) $cp->amount;
+            $totalAmount += $amt;
+
+            $results[] = [
+                'location' => '8 Mile',
+                'type' => 'Insurance Co Pmt',
+                'amount' => $amt
+            ];
+        }
+
+        usort($results, function ($a, $b) {
+            return strcmp($a['type'], $b['type']);
+        });
+
+        // ── DETAILS TAB DATA ──
+        $details = [];
+        $providers = \App\Models\OdProvider::pluck('Abbr', 'ProvNum');
+
+        $paymentsForDetails = \App\Models\OdPayment::leftJoin($defTable, "{$paymentTable}.PayType", '=', "{$defTable}.DefNum")
+            ->leftJoin($patientTable, "{$paymentTable}.PatNum", '=', "{$patientTable}.PatNum")
+            ->whereBetween("{$paymentTable}.PayDate", [$start, $end])
+            ->select(
+                "{$paymentTable}.ClinicNum",
+                "{$defTable}.ItemName as type",
+                "{$paymentTable}.PayAmt as amount",
+                "{$paymentTable}.PayDate as date",
+                "{$paymentTable}.PatNum",
+                "{$patientTable}.FName",
+                "{$patientTable}.LName",
+                "{$paymentTable}.CheckNum"
+            )
+            ->orderBy("{$paymentTable}.PayDate", 'desc')
+            ->limit(100)
+            ->get();
+
+        foreach ($paymentsForDetails as $p) {
+            $details[] = [
+                'office' => '8 Mile',
+                'patient_name' => ($p->LName || $p->FName) ? trim($p->LName . ', ' . $p->FName, ', ') : '',
+                'patient_id' => $p->PatNum,
+                'provider' => '',
+                'provider_id' => '',
+                'date' => $p->date,
+                'payment_type' => $p->type,
+                'type' => 'Patient Payment',
+                'insurance' => '',
+                'bank' => '',
+                'check_number' => $p->CheckNum,
+                'unallocated' => '',
+                'amount' => (float) $p->amount
+            ];
+        }
+
+        return response()->json([
+            'deposits' => $results,
+            'details' => $details,
+            'summary' => [
+                'total_amount' => $totalAmount,
+            ]
+        ]);
     }
 }

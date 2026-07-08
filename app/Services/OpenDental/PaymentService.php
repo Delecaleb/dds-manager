@@ -11,7 +11,8 @@ class PaymentService
 
     public function __construct(
         protected OpenDentalClient $client
-    ){}
+    ) {
+    }
 
 
 
@@ -21,7 +22,7 @@ class PaymentService
 
         return Cache::remember(
             'od_payments',
-            now()->addHours(12),
+            now()->addHours(1),
 
             fn() => $this->client->get(
                 'payments'
@@ -34,18 +35,18 @@ class PaymentService
 
 
 
-    public function byDate($start,$end)
+    public function byDate($start, $end)
     {
 
-                return $this->client->get(
+        return $this->client->get(
 
-                    'payments',
+            'payments',
 
-                    [
-                        'DateEntry'=>$start,          //no start - end but from the DateEntry upward
-                    ]
+            [
+                'DateEntry' => $start,          //no start - end but from the DateEntry upward
+            ]
 
-                );
+        );
     }
 
 

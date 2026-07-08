@@ -335,4 +335,59 @@ class DashboardController extends Controller
 
         return response()->json($result);
     }
+
+    public function patientVisitsPerLocationData(Request $request)
+    {
+        $start = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $end = $request->input('end_date', now()->toDateString());
+
+        $startLastYear = \Carbon\Carbon::parse($start)->subYear()->toDateString();
+        $endLastYear = \Carbon\Carbon::parse($end)->subYear()->toDateString();
+
+        $buildVisitStats = function ($s, $e) {
+            $patientVisits = DB::table('od_procedure_logs')
+                ->where('ProcStatus', 'C')
+                ->whereBetween('ProcDate', [$s, $e])
+                ->select('ClinicNum', DB::raw('COUNT(DISTINCT PatNum) as val'))
+                ->groupBy('ClinicNum')
+                ->pluck('val', 'ClinicNum');
+
+            // Find new patient visits per clinic (patient's first completed procedure at this clinic falls in date range)
+            $newPatientVisits = DB::table('od_procedure_logs')
+                ->select('PatNum', 'ClinicNum', DB::raw('MIN(ProcDate) as first_visit'))
+                ->where('ProcStatus', 'C')
+                ->groupBy('PatNum', 'ClinicNum')
+                ->havingBetween('first_visit', [$s, $e])
+                ->get()
+                ->groupBy('ClinicNum')
+                ->map->count();
+
+            return compact('patientVisits', 'newPatientVisits');
+        };
+
+        $currentStats = $buildVisitStats($start, $end);
+        $lastYearStats = $buildVisitStats($startLastYear, $endLastYear);
+
+        $allClinicNums = collect()
+            ->merge($currentStats['patientVisits']->keys())
+            ->merge($currentStats['newPatientVisits']->keys())
+            ->merge($lastYearStats['patientVisits']->keys())
+            ->merge($lastYearStats['newPatientVisits']->keys())
+            ->unique()
+            ->sort();
+
+        $result = [];
+        foreach ($allClinicNums as $cNum) {
+            $result[] = [
+                'clinic_num' => $cNum,
+                'location' => $this->clinicNames[(int) $cNum] ?? 'Location ' . $cNum,
+                'patient_visits' => $currentStats['patientVisits']->get($cNum, 0),
+                'patient_visits_last' => $lastYearStats['patientVisits']->get($cNum, 0),
+                'new_patient_visits' => $currentStats['newPatientVisits']->get($cNum, 0),
+                'new_patient_visits_last' => $lastYearStats['newPatientVisits']->get($cNum, 0),
+            ];
+        }
+
+        return response()->json($result);
+    }
 }

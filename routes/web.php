@@ -24,6 +24,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/data', [DashboardController::class, 'data'])->name('dashboard.data');
     Route::get('/dashboard/location-stats', [DashboardController::class, 'locationStats'])->name('dashboard.location-stats');
     Route::get('/dashboard/financials-per-location', [DashboardController::class, 'financialsPerLocationData'])->name('dashboard.financials-per-location');
+    Route::get('/dashboard/patient-visits-per-location', [DashboardController::class, 'patientVisitsPerLocationData'])->name('dashboard.patient-visits-per-location');
     Route::get('/dashboard/providers', [DashboardController::class, 'providerPerformance'])->name('dashboard.providers');
     Route::get('/dashboard/providers/{id}', [DashboardController::class, 'providerDetails'])->name('dashboard.provider-details');
 
@@ -63,6 +64,7 @@ Route::middleware('auth')->group(function () {
     Route::get('calendar/appointments-details-data', [CalendarController::class, 'appointmentsDetailsData'])->name('calendar.appointments-details-data');
     Route::get('calendar/appointment-capacity-data', [CalendarController::class, 'appointmentCapacityData'])->name('calendar.appointment-capacity-data');
     Route::get('deposits', [DepositSlipController::class, 'index'])->name('deposits.index');
+    Route::get('deposits/data', [DepositSlipController::class, 'data'])->name('deposits.data');
 
     Route::get('eod', function () {
         return view('eod.index');

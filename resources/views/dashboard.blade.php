@@ -277,6 +277,51 @@
       </div>
     </div>
 
+    <!-- ── PATIENT VISITS PER LOCATION ──────────────────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+      <!-- New Patient Visit Per Location -->
+      <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <h2 class="text-lg font-bold text-slate-800">New Patient Visit Per Location</h2>
+          <button id="exportNewPatVisitsBtn"
+            class="text-xs border border-emerald-500 text-emerald-600 font-semibold px-3 py-1 rounded-lg hover:bg-emerald-50 transition flex-shrink-0 ml-3">
+            Export CSV
+          </button>
+        </div>
+        <div class="p-5 flex-1 relative">
+          <div class="relative w-full h-[400px]">
+            <div id="newPatVisitsSkel" class="absolute inset-0 flex items-end justify-around pb-6 px-10 gap-4">
+              <span class="skel w-full h-1/4 rounded-t-sm"></span>
+              <span class="skel w-full h-2/4 rounded-t-sm"></span>
+            </div>
+            <canvas id="newPatVisitsChart" class="opacity-0 transition-opacity duration-300"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Patient Visit Per Location -->
+      <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <h2 class="text-lg font-bold text-slate-800">Patient Visit Per Location</h2>
+          <button id="exportPatVisitsBtn"
+            class="text-xs border border-emerald-500 text-emerald-600 font-semibold px-3 py-1 rounded-lg hover:bg-emerald-50 transition flex-shrink-0 ml-3">
+            Export CSV
+          </button>
+        </div>
+        <div class="p-5 flex-1 relative">
+          <div class="relative w-full h-[400px]">
+            <div id="patVisitsSkel" class="absolute inset-0 flex items-end justify-around pb-6 px-10 gap-4">
+              <span class="skel w-full h-1/4 rounded-t-sm"></span>
+              <span class="skel w-full h-2/4 rounded-t-sm"></span>
+            </div>
+            <canvas id="patVisitsChart" class="opacity-0 transition-opacity duration-300"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
     <!-- ── ANALYTICS: Location + Providers ──────────── -->
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-5 items-start">
 
@@ -404,6 +449,29 @@
       </div>
     </div>{{-- /analytics --}}
 
+    <!-- ── LOCATION UTILIZATION ───────────────────────── -->
+    <section id="location-utilization"
+      class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <h2 class="text-lg font-bold text-slate-800">Location Utilization</h2>
+        <button id="exportLocUtilizationBtn"
+          class="text-xs border border-emerald-500 text-emerald-600 font-semibold px-3 py-1 rounded-lg hover:bg-emerald-50 transition flex-shrink-0 ml-3">
+          Export CSV
+        </button>
+      </div>
+      <div class="p-5">
+        <div class="relative w-full h-[400px]" id="locUtilizationChartContainer">
+          <div id="locUtilizationSkel" class="absolute inset-0 flex items-end justify-around pb-6 px-10 gap-4 hidden">
+            <span class="skel w-full h-1/4 rounded-t-sm"></span>
+            <span class="skel w-full h-2/4 rounded-t-sm"></span>
+            <span class="skel w-full h-1/3 rounded-t-sm"></span>
+            <span class="skel w-full h-3/4 rounded-t-sm"></span>
+            <span class="skel w-full h-1/2 rounded-t-sm"></span>
+          </div>
+          <canvas id="locUtilizationChart" class="transition-opacity duration-300"></canvas>
+        </div>
+      </div>
+    </section>
   </main>
 
   {{-- Chart.js --}}
@@ -420,6 +488,10 @@
     var _provTxChart = null;
     var _finPerLocChartInstance = null;
     var _finPerLocData = [];
+    var _patVisitsPerLocChartInstance = null;
+    var _newPatVisitsPerLocChartInstance = null;
+    var _patVisitsPerLocData = [];
+    var _locUtilizationChartInstance = null;
 
     /* ── Helpers ──────────────────────────────────────── */
     function fmtMoney(v) {
@@ -476,6 +548,12 @@
 
       $('#finPerLocSkel').removeClass('hidden');
       $('#finPerLocChart').removeClass('opacity-100');
+
+      $('#newPatVisitsSkel, #patVisitsSkel').removeClass('hidden');
+      $('#newPatVisitsChart, #patVisitsChart').removeClass('opacity-100');
+
+      $('#locUtilizationSkel').removeClass('hidden');
+      $('#locUtilizationChart').removeClass('opacity-100');
     }
 
     function populateKpis(data) {
@@ -687,6 +765,16 @@
           console.error("Failed to load financials per location.");
         });
 
+      /* Patient Visits Per Location */
+      $.get("{{ route('dashboard.patient-visits-per-location') }}", { start_date: start, end_date: end })
+        .done(function (data) {
+          _patVisitsPerLocData = data;
+          renderPatVisitsCharts(data);
+        })
+        .fail(function () {
+          console.error("Failed to load patient visits per location.");
+        });
+
       /* Location stats */
       $.get("{{ route('dashboard.location-stats') }}", { start_date: start, end_date: end })
         .done(function (data) {
@@ -703,6 +791,7 @@
         .done(function (data) {
           _providerData = data;
           renderProviders();
+          renderLocUtilizationChart(data);
         })
         .fail(function () {
           $('#providerList').html('<p class="px-5 py-8 text-xs text-red-400 text-center">Failed to load provider data.</p>');
@@ -768,6 +857,121 @@
       downloadCsv('financials-per-location.csv', rows);
     }
 
+    /* ── Patient Visits Per Location Charts ───────────── */
+    function renderPatVisitsCharts(data) {
+      $('#newPatVisitsSkel, #patVisitsSkel').addClass('hidden');
+      $('#newPatVisitsChart, #patVisitsChart').addClass('opacity-100');
+
+      var labels = data.map(function (d) { return d.location; });
+      var dsNewPat = data.map(function (d) { return d.new_patient_visits; });
+      var dsNewPatLast = data.map(function (d) { return d.new_patient_visits_last; });
+      var dsPat = data.map(function (d) { return d.patient_visits; });
+      var dsPatLast = data.map(function (d) { return d.patient_visits_last; });
+
+      var ctxNew = document.getElementById('newPatVisitsChart');
+      var ctxPat = document.getElementById('patVisitsChart');
+
+      if (_newPatVisitsPerLocChartInstance) _newPatVisitsPerLocChartInstance.destroy();
+      if (_patVisitsPerLocChartInstance) _patVisitsPerLocChartInstance.destroy();
+
+      if (ctxNew) {
+        _newPatVisitsPerLocChartInstance = new Chart(ctxNew, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'New Patient Visits', data: dsNewPat, backgroundColor: '#3b82f6' },
+              { label: 'New Patient Visits Last Year', data: dsNewPatLast, backgroundColor: '#51ca8e' }
+            ]
+          },
+          options: chartOptions(function (v) { return v; })
+        });
+      }
+
+      if (ctxPat) {
+        _patVisitsPerLocChartInstance = new Chart(ctxPat, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'Patient Visits', data: dsPat, backgroundColor: '#3b82f6' },
+              { label: 'Patient Visits Last Year', data: dsPatLast, backgroundColor: '#51ca8e' }
+            ]
+          },
+          options: chartOptions(function (v) { return v; })
+        });
+      }
+    }
+
+    function exportNewPatVisitsCsv() {
+      var rows = ['Location,New Patient Visits,New Patient Visits Last Year'];
+      _patVisitsPerLocData.forEach(function (r) {
+        rows.push([r.location, r.new_patient_visits, r.new_patient_visits_last].join(','));
+      });
+      downloadCsv('new-patient-visits-per-location.csv', rows);
+    }
+
+    function exportPatVisitsCsv() {
+      var rows = ['Location,Patient Visits,Patient Visits Last Year'];
+      _patVisitsPerLocData.forEach(function (r) {
+        rows.push([r.location, r.patient_visits, r.patient_visits_last].join(','));
+      });
+      downloadCsv('patient-visits-per-location.csv', rows);
+    }
+
+    /* ── Location Utilization Chart ───────────────────── */
+    function renderLocUtilizationChart(data) {
+      $('#locUtilizationSkel').addClass('hidden');
+      $('#locUtilizationChart').addClass('opacity-100');
+
+      // Sort data by net production desc
+      var sortedData = data.slice().sort(function (a, b) {
+        return Number(b.net_production) - Number(a.net_production);
+      });
+
+      var labels = sortedData.map(function (d) {
+        return (d.LName || '') + (d.PName ? ', ' + d.PName : '');
+      });
+
+      var dsNet = sortedData.map(function (d) { return d.net_production; });
+      var dsColors = dsNet.map(function (v) { return Number(v) >= 0 ? '#6ee7b7' : '#a855f7'; });
+
+      var ctx = document.getElementById('locUtilizationChart');
+      if (!ctx) return;
+
+      if (_locUtilizationChartInstance) {
+        _locUtilizationChartInstance.destroy();
+      }
+
+      var opts = chartOptions(function (v) { return v >= 1000 || v <= -1000 ? (v / 1000) + 'k' : v; });
+      opts.scales.x.stacked = false;
+      opts.scales.y.stacked = false;
+      opts.scales.y.min = undefined; // allow negative
+
+      _locUtilizationChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: 'Net Production', data: dsNet, backgroundColor: dsColors }
+          ]
+        },
+        options: opts
+      });
+    }
+
+    function exportLocUtilizationCsv() {
+      var rows = ['Provider,Net Production'];
+      var sortedData = _providerData.slice().sort(function (a, b) {
+        return Number(b.net_production) - Number(a.net_production);
+      });
+      sortedData.forEach(function (r) {
+        var name = (r.LName || '') + (r.PName ? ', ' + r.PName : '');
+        rows.push(['"' + name.replace(/"/g, '""') + '"', r.net_production].join(','));
+      });
+      downloadCsv('location-utilization.csv', rows);
+    }
+
     /* ── Daterangepicker callback (picker initialised by x-daterange-picker component) ── */
     window.onDrpApply = function (start, end) { fetchAll(start, end); };
 
@@ -783,6 +987,9 @@
 
       /* Export handlers */
       $('#exportFinPerLocBtn').on('click', exportFinPerLocCsv);
+      $('#exportNewPatVisitsBtn').on('click', exportNewPatVisitsCsv);
+      $('#exportPatVisitsBtn').on('click', exportPatVisitsCsv);
+      $('#exportLocUtilizationBtn').on('click', exportLocUtilizationCsv);
       $('#exportLocationBtn').on('click', exportLocationCsv);
       $('#exportProvidersBtn').on('click', exportProvidersCsv);
 
@@ -1175,5 +1382,6 @@
       </div>
     </div>
   </div>
+
 
 </x-app-layout>
