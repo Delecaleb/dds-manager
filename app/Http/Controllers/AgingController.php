@@ -25,11 +25,32 @@ class AgingController extends Controller
         $search = $request->input('search.value') ?: null;
         $mode   = $request->get('mode', 'responsible_party');
 
+        [$sortKey, $sortDir] = $this->resolveOrder($request);
+
         if ($mode === 'by_patient') {
-            return $this->byPatientData($request, $draw, $start, $length, $search);
+            return $this->byPatientData($request, $draw, $start, $length, $search, $sortKey, $sortDir);
         }
 
-        return $this->responsiblePartyData($request, $draw, $start, $length, $search);
+        return $this->responsiblePartyData($request, $draw, $start, $length, $search, $sortKey, $sortDir);
+    }
+
+    /**
+     * Translate the DataTables order payload (order[0][column] index +
+     * dir, resolved against columns[i][data]) into a [dataKey, direction]
+     * pair. The key is validated downstream against the service's sort
+     * allowlist, so an unknown/derived column simply falls back to the
+     * default ordering rather than reaching SQL.
+     */
+    private function resolveOrder(Request $request): array
+    {
+        $columnIndex = $request->input('order.0.column');
+        $dir = strtolower((string) $request->input('order.0.dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        $sortKey = $columnIndex !== null
+            ? $request->input("columns.{$columnIndex}.data")
+            : null;
+
+        return [$sortKey, $dir];
     }
 
     /**
@@ -38,7 +59,7 @@ class AgingController extends Controller
      * balance snapshot. Also serves as the fallback for by_office/
      * by_insurance until those tabs get dedicated grouping.
      */
-    private function responsiblePartyData(Request $request, int $draw, int $start, int $length, ?string $search)
+    private function responsiblePartyData(Request $request, int $draw, int $start, int $length, ?string $search, ?string $sortKey = null, string $sortDir = 'desc')
     {
         $asOfDate = $request->get('as_of_date', now()->toDateString());
         $includeCredits = $request->get('credits', 'include') !== 'exclude';
@@ -48,7 +69,9 @@ class AgingController extends Controller
             $search,
             $includeCredits,
             $start,
-            $length
+            $length,
+            $sortKey,
+            $sortDir
         );
 
         $fmt = fn($v) => '$ ' . number_format((float) ($v ?? 0), 2);
@@ -103,7 +126,7 @@ class AgingController extends Controller
      * environment (never synced by OpenDental), so that query always
      * returned zero rows.
      */
-    private function byPatientData(Request $request, int $draw, int $start, int $length, ?string $search)
+    private function byPatientData(Request $request, int $draw, int $start, int $length, ?string $search, ?string $sortKey = null, string $sortDir = 'desc')
     {
         $asOfDate = $request->get('as_of_date', now()->toDateString());
         $includeCredits = $request->get('credits', 'include') !== 'exclude';
@@ -113,7 +136,9 @@ class AgingController extends Controller
             $search,
             $includeCredits,
             $start,
-            $length
+            $length,
+            $sortKey,
+            $sortDir
         );
 
         $fmt = fn ($v) => '$ ' . number_format((float) ($v ?? 0), 2);

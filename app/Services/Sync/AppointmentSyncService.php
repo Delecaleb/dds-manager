@@ -18,7 +18,7 @@ class AppointmentSyncService extends BaseQuerySyncService
 
     protected function syncColumn(): ?string
     {
-        return 'SecDateTEdit';
+        return 'DateTStamp';
     }
 
     protected function primaryKey(): string
