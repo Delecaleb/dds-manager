@@ -31,6 +31,7 @@ Schedule::command('sync:paysplits')->cron('3-59/5 * * * *')->withoutOverlapping(
 Schedule::command('sync:claimpayments')->cron('4-59/5 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:claimprocs')->cron('*/5 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:patient-balance')->cron('2-59/5 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
+Schedule::command('sync:payment')->cron('3-59/5 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 
 /*
 | MEDIUM FREQUENCY (every 30 minutes) — data that changes occasionally.
@@ -41,6 +42,7 @@ Schedule::command('sync:treatment-plan-attachments')->cron('10,40 * * * *')->wit
 Schedule::command('sync:payplancharges')->cron('15,45 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:recalls')->cron('20,50 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:schedules')->cron('25,55 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
+Schedule::command('sync:deposit')->cron('12,42 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 
 /*
 | LOW FREQUENCY (daily) — reference tables that rarely change.
