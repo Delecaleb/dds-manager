@@ -23,7 +23,6 @@ class AppointmentRepository
 
         $query = OdAppointment::query()
             ->with(['patient', 'provider'])
-            ->withSum('procedureLogs as production_total', 'ProcFee')
             ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$startDate, $endDate]);
 
         // Filter out unused status codes to match legacy Calendar logic

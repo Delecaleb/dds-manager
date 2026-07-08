@@ -35,7 +35,6 @@ class CalendarEventTransformer
             'procedure' => $appointment->ProcDescript ?? '',
             'status' => $status->text(),
             'operator' => $appointment->Op ?? '',
-            'production' => (float) ($appointment->production_total ?? 0),
             'clinic' => $appointment->ClinicNum ?? '',
             'note' => $appointment->Note ?? '',
             'patNum' => $appointment->PatNum,

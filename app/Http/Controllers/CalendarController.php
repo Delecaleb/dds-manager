@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 
 use App\Services\OpenDental\CalendarService;
 use App\Models\OdAppointment;
+use App\Models\OdProcedureLog;
 use Yajra\DataTables\Facades\DataTables;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -33,6 +34,43 @@ class CalendarController extends Controller
         $date = $request->get('date') ?? date('Y-m-d');
 
         return response()->json($calendar->resources($date, $date));
+    }
+
+    /**
+     * Daily production figures for the calendar's stats bar.
+     *
+     *  production            — $ actually PRODUCED that day: completed
+     *                          procedures (ProcStatus 'C'/'2') dated that day.
+     *                          This is the standard daily-production metric and
+     *                          is independent of appointment linkage.
+     *  scheduled_production  — $ SCHEDULED that day: the booked fee value of
+     *                          appointments in Scheduled status for the day.
+     *
+     * ProcFee is stored as text, so it is CAST for summing. Date columns may be
+     * raw ISO strings (with a 'T') or normalized dates/datetimes, so both are
+     * matched via DATE(REPLACE(...)) which is correct either way.
+     */
+    public function stats(Request $request)
+    {
+        $date = $request->get('date') ?? date('Y-m-d');
+
+        $produced = (float) OdProcedureLog::query()
+            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) = ?", [$date])
+            ->selectRaw('COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0) AS total')
+            ->value('total');
+
+        $scheduled = (float) OdAppointment::query()
+            ->join('od_procedure_logs as pl', 'pl.AptNum', '=', 'od_appointments.AptNum')
+            ->where('od_appointments.AptStatus', '1')
+            ->whereRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) = ?", [$date])
+            ->selectRaw('COALESCE(SUM(CAST(pl.ProcFee AS DECIMAL(12,2))), 0) AS total')
+            ->value('total');
+
+        return response()->json([
+            'production' => $produced,
+            'scheduled_production' => $scheduled,
+        ]);
     }
 
     public function appointmentsDetailsData(Request $request)

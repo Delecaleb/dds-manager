@@ -57,6 +57,7 @@ Route::middleware('auth')->group(function () {
     Route::get('financials/score-cards', [FinancialController::class, 'scoreCards'])->name('financials.score-cards');
     Route::get('calendar', [CalendarController::class, 'index'])->name('calendar.index');
     Route::get('calendar/data', [CalendarController::class, 'getData'])->name('calendar.data');
+    Route::get('calendar/stats', [CalendarController::class, 'stats'])->name('calendar.stats');
     Route::get('calendar/resources', [CalendarController::class, 'getResources'])->name('calendar.resources');
     Route::get('calendar/appointments-details-data', [CalendarController::class, 'appointmentsDetailsData'])->name('calendar.appointments-details-data');
     Route::get('calendar/appointment-capacity-data', [CalendarController::class, 'appointmentCapacityData'])->name('calendar.appointment-capacity-data');
