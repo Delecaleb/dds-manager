@@ -40,9 +40,11 @@ class CalendarController extends Controller
         $start = $request->get('start') ?? date('Y-m-d');
         $end = $request->get('end') ?? date('Y-m-d');
 
+        // Match by calendar date regardless of whether AptDateTime is a raw ISO
+        // 'T' string or a normalized DATETIME (see AppointmentRepository).
         $query = OdAppointment::with(['patient', 'provider'])
             ->withSum('procedureLogs as production_total', 'ProcFee')
-            ->whereBetween('AptDateTime', [$start . ' 00:00:00', $end . ' 23:59:59']);
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
 
         return DataTables::of($query)
             ->addColumn('location', fn($row) => '8 Mile')
@@ -93,8 +95,9 @@ class CalendarController extends Controller
         $start = $request->get('start') ?? date('Y-m-d');
         $end = $request->get('end') ?? date('Y-m-d');
 
-        // We fetch scheduled appointments for the date frame.
-        $appointments = OdAppointment::whereBetween('AptDateTime', [$start . ' 00:00:00', $end . ' 23:59:59'])
+        // We fetch scheduled appointments for the date frame. Match by calendar
+        // date regardless of AptDateTime storage format (see AppointmentRepository).
+        $appointments = OdAppointment::whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
             ->where('AptStatus', 1) // Only count Scheduled
             ->get();
 

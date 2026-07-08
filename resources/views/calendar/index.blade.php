@@ -182,7 +182,16 @@
             {{-- ══════════════════ STATS ROW ══════════════════ --}}
             <div class="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-10 flex-shrink-0">
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Production</p>
+                    <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
+                        Production
+                        <span class="text-slate-400 cursor-help"
+                              title="Display $ amount of what has been produced for the day">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </span>
+                    </p>
                     <p class="text-xl font-bold text-slate-900" id="stat-production">—</p>
                 </div>
                 <div>
@@ -381,7 +390,7 @@
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">--</span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">35.00</span></td>
+                                    style="min-width: 10rem;"><span class=""></span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">--</span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
@@ -403,7 +412,7 @@
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">--</span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">$ 675.00</span></td>
+                                    style="min-width: 10rem;"><span class=""></span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">--</span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
@@ -411,7 +420,7 @@
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">--</span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">$ 603.57</span></td>
+                                    style="min-width: 10rem;"><span class=""></span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">-</span></td>
                             </tr>
@@ -430,7 +439,7 @@
                                                 class="block truncate">--</strong> <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class="">700.00</span></strong>
+                                                class="block truncate"><span class=""></span></strong>
                                             <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
@@ -464,7 +473,7 @@
                                                 class="block truncate">--</strong> <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class="">$ 13,500.00</span></strong>
+                                                class="block truncate"><span class=""></span></strong>
                                             <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
@@ -477,7 +486,7 @@
                                                 class="block truncate">--</strong> <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class="">$ 12,071.40</span></strong>
+                                                class="block truncate"><span class=""></span></strong>
                                             <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
@@ -980,12 +989,15 @@
 
         // ── Stats bar ─────────────────────────────────────────────────────
         function updateStats(events) {
-            const scheduled = events.filter(e =>
-                e.status === 1 || e.status === 'Scheduled'
-            ).length;
-            const total = events.length;
-            document.getElementById('stat-production').textContent = total + ' appointments';
-            document.getElementById('stat-scheduled').textContent = scheduled + ' scheduled';
+            const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+            const sumProduction = list => list.reduce((sum, e) => sum + (parseFloat(e.production) || 0), 0);
+
+            // Production = $ produced across every appointment shown for the day.
+            // Scheduled Production = the subset still in Scheduled status.
+            const scheduled = events.filter(e => e.status === 1 || e.status === 'Scheduled');
+
+            document.getElementById('stat-production').textContent = usd.format(sumProduction(events));
+            document.getElementById('stat-scheduled').textContent = usd.format(sumProduction(scheduled));
         }
 
         // ── Sidebar: show ─────────────────────────────────────────────────
