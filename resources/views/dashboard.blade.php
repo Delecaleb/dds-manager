@@ -2,7 +2,18 @@
 
   <style>
     /* ── Skeleton loader ─────────────────────────────── */
-    @keyframes skel-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    @keyframes skel-pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .4
+      }
+    }
+
     .skel {
       display: inline-block;
       background: #e5e7eb;
@@ -24,12 +35,14 @@
   </style>
 
   <!-- ── HEADER ─────────────────────────────────────────── -->
-  <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-20">
+  <header
+    class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-20">
     <div class="flex items-center gap-3">
 
       <!-- Location selector -->
       <div class="relative">
-        <select class="appearance-none bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-9 py-1.5 text-sm font-semibold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white cursor-pointer transition-colors">
+        <select
+          class="appearance-none bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-9 py-1.5 text-sm font-semibold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white cursor-pointer transition-colors">
           <option value="all">All Locations</option>
           <option value="8mile" selected>8 Mile</option>
         </select>
@@ -45,11 +58,13 @@
 
     <!-- Right: status + user -->
     <div class="flex items-center gap-4">
-      <div class="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded border border-emerald-200 flex items-center gap-1.5">
+      <div
+        class="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded border border-emerald-200 flex items-center gap-1.5">
         <i data-lucide="check-circle" class="w-3 h-3"></i> Open Dental Inbound Match 100%
       </div>
       <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
-        <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">JA</div>
+        <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">JA
+        </div>
         <span class="text-sm font-medium text-slate-700 hidden md:inline">Admin Controller</span>
       </div>
     </div>
@@ -59,7 +74,8 @@
   <main class="py-3 px-6 space-y-6 w-full mx-auto">
 
     <!-- Error banner -->
-    <div id="dashError" class="hidden items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs font-medium px-4 py-2.5 rounded-lg">
+    <div id="dashError"
+      class="hidden items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs font-medium px-4 py-2.5 rounded-lg">
       <i data-lucide="alert-triangle" class="w-4 h-4 flex-shrink-0"></i>
       Failed to load dashboard data. Check your connection and try again.
     </div>
@@ -73,11 +89,15 @@
           <p class="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight pr-2">Gross Production</p>
           <div class="relative group flex-shrink-0">
             <button class="text-slate-300 hover:text-emerald-500 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
             </button>
-            <div class="absolute right-0 top-6 w-60 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
+            <div
+              class="absolute right-0 top-6 w-60 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
               <div class="tt-arrow"></div>
               The total production before any writeoffs or adjustments.
             </div>
@@ -95,11 +115,15 @@
           <p class="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight pr-2">Net Production</p>
           <div class="relative group flex-shrink-0">
             <button class="text-slate-300 hover:text-emerald-500 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
             </button>
-            <div class="absolute right-0 top-6 w-64 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
+            <div
+              class="absolute right-0 top-6 w-64 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
               <div class="tt-arrow"></div>
               The breakdown of the amount of adjustment types in $ relative to both Production and Collections.
             </div>
@@ -117,11 +141,15 @@
           <p class="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight pr-2">Total Adjustment</p>
           <div class="relative group flex-shrink-0">
             <button class="text-slate-300 hover:text-emerald-500 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
             </button>
-            <div class="absolute right-0 top-6 w-64 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
+            <div
+              class="absolute right-0 top-6 w-64 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
               <div class="tt-arrow"></div>
               The total amount of adjustment types in $ relative to both Production and Collections.
             </div>
@@ -143,11 +171,15 @@
           <p class="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight pr-2">Total Collection</p>
           <div class="relative group flex-shrink-0">
             <button class="text-slate-300 hover:text-emerald-500 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
             </button>
-            <div class="absolute right-0 top-6 w-64 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
+            <div
+              class="absolute right-0 top-6 w-64 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
               <div class="tt-arrow"></div>
               The total payment collected in $, after all Collections Adjustments and Refunds.
             </div>
@@ -166,14 +198,19 @@
       <!-- 5 · Total New Patient Visits -->
       <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
         <div class="flex items-start justify-between mb-3">
-          <p class="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight pr-2">Total New Patient Visits</p>
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight pr-2">Total New Patient
+            Visits</p>
           <div class="relative group flex-shrink-0">
             <button class="text-slate-300 hover:text-emerald-500 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
             </button>
-            <div class="absolute right-0 top-6 w-56 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
+            <div
+              class="absolute right-0 top-6 w-56 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
               <div class="tt-arrow"></div>
               The Total New Patients — patients whose first-ever completed procedure falls in the selected period.
             </div>
@@ -188,16 +225,22 @@
       <!-- 6 · Total Patient Visits -->
       <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
         <div class="flex items-start justify-between mb-3">
-          <p class="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight pr-2">Total Patient Visits</p>
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight pr-2">Total Patient Visits
+          </p>
           <div class="relative group flex-shrink-0">
             <button class="text-slate-300 hover:text-emerald-500 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
             </button>
-            <div class="absolute right-0 top-6 w-56 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
+            <div
+              class="absolute right-0 top-6 w-56 bg-slate-900 text-white text-xs rounded-xl p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-30 leading-relaxed">
               <div class="tt-arrow"></div>
-              The total existing patients — distinct patients with at least one completed procedure in the selected period.
+              The total existing patients — distinct patients with at least one completed procedure in the selected
+              period.
             </div>
           </div>
         </div>
@@ -208,6 +251,31 @@
       </div>
 
     </div>{{-- /kpi grid --}}
+
+    <!-- ── FINANCIAL PER LOCATION ─────────────────────── -->
+    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <h2 class="text-lg font-bold text-slate-800">Financials Per Location</h2>
+        <button id="exportFinPerLocBtn"
+          class="text-xs border border-emerald-500 text-emerald-600 font-semibold px-3 py-1 rounded-lg hover:bg-emerald-50 transition flex-shrink-0 ml-3">
+          Export CSV
+        </button>
+      </div>
+      <div class="p-5">
+        <div class="relative w-full h-[400px]" id="finPerLocChartContainer">
+          <div id="finPerLocSkel" class="absolute inset-0 flex items-end justify-around pb-6 px-10 gap-4">
+            <span class="skel w-full h-1/4 rounded-t-sm"></span>
+            <span class="skel w-full h-2/4 rounded-t-sm"></span>
+            <span class="skel w-full h-1/3 rounded-t-sm"></span>
+            <span class="skel w-full h-3/4 rounded-t-sm"></span>
+            <span class="skel w-full h-1/2 rounded-t-sm"></span>
+            <span class="skel w-full h-[60%] rounded-t-sm"></span>
+            <span class="skel w-full h-1/4 rounded-t-sm"></span>
+          </div>
+          <canvas id="finPerLocChart" class="opacity-0 transition-opacity duration-300"></canvas>
+        </div>
+      </div>
+    </div>
 
     <!-- ── ANALYTICS: Location + Providers ──────────── -->
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-5 items-start">
@@ -255,7 +323,12 @@
             <div class="relative">
               <input type="text" id="providerSearch" placeholder="Search providers…"
                 class="w-full border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-xs focus:outline-none focus:border-emerald-400">
-              <svg class="absolute right-2.5 top-2 w-3.5 h-3.5 text-slate-400 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <svg class="absolute right-2.5 top-2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
+                xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
             </div>
           </div>
           <div class="flex-shrink-0">
@@ -277,25 +350,29 @@
         <!-- Aggregate totals strip -->
         <div class="grid grid-cols-4 border-b border-slate-100">
           <div class="px-4 py-3 border-r border-slate-100">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide leading-tight mb-1">Total Gross<br>Production</p>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide leading-tight mb-1">Total
+              Gross<br>Production</p>
             <p id="tot-gross" class="text-sm font-extrabold text-slate-900 tabular-nums">
               <span class="skel h-4 w-20 rounded"></span>
             </p>
           </div>
           <div class="px-4 py-3 border-r border-slate-100">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide leading-tight mb-1">Total Net<br>Production</p>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide leading-tight mb-1">Total
+              Net<br>Production</p>
             <p id="tot-net" class="text-sm font-extrabold text-slate-900 tabular-nums">
               <span class="skel h-4 w-20 rounded"></span>
             </p>
           </div>
           <div class="px-4 py-3 border-r border-slate-100">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide leading-tight mb-1">Total<br>Collection</p>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide leading-tight mb-1">
+              Total<br>Collection</p>
             <p id="tot-coll" class="text-sm font-extrabold text-slate-900 tabular-nums">
               <span class="skel h-4 w-20 rounded"></span>
             </p>
           </div>
           <div class="px-4 py-3">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide leading-tight mb-1">Total<br>Adjustment</p>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide leading-tight mb-1">
+              Total<br>Adjustment</p>
             <p id="tot-adj" class="text-sm font-extrabold text-slate-900 tabular-nums">
               <span class="skel h-4 w-20 rounded"></span>
             </p>
@@ -305,21 +382,22 @@
         <!-- Provider card list -->
         <div id="providerList" class="divide-y divide-slate-100 max-h-[480px] overflow-y-auto">
           {{-- skeleton --}}
-          @foreach(range(1,3) as $i)
-          <div class="flex items-center gap-4 px-5 py-4">
-            <span class="skel h-4 w-4 rounded"></span>
-            <span class="skel w-10 h-10 rounded-full flex-shrink-0"></span>
-            <div class="flex-1 space-y-1.5">
-              <span class="skel h-3 w-32 rounded block"></span>
-              <span class="skel h-3 w-20 rounded block"></span>
-              <span class="skel h-3.5 w-40 rounded block"></span>
+          @foreach(range(1, 3) as $i)
+            <div class="flex items-center gap-4 px-5 py-4">
+              <span class="skel h-4 w-4 rounded"></span>
+              <span class="skel w-10 h-10 rounded-full flex-shrink-0"></span>
+              <div class="flex-1 space-y-1.5">
+                <span class="skel h-3 w-32 rounded block"></span>
+                <span class="skel h-3 w-20 rounded block"></span>
+                <span class="skel h-3.5 w-40 rounded block"></span>
+              </div>
+              <div class="grid grid-cols-4 gap-4 text-right">
+                @foreach(range(1, 4) as $j)
+                  <div><span class="skel h-3 w-16 rounded block mb-1"></span><span
+                      class="skel h-4 w-16 rounded block"></span></div>
+                @endforeach
+              </div>
             </div>
-            <div class="grid grid-cols-4 gap-4 text-right">
-              @foreach(range(1,4) as $j)
-              <div><span class="skel h-3 w-16 rounded block mb-1"></span><span class="skel h-4 w-16 rounded block"></span></div>
-              @endforeach
-            </div>
-          </div>
           @endforeach
         </div>
 
@@ -333,13 +411,15 @@
 
   <script>
     /* ── State ────────────────────────────────────────── */
-    var _providerData        = [];
-    var _locationData        = [];
-    var _currentStart        = '';
-    var _currentEnd          = '';
+    var _providerData = [];
+    var _locationData = [];
+    var _currentStart = '';
+    var _currentEnd = '';
     var _provProductionChart = null;
-    var _provVisitsChart     = null;
-    var _provTxChart         = null;
+    var _provVisitsChart = null;
+    var _provTxChart = null;
+    var _finPerLocChartInstance = null;
+    var _finPerLocData = [];
 
     /* ── Helpers ──────────────────────────────────────── */
     function fmtMoney(v) {
@@ -354,16 +434,16 @@
       var abs = Math.abs(n);
       var str;
       if (abs >= 1000) {
-        str = '$' + (abs / 1000).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 1}) + 'K';
+        str = '$' + (abs / 1000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + 'K';
       } else {
-        str = '$' + abs.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        str = '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
       return neg ? '(' + str + ')' : str;
     }
 
     var AVATAR_COLORS = [
-      '#10b981','#3b82f6','#8b5cf6','#ec4899',
-      '#f59e0b','#06b6d4','#ef4444','#84cc16'
+      '#10b981', '#3b82f6', '#8b5cf6', '#ec4899',
+      '#f59e0b', '#06b6d4', '#ef4444', '#84cc16'
     ];
 
     function avatarColor(provNum) {
@@ -377,8 +457,8 @@
     }
 
     function escHtml(s) {
-      return String(s ?? '').replace(/[&<>"']/g, function(c) {
-        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+      return String(s ?? '').replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
       });
     }
 
@@ -393,6 +473,9 @@
       $('#kpi-new-patients').html('<span class="skel h-9 w-20 rounded-lg"></span>');
       $('#kpi-visits').html('<span class="skel h-9 w-20 rounded-lg"></span>');
       $('#dashError').addClass('hidden').removeClass('flex');
+
+      $('#finPerLocSkel').removeClass('hidden');
+      $('#finPerLocChart').removeClass('opacity-100');
     }
 
     function populateKpis(data) {
@@ -411,8 +494,8 @@
     }
 
     function showKpiError() {
-      ['#kpi-gross','#kpi-net','#kpi-adj','#kpi-collections','#kpi-new-patients','#kpi-visits']
-        .forEach(function(id){ $(id).text('—'); });
+      ['#kpi-gross', '#kpi-net', '#kpi-adj', '#kpi-collections', '#kpi-new-patients', '#kpi-visits']
+        .forEach(function (id) { $(id).text('—'); });
       $('#kpi-adj-rate, #kpi-coll-rate').text('—');
       $('#dashError').removeClass('hidden').addClass('flex');
     }
@@ -426,7 +509,7 @@
         return;
       }
       var html = '';
-      rows.forEach(function(row) {
+      rows.forEach(function (row) {
         html += '<div class="grid grid-cols-[2rem_1fr_auto] gap-x-4 items-center px-5 py-3.5 hover:bg-slate-50 transition-colors">';
         html += '<span class="text-xs font-bold text-slate-400">' + escHtml(row.rank) + '</span>';
         html += '<span class="text-sm font-semibold text-slate-800">' + escHtml(row.location) + '</span>';
@@ -438,10 +521,10 @@
 
     /* ── Provider list ────────────────────────────────── */
     function sortedFiltered() {
-      var search  = $('#providerSearch').val().toLowerCase().trim();
+      var search = $('#providerSearch').val().toLowerCase().trim();
       var sortKey = $('#providerSort').val();
 
-      var data = _providerData.filter(function(r) {
+      var data = _providerData.filter(function (r) {
         if (!search) return true;
         var name = ((r.LName || '') + ' ' + (r.PName || '') + ' ' + (r.Abbr || '')).toLowerCase();
         return name.indexOf(search) !== -1;
@@ -449,16 +532,16 @@
 
       var sortMap = {
         gross_desc: ['gross_production', -1],
-        gross_asc:  ['gross_production',  1],
-        net_desc:   ['net_production',   -1],
-        net_asc:    ['net_production',    1],
-        coll_desc:  ['collections',      -1],
-        coll_asc:   ['collections',       1],
-        adj_desc:   ['adjustments',      -1],
-        adj_asc:    ['adjustments',       1],
+        gross_asc: ['gross_production', 1],
+        net_desc: ['net_production', -1],
+        net_asc: ['net_production', 1],
+        coll_desc: ['collections', -1],
+        coll_asc: ['collections', 1],
+        adj_desc: ['adjustments', -1],
+        adj_asc: ['adjustments', 1],
       };
       var sm = sortMap[sortKey] || ['gross_production', -1];
-      data.sort(function(a, b) {
+      data.sort(function (a, b) {
         return sm[1] * (Number(b[sm[0]]) - Number(a[sm[0]]));
       });
       return data;
@@ -468,13 +551,13 @@
       var data = sortedFiltered();
 
       /* Totals strip */
-      var totals = data.reduce(function(acc, r) {
-        acc.gross += Number(r.gross_production  || 0);
-        acc.net   += Number(r.net_production    || 0);
-        acc.coll  += Number(r.collections       || 0);
-        acc.adj   += Number(r.adjustments       || 0);
+      var totals = data.reduce(function (acc, r) {
+        acc.gross += Number(r.gross_production || 0);
+        acc.net += Number(r.net_production || 0);
+        acc.coll += Number(r.collections || 0);
+        acc.adj += Number(r.adjustments || 0);
         return acc;
-      }, {gross:0, net:0, coll:0, adj:0});
+      }, { gross: 0, net: 0, coll: 0, adj: 0 });
 
       $('#tot-gross').text(fmtMoney(totals.gross));
       $('#tot-net').text(fmtMoney(totals.net));
@@ -487,13 +570,13 @@
       }
 
       var html = '';
-      data.forEach(function(row, idx) {
-        var color     = avatarColor(row.ProvNum);
-        var initStr   = initials(row);
-        var name      = escHtml(row.LName || '') + (row.PName ? ', ' + escHtml(row.PName) : '');
-        var adjVal    = Number(row.adjustments || 0);
-        var adjFmt    = fmtMoneyCompact(adjVal);
-        var adjColor  = adjVal < 0 ? 'text-red-500' : 'text-slate-900';
+      data.forEach(function (row, idx) {
+        var color = avatarColor(row.ProvNum);
+        var initStr = initials(row);
+        var name = escHtml(row.LName || '') + (row.PName ? ', ' + escHtml(row.PName) : '');
+        var adjVal = Number(row.adjustments || 0);
+        var adjFmt = fmtMoneyCompact(adjVal);
+        var adjColor = adjVal < 0 ? 'text-red-500' : 'text-slate-900';
 
         html += '<div class="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/70 transition-colors">';
 
@@ -548,9 +631,9 @@
 
     /* ── CSV exports ──────────────────────────────────── */
     function downloadCsv(filename, rows) {
-      var blob = new Blob([rows.join('\n')], {type: 'text/csv'});
-      var a    = document.createElement('a');
-      a.href   = URL.createObjectURL(blob);
+      var blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
       a.download = filename;
       a.click();
       URL.revokeObjectURL(a.href);
@@ -558,7 +641,7 @@
 
     function exportLocationCsv() {
       var rows = ['#,Location,Total Production,Patient Count,Avg Production Per Patient'];
-      _locationData.forEach(function(r) {
+      _locationData.forEach(function (r) {
         rows.push([r.rank, r.location, r.total_production, r.patient_count, r.avg_production].join(','));
       });
       downloadCsv('location-production.csv', rows);
@@ -567,7 +650,7 @@
     function exportProvidersCsv() {
       var data = sortedFiltered();
       var rows = ['#,Name,Abbr,Gross Production,Net Production,Collections,Adjustments'];
-      data.forEach(function(r, i) {
+      data.forEach(function (r, i) {
         var name = (r.LName || '') + (r.PName ? ' ' + r.PName : '');
         rows.push([
           i + 1,
@@ -585,61 +668,131 @@
     /* ── Data fetching ────────────────────────────────── */
     function fetchAll(start, end) {
       _currentStart = start;
-      _currentEnd   = end;
+      _currentEnd = end;
 
       showSkeletons();
 
       /* KPIs */
-      $.get("{{ route('dashboard.data') }}", {start_date: start, end_date: end})
+      $.get("{{ route('dashboard.data') }}", { start_date: start, end_date: end })
         .done(populateKpis)
         .fail(showKpiError);
 
+      /* Financials Per Location */
+      $.get("{{ route('dashboard.financials-per-location') }}", { start_date: start, end_date: end })
+        .done(function (data) {
+          _finPerLocData = data;
+          renderFinPerLocChart(data);
+        })
+        .fail(function () {
+          console.error("Failed to load financials per location.");
+        });
+
       /* Location stats */
-      $.get("{{ route('dashboard.location-stats') }}", {start_date: start, end_date: end})
-        .done(function(data) {
+      $.get("{{ route('dashboard.location-stats') }}", { start_date: start, end_date: end })
+        .done(function (data) {
           _locationData = data;
           renderLocationTable(data);
         })
-        .fail(function() {
+        .fail(function () {
           $('#locationTable').html('<p class="px-5 py-6 text-xs text-red-400 text-center">Failed to load location data.</p>');
         });
 
       /* Providers */
       $('#tot-gross,#tot-net,#tot-coll,#tot-adj').html('<span class="skel h-4 w-20 rounded"></span>');
-      $.get("{{ route('dashboard.providers') }}", {start_date: start, end_date: end})
-        .done(function(data) {
+      $.get("{{ route('dashboard.providers') }}", { start_date: start, end_date: end })
+        .done(function (data) {
           _providerData = data;
           renderProviders();
         })
-        .fail(function() {
+        .fail(function () {
           $('#providerList').html('<p class="px-5 py-8 text-xs text-red-400 text-center">Failed to load provider data.</p>');
         });
     }
 
+    /* ── Financials Per Location Chart ────────────────── */
+    function renderFinPerLocChart(data) {
+      $('#finPerLocSkel').addClass('hidden');
+      $('#finPerLocChart').addClass('opacity-100');
+
+      var labels = data.map(function (d) { return d.location; });
+      var dsNet = data.map(function (d) { return d.net_production; });
+      var dsNetLast = data.map(function (d) { return d.net_production_last; });
+      var dsGross = data.map(function (d) { return d.gross_production; });
+      var dsGrossLast = data.map(function (d) { return d.gross_production_last; });
+      var dsAdj = data.map(function (d) { return d.adjustments; });
+      var dsColl = data.map(function (d) { return d.collections; });
+      var dsCollLast = data.map(function (d) { return d.collections_last; });
+
+      var ctx = document.getElementById('finPerLocChart');
+      if (!ctx) return;
+
+      if (_finPerLocChartInstance) {
+        _finPerLocChartInstance.destroy();
+      }
+
+      var opts = chartOptions(function (v) { return v >= 1000 || v <= -1000 ? (v / 1000) + 'k' : v; });
+      opts.scales.y.min = undefined; // allow negative values
+
+      _finPerLocChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: 'Net Production', data: dsNet, backgroundColor: '#fbbf24' },
+            { label: 'Net Production Last year', data: dsNetLast, backgroundColor: '#d97706' },
+            { label: 'Gross Production', data: dsGross, backgroundColor: '#6ee7b7' },
+            { label: 'Gross Production Last year', data: dsGrossLast, backgroundColor: '#34d399' },
+            { label: 'Adjustment', data: dsAdj, backgroundColor: '#a855f7' },
+            { label: 'Collection', data: dsColl, backgroundColor: '#38bdf8' },
+            { label: 'Collection Last year', data: dsCollLast, backgroundColor: '#0284c7' },
+          ]
+        },
+        options: opts
+      });
+    }
+
+    function exportFinPerLocCsv() {
+      var rows = ['Location,Net Production,Net Production Last year,Gross Production,Gross Production Last year,Adjustment,Collection,Collection Last year'];
+      _finPerLocData.forEach(function (r) {
+        rows.push([
+          r.location,
+          r.net_production,
+          r.net_production_last,
+          r.gross_production,
+          r.gross_production_last,
+          r.adjustments,
+          r.collections,
+          r.collections_last
+        ].join(','));
+      });
+      downloadCsv('financials-per-location.csv', rows);
+    }
+
     /* ── Daterangepicker callback (picker initialised by x-daterange-picker component) ── */
-    window.onDrpApply = function(start, end) { fetchAll(start, end); };
+    window.onDrpApply = function (start, end) { fetchAll(start, end); };
 
     $(document).ready(function () {
 
       /* Search + sort handlers */
       var searchTimer;
-      $('#providerSearch').on('input', function() {
+      $('#providerSearch').on('input', function () {
         clearTimeout(searchTimer);
         searchTimer = setTimeout(renderProviders, 200);
       });
       $('#providerSort').on('change', renderProviders);
 
       /* Export handlers */
+      $('#exportFinPerLocBtn').on('click', exportFinPerLocCsv);
       $('#exportLocationBtn').on('click', exportLocationCsv);
       $('#exportProvidersBtn').on('click', exportProvidersCsv);
 
       /* Provider arrow click (event delegation) */
-      $(document).on('click', '.provArrow', function() {
+      $(document).on('click', '.provArrow', function () {
         openProvider($(this).data('provnum'));
       });
 
       /* Provider modal: tab switching */
-      $(document).on('click', '.prov-tab-btn', function() {
+      $(document).on('click', '.prov-tab-btn', function () {
         var tab = $(this).data('tab');
         $('.prov-tab-btn')
           .removeClass('border-emerald-500 text-emerald-600')
@@ -650,7 +803,7 @@
       });
 
       /* Provider modal: close */
-      $(document).on('click', '#closeProviderModal, #providerModalBackdrop', function() {
+      $(document).on('click', '#closeProviderModal, #providerModalBackdrop', function () {
         $('#providerModal').addClass('hidden');
       });
 
@@ -673,8 +826,8 @@
 
     function buildDailyData(allDates, dataArray, dateKey, valueKey) {
       var map = {};
-      (dataArray || []).forEach(function(r) { map[r[dateKey]] = Number(r[valueKey]) || 0; });
-      return allDates.map(function(d) { return map[d] || 0; });
+      (dataArray || []).forEach(function (r) { map[r[dateKey]] = Number(r[valueKey]) || 0; });
+      return allDates.map(function (d) { return map[d] || 0; });
     }
 
     function chartOptions(yCallback, yMax) {
@@ -709,7 +862,7 @@
 
     /* ── Provider modal ───────────────────────────────── */
     function openProvider(provNum) {
-      var prov = _providerData.find(function(p) { return String(p.ProvNum) === String(provNum); });
+      var prov = _providerData.find(function (p) { return String(p.ProvNum) === String(provNum); });
       if (!prov) return;
 
       /* Avatar + name */
@@ -728,8 +881,8 @@
 
       /* Destroy old charts */
       if (_provProductionChart) { _provProductionChart.destroy(); _provProductionChart = null; }
-      if (_provVisitsChart)     { _provVisitsChart.destroy();     _provVisitsChart     = null; }
-      if (_provTxChart)         { _provTxChart.destroy();         _provTxChart         = null; }
+      if (_provVisitsChart) { _provVisitsChart.destroy(); _provVisitsChart = null; }
+      if (_provTxChart) { _provTxChart.destroy(); _provTxChart = null; }
 
       /* Immediately populate Info tab with what we already have */
       $('#pov-net').text(fmtMoney(prov.net_production));
@@ -737,8 +890,8 @@
         .html('<span class="skel h-5 w-20 rounded"></span>');
 
       /* Fetch detail data from API */
-      $.get("{{ url('/dashboard/providers') }}/" + provNum, {start_date: _currentStart, end_date: _currentEnd})
-        .done(function(d) {
+      $.get("{{ url('/dashboard/providers') }}/" + provNum, { start_date: _currentStart, end_date: _currentEnd })
+        .done(function (d) {
           /* ── Info tab ── */
           $('#pov-specialty').text(d.provider.Specialty || 'N/A');
           $('#pov-avg-day').text(fmtMoney(d.stats.avg_production_per_day));
@@ -760,8 +913,8 @@
           $('#ptab-tx-rate').text(d.stats.tx_accepted_rate != null ? d.stats.tx_accepted_rate + '%' : 'N/A');
 
           /* ── Build daily date arrays ── */
-          var allDates   = allDatesInRange(_currentStart, _currentEnd);
-          var dateLabels = allDates.map(function(dt) { return moment(dt).format('MMM DD'); });
+          var allDates = allDatesInRange(_currentStart, _currentEnd);
+          var dateLabels = allDates.map(function (dt) { return moment(dt).format('MMM DD'); });
 
           /* Production chart */
           _provProductionChart = new Chart(document.getElementById('provProductionChart'), {
@@ -781,7 +934,7 @@
                 },
               ]
             },
-            options: chartOptions(function(v) { return v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v; })
+            options: chartOptions(function (v) { return v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v; })
           });
 
           /* Visits chart */
@@ -802,7 +955,7 @@
                 },
               ]
             },
-            options: chartOptions(function(v) { return v; })
+            options: chartOptions(function (v) { return v; })
           });
 
           /* TX Accepted chart */
@@ -818,10 +971,10 @@
                 },
               ]
             },
-            options: chartOptions(function(v) { return v + '%'; }, 100)
+            options: chartOptions(function (v) { return v + '%'; }, 100)
           });
         })
-        .fail(function() {
+        .fail(function () {
           $('#pov-specialty, #pov-avg-day, #pov-per-visit, #pov-patient-visits, #pov-new-visits, #pov-tx-rate').text('—');
           $('#ptab-prod-net, #ptab-prod-avg, #ptab-prod-per-visit, #ptab-visits-total, #ptab-visits-new, #ptab-tx-rate').text('—');
         });
@@ -838,7 +991,11 @@
       <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
         <h3 class="text-base font-bold text-slate-900">Provider Information</h3>
         <button id="closeProviderModal" class="text-slate-400 hover:text-slate-700 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       </div>
 
@@ -855,10 +1012,17 @@
 
       <!-- Tabs -->
       <div class="flex border-b border-slate-100 px-6 flex-shrink-0">
-        <button class="prov-tab-btn border-b-2 border-emerald-500 text-emerald-600 font-semibold py-3 pr-6 text-sm" data-tab="info">Info</button>
-        <button class="prov-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 font-medium py-3 pr-6 text-sm" data-tab="production">Production</button>
-        <button class="prov-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 font-medium py-3 pr-6 text-sm" data-tab="visits">Visits</button>
-        <button class="prov-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 font-medium py-3 text-sm" data-tab="tx-accepted">TX Accepted</button>
+        <button class="prov-tab-btn border-b-2 border-emerald-500 text-emerald-600 font-semibold py-3 pr-6 text-sm"
+          data-tab="info">Info</button>
+        <button
+          class="prov-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 font-medium py-3 pr-6 text-sm"
+          data-tab="production">Production</button>
+        <button
+          class="prov-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 font-medium py-3 pr-6 text-sm"
+          data-tab="visits">Visits</button>
+        <button
+          class="prov-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 font-medium py-3 text-sm"
+          data-tab="tx-accepted">TX Accepted</button>
       </div>
 
       <!-- Tab panels -->
@@ -887,7 +1051,11 @@
                 <!-- Map placeholder -->
                 <div class="h-44 bg-slate-100 flex items-center justify-center border-b border-slate-100">
                   <div class="text-center">
-                    <svg class="w-8 h-8 text-slate-300 mx-auto mb-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <svg class="w-8 h-8 text-slate-300 mx-auto mb-1" xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                      <circle cx="12" cy="10" r="3" />
+                    </svg>
                     <p class="text-xs text-slate-400">Map not available</p>
                   </div>
                 </div>
