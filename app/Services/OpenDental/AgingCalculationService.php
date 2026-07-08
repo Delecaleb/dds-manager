@@ -33,17 +33,49 @@ class AgingCalculationService
 {
     private const OFFICE_NAME = '8 Mile';
 
+    /**
+     * Allowlist mapping a DataTables column data-key to the outer-query
+     * alias it may be ordered by. Every value here is a column selected in
+     * pagedRows()'s outer SELECT (in BOTH the guarantor and patient
+     * branches), so MySQL can ORDER BY the alias directly. Any requested
+     * key not present here falls back to 'total' — this is the only thing
+     * that ever reaches the ORDER BY clause, so a caller can never inject
+     * arbitrary SQL through the sort parameter.
+     *
+     * Deliberately excluded (not meaningfully sortable):
+     *   office        — a single constant label ('8 Mile')
+     *   family_names  — GROUP_CONCAT list attached AFTER pagination
+     *   family_ids    — same; no pre-LIMIT sort key exists
+     */
+    private const SORTABLE = [
+        'guarantor_name' => 'guarantor_name',
+        'guarantor_id'   => 'guarantor_id',
+        'bal_current'    => 'bal_current',
+        'bal_30'         => 'bal_30',
+        'bal_60'         => 'bal_60',
+        'bal_90'         => 'bal_90',
+        'bal_120'        => 'bal_120',
+        'bal_180'        => 'bal_180',
+        'bal_240'        => 'bal_240',
+        'bal_365'        => 'bal_365',
+        'credit_balance' => 'credit_balance',
+        'contract'       => 'contract',
+        'total'          => 'total',
+    ];
+
     public function guarantorAging(
         string $asOfDate,
         ?string $search,
         bool $includeCredits,
         int $start,
-        int $length
+        int $length,
+        ?string $sortKey = null,
+        string $sortDir = 'desc'
     ): array {
         $totalRecords = $this->countRecords($asOfDate, null, true, 'guarantor');
         $filteredRecords = $this->countRecords($asOfDate, $search, $includeCredits, 'guarantor');
 
-        $rows = $this->pagedRows($asOfDate, $search, $includeCredits, $start, $length, 'guarantor');
+        $rows = $this->pagedRows($asOfDate, $search, $includeCredits, $start, $length, 'guarantor', $sortKey, $sortDir);
         $rows = $this->attachFamilies($rows);
 
         $totals = $this->totals($asOfDate, $search, $includeCredits, 'guarantor');
@@ -69,12 +101,14 @@ class AgingCalculationService
         ?string $search,
         bool $includeCredits,
         int $start,
-        int $length
+        int $length,
+        ?string $sortKey = null,
+        string $sortDir = 'desc'
     ): array {
         $totalRecords = $this->countRecords($asOfDate, null, true, 'patient');
         $filteredRecords = $this->countRecords($asOfDate, $search, $includeCredits, 'patient');
 
-        $rows = $this->pagedRows($asOfDate, $search, $includeCredits, $start, $length, 'patient');
+        $rows = $this->pagedRows($asOfDate, $search, $includeCredits, $start, $length, 'patient', $sortKey, $sortDir);
 
         $totals = $this->totals($asOfDate, $search, $includeCredits, 'patient');
 
@@ -99,8 +133,16 @@ class AgingCalculationService
         return (int) DB::selectOne($sql, $bindings)->cnt;
     }
 
-    private function pagedRows(string $asOfDate, ?string $search, bool $includeCredits, int $start, int $length, string $groupBy): Collection
+    private function pagedRows(string $asOfDate, ?string $search, bool $includeCredits, int $start, int $length, string $groupBy, ?string $sortKey = null, string $sortDir = 'desc'): Collection
     {
+        // Resolve the requested sort against the allowlist (never the raw
+        // request), then append a unique tiebreak so pagination is stable
+        // across pages when the primary key has ties.
+        $sortExpr = self::SORTABLE[$sortKey] ?? 'total';
+        $dir      = strtolower($sortDir) === 'asc' ? 'ASC' : 'DESC';
+        $tieBreak = $groupBy === 'patient' ? 'patient_id' : 'guarantor_id';
+        $orderBy  = "ORDER BY {$sortExpr} {$dir}, {$tieBreak} ASC";
+
         if ($groupBy === 'patient') {
             $sql = 'SELECT
                         base.guarantor_id,
@@ -118,7 +160,7 @@ class AgingCalculationService
                     JOIN od_patients g ON g.PatNum = base.guarantor_id
                     LEFT JOIN (' . $this->contractSql() . ') contract_agg ON contract_agg.guarantor_id = base.guarantor_id
                     WHERE 1=1 ' . $this->searchClause($search, 'p') . '
-                    ORDER BY base.total DESC
+                    ' . $orderBy . '
                     LIMIT ? OFFSET ?';
 
             $bindings = array_merge($this->dateBindings($asOfDate), $this->searchBindings($search), [$length, $start]);
@@ -144,7 +186,7 @@ class AgingCalculationService
                 JOIN od_patients g ON g.PatNum = base.row_id
                 LEFT JOIN (' . $this->contractSql() . ') contract_agg ON contract_agg.guarantor_id = base.row_id
                 WHERE 1=1 ' . $this->searchClause($search, 'g') . '
-                ORDER BY base.total DESC
+                ' . $orderBy . '
                 LIMIT ? OFFSET ?';
 
         $bindings = array_merge($this->dateBindings($asOfDate), $this->searchBindings($search), [$length, $start]);

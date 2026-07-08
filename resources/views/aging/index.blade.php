@@ -503,9 +503,12 @@
         className: 'dt-col-sticky px-4 py-3',
       },
       { data: 'guarantor_id', className: 'px-4 py-3 border-r border-gray-200 text-gray-500' },
-      { data: 'family_names', className: 'px-4 py-3 border-r border-gray-200 text-gray-900 truncate max-w-[240px]' },
-      { data: 'family_ids', className: 'px-4 py-3 border-r border-gray-200 text-gray-500' },
-      { data: 'office', defaultContent: '—', className: 'px-4 py-3 border-r border-gray-200 text-gray-500' },
+      // Patient / Patient ID are a GROUP_CONCAT family list attached after
+      // pagination, and Office is a single constant label — none has a
+      // pre-LIMIT SQL sort key, so they're intentionally not orderable.
+      { data: 'family_names', orderable: false, className: 'px-4 py-3 border-r border-gray-200 text-gray-900 truncate max-w-[240px]' },
+      { data: 'family_ids', orderable: false, className: 'px-4 py-3 border-r border-gray-200 text-gray-500' },
+      { data: 'office', orderable: false, defaultContent: '—', className: 'px-4 py-3 border-r border-gray-200 text-gray-500' },
       { data: 'bal_current', className: 'px-4 py-3 border-r border-gray-200 bg-emerald-50/40 text-emerald-700 font-semibold' },
       { data: 'bal_30', className: 'px-4 py-3 border-r border-gray-200 bg-emerald-50/40 text-emerald-700 font-semibold' },
       { data: 'bal_60', className: 'px-4 py-3 border-r border-gray-200 bg-emerald-50/40 text-emerald-700 font-semibold' },
@@ -562,7 +565,8 @@
         serverSide: true,
         paging: true,
         searching: false,
-        ordering: false,
+        ordering: true,
+        order: [[15, 'desc']], // Total, descending — matches the previous fixed sort
         pageLength: 20,
         lengthMenu: [10, 20, 50, 100],
         ajax: {

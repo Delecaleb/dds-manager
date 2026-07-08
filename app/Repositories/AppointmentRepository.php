@@ -13,9 +13,17 @@ class AppointmentRepository
      */
     public function getAppointmentsByDateRange(string $start, string $end, ?string $clinicId = null): Collection
     {
+        // AptDateTime may be stored either as OpenDental's raw ISO string with
+        // a 'T' separator (varchar) or as a normalized MySQL DATETIME, depending
+        // on whether the datetime conversion migration has run yet. Filtering on
+        // the normalized DATE keeps the range correct in BOTH cases — REPLACE is
+        // a harmless no-op once the column is a real DATETIME (no 'T' present).
+        $startDate = substr($start, 0, 10);
+        $endDate   = substr($end, 0, 10);
+
         $query = OdAppointment::query()
             ->with(['patient', 'provider'])
-            ->whereBetween('AptDateTime', [$start, $end]);
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$startDate, $endDate]);
 
         // Filter out unused status codes to match legacy Calendar logic
         // E.g., skip planned or unscheduled if needed in calendar view, though OpenDental API filtered these dynamically

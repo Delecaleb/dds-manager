@@ -182,11 +182,29 @@
             {{-- ══════════════════ STATS ROW ══════════════════ --}}
             <div class="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-10 flex-shrink-0">
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Production</p>
+                    <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
+                        Production
+                        <span class="text-slate-400 cursor-help"
+                              title="Display $ amount of what has been produced for the day">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </span>
+                    </p>
                     <p class="text-xl font-bold text-slate-900" id="stat-production">—</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Scheduled Production</p>
+                    <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
+                        Scheduled Production
+                        <span class="text-slate-400 cursor-help"
+                              title="Display $ amount of what has been scheduled for the day">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </span>
+                    </p>
                     <p class="text-xl font-bold text-slate-900" id="stat-scheduled">—</p>
                 </div>
                 <div class="ml-auto flex items-center gap-2">
@@ -381,7 +399,7 @@
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">--</span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">35.00</span></td>
+                                    style="min-width: 10rem;"><span class=""></span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">--</span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
@@ -403,7 +421,7 @@
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">--</span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">$ 675.00</span></td>
+                                    style="min-width: 10rem;"><span class=""></span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">--</span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
@@ -411,7 +429,7 @@
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">--</span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">$ 603.57</span></td>
+                                    style="min-width: 10rem;"><span class=""></span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="">-</span></td>
                             </tr>
@@ -430,7 +448,7 @@
                                                 class="block truncate">--</strong> <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class="">700.00</span></strong>
+                                                class="block truncate"><span class=""></span></strong>
                                             <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
@@ -464,7 +482,7 @@
                                                 class="block truncate">--</strong> <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class="">$ 13,500.00</span></strong>
+                                                class="block truncate"><span class=""></span></strong>
                                             <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
@@ -477,7 +495,7 @@
                                                 class="block truncate">--</strong> <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class="">$ 12,071.40</span></strong>
+                                                class="block truncate"><span class=""></span></strong>
                                             <!----></span> </span></td>
                                 <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
                                     style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
@@ -853,7 +871,6 @@
                             if (data.length) console.log('[FC Events] sample:', { id: data[0].id, title: data[0].title, start: data[0].start, resourceId: data[0].resourceId });
                             setProgress(82, 'Rendering...');
                             success(data);
-                            updateStats(data);
                         })
                         .catch(err => { setProgress(100, 'Failed to load appointments'); fail(err); });
                 },
@@ -905,11 +922,14 @@
                 // ── Keep date picker in sync + re-fetch resources for new date ─
                 datesSet: function (info) {
                     const d = info.view.currentStart;
-                    document.getElementById('calDate').value = d.toISOString().split('T')[0];
+                    const dateStr = d.toISOString().split('T')[0];
+                    document.getElementById('calDate').value = dateStr;
                     updateDateLabel(d);
                     // Resources are provider columns for the CURRENT date; they must be
                     // re-fetched whenever the visible date changes (FC does not do this automatically).
                     calendar.refetchResources();
+                    // Production stats are computed server-side for the visible day.
+                    fetchCalendarStats(dateStr);
                 },
             });
 
@@ -934,6 +954,7 @@
                 showCalSkeleton('Refreshing...');
                 calendar.refetchEvents();
                 calendar.refetchResources();
+                fetchCalendarStats(document.getElementById('calDate').value);
             });
 
             // ── Date picker ───────────────────────────────────────────────
@@ -979,13 +1000,22 @@
         }
 
         // ── Stats bar ─────────────────────────────────────────────────────
-        function updateStats(events) {
-            const scheduled = events.filter(e =>
-                e.status === 1 || e.status === 'Scheduled'
-            ).length;
-            const total = events.length;
-            document.getElementById('stat-production').textContent = total + ' appointments';
-            document.getElementById('stat-scheduled').textContent = scheduled + ' scheduled';
+        // Production / Scheduled Production are computed server-side for the
+        // selected day (see CalendarController@stats) so the figures reflect
+        // real produced/scheduled dollars rather than a client-side sum.
+        function fetchCalendarStats(date) {
+            const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+            const prodEl = document.getElementById('stat-production');
+            const schedEl = document.getElementById('stat-scheduled');
+            prodEl.textContent = schedEl.textContent = '…';
+
+            fetch(baseUrl + '/calendar/stats?date=' + date)
+                .then(r => r.json())
+                .then(s => {
+                    prodEl.textContent = usd.format(parseFloat(s.production) || 0);
+                    schedEl.textContent = usd.format(parseFloat(s.scheduled_production) || 0);
+                })
+                .catch(() => { prodEl.textContent = schedEl.textContent = '—'; });
         }
 
         // ── Sidebar: show ─────────────────────────────────────────────────

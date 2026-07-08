@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
     Route::get('financials/score-cards', [FinancialController::class, 'scoreCards'])->name('financials.score-cards');
     Route::get('calendar', [CalendarController::class, 'index'])->name('calendar.index');
     Route::get('calendar/data', [CalendarController::class, 'getData'])->name('calendar.data');
+    Route::get('calendar/stats', [CalendarController::class, 'stats'])->name('calendar.stats');
     Route::get('calendar/resources', [CalendarController::class, 'getResources'])->name('calendar.resources');
     Route::get('calendar/appointments-details-data', [CalendarController::class, 'appointmentsDetailsData'])->name('calendar.appointments-details-data');
     Route::get('calendar/appointment-capacity-data', [CalendarController::class, 'appointmentCapacityData'])->name('calendar.appointment-capacity-data');
@@ -90,6 +91,13 @@ Route::middleware('auth')->group(function () {
     Route::get('front-office/performance-reminders-data', [\App\Http\Controllers\FrontOfficeController::class, 'performanceRemindersData'])->name('front-office.performance-reminders-data');
     Route::get('front-office/performance-non-reminders-data', [\App\Http\Controllers\FrontOfficeController::class, 'performanceNonRemindersData'])->name('front-office.performance-non-reminders-data');
     Route::get('front-office/performance-totals-data', [\App\Http\Controllers\FrontOfficeController::class, 'performanceTotalsData'])->name('front-office.performance-totals-data');
+
+    Route::get('rcm', function () {
+        return view('rcm.index');
+    })->name('rcm.index');
+    Route::get('provisioner', function () {
+        return view('provisioner.index');
+    })->name('provisioner.index');
 
     Route::get('tx-miner', [TxMinerController::class, 'index'])->name('tx-miner.index');
     Route::get('tx-miner/data', [TxMinerController::class, 'data'])->name('tx-miner.data');
