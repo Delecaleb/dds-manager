@@ -36,6 +36,50 @@ abstract class BaseQuerySyncService
         return $this->table();
     }
 
+    /**
+     * Hook to massage a raw OpenDental API row before it is persisted
+     * locally. Base implementation is a pass-through; subclasses override
+     * to normalize values (e.g. datetimes) so they land cleanly in typed
+     * local columns. Keeping this in the base — rather than each caller —
+     * means every current and future sync gets a single, consistent place
+     * to sanitize source data.
+     */
+    protected function transformRow(array $row): array
+    {
+        return $row;
+    }
+
+    /**
+     * Convert an OpenDental datetime string into a MySQL-storable
+     * "Y-m-d H:i:s" value, or null when the source is blank/sentinel/
+     * out-of-range. OpenDental emits ISO-8601 with a 'T' separator and uses
+     * placeholder dates (e.g. 0001-01-01) for "no value"; both must be
+     * normalized before they reach a real DATETIME column.
+     */
+    protected function normalizeDateTime($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = str_replace('T', ' ', trim((string) $value));
+
+        if ($value === '') {
+            return null;
+        }
+
+        // Reject OpenDental sentinels and anything outside MySQL's DATETIME
+        // range (1000-01-01 .. 9999-12-31) — lexical compare is valid for
+        // zero-padded ISO strings.
+        if ($value < '1000-01-01 00:00:00' || $value > '9999-12-31 23:59:59') {
+            return null;
+        }
+
+        $timestamp = strtotime($value);
+
+        return $timestamp !== false ? date('Y-m-d H:i:s', $timestamp) : null;
+    }
+
     public function sync(): void
     {
         $log = SyncLog::firstOrCreate(
@@ -115,7 +159,7 @@ abstract class BaseQuerySyncService
                             $this->primaryKey() => $row[$this->primaryKey()]
                         ],
 
-                        $row
+                        $this->transformRow($row)
 
                     );
 
@@ -174,7 +218,7 @@ abstract class BaseQuerySyncService
                             $this->primaryKey() => $row[$this->primaryKey()]
                         ],
 
-                        $row
+                        $this->transformRow($row)
 
                     );
 

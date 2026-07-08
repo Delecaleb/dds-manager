@@ -13,9 +13,14 @@ class AppointmentRepository
      */
     public function getAppointmentsByDateRange(string $start, string $end, ?string $clinicId = null): Collection
     {
+        // AptDateTime is a real DATETIME column; build full-day bounds so the
+        // range is inclusive of the entire end day.
+        $startBound = substr($start, 0, 10) . ' 00:00:00';
+        $endBound   = substr($end, 0, 10) . ' 23:59:59';
+
         $query = OdAppointment::query()
             ->with(['patient', 'provider'])
-            ->whereBetween('AptDateTime', [$start, $end]);
+            ->whereBetween('AptDateTime', [$startBound, $endBound]);
 
         // Filter out unused status codes to match legacy Calendar logic
         // E.g., skip planned or unscheduled if needed in calendar view, though OpenDental API filtered these dynamically

@@ -93,7 +93,7 @@ class CalendarController extends Controller
         $start = $request->get('start') ?? date('Y-m-d');
         $end = $request->get('end') ?? date('Y-m-d');
 
-        // We fetch scheduled appointments for the date frame
+        // We fetch scheduled appointments for the date frame.
         $appointments = OdAppointment::whereBetween('AptDateTime', [$start . ' 00:00:00', $end . ' 23:59:59'])
             ->where('AptStatus', 1) // Only count Scheduled
             ->get();
