@@ -234,6 +234,22 @@
       if (!start) start = moment().startOf('year').format('YYYY-MM-DD');
       if (!end) end = moment().endOf('year').format('YYYY-MM-DD');
 
+      var skelSummary = '';
+      for (let i = 0; i < 3; i++) {
+        skelSummary += '<tr class="animate-pulse"><td class="px-4 py-3"><div class="h-4 bg-gray-200 rounded w-3/4"></div></td><td class="px-4 py-3"><div class="h-4 bg-gray-200 rounded w-1/2"></div></td><td class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-1/4"></div></td></tr>';
+      }
+      $('#depositTbody').html(skelSummary);
+      $('#depositTfoot').addClass('hidden');
+
+      var skelDetail = '';
+      for (let i = 0; i < 5; i++) {
+        skelDetail += '<tr class="animate-pulse">';
+        for (let c = 0; c < 13; c++) skelDetail += '<td class="px-4 py-3"><div class="h-3 bg-gray-200 rounded w-full"></div></td>';
+        skelDetail += '</tr>';
+      }
+      $('#detailTbody').html(skelDetail);
+      $('#detailTfoot').addClass('hidden');
+
       $.get('{{ route("deposits.data") }}', { start_date: start, end_date: end })
         .done(function (res) {
           _depositsData = res.deposits || [];
@@ -243,7 +259,8 @@
           renderDetail(_detailsData, _totalAmount);
         })
         .fail(function () {
-          $('#depositTbody').html('<tr><td colspan="3" class="text-center py-6 text-red-500">Failed to load data.</td></tr>');
+          $('#depositTbody').html('<tr><td colspan="3" class="text-center py-6 text-red-500">Failed to load summary data.</td></tr>');
+          $('#detailTbody').html('<tr><td colspan="13" class="text-center py-6 text-red-500">Failed to load detail data.</td></tr>');
         });
     }
 

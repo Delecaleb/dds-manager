@@ -151,76 +151,77 @@
         </div>
     </main>
 
-    @push('scripts')
-        <script>
-            $(document).ready(function () {
-                let table = $('#hygieneRecallTable').DataTable({
-                    processing: true,
-                    serverSide: true,
-                    ajax: {
-                        url: "{{ route('hygiene-recall.data') }}",
-                        data: function (d) {
-                            var drp = $('#hygieneDateRange').data('daterangepicker');
-                            if (drp) {
-                                d.start_date = drp.startDate.format('YYYY-MM-DD');
-                                d.end_date = drp.endDate.format('YYYY-MM-DD');
-                            }
-                        }
-                    },
-                    columns: [
-                        { data: 'provider_name', name: 'provider_name' },
-                        { data: 'provider_id', name: 'provider_id' },
-                        { data: 'office', name: 'office' },
-                        { data: 'missed_recall', name: 'missed_recall' },
-                        { data: 'patient_recalled', name: 'patient_recalled' },
-                        { data: 'future_appointments', name: 'future_appointments' },
-                        { data: 'patients_recalled_dollars', name: 'patients_recalled_dollars' },
-                        { data: 'patient_recall_rate', name: 'patient_recall_rate' }
-                    ],
-                    dom: 'rt<"flex justify-between items-center px-5 py-4 border-t border-slate-100 bg-white"ip>',
-                    pagingType: 'simple_numbers',
-                    pageLength: 10,
-                    language: { paginate: { previous: "Prev", next: "Next" }, processing: "" },
-                    createdRow: function (row, data, dataIndex) {
-                        $(row).addClass('hover:bg-slate-50 transition border-b border-slate-100 last:border-0');
+    <script>
+        var _currentStartDate = moment().startOf('month').format('YYYY-MM-DD');
+        var _currentEndDate = moment().format('YYYY-MM-DD');
 
-                        // Fixed Columns styling matching Figma
-                        $('td:eq(0)', row).addClass('dt-col-sticky bg-white font-medium text-slate-700 border-r border-slate-100 p-4 text-[13px]').css('left', '0');
-                        $('td:eq(1)', row).addClass('dt-col-sticky bg-slate-50/50 font-bold text-slate-800 border-r border-slate-100 p-4 text-[13px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]').css('left', '12rem');
+        $(document).ready(function () {
+            let table = $('#hygieneRecallTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: "{{ route('hygiene-recall.data') }}",
+                    data: function (d) {
+                        d.start_date = _currentStartDate;
+                        d.end_date = _currentEndDate;
+                    }
+                },
+                columns: [
+                    { data: 'provider_name', name: 'provider_name' },
+                    { data: 'provider_id', name: 'provider_id' },
+                    { data: 'office', name: 'office' },
+                    { data: 'missed_recall', name: 'missed_recall' },
+                    { data: 'patient_recalled', name: 'patient_recalled' },
+                    { data: 'future_appointments', name: 'future_appointments' },
+                    { data: 'patients_recalled_dollars', name: 'patients_recalled_dollars' },
+                    { data: 'patient_recall_rate', name: 'patient_recall_rate' }
+                ],
+                dom: 'rt<"flex justify-between items-center px-5 py-4 border-t border-slate-100 bg-white"ip>',
+                pagingType: 'simple_numbers',
+                pageLength: 10,
+                language: { paginate: { previous: "Prev", next: "Next" }, processing: "" },
+                createdRow: function (row, data, dataIndex) {
+                    $(row).addClass('hover:bg-slate-50 transition border-b border-slate-100 last:border-0');
 
-                        // Remainder styling
-                        $('td', row).not(':lt(2)').addClass('text-right p-4 font-medium text-slate-600 text-[13px] border-l border-slate-100');
-                        $('td:eq(2)', row).removeClass('text-right').addClass('text-left'); // Office column
+                    // Fixed Columns styling matching Figma
+                    $('td:eq(0)', row).addClass('dt-col-sticky bg-white font-medium text-slate-700 border-r border-slate-100 p-4 text-[13px]').css('left', '0');
+                    $('td:eq(1)', row).addClass('dt-col-sticky bg-slate-50/50 font-bold text-slate-800 border-r border-slate-100 p-4 text-[13px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]').css('left', '12rem');
 
-                        // Inject decorative icon to all except the percentage
-                        const svgLink = '<div class="ml-2 inline-flex items-center justify-center p-0.5 border border-slate-200 rounded text-slate-400 bg-slate-50 hover:bg-slate-100 flex-shrink-0"><svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="square" stroke-width="2" d="M7 17l9.2-9.2M17 17V7H7"/></svg></div>';
+                    // Remainder styling
+                    $('td', row).not(':lt(2)').addClass('text-right p-4 font-medium text-slate-600 text-[13px] border-l border-slate-100');
+                    $('td:eq(2)', row).removeClass('text-right').addClass('text-left'); // Office column
 
-                        for (let i = 0; i <= 6; i++) {
-                            if (i === 2) continue; // Office column skipped
-                            let td = $('td:eq(' + i + ')', row);
-                            let isRight = td.hasClass('text-right');
-                            let content = td.html();
-                            if (isRight) {
-                                td.html('<div class="flex items-center justify-end w-full">' + content + svgLink + '</div>');
-                            } else {
-                                td.html('<div class="flex items-center justify-between w-full">' + content + svgLink + '</div>');
-                            }
+                    // Inject decorative icon to all except the percentage
+                    const svgLink = '<div class="ml-2 inline-flex items-center justify-center p-0.5 border border-slate-200 rounded text-slate-400 bg-slate-50 hover:bg-slate-100 flex-shrink-0"><svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="square" stroke-width="2" d="M7 17l9.2-9.2M17 17V7H7"/></svg></div>';
+
+                    for (let i = 0; i <= 6; i++) {
+                        if (i === 2) continue; // Office column skipped
+                        let td = $('td:eq(' + i + ')', row);
+                        let isRight = td.hasClass('text-right');
+                        let content = td.html();
+                        if (isRight) {
+                            td.html('<div class="flex items-center justify-end w-full">' + content + svgLink + '</div>');
+                        } else {
+                            td.html('<div class="flex items-center justify-between w-full">' + content + svgLink + '</div>');
                         }
                     }
-                });
+                }
+            });
 
-                $('#tableSearch').on('keyup', function () {
-                    table.search(this.value).draw();
-                });
+            $('#tableSearch').on('keyup', function () {
+                table.search(this.value).draw();
+            });
 
-                window.refreshHygieneTable = function (start, end) {
-                    table.ajax.reload();
-                };
+            window.refreshHygieneTable = function (start, end) {
+                _currentStartDate = start;
+                _currentEndDate = end;
+                table.ajax.reload();
+            };
 
-                $('#refreshBtn').on('click', function () {
-                    table.ajax.reload();
-                });
-            }));
-        </script>
-    @endpush
+            $('#refreshBtn').on('click', function () {
+                table.ajax.reload();
+            });
+        });
+    </script>
+
 </x-app-layout>

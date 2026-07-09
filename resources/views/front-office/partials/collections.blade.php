@@ -216,7 +216,7 @@
     $(document).ready(function () {
 
         // Chart Config
-        const chartConfig = {
+        const foCollectionsChartConfig = {
             type: 'doughnut',
             options: {
                 responsive: true,
@@ -231,7 +231,7 @@
         try {
             const ctx = document.getElementById('patBalancesChart').getContext('2d');
             balancesChart = new Chart(ctx, {
-                ...chartConfig,
+                ...foCollectionsChartConfig,
                 data: {
                     labels: ['0-30 Days', '31-60 Days', '61-90 Days', '91-120 Days', '120+ Days'],
                     datasets: [{
@@ -274,7 +274,7 @@
         // Trigger load initially
         hydrateCollections();
 
-        $('#frontOfficeMonth').off('change.cols').on('change.cols', function() {
+        $('#frontOfficeMonth').off('change.cols').on('change.cols', function () {
             colTable.ajax.reload();
             hydrateCollections();
         });

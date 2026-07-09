@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OdProvider;
 use App\Services\OpenDental\FinancialAnalyticsService;
 use App\Services\OpenDental\PatientAnalyticsService;
 use Illuminate\Http\Request;
@@ -68,7 +69,7 @@ class DashboardController extends Controller
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
 
-        $provider = DB::table('od_providers')->where('ProvNum', $id)->first();
+        $provider = OdProvider::where('ProvNum', $id)->first();
         if (!$provider) {
             return response()->json(['error' => 'Provider not found'], 404);
         }
@@ -207,44 +208,40 @@ class DashboardController extends Controller
         $end = $request->input('end_date', now()->toDateString());
         $search = trim($request->input('search', ''));
 
-        $grossSub = DB::table('od_procedure_logs')
-            ->select('ProvNum', DB::raw('SUM(ProcFee) AS gross'))
+        $grossSub = \App\Models\OdProcedureLog::select('ProvNum', \Illuminate\Support\Facades\DB::raw('SUM(ProcFee) AS gross'))
             ->where('ProcStatus', 'C')
             ->whereBetween('ProcDate', [$start, $end])
             ->groupBy('ProvNum');
 
-        $adjSub = DB::table('od_adjustments')
-            ->select('ProvNum', DB::raw('SUM(AdjAmt) AS adjustments'))
+        $adjSub = \App\Models\OdAdjustment::select('ProvNum', \Illuminate\Support\Facades\DB::raw('SUM(AdjAmt) AS adjustments'))
             ->whereBetween('AdjDate', [$start, $end])
             ->groupBy('ProvNum');
 
-        $writeoffSub = DB::table('od_claim_procs')
-            ->select('ProvNum', DB::raw('SUM(WriteOff) AS writeoffs'))
+        $writeoffSub = \App\Models\ClaimProcs::select('ProvNum', \Illuminate\Support\Facades\DB::raw('SUM(WriteOff) AS writeoffs'))
             ->whereBetween('ProcDate', [$start, $end])
             ->groupBy('ProvNum');
 
-        $collSub = DB::table('od_pay_splits')
-            ->select('ProvNum', DB::raw('SUM(SplitAmt) AS collections'))
+        $collSub = \App\Models\PaySplit::select('ProvNum', \Illuminate\Support\Facades\DB::raw('SUM(SplitAmt) AS collections'))
             ->whereBetween('DatePay', [$start, $end])
             ->groupBy('ProvNum');
 
-        $providers = DB::table('od_providers as p')
+        $providers = \App\Models\OdProvider::from((new \App\Models\OdProvider)->getTable() . ' as p')
             ->select(
                 'p.ProvNum',
                 'p.LName',
                 'p.PName',
                 'p.Abbr',
-                DB::raw('COALESCE(g.gross, 0) AS gross_production'),
-                DB::raw('COALESCE(a.adjustments, 0) AS adjustments'),
-                DB::raw('COALESCE(w.writeoffs, 0) AS writeoffs'),
-                DB::raw('COALESCE(c.collections, 0) AS collections'),
-                DB::raw('COALESCE(g.gross, 0) - ABS(COALESCE(a.adjustments, 0)) - ABS(COALESCE(w.writeoffs, 0)) AS net_production')
+                \Illuminate\Support\Facades\DB::raw('COALESCE(g.gross, 0) AS gross_production'),
+                \Illuminate\Support\Facades\DB::raw('COALESCE(a.adjustments, 0) AS adjustments'),
+                \Illuminate\Support\Facades\DB::raw('COALESCE(w.writeoffs, 0) AS writeoffs'),
+                \Illuminate\Support\Facades\DB::raw('COALESCE(c.collections, 0) AS collections'),
+                \Illuminate\Support\Facades\DB::raw('COALESCE(g.gross, 0) + COALESCE(a.adjustments, 0) + COALESCE(w.writeoffs, 0) AS net_production')
             )
             ->leftJoinSub($grossSub, 'g', 'p.ProvNum', '=', 'g.ProvNum')
             ->leftJoinSub($adjSub, 'a', 'p.ProvNum', '=', 'a.ProvNum')
             ->leftJoinSub($writeoffSub, 'w', 'p.ProvNum', '=', 'w.ProvNum')
             ->leftJoinSub($collSub, 'c', 'p.ProvNum', '=', 'c.ProvNum')
-            ->where('p.IsHidden', 'false')
+            ->where('p.IsHidden', 0)
             ->whereRaw('COALESCE(g.gross, 0) > 0')
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($q2) use ($search) {

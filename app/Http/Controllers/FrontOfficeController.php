@@ -412,7 +412,7 @@ class FrontOfficeController extends Controller
 
     public function collectionsStats(Request $request)
     {
-        $stats = clone OdPatient::query()->select(
+        $stats = OdPatient::query()->select(
             DB::raw('SUM(CAST(Bal_0_30 AS DECIMAL(10,2))) as Bal_0_30'),
             DB::raw('SUM(CAST(Bal_31_60 AS DECIMAL(10,2))) as Bal_31_60'),
             DB::raw('SUM(CAST(Bal_61_90 AS DECIMAL(10,2))) as Bal_61_90'),
@@ -421,8 +421,8 @@ class FrontOfficeController extends Controller
         )->first();
 
         // Ins/Pts Collect
-        $pts_collection = clone OdProcedureLog::query()->where('ProcStatus', 2)->sum('ProcFee');
-        $ins_collection = clone OdPatient::query()->sum(DB::raw('CAST(InsEst AS DECIMAL(10,2))'));
+        $pts_collection = OdProcedureLog::query()->where('ProcStatus', 2)->sum('ProcFee');
+        $ins_collection = OdPatient::query()->sum(DB::raw('CAST(InsEst AS DECIMAL(10,2))'));
 
         return response()->json([
             'balances' => [

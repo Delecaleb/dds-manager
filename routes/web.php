@@ -45,8 +45,20 @@ Route::middleware('auth')->group(function () {
 
     Route::get('kpis', [KpisController::class, 'index'])->name('kpis.index');
     Route::get('kpis/hygiene', [KpisController::class, 'hygiene'])->name('kpis.hygiene');
+    Route::get('kpis/hygiene-providers', [KpisController::class, 'hygieneProviders'])->name('kpis.hygiene-providers');
     Route::get('kpis/doctor', [KpisController::class, 'doctor'])->name('kpis.doctor');
+    Route::get('kpis/doctor-providers', [KpisController::class, 'doctorProviders'])->name('kpis.doctor-providers');
     Route::get('kpis/office', [KpisController::class, 'office'])->name('kpis.office');
+    Route::get('kpis/endo', [KpisController::class, 'endo'])->name('kpis.endo');
+    Route::get('kpis/endo-providers', [KpisController::class, 'endoProviders'])->name('kpis.endo-providers');
+    Route::get('kpis/perio', [KpisController::class, 'perio'])->name('kpis.perio');
+    Route::get('kpis/perio-providers', [KpisController::class, 'perioProviders'])->name('kpis.perio-providers');
+    Route::get('kpis/ortho', [KpisController::class, 'ortho'])->name('kpis.ortho');
+    Route::get('kpis/ortho-providers', [KpisController::class, 'orthoProviders'])->name('kpis.ortho-providers');
+    Route::get('kpis/os', [KpisController::class, 'os'])->name('kpis.os');
+    Route::get('kpis/os-providers', [KpisController::class, 'osProviders'])->name('kpis.os-providers');
+    Route::get('kpis/pedo', [KpisController::class, 'pedo'])->name('kpis.pedo');
+    Route::get('kpis/pedo-providers', [KpisController::class, 'pedoProviders'])->name('kpis.pedo-providers');
 
     Route::get('provider-portal', [ProviderPortalController::class, 'index'])->name('provider-portal.index');
     Route::get('provider-portal/providers', [ProviderPortalController::class, 'providers'])->name('provider-portal.providers');

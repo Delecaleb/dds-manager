@@ -24,11 +24,12 @@ class HygieneRecallController extends Controller
         $providers = OdProvider::where('IsHidden', false)->get();
 
         $data = $providers->map(function ($prov) use ($start, $end) {
-            // Find overdue recalls mapped directly to this provider within the selected date range
-            $overdueRecallPatNums = OdRecall::where('ProvNum', $prov->ProvNum)
-                ->whereBetween('DateDue', [$start, $end])
-                ->whereDate('DateDue', '<', Carbon::today())
-                ->pluck('PatNum')
+            // Find overdue recalls mapped directly to this provider (via patient PriProv) within the selected date range
+            $overdueRecallPatNums = OdRecall::join('od_patients', 'od_recalls.PatNum', '=', 'od_patients.PatNum')
+                ->where('od_patients.PriProv', $prov->ProvNum)
+                ->whereBetween('od_recalls.DateDue', [$start, $end])
+                ->whereDate('od_recalls.DateDue', '<', Carbon::today())
+                ->pluck('od_recalls.PatNum')
                 ->toArray();
 
             $totalOverdueCount = count($overdueRecallPatNums);
