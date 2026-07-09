@@ -1747,6 +1747,7 @@ class OperationsAnalyticsService
                 'p.PatNum',
                 'p.EmployerNum',
                 'p.City', // Fallback for Referrals as Referral tables are unsynced
+                'p.Zip',
                 \Illuminate\Support\Facades\DB::raw('MAX(cp.PlanNum) as PlanNum')
             )
             ->where('pl.ProcStatus', 'C')
@@ -1765,6 +1766,7 @@ class OperationsAnalyticsService
         $referrals = [];
         $payors = [];
         $employers = [];
+        $zips = [];
 
         foreach ($rows as $r) {
             $ref = $r->City ?: 'Unknown Referral';
@@ -1775,16 +1777,21 @@ class OperationsAnalyticsService
 
             $emp = $r->EmployerNum ? 'Employer ' . $r->EmployerNum : 'No Employer';
             $employers[$emp] = ($employers[$emp] ?? 0) + 1;
+
+            $zipCode = trim($r->Zip) ?: 'No Zip';
+            $zips[$zipCode] = ($zips[$zipCode] ?? 0) + 1;
         }
 
         arsort($referrals);
         arsort($payors);
         arsort($employers);
+        arsort($zips);
 
         return [
-            'top_referrals' => array_slice($referrals, 0, 10),
-            'top_payors' => array_slice($payors, 0, 10),
-            'top_employers' => array_slice($employers, 0, 10),
+            'top_referrals' => array_slice($referrals, 0, 10, true),
+            'top_payors' => array_slice($payors, 0, 10, true),
+            'top_employers' => array_slice($employers, 0, 10, true),
+            'top_zips' => array_slice($zips, 0, 10, true),
             'available_zips' => $allZips,
         ];
     }
