@@ -13,6 +13,8 @@ abstract class BaseQuerySyncService
 
     protected int $maxRetries = 5;
 
+    protected bool $throttle = false;
+
     protected int $sleepSeconds = 1;
 
     public function __construct(
@@ -36,48 +38,27 @@ abstract class BaseQuerySyncService
         return $this->table();
     }
 
-    /**
-     * Hook to massage a raw OpenDental API row before it is persisted
-     * locally. Base implementation is a pass-through; subclasses override
-     * to normalize values (e.g. datetimes) so they land cleanly in typed
-     * local columns. Keeping this in the base — rather than each caller —
-     * means every current and future sync gets a single, consistent place
-     * to sanitize source data.
-     */
     protected function transformRow(array $row): array
     {
         return $row;
     }
 
-    /**
-     * Convert an OpenDental datetime string into a MySQL-storable
-     * "Y-m-d H:i:s" value, or null when the source is blank/sentinel/
-     * out-of-range. OpenDental emits ISO-8601 with a 'T' separator and uses
-     * placeholder dates (e.g. 0001-01-01) for "no value"; both must be
-     * normalized before they reach a real DATETIME column.
-     */
     protected function normalizeDateTime($value): ?string
     {
-        if ($value === null) {
+        if (!$value) {
             return null;
         }
 
-        $value = str_replace('T', ' ', trim((string) $value));
+        $value = str_replace('T', ' ', trim($value));
 
-        if ($value === '') {
+        if (
+            $value < '1000-01-01 00:00:00' ||
+            $value > '9999-12-31 23:59:59'
+        ) {
             return null;
         }
 
-        // Reject OpenDental sentinels and anything outside MySQL's DATETIME
-        // range (1000-01-01 .. 9999-12-31) — lexical compare is valid for
-        // zero-padded ISO strings.
-        if ($value < '1000-01-01 00:00:00' || $value > '9999-12-31 23:59:59') {
-            return null;
-        }
-
-        $timestamp = strtotime($value);
-
-        return $timestamp !== false ? date('Y-m-d H:i:s', $timestamp) : null;
+        return date('Y-m-d H:i:s', strtotime($value));
     }
 
     public function sync(): void
@@ -93,19 +74,16 @@ abstract class BaseQuerySyncService
         $log->update([
             'status' => 'running',
             'started_at' => now(),
-            'last_error' => null
+            'finished_at' => null,
+            'last_error' => null,
         ]);
 
         try {
 
-            if ($log->last_primary_key === null || $this->syncColumn() === null) {
-
-                $this->runInitialSync($log);
-
+            if ($this->syncColumn()) {
+                $this->incrementalSync($log);
             } else {
-
-                $this->runIncrementalSync($log);
-
+                $this->initialSync($log);
             }
 
             $log->update([
@@ -127,119 +105,120 @@ abstract class BaseQuerySyncService
         }
     }
 
-    protected function runInitialSync(SyncLog $log): void
+    protected function initialSync(SyncLog $log): void
     {
         $lastId = $log->last_primary_key ?? 0;
 
         while (true) {
 
-            $sql = "
+            $rows = $this->executeWithRetry("
                 SELECT *
                 FROM {$this->table()}
                 WHERE {$this->primaryKey()} > {$lastId}
                 ORDER BY {$this->primaryKey()}
                 LIMIT {$this->batchSize}
-            ";
-
-            $rows = $this->executeWithRetry($sql);
+            ");
 
             if (empty($rows)) {
                 break;
             }
 
-            DB::transaction(function () use ($rows, $log, &$lastId) {
+            $this->bulkUpsert($rows);
 
-                $model = $this->model();
-
-                foreach ($rows as $row) {
-
-                    $model::updateOrCreate(
-
-                        [
-                            $this->primaryKey() => $row[$this->primaryKey()]
-                        ],
-
-                        $this->transformRow($row)
-
-                    );
-
-                    $lastId = $row[$this->primaryKey()];
-
-                    $log->increment('total_processed');
-                }
-
-            });
+            $lastId = end($rows)[$this->primaryKey()];
 
             $log->update([
                 'last_primary_key' => $lastId
             ]);
 
-            echo "Synced through ID {$lastId}\n";
+            $log->increment('total_processed', count($rows));
 
-            sleep($this->sleepSeconds);
+            echo "Synced {$log->total_processed} rows (Last ID {$lastId})\n";
+
+            if ($this->throttle) {
+                sleep($this->sleepSeconds);
+            }
         }
     }
 
-    protected function runIncrementalSync(SyncLog $log): void
+    protected function incrementalSync(SyncLog $log): void
     {
-        $lastSync = $log->last_synced_at;
+        $lastDate = $log->last_synced_at ?? '1900-01-01 00:00:00';
+        $lastId = $log->last_primary_key ?? 0;
 
         while (true) {
 
-            $sql = "
-
-                SELECT *
-
-                FROM {$this->table()}
-
-                WHERE {$this->syncColumn()} > '{$lastSync}'
-
-                ORDER BY {$this->syncColumn()},{$this->primaryKey()}
-
-                LIMIT {$this->batchSize}
-
-            ";
-
-            $rows = $this->executeWithRetry($sql);
+            $rows = $this->executeWithRetry("
+            SELECT *
+            FROM {$this->table()}
+            WHERE
+                {$this->syncColumn()} > '{$lastDate}'
+            OR (
+                {$this->syncColumn()} = '{$lastDate}'
+                AND {$this->primaryKey()} > {$lastId}
+            )
+            ORDER BY
+                {$this->syncColumn()},
+                {$this->primaryKey()}
+            LIMIT {$this->batchSize}
+        ");
 
             if (empty($rows)) {
                 break;
             }
 
-            DB::transaction(function () use ($rows, $log, &$lastSync) {
+            $this->bulkUpsert($rows);
 
-                $model = $this->model();
+            $lastRow = end($rows);
 
-                foreach ($rows as $row) {
-
-                    $model::updateOrCreate(
-
-                        [
-                            $this->primaryKey() => $row[$this->primaryKey()]
-                        ],
-
-                        $this->transformRow($row)
-
-                    );
-
-                    if (isset($row[$this->syncColumn()])) {
-                        $lastSync = $row[$this->syncColumn()];
-                    }
-
-                    $log->increment('total_processed');
-                }
-
-            });
+            $lastDate = $lastRow[$this->syncColumn()];
+            $lastId = $lastRow[$this->primaryKey()];
 
             $log->update([
-                'last_synced_at' => $lastSync
+                'last_synced_at' => $lastDate,
+                'last_primary_key' => $lastId,
             ]);
 
-            echo "Synced through {$lastSync}\n";
+            $log->increment('total_processed', count($rows));
 
-            sleep($this->sleepSeconds);
+            echo sprintf(
+                "Processed %d rows | Checkpoint: %s | PK: %s\n",
+                count($rows),
+                $lastDate,
+                $lastId
+            );
 
+            if ($this->throttle) {
+                sleep($this->sleepSeconds);
+            }
         }
+    }
+
+    protected function bulkUpsert(array $rows): void
+    {
+        if (empty($rows)) {
+            return;
+        }
+
+        $model = $this->model();
+
+        $records = array_map(
+            fn($row) => $this->transformRow($row),
+            $rows
+        );
+
+        $updateColumns = array_values(array_diff(
+            array_keys($records[0]),
+            [$this->primaryKey()]
+        ));
+
+        DB::transaction(function () use ($model, $records, $updateColumns) {
+            $model::upsert(
+                $records,
+                [$this->primaryKey()],
+                $updateColumns
+            );
+        }, 3);
     }
 
     protected function executeWithRetry(string $sql): array
@@ -254,24 +233,28 @@ abstract class BaseQuerySyncService
 
             } catch (Exception $e) {
 
-                if ($attempt >= $this->maxRetries) {
-
+                if (
+                    !str_contains($e->getMessage(), 'Deadlock')
+                    &&
+                    !str_contains($e->getMessage(), 'Lock wait timeout')
+                    &&
+                    !str_contains($e->getMessage(), 'server has gone away')
+                ) {
                     throw $e;
-
                 }
 
-                $wait = pow(2, $attempt);
+                if ($attempt >= $this->maxRetries) {
+                    throw $e;
+                }
 
-                echo "Retry {$attempt} after {$wait} seconds...\n";
+                $wait = 2 ** $attempt;
+
+                echo "Retry {$attempt} after {$wait}s\n";
 
                 sleep($wait);
 
                 $attempt++;
-
             }
-
         }
-
     }
-
 }
