@@ -312,13 +312,15 @@ class DashboardController extends Controller
             $ca = $currentStats['adj']->get($cNum, 0);
             $cw = $currentStats['writeoffs']->get($cNum, 0);
             $cc = $currentStats['coll']->get($cNum, 0);
-            $cn = $cg - abs($ca) - abs($cw);
+            // $cn = $cg - abs($ca) - abs($cw);
+            $cn = $cg + $ca + $cw;
 
             $lg = $lastYearStats['gross']->get($cNum, 0);
             $la = $lastYearStats['adj']->get($cNum, 0);
             $lw = $lastYearStats['writeoffs']->get($cNum, 0);
             $lc = $lastYearStats['coll']->get($cNum, 0);
-            $ln = $lg - abs($la) - abs($lw);
+            // $ln = $lg - abs($la) - abs($lw);
+            $ln = $lg + $la + $lw;
 
             $result[] = [
                 'clinic_num' => $cNum,
