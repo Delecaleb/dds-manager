@@ -25,16 +25,16 @@ class FinancialAnalyticsService
             ->whereBetween('ProcDate', [$start, $end])
             ->sum('WriteOff');
 
-        $net = $gross - abs($adjustments) - abs($writeoffs);
+        $net = $gross + $adjustments + $writeoffs;
 
         return [
-            'gross_production'  => round($gross, 2),
-            'net_production'    => round($net, 2),
-            'adjustments'       => round($adjustments, 2),
-            'writeoffs'         => round($writeoffs, 2),
-            'collections'       => round($collections, 2),
-            'adjustment_rate'   => $gross > 0 ? round((abs($adjustments) / $gross) * 100, 2) : 0,
-            'collection_rate'   => $gross > 0 ? round(($collections / $gross) * 100, 2) : 0,
+            'gross_production' => round($gross, 2),
+            'net_production' => round($net, 2),
+            'adjustments' => round($adjustments, 2),
+            'writeoffs' => round($writeoffs, 2),
+            'collections' => round($collections, 2),
+            'adjustment_rate' => $gross > 0 ? round((abs($adjustments) / $gross) * 100, 2) : 0,
+            'collection_rate' => $gross > 0 ? round(($collections / $gross) * 100, 2) : 0,
         ];
     }
 }
