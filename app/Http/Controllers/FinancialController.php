@@ -25,158 +25,170 @@ class FinancialController extends Controller
     {
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
+        $section = $request->input('section', 'all');
+
+        $response = [];
+
+        if (in_array($section, ['all', 'kpis'])) {
+            $response = array_merge(
+                $response,
+                $this->patientAnalytics->getPatientAnalytics($start, $end),
+                $this->financialAnalytics->filterAnalysis($start, $end)
+            );
+        }
 
         // Utilization Data Chart (Provider Production)
-        $utilizationData = DB::select("
-            SELECT
-                CONCAT(pr.LName, ', ', pr.PName) AS provider,
-                SUM(pl.ProcFee) AS production
-            FROM od_procedure_logs pl
-            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            WHERE pl.ProcStatus = 'C'
-              AND pl.ProcDate BETWEEN ? AND ?
-            GROUP BY pr.ProvNum, pr.LName, pr.PName
-            ORDER BY production DESC
-        ", [$start, $end]);
+        if (in_array($section, ['all', 'utilization'])) {
+            $utilizationData = DB::select("
+                SELECT
+                    CONCAT(pr.LName, ', ', pr.PName) AS provider,
+                    SUM(pl.ProcFee) AS production
+                FROM od_procedure_logs pl
+                JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
+                WHERE pl.ProcStatus = 'C'
+                  AND pl.ProcDate BETWEEN ? AND ?
+                GROUP BY pr.ProvNum, pr.LName, pr.PName
+                ORDER BY production DESC
+            ", [$start, $end]);
 
-        // Adjustment Percent Chart
-        $adjustmentData = DB::select("
-            SELECT
-                d.ItemName AS label,
-                SUM(a.AdjAmt) AS value
-            FROM od_adjustments a
-            JOIN od_definitions d ON a.AdjType = d.DefNum
-            WHERE a.AdjDate BETWEEN ? AND ?
-            GROUP BY d.DefNum, d.ItemName
-            ORDER BY ABS(SUM(a.AdjAmt)) DESC
-        ", [$start, $end]);
+            $response['utilization'] = $utilizationData;
+        }
 
-        // Top Services Chart
-        $topServicesData = DB::select("
-            SELECT
-                d.ItemName AS label,
-                SUM(pl.ProcFee) AS value
-            FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            JOIN od_definitions d ON pc.ProcCat = d.DefNum
-            WHERE pl.ProcStatus = 'C'
-              AND pl.ProcDate BETWEEN ? AND ?
-            GROUP BY d.DefNum, d.ItemName
-            ORDER BY SUM(pl.ProcFee) DESC
-            LIMIT 5
-        ", [$start, $end]);
+        // Adjustment & Top Services Charts
+        if (in_array($section, ['all', 'charts'])) {
+            $adjustmentData = DB::select("
+                SELECT
+                    d.ItemName AS label,
+                    SUM(a.AdjAmt) AS value
+                FROM od_adjustments a
+                JOIN od_definitions d ON a.AdjType = d.DefNum
+                WHERE a.AdjDate BETWEEN ? AND ?
+                GROUP BY d.DefNum, d.ItemName
+                ORDER BY ABS(SUM(a.AdjAmt)) DESC
+            ", [$start, $end]);
 
+            $topServicesData = DB::select("
+                SELECT
+                    d.ItemName AS label,
+                    SUM(pl.ProcFee) AS value
+                FROM od_procedure_logs pl
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
+                JOIN od_definitions d ON pc.ProcCat = d.DefNum
+                WHERE pl.ProcStatus = 'C'
+                  AND pl.ProcDate BETWEEN ? AND ?
+                GROUP BY d.DefNum, d.ItemName
+                ORDER BY SUM(pl.ProcFee) DESC
+                LIMIT 5
+            ", [$start, $end]);
+
+            $response['adjustments_breakdown'] = $adjustmentData;
+            $response['top_services'] = $topServicesData;
+        }
 
         // Daily Revenue Data
-        $dailyGross = DB::table('od_procedure_logs')
-            ->where('ProcStatus', 'C')
-            ->whereBetween('ProcDate', [$start, $end])
-            ->selectRaw('DATE(ProcDate) as date, SUM(ProcFee) as amount')
-            ->groupByRaw('DATE(ProcDate)')
-            ->pluck('amount', 'date');
+        if (in_array($section, ['all', 'daily-revenue'])) {
+            $dailyGross = DB::table('od_procedure_logs')
+                ->where('ProcStatus', 'C')
+                ->whereBetween('ProcDate', [$start, $end])
+                ->selectRaw('DATE(ProcDate) as date, SUM(ProcFee) as amount')
+                ->groupByRaw('DATE(ProcDate)')
+                ->pluck('amount', 'date');
 
-        $dailyAdj = DB::table('od_adjustments')
-            ->whereBetween('AdjDate', [$start, $end])
-            ->selectRaw('DATE(AdjDate) as date, SUM(AdjAmt) as amount')
-            ->groupByRaw('DATE(AdjDate)')
-            ->pluck('amount', 'date');
+            $dailyAdj = DB::table('od_adjustments')
+                ->whereBetween('AdjDate', [$start, $end])
+                ->selectRaw('DATE(AdjDate) as date, SUM(AdjAmt) as amount')
+                ->groupByRaw('DATE(AdjDate)')
+                ->pluck('amount', 'date');
 
-        $dailyWriteOffs = DB::table('od_claim_procs')
-            ->whereBetween('ProcDate', [$start, $end])
-            ->selectRaw('DATE(ProcDate) as date, SUM(WriteOff) as amount')
-            ->groupByRaw('DATE(ProcDate)')
-            ->pluck('amount', 'date');
+            $dailyWriteOffs = DB::table('od_claim_procs')
+                ->whereBetween('ProcDate', [$start, $end])
+                ->selectRaw('DATE(ProcDate) as date, SUM(WriteOff) as amount')
+                ->groupByRaw('DATE(ProcDate)')
+                ->pluck('amount', 'date');
 
-        $dailyColl = DB::table('od_pay_splits')
-            ->whereBetween('DatePay', [$start, $end])
-            ->selectRaw('DATE(DatePay) as date, SUM(SplitAmt) as amount')
-            ->groupByRaw('DATE(DatePay)')
-            ->pluck('amount', 'date');
+            $dailyColl = DB::table('od_pay_splits')
+                ->whereBetween('DatePay', [$start, $end])
+                ->selectRaw('DATE(DatePay) as date, SUM(SplitAmt) as amount')
+                ->groupByRaw('DATE(DatePay)')
+                ->pluck('amount', 'date');
 
-        $allDates = collect(array_keys($dailyGross->toArray()))
-            ->merge(array_keys($dailyAdj->toArray()))
-            ->merge(array_keys($dailyWriteOffs->toArray()))
-            ->merge(array_keys($dailyColl->toArray()))
-            ->unique()
-            ->sort()
-            ->values();
+            $allDates = collect(array_keys($dailyGross->toArray()))
+                ->merge(array_keys($dailyAdj->toArray()))
+                ->merge(array_keys($dailyWriteOffs->toArray()))
+                ->merge(array_keys($dailyColl->toArray()))
+                ->unique()
+                ->sort()
+                ->values();
 
-        $dailyRevenueData = $allDates->map(function ($date) use ($dailyGross, $dailyAdj, $dailyWriteOffs, $dailyColl) {
-            $g = (float) ($dailyGross[$date] ?? 0);
-            $a = (float) ($dailyAdj[$date] ?? 0);
-            $w = (float) ($dailyWriteOffs[$date] ?? 0);
-            $c = (float) ($dailyColl[$date] ?? 0);
-            $n = $g + $a + $w;
-            return [
-                'date' => $date,
-                'gross' => $g,
-                'adjustments' => $a,
-                'collections' => $c,
-                'net' => $n
-            ];
-        })->values();
+            $response['daily_revenue'] = $allDates->map(function ($date) use ($dailyGross, $dailyAdj, $dailyWriteOffs, $dailyColl) {
+                $g = (float) ($dailyGross[$date] ?? 0);
+                $a = (float) ($dailyAdj[$date] ?? 0);
+                $w = (float) ($dailyWriteOffs[$date] ?? 0);
+                $c = (float) ($dailyColl[$date] ?? 0);
+                $n = $g + $a + $w;
+                return [
+                    'date' => $date,
+                    'gross' => $g,
+                    'adjustments' => $a,
+                    'collections' => $c,
+                    'net' => $n
+                ];
+            })->values();
+        }
 
         // Daily Patient Statistics
-        $dailyVisits = \App\Models\OdProcedureLog::where('ProcStatus', 'C')
-            ->whereBetween('ProcDate', [$start, $end])
-            ->selectRaw('DATE(ProcDate) as date, COUNT(DISTINCT PatNum) as cnt')
-            ->groupByRaw('DATE(ProcDate)')
-            ->pluck('cnt', 'date');
+        if (in_array($section, ['all', 'daily-patient'])) {
+            $dailyVisits = \App\Models\OdProcedureLog::where('ProcStatus', 'C')
+                ->whereBetween('ProcDate', [$start, $end])
+                ->selectRaw('DATE(ProcDate) as date, COUNT(DISTINCT PatNum) as cnt')
+                ->groupByRaw('DATE(ProcDate)')
+                ->pluck('cnt', 'date');
 
-        $dailyScheduled = \App\Models\OdAppointment::whereBetween('AptDateTime', [$start, $end])
-            ->where('AptStatus', 'Scheduled')
-            ->selectRaw('DATE(AptDateTime) as date, COUNT(DISTINCT PatNum) as cnt')
-            ->groupByRaw('DATE(AptDateTime)')
-            ->pluck('cnt', 'date');
+            $dailyScheduled = \App\Models\OdAppointment::whereBetween('AptDateTime', [$start, $end])
+                ->where('AptStatus', 'Scheduled')
+                ->selectRaw('DATE(AptDateTime) as date, COUNT(DISTINCT PatNum) as cnt')
+                ->groupByRaw('DATE(AptDateTime)')
+                ->pluck('cnt', 'date');
 
-        $dailyNewScheduled = \App\Models\OdAppointment::whereBetween('AptDateTime', [$start, $end])
-            ->where('IsNewPatient', 'true')
-            ->selectRaw('DATE(AptDateTime) as date, COUNT(DISTINCT PatNum) as cnt')
-            ->groupByRaw('DATE(AptDateTime)')
-            ->pluck('cnt', 'date');
+            $dailyNewScheduled = \App\Models\OdAppointment::whereBetween('AptDateTime', [$start, $end])
+                ->where('IsNewPatient', 'true')
+                ->selectRaw('DATE(AptDateTime) as date, COUNT(DISTINCT PatNum) as cnt')
+                ->groupByRaw('DATE(AptDateTime)')
+                ->pluck('cnt', 'date');
 
-        $dailyNewVisits = DB::table(function ($query) {
-            $query->from('od_procedure_logs')
-                ->where('ProcStatus', 'C')
-                ->select('PatNum')
-                ->selectRaw('MIN(DATE(ProcDate)) as first_visit')
-                ->groupBy('PatNum');
-        }, 'first_visits')
-            ->whereBetween('first_visit', [$start, $end])
-            ->select('first_visit as date')
-            ->selectRaw('COUNT(*) as cnt')
-            ->groupBy('first_visit')
-            ->pluck('cnt', 'date');
+            $dailyNewVisits = DB::table(function ($query) {
+                $query->from('od_procedure_logs')
+                    ->where('ProcStatus', 'C')
+                    ->select('PatNum')
+                    ->selectRaw('MIN(DATE(ProcDate)) as first_visit')
+                    ->groupBy('PatNum');
+            }, 'first_visits')
+                ->whereBetween('first_visit', [$start, $end])
+                ->select('first_visit as date')
+                ->selectRaw('COUNT(*) as cnt')
+                ->groupBy('first_visit')
+                ->pluck('cnt', 'date');
 
-        $allStatDates = collect(array_keys($dailyVisits->toArray()))
-            ->merge(array_keys($dailyScheduled->toArray()))
-            ->merge(array_keys($dailyNewScheduled->toArray()))
-            ->merge(array_keys($dailyNewVisits->toArray()))
-            ->unique()
-            ->sort()
-            ->values();
+            $allStatDates = collect(array_keys($dailyVisits->toArray()))
+                ->merge(array_keys($dailyScheduled->toArray()))
+                ->merge(array_keys($dailyNewScheduled->toArray()))
+                ->merge(array_keys($dailyNewVisits->toArray()))
+                ->unique()
+                ->sort()
+                ->values();
 
-        $dailyPatientStats = $allStatDates->map(function ($date) use ($dailyVisits, $dailyScheduled, $dailyNewScheduled, $dailyNewVisits) {
-            return [
-                'date' => $date,
-                'patient_visits' => (int) ($dailyVisits[$date] ?? 0),
-                'new_patient_visits' => (int) ($dailyNewVisits[$date] ?? 0),
-                'patient_scheduled' => (int) ($dailyScheduled[$date] ?? 0),
-                'new_patient_scheduled' => (int) ($dailyNewScheduled[$date] ?? 0),
-            ];
-        })->values();
+            $response['daily_patient_stats'] = $allStatDates->map(function ($date) use ($dailyVisits, $dailyScheduled, $dailyNewScheduled, $dailyNewVisits) {
+                return [
+                    'date' => $date,
+                    'patient_visits' => (int) ($dailyVisits[$date] ?? 0),
+                    'new_patient_visits' => (int) ($dailyNewVisits[$date] ?? 0),
+                    'patient_scheduled' => (int) ($dailyScheduled[$date] ?? 0),
+                    'new_patient_scheduled' => (int) ($dailyNewScheduled[$date] ?? 0),
+                ];
+            })->values();
+        }
 
-        return response()->json(array_merge(
-            $this->patientAnalytics->getPatientAnalytics($start, $end),
-            $this->financialAnalytics->filterAnalysis($start, $end),
-            [
-                'utilization' => $utilizationData,
-                'adjustments_breakdown' => $adjustmentData,
-                'top_services' => $topServicesData,
-                'daily_revenue' => $dailyRevenueData,
-                'daily_patient_stats' => $dailyPatientStats
-            ]
-        ));
+        return response()->json($response);
     }
 
     // ── Score Cards ───────────────────────────────────────────────────────────

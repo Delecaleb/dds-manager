@@ -775,22 +775,39 @@
     }
 
     function populate(data) {
-      $('#gross-production').text(fmtMoney(data.gross_production));
-      $('#net-production').text(fmtMoney(data.net_production));
-      $('#adjustment').text(fmtMoney(data.adjustments));
-      $('#adjustment-rate').text(data.adjustment_rate + '%');
-      $('#collection-rate').text(data.collection_rate + '%');
-      $('#collections-amt').text(fmtMoney(data.collections));
-      if (data.patient_visits != null) $('#patient-visits').text(data.patient_visits);
-      if (data.patient_scheduled != null) $('#patients-scheduled').text(data.patient_scheduled);
-      if (data.new_patients_scheduled != null) $('#new-patients-scheduled').text(data.new_patients_scheduled);
-      if (data.new_patient_visit != null) $('#new-patient-visits').text(data.new_patient_visit);
-      if (data.patient_avg_production != null) $('#patient-avg-production').text(fmtMoney(data.patient_avg_production));
-      if (data.daily_revenue) renderDailyRevenueChart(data.daily_revenue);
-      if (data.daily_patient_stats) renderDailyPatientStatsChart(data.daily_patient_stats);
-      if (data.utilization) renderUtilizationChart(data.utilization);
-      if (data.adjustments_breakdown) renderAdjustmentChart(data.adjustments_breakdown);
-      if (data.top_services) renderTopServicesChart(data.top_services);
+      if (data.gross_production !== undefined) $('#gross-production').text(fmtMoney(data.gross_production));
+      if (data.net_production !== undefined) $('#net-production').text(fmtMoney(data.net_production));
+      if (data.adjustments !== undefined) $('#adjustment').text(fmtMoney(data.adjustments));
+      if (data.adjustment_rate !== undefined) $('#adjustment-rate').text(data.adjustment_rate + '%');
+      if (data.collection_rate !== undefined) $('#collection-rate').text(data.collection_rate + '%');
+      if (data.collections !== undefined) $('#collections-amt').text(fmtMoney(data.collections));
+      if (data.patient_visits !== undefined) $('#patient-visits').text(data.patient_visits);
+      if (data.patient_scheduled !== undefined) $('#patients-scheduled').text(data.patient_scheduled);
+      if (data.new_patients_scheduled !== undefined) $('#new-patients-scheduled').text(data.new_patients_scheduled);
+      if (data.new_patient_visit !== undefined) $('#new-patient-visits').text(data.new_patient_visit);
+      if (data.patient_avg_production !== undefined) $('#patient-avg-production').text(fmtMoney(data.patient_avg_production));
+
+      if (data.daily_revenue !== undefined) renderDailyRevenueChart(data.daily_revenue);
+      if (data.daily_patient_stats !== undefined) renderDailyPatientStatsChart(data.daily_patient_stats);
+      if (data.utilization !== undefined) renderUtilizationChart(data.utilization);
+      if (data.adjustments_breakdown !== undefined) renderAdjustmentChart(data.adjustments_breakdown);
+      if (data.top_services !== undefined) renderTopServicesChart(data.top_services);
+    }
+
+    function fetchAnalytics(start, end) {
+      showSkeletons();
+
+      // Load blocks concurrently to prevent massive response sizes generating bottlenecks
+      var sections = ['kpis', 'utilization', 'charts', 'daily-revenue', 'daily-patient'];
+      sections.forEach(function (section) {
+        $.get(baseUrl + '/financials/data', { start_date: start, end_date: end, section: section })
+          .done(function (data) {
+            populate(data);
+          })
+          .fail(function (err) {
+            console.error('Failed to load section:', section, err);
+          });
+      });
     }
 
     var utilizationChartInstance = null;
@@ -1300,31 +1317,31 @@
       document.getElementById('scChart2Title').textContent = _sc.tab === 'production' ? 'Top Services' : 'Top Payments';
 
       var chartColors = _sc.tab === 'production' ? SC_COLORS : ['#6DE5C1', '#996BE5', '#56D9FE', '#FF8373', '#FFDA83', '#07A48D'];
-      var chartType   = _sc.tab === 'production' ? 'doughnut' : 'pie';
+      var chartType = _sc.tab === 'production' ? 'doughnut' : 'pie';
 
       if (_scChartCounts) _scChartCounts.destroy();
       _scChartCounts = new Chart(document.getElementById('scChartCounts').getContext('2d'), {
         type: chartType,
         data: {
-          labels: countsData.map(function (d) { 
-              return _sc.tab === 'collection' ? (d.label + ' ' + d.value) : d.label; 
+          labels: countsData.map(function (d) {
+            return _sc.tab === 'collection' ? (d.label + ' ' + d.value) : d.label;
           }),
           datasets: [{ data: countsData.map(function (d) { return d.value; }), backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff' }]
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { 
-             legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 8 } },
-             tooltip: {
-                callbacks: {
-                   label: function(item) {
-                      var val = item.raw;
-                      var total = item.dataset.data.reduce(function(a,b){return a+b},0);
-                      var pct = total > 0 ? ((val/total)*100).toFixed(2) + '%' : '0%';
-                      return ' ' + val + ' (' + pct + ')';
-                   }
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 8 } },
+            tooltip: {
+              callbacks: {
+                label: function (item) {
+                  var val = item.raw;
+                  var total = item.dataset.data.reduce(function (a, b) { return a + b }, 0);
+                  var pct = total > 0 ? ((val / total) * 100).toFixed(2) + '%' : '0%';
+                  return ' ' + val + ' (' + pct + ')';
                 }
-             }
+              }
+            }
           }
         }
       });
@@ -1333,25 +1350,25 @@
       _scChartValues = new Chart(document.getElementById('scChartValues').getContext('2d'), {
         type: chartType,
         data: {
-          labels: valuesData.map(function (d) { 
-              return _sc.tab === 'collection' ? (d.label + ' ' + fmtMoney(d.value)) : d.label; 
+          labels: valuesData.map(function (d) {
+            return _sc.tab === 'collection' ? (d.label + ' ' + fmtMoney(d.value)) : d.label;
           }),
           datasets: [{ data: valuesData.map(function (d) { return d.value; }), backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff' }]
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { 
-             legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 8 } },
-             tooltip: {
-                callbacks: {
-                   label: function(item) {
-                      var val = item.raw;
-                      var total = item.dataset.data.reduce(function(a,b){return a+b},0);
-                      var pct = total > 0 ? ((val/total)*100).toFixed(2) + '%' : '0%';
-                      return ' ' + fmtMoney(val) + ' (' + pct + ')';
-                   }
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 8 } },
+            tooltip: {
+              callbacks: {
+                label: function (item) {
+                  var val = item.raw;
+                  var total = item.dataset.data.reduce(function (a, b) { return a + b }, 0);
+                  var pct = total > 0 ? ((val / total) * 100).toFixed(2) + '%' : '0%';
+                  return ' ' + fmtMoney(val) + ' (' + pct + ')';
                 }
-             }
+              }
+            }
           }
         }
       });
