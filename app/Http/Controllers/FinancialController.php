@@ -39,10 +39,42 @@ class FinancialController extends Controller
             ORDER BY production DESC
         ", [$start, $end]);
 
+        // Adjustment Percent Chart
+        $adjustmentData = DB::select("
+            SELECT
+                d.ItemName AS label,
+                SUM(a.AdjAmt) AS value
+            FROM od_adjustments a
+            JOIN od_definitions d ON a.AdjType = d.DefNum
+            WHERE a.AdjDate BETWEEN ? AND ?
+            GROUP BY d.DefNum, d.ItemName
+            ORDER BY ABS(value) DESC
+        ", [$start, $end]);
+
+        // Top Services Chart
+        $topServicesData = DB::select("
+            SELECT
+                d.ItemName AS label,
+                SUM(pl.ProcFee) AS value
+            FROM od_procedure_logs pl
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
+            JOIN od_definitions d ON pc.ProcCat = d.DefNum
+            WHERE pl.ProcStatus = 'C'
+              AND pl.ProcDate BETWEEN ? AND ?
+            GROUP BY d.DefNum, d.ItemName
+            ORDER BY value DESC
+            LIMIT 5
+        ", [$start, $end]);
+
+
         return response()->json(array_merge(
             $this->patientAnalytics->getPatientAnalytics($start, $end),
             $this->financialAnalytics->filterAnalysis($start, $end),
-            ['utilization' => $utilizationData]
+            [
+                'utilization' => $utilizationData,
+                'adjustments_breakdown' => $adjustmentData,
+                'top_services' => $topServicesData
+            ]
         ));
     }
 

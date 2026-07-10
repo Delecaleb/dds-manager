@@ -140,7 +140,7 @@
                 </button>
                 <div class="flex items-center gap-2">
                     <i data-lucide="bar-chart-big" class="text-blue-600 w-5 h-5"></i>
-                    <span class="font-bold text-md tracking-tight text-slate-900">DDS Manager Dashboard</span>
+                    <span class="font-bold text-md tracking-tight text-slate-900">DDS Manager</span>
                 </div>
             </div>
             <div class="flex items-center gap-3"></div>

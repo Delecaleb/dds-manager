@@ -506,6 +506,35 @@
         </div>
       </div>
     </div>
+
+    {{-- ── Adjustment & Top Services Charts ──────────────────────────────────── --}}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+
+      <div>
+        <div class="font-bold border-b p-3 text-lg text-black bg-gray-50 border-gray-100 flex items-center">
+          Adjustment Percent
+        </div>
+        <div
+          class="bg-white p-6 border border-gray-100 border-t-0 shadow-sm relative pt-[60px] flex items-center justify-center">
+          <div class="w-full h-[320px]">
+            <canvas id="adjustmentChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="font-bold border-b p-3 text-lg text-black bg-gray-50 border-gray-100 flex items-center">
+          Top Services
+        </div>
+        <div
+          class="bg-white p-6 border border-gray-100 border-t-0 shadow-sm relative pt-[60px] flex items-center justify-center">
+          <div class="w-full h-[320px]">
+            <canvas id="topServicesChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
   </main>
 
   {{-- ── Score Cards Panel ───────────────────────────────────────────────────── --}}
@@ -734,6 +763,8 @@
       if (data.new_patient_visit != null) $('#new-patient-visits').text(data.new_patient_visit);
       if (data.patient_avg_production != null) $('#patient-avg-production').text(fmtMoney(data.patient_avg_production));
       if (data.utilization) renderUtilizationChart(data.utilization);
+      if (data.adjustments_breakdown) renderAdjustmentChart(data.adjustments_breakdown);
+      if (data.top_services) renderTopServicesChart(data.top_services);
     }
 
     var utilizationChartInstance = null;
@@ -793,6 +824,81 @@
             }
           }
         });
+      }
+    }
+
+    var adjustmentChartInstance = null;
+    var topServicesChartInstance = null;
+
+    // Core color palette matching screenshots
+    const donutColors = ['#69e0a2', '#a855f7', '#67e8f9', '#f87171', '#fde047', '#14b8a6', '#db2777', '#f97316'];
+
+    function createDonutConfig(labels, dataValues) {
+      return {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: dataValues,
+            backgroundColor: donutColors,
+            borderWidth: 0,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: {
+            legend: {
+              display: true,
+              position: 'right',
+              align: 'center',
+              labels: {
+                boxWidth: 12,
+                usePointStyle: false,
+                font: { weight: 'bold', size: 12, family: 'Inter, sans-serif' },
+                padding: 15,
+                color: '#111827'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function (item) {
+                  return ' ' + item.label + ': ' + fmtMoney(item.raw);
+                }
+              }
+            }
+          }
+        }
+      };
+    }
+
+    function renderAdjustmentChart(breakdownData) {
+      var ctx = document.getElementById('adjustmentChart').getContext('2d');
+      var labels = breakdownData.map(function (item) { return item.label; });
+      var values = breakdownData.map(function (item) { return parseFloat(item.value); }); // Positive or absolute values for charting
+
+      if (adjustmentChartInstance) {
+        adjustmentChartInstance.data.labels = labels;
+        adjustmentChartInstance.data.datasets[0].data = values;
+        adjustmentChartInstance.update();
+      } else {
+        adjustmentChartInstance = new Chart(ctx, createDonutConfig(labels, values));
+      }
+    }
+
+    function renderTopServicesChart(servicesData) {
+      var ctx = document.getElementById('topServicesChart').getContext('2d');
+      var labels = servicesData.map(function (item) { return item.label; });
+      var values = servicesData.map(function (item) { return parseFloat(item.value); });
+
+      if (topServicesChartInstance) {
+        topServicesChartInstance.data.labels = labels;
+        topServicesChartInstance.data.datasets[0].data = values;
+        topServicesChartInstance.update();
+      } else {
+        topServicesChartInstance = new Chart(ctx, createDonutConfig(labels, values));
       }
     }
 
