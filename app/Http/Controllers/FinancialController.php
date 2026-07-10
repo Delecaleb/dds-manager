@@ -48,7 +48,7 @@ class FinancialController extends Controller
             JOIN od_definitions d ON a.AdjType = d.DefNum
             WHERE a.AdjDate BETWEEN ? AND ?
             GROUP BY d.DefNum, d.ItemName
-            ORDER BY ABS(value) DESC
+            ORDER BY ABS(SUM(a.AdjAmt)) DESC
         ", [$start, $end]);
 
         // Top Services Chart
@@ -62,7 +62,7 @@ class FinancialController extends Controller
             WHERE pl.ProcStatus = 'C'
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY d.DefNum, d.ItemName
-            ORDER BY value DESC
+            ORDER BY SUM(pl.ProcFee) DESC
             LIMIT 5
         ", [$start, $end]);
 
@@ -341,7 +341,7 @@ class FinancialController extends Controller
             LEFT JOIN od_definitions pt ON p.PayType = pt.DefNum
             WHERE p.PayDate BETWEEN ? AND ?
             GROUP BY pt.ItemName, p.PayType
-            ORDER BY AmountValue DESC
+            ORDER BY SUM(p.PayAmt) DESC
         ", [$start, $end]);
 
         $byCount = $topPayments;
