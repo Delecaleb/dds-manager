@@ -326,27 +326,40 @@ class FinancialController extends Controller
         $totalCount = (int) array_sum(array_map(fn($r) => $r->cnt, $rows));
         $totalPay = (float) array_sum(array_map(fn($r) => $r->total_payments, $rows));
 
-        $byCount = $rows;
-        usort($byCount, fn($a, $b) => $b->cnt <=> $a->cnt);
-
         $providers = DB::table('od_providers')
             ->where('IsHidden', 'false')
             ->orderBy('LName')
             ->get(['ProvNum', 'LName', 'PName']);
+
+        // Collection Scorecard - Top Counts and Top Payments Charts
+        $topPayments = DB::select("
+            SELECT 
+                pt.ItemName AS PaymentType,
+                COUNT(p.PayNum) AS CountValue,
+                SUM(p.PayAmt) AS AmountValue
+            FROM od_payments p
+            LEFT JOIN od_definitions pt ON p.PayType = pt.DefNum
+            WHERE p.PayDate BETWEEN ? AND ?
+            GROUP BY pt.ItemName, p.PayType
+            ORDER BY AmountValue DESC
+        ", [$start, $end]);
+
+        $byCount = $topPayments;
+        usort($byCount, fn($a, $b) => $b->CountValue <=> $a->CountValue);
 
         return [
             'kpis' => [
                 'total_count' => $totalCount,
                 'total_payments' => round($totalPay, 2),
             ],
-            'chart_counts' => array_slice(array_map(fn($r) => [
-                'label' => $r->description,
-                'value' => (int) $r->cnt,
-            ], $byCount), 0, 5),
-            'chart_payments' => array_slice(array_map(fn($r) => [
-                'label' => $r->description,
-                'value' => round((float) $r->total_payments, 2),
-            ], $rows), 0, 5),
+            'chart_counts' => array_map(fn($r) => [
+                'label' => $r->PaymentType ?? 'Unknown',
+                'value' => (int) $r->CountValue,
+            ], array_slice($byCount, 0, 6)),
+            'chart_payments' => array_map(fn($r) => [
+                'label' => $r->PaymentType ?? 'Unknown',
+                'value' => round((float) $r->AmountValue, 2),
+            ], array_slice($topPayments, 0, 6)),
             'rows' => array_map(fn($r) => [
                 'provider' => $r->provider ?? 'Unknown',
                 'description' => $r->description,

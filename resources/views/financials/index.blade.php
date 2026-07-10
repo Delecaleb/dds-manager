@@ -1299,29 +1299,60 @@
       var valuesData = (_sc.tab === 'production' ? data.chart_services : data.chart_payments) || [];
       document.getElementById('scChart2Title').textContent = _sc.tab === 'production' ? 'Top Services' : 'Top Payments';
 
+      var chartColors = _sc.tab === 'production' ? SC_COLORS : ['#6DE5C1', '#996BE5', '#56D9FE', '#FF8373', '#FFDA83', '#07A48D'];
+      var chartType   = _sc.tab === 'production' ? 'doughnut' : 'pie';
+
       if (_scChartCounts) _scChartCounts.destroy();
       _scChartCounts = new Chart(document.getElementById('scChartCounts').getContext('2d'), {
-        type: 'doughnut',
+        type: chartType,
         data: {
-          labels: countsData.map(function (d) { return d.label; }),
-          datasets: [{ data: countsData.map(function (d) { return d.value; }), backgroundColor: SC_COLORS, borderWidth: 2, borderColor: '#fff' }]
+          labels: countsData.map(function (d) { 
+              return _sc.tab === 'collection' ? (d.label + ' ' + d.value) : d.label; 
+          }),
+          datasets: [{ data: countsData.map(function (d) { return d.value; }), backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff' }]
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 8 } } }
+          plugins: { 
+             legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 8 } },
+             tooltip: {
+                callbacks: {
+                   label: function(item) {
+                      var val = item.raw;
+                      var total = item.dataset.data.reduce(function(a,b){return a+b},0);
+                      var pct = total > 0 ? ((val/total)*100).toFixed(2) + '%' : '0%';
+                      return ' ' + val + ' (' + pct + ')';
+                   }
+                }
+             }
+          }
         }
       });
 
       if (_scChartValues) _scChartValues.destroy();
       _scChartValues = new Chart(document.getElementById('scChartValues').getContext('2d'), {
-        type: 'doughnut',
+        type: chartType,
         data: {
-          labels: valuesData.map(function (d) { return d.label; }),
-          datasets: [{ data: valuesData.map(function (d) { return d.value; }), backgroundColor: SC_COLORS, borderWidth: 2, borderColor: '#fff' }]
+          labels: valuesData.map(function (d) { 
+              return _sc.tab === 'collection' ? (d.label + ' ' + fmtMoney(d.value)) : d.label; 
+          }),
+          datasets: [{ data: valuesData.map(function (d) { return d.value; }), backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff' }]
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 8 } } }
+          plugins: { 
+             legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 8 } },
+             tooltip: {
+                callbacks: {
+                   label: function(item) {
+                      var val = item.raw;
+                      var total = item.dataset.data.reduce(function(a,b){return a+b},0);
+                      var pct = total > 0 ? ((val/total)*100).toFixed(2) + '%' : '0%';
+                      return ' ' + fmtMoney(val) + ' (' + pct + ')';
+                   }
+                }
+             }
+          }
         }
       });
     }
