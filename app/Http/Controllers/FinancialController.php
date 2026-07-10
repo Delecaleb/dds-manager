@@ -46,8 +46,10 @@ class FinancialController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
                 WHERE pl.ProcStatus = 'C'
+                  AND pr.IsHidden = 'false'
                   AND pl.ProcDate BETWEEN ? AND ?
                 GROUP BY pr.ProvNum, pr.LName, pr.PName
+                HAVING SUM(pl.ProcFee) > 0
                 ORDER BY production DESC
             ", [$start, $end]);
 

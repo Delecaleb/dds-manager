@@ -495,10 +495,10 @@
 
     </section>
 
-    {{-- ── Utilization Data Chart ────────────────────────────────────────────── --}}
+    {{-- ── Utilization Data Chart (Production by Provider) ────────────────────── --}}
     <div class="mt-8">
       <div class="font-bold border-b p-3 text-lg text-black bg-gray-50 border-gray-100 flex items-center">
-        Utilization Data
+        Production (by Provider)
       </div>
       <div class="bg-white p-8 border border-gray-100 border-t-0 shadow-sm relative pt-[60px]">
         <div class="h-[400px] w-full">
@@ -828,8 +828,8 @@
             datasets: [{
               label: 'Production',
               data: values,
-              backgroundColor: '#9b72e5',
-              barThickness: 150,
+              backgroundColor: '#996BE5',
+              barThickness: 100, // Slightly adjusted for better representation
               borderRadius: 2
             }]
           },
@@ -851,8 +851,8 @@
                 border: { display: false },
                 ticks: {
                   callback: function (value) {
-                    if (value >= 1000) return (value / 1000) + 'k';
-                    return value;
+                    if (value >= 1000) return '$' + (value / 1000) + 'k';
+                    return '$' + value;
                   },
                   color: '#6b7280',
                   font: { size: 11, family: 'Inter, sans-serif' },
@@ -902,56 +902,40 @@
                 label: 'Gross Production',
                 data: grossVals,
                 borderColor: '#6DE5C1',
-                backgroundColor: 'rgba(109, 229, 193, 0.2)',
-                fill: false,
+                backgroundColor: 'rgba(109, 229, 193, 0.4)',
+                fill: true,
                 tension: 0,
-                pointRadius: 4,
-                pointStyle: 'rectOutline',
-                pointBackgroundColor: '#6DE5C1',
-                pointBorderColor: '#fff',
-                pointHoverRadius: 6,
+                pointRadius: 0,
                 borderWidth: 2
               },
               {
                 label: 'Net Production',
                 data: netVals,
                 borderColor: '#996BE5',
-                backgroundColor: 'rgba(153, 107, 229, 0.2)',
-                fill: false,
+                backgroundColor: 'rgba(153, 107, 229, 0.4)',
+                fill: true,
                 tension: 0,
-                pointRadius: 4,
-                pointStyle: 'rectOutline',
-                pointBackgroundColor: '#996BE5',
-                pointBorderColor: '#fff',
-                pointHoverRadius: 6,
+                pointRadius: 0,
                 borderWidth: 2
               },
               {
                 label: 'Adjustment',
                 data: adjVals,
                 borderColor: '#56D9FE',
-                backgroundColor: 'rgba(86, 217, 254, 0.3)',
-                fill: 'origin',
+                backgroundColor: 'rgba(86, 217, 254, 0.4)',
+                fill: true,
                 tension: 0,
-                pointRadius: 4,
-                pointStyle: 'rectOutline',
-                pointBackgroundColor: '#56D9FE',
-                pointBorderColor: '#fff',
-                pointHoverRadius: 6,
+                pointRadius: 0,
                 borderWidth: 2
               },
               {
                 label: 'Collection',
                 data: collVals,
                 borderColor: '#FF8373',
-                backgroundColor: 'rgba(255, 131, 115, 0.3)',
-                fill: 'origin',
+                backgroundColor: 'rgba(255, 131, 115, 0.4)',
+                fill: true,
                 tension: 0,
-                pointRadius: 4,
-                pointStyle: 'rectOutline',
-                pointBackgroundColor: '#FF8373',
-                pointBorderColor: '#fff',
-                pointHoverRadius: 6,
+                pointRadius: 0,
                 borderWidth: 2
               }
             ]
@@ -1207,18 +1191,7 @@
       }
     }
 
-    function fetchAnalytics(start, end) {
-      showSkeletons();
-      $.get(baseUrl + '/financials/data', { start_date: start, end_date: end })
-        .done(function (data) { populate(data); })
-        .fail(function () {
-          ['#gross-production', '#net-production', '#adjustment', '#collection-rate',
-            '#patient-visits', '#patients-scheduled', '#new-patients-scheduled']
-            .forEach(function (id) { $(id).text('--'); });
-          $('#adjustment-rate, #collections-amt').text('--');
-          $('#fetchError').removeClass('hidden');
-        });
-    }
+
 
     var _currentStartDate = moment().startOf('month').format('YYYY-MM-DD');
     var _currentEndDate = moment().format('YYYY-MM-DD');
