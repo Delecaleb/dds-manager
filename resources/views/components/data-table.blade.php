@@ -60,7 +60,7 @@
         </tbody>
 
         @if(isset($foot) && $foot->isNotEmpty())
-        <tfoot>
+        <tfoot class="sticky bottom-0 z-20 bg-gray-50 shadow-[0_-1px_2px_rgba(0,0,0,0.1)] border-t border-gray-200">
             {{ $foot }}
         </tfoot>
         @endif
