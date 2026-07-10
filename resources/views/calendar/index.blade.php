@@ -185,10 +185,10 @@
                     <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
                         Production
                         <span class="text-slate-400 cursor-help"
-                              title="Display $ amount of what has been produced for the day">
+                            title="Display $ amount of what has been produced for the day">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </span>
                     </p>
@@ -198,10 +198,10 @@
                     <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
                         Scheduled Production
                         <span class="text-slate-400 cursor-help"
-                              title="Display $ amount of what has been scheduled for the day">
+                            title="Display $ amount of what has been scheduled for the day">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </span>
                     </p>
@@ -922,9 +922,17 @@
                 // ── Keep date picker in sync + re-fetch resources for new date ─
                 datesSet: function (info) {
                     const d = info.view.currentStart;
-                    const dateStr = d.toISOString().split('T')[0];
+
+                    // Extract local year, month, and day without toISOString() 
+                    // which modifies output based on timezone UTC offsets (e.g. -1 Day).
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+
                     document.getElementById('calDate').value = dateStr;
                     updateDateLabel(d);
+
                     // Resources are provider columns for the CURRENT date; they must be
                     // re-fetched whenever the visible date changes (FC does not do this automatically).
                     calendar.refetchResources();
@@ -1263,17 +1271,17 @@
                     $('td:eq(0)', row).addClass('dt-col-sticky text-left font-medium px-4 py-3 bg-white shadow-sm border-white');
 
                     const columns = ['scheduled_appointments', 'provider_count', 'booked_hours', 'avg_lead_all', 'avg_lead_new', 'avg_lead_emerg'];
-                    
+
                     columns.forEach((col, index) => {
                         const td = $('td:eq(' + (index + 1) + ')', row);
                         const tier = data._tiers ? data._tiers[col] : 'mid';
                         td.addClass('px-4 py-3 text-right font-medium text-slate-800');
-                        
+
                         let bgColor = 'bg-yellow-100/70';
                         let arrow = '<svg class="w-3.5 h-3.5 text-yellow-600 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
-                        
+
                         if (tier === 'top') {
-                            bgColor = 'bg-[#c5f5dd]'; 
+                            bgColor = 'bg-[#c5f5dd]';
                             arrow = '<svg class="w-3.5 h-3.5 text-emerald-600 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>';
                         } else if (tier === 'bottom') {
                             bgColor = 'bg-[#ffcfd2]';
@@ -1288,9 +1296,9 @@
                 footerCallback: function (row, data, start, end, display) {
                     if (data.length > 0) {
                         const first = data[0];
-                        ['scheduled_appointments','provider_count','booked_hours','avg_lead_all','avg_lead_new','avg_lead_emerg'].forEach((col, idx) => {
-                            $('.capacity-total-' + (idx+1)).text(first[col]);
-                            $('.capacity-avg-' + (idx+1)).text(first[col]);
+                        ['scheduled_appointments', 'provider_count', 'booked_hours', 'avg_lead_all', 'avg_lead_new', 'avg_lead_emerg'].forEach((col, idx) => {
+                            $('.capacity-total-' + (idx + 1)).text(first[col]);
+                            $('.capacity-avg-' + (idx + 1)).text(first[col]);
                         });
                     }
                 }
