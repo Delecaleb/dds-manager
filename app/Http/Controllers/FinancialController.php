@@ -67,13 +67,63 @@ class FinancialController extends Controller
         ", [$start, $end]);
 
 
+        // Daily Revenue Data
+        $dailyGross = DB::table('od_procedure_logs')
+            ->where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end])
+            ->selectRaw('DATE(ProcDate) as date, SUM(ProcFee) as amount')
+            ->groupByRaw('DATE(ProcDate)')
+            ->pluck('amount', 'date');
+
+        $dailyAdj = DB::table('od_adjustments')
+            ->whereBetween('AdjDate', [$start, $end])
+            ->selectRaw('DATE(AdjDate) as date, SUM(AdjAmt) as amount')
+            ->groupByRaw('DATE(AdjDate)')
+            ->pluck('amount', 'date');
+
+        $dailyWriteOffs = DB::table('od_claim_procs')
+            ->whereBetween('ProcDate', [$start, $end])
+            ->selectRaw('DATE(ProcDate) as date, SUM(WriteOff) as amount')
+            ->groupByRaw('DATE(ProcDate)')
+            ->pluck('amount', 'date');
+
+        $dailyColl = DB::table('od_pay_splits')
+            ->whereBetween('DatePay', [$start, $end])
+            ->selectRaw('DATE(DatePay) as date, SUM(SplitAmt) as amount')
+            ->groupByRaw('DATE(DatePay)')
+            ->pluck('amount', 'date');
+
+        $allDates = collect(array_keys($dailyGross->toArray()))
+            ->merge(array_keys($dailyAdj->toArray()))
+            ->merge(array_keys($dailyWriteOffs->toArray()))
+            ->merge(array_keys($dailyColl->toArray()))
+            ->unique()
+            ->sort()
+            ->values();
+
+        $dailyRevenueData = $allDates->map(function ($date) use ($dailyGross, $dailyAdj, $dailyWriteOffs, $dailyColl) {
+            $g = (float) ($dailyGross[$date] ?? 0);
+            $a = (float) ($dailyAdj[$date] ?? 0);
+            $w = (float) ($dailyWriteOffs[$date] ?? 0);
+            $c = (float) ($dailyColl[$date] ?? 0);
+            $n = $g + $a + $w;
+            return [
+                'date' => $date,
+                'gross' => $g,
+                'adjustments' => $a,
+                'collections' => $c,
+                'net' => $n
+            ];
+        })->values();
+
         return response()->json(array_merge(
             $this->patientAnalytics->getPatientAnalytics($start, $end),
             $this->financialAnalytics->filterAnalysis($start, $end),
             [
                 'utilization' => $utilizationData,
                 'adjustments_breakdown' => $adjustmentData,
-                'top_services' => $topServicesData
+                'top_services' => $topServicesData,
+                'daily_revenue' => $dailyRevenueData
             ]
         ));
     }
