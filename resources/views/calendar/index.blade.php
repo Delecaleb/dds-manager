@@ -113,7 +113,11 @@
             animation: skel-pulse 1.6s ease-in-out infinite;
         }
     </style>
-
+    <header class="bg-white border-b border-gray-100 px-8 py-4 flex justify-between items-center">
+    <div class="flex items-center space-x-2">
+      <h1 class="text-3xl font-extrabold tracking-tight text-gray-900">Calendar</h1>
+    </div>
+  </header>
     <div class="flex flex-col bg-slate-50" style="min-height: calc(100vh - 64px);">
 
         {{-- ══════════════════ TOP TOOLBAR ══════════════════ --}}

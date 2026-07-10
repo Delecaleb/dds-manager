@@ -494,6 +494,18 @@
       </div>
 
     </section>
+
+    {{-- ── Utilization Data Chart ────────────────────────────────────────────── --}}
+    <div class="mt-8">
+      <div class="font-bold border-b p-3 text-lg text-black bg-gray-50 border-gray-100 flex items-center">
+        Utilization Data
+      </div>
+      <div class="bg-white p-8 border border-gray-100 border-t-0 shadow-sm relative pt-[60px]">
+        <div class="h-[400px] w-full">
+          <canvas id="utilizationChart"></canvas>
+        </div>
+      </div>
+    </div>
   </main>
 
   {{-- ── Score Cards Panel ───────────────────────────────────────────────────── --}}
@@ -721,6 +733,67 @@
       if (data.new_patients_scheduled != null) $('#new-patients-scheduled').text(data.new_patients_scheduled);
       if (data.new_patient_visit != null) $('#new-patient-visits').text(data.new_patient_visit);
       if (data.patient_avg_production != null) $('#patient-avg-production').text(fmtMoney(data.patient_avg_production));
+      if (data.utilization) renderUtilizationChart(data.utilization);
+    }
+
+    var utilizationChartInstance = null;
+    function renderUtilizationChart(utilData) {
+      var ctx = document.getElementById('utilizationChart').getContext('2d');
+      var labels = utilData.map(function (item) { return item.provider; });
+      var values = utilData.map(function (item) { return parseFloat(item.production); });
+
+      if (utilizationChartInstance) {
+        utilizationChartInstance.data.labels = labels;
+        utilizationChartInstance.data.datasets[0].data = values;
+        utilizationChartInstance.update();
+      } else {
+        utilizationChartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Production',
+              data: values,
+              backgroundColor: '#9b72e5',
+              barThickness: 150,
+              borderRadius: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top',
+                align: 'start',
+                labels: { boxWidth: 12, usePointStyle: false, font: { weight: 'bold' }, padding: 30 }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: { color: '#f3f4f6' },
+                border: { display: false },
+                ticks: {
+                  callback: function (value) {
+                    if (value >= 1000) return (value / 1000) + 'k';
+                    return value;
+                  },
+                  color: '#6b7280',
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  padding: 20
+                }
+              },
+              x: {
+                grid: { display: false },
+                ticks: { color: '#374151', font: { size: 12, family: 'Inter, sans-serif' } },
+                border: { color: '#c7d2fe', width: 1.5 }
+              }
+            }
+          }
+        });
+      }
     }
 
     function fetchAnalytics(start, end) {
