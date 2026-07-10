@@ -547,6 +547,18 @@
         </div>
       </div>
     </div>
+
+    {{-- ── Daily Patient Statistics ──────────────────────────────────────────── --}}
+    <div class="mt-8">
+      <div class="font-bold border-b p-3 text-lg text-black bg-gray-50 border-gray-100 flex items-center">
+        Daily Patient Statistics
+      </div>
+      <div class="bg-white p-6 border border-gray-100 border-t-0 shadow-sm relative pt-[20px]">
+        <div class="h-[400px] w-full">
+          <canvas id="dailyPatientStatsChart"></canvas>
+        </div>
+      </div>
+    </div>
   </main>
 
   {{-- ── Score Cards Panel ───────────────────────────────────────────────────── --}}
@@ -775,6 +787,7 @@
       if (data.new_patient_visit != null) $('#new-patient-visits').text(data.new_patient_visit);
       if (data.patient_avg_production != null) $('#patient-avg-production').text(fmtMoney(data.patient_avg_production));
       if (data.daily_revenue) renderDailyRevenueChart(data.daily_revenue);
+      if (data.daily_patient_stats) renderDailyPatientStatsChart(data.daily_patient_stats);
       if (data.utilization) renderUtilizationChart(data.utilization);
       if (data.adjustments_breakdown) renderAdjustmentChart(data.adjustments_breakdown);
       if (data.top_services) renderTopServicesChart(data.top_services);
@@ -942,6 +955,127 @@
                     if (Math.abs(value) >= 1000) return (value / 1000) + 'k';
                     return value;
                   },
+                  color: '#6b7280',
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  padding: 20
+                }
+              },
+              x: {
+                grid: { display: false },
+                ticks: {
+                  maxRotation: 45,
+                  minRotation: 45,
+                  autoSkip: true,
+                  maxTicksLimit: 30,
+                  color: '#374151',
+                  font: { size: 11, family: 'Inter, sans-serif' }
+                },
+                border: { color: '#e5e7eb', width: 2 }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    var dailyPatientStatsChartInstance = null;
+    function renderDailyPatientStatsChart(statsData) {
+      var ctx = document.getElementById('dailyPatientStatsChart').getContext('2d');
+
+      var labels = statsData.map(function (item) {
+        var parts = item.date.split('-');
+        var monthName = new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString('en-US', { month: 'short' });
+        return monthName + ' ' + parts[2];
+      });
+
+      var pVisitsVals = statsData.map(function (item) { return item.patient_visits; });
+      var npVisitsVals = statsData.map(function (item) { return item.new_patient_visits; });
+      var pSchedVals = statsData.map(function (item) { return item.patient_scheduled; });
+      var npSchedVals = statsData.map(function (item) { return item.new_patient_scheduled; });
+
+      if (dailyPatientStatsChartInstance) {
+        dailyPatientStatsChartInstance.data.labels = labels;
+        dailyPatientStatsChartInstance.data.datasets[0].data = pVisitsVals;
+        dailyPatientStatsChartInstance.data.datasets[1].data = npVisitsVals;
+        dailyPatientStatsChartInstance.data.datasets[2].data = pSchedVals;
+        dailyPatientStatsChartInstance.data.datasets[3].data = npSchedVals;
+        dailyPatientStatsChartInstance.update();
+      } else {
+        dailyPatientStatsChartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Patient Visits',
+                data: pVisitsVals,
+                borderColor: '#69e0a2', // Green
+                backgroundColor: 'rgba(105, 224, 162, 0.4)',
+                fill: true,
+                tension: 0,
+                pointRadius: 0,
+                borderWidth: 2
+              },
+              {
+                label: 'New Patient Visits',
+                data: npVisitsVals,
+                borderColor: '#a855f7', // Purple
+                backgroundColor: 'rgba(168, 85, 247, 0.4)',
+                fill: true,
+                tension: 0,
+                pointRadius: 0,
+                borderWidth: 2
+              },
+              {
+                label: 'Patient Scheduled',
+                data: pSchedVals,
+                borderColor: '#67e8f9', // Blue
+                backgroundColor: 'rgba(103, 232, 249, 0.4)',
+                fill: true,
+                tension: 0,
+                pointRadius: 0,
+                borderWidth: 2
+              },
+              {
+                label: 'New Patient Scheduled',
+                data: npSchedVals,
+                borderColor: '#f87171', // Red
+                backgroundColor: 'rgba(248, 113, 113, 0.4)',
+                fill: true,
+                tension: 0,
+                pointRadius: 0,
+                borderWidth: 2
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top',
+                align: 'start',
+                labels: { boxWidth: 12, usePointStyle: false, font: { weight: 'bold' }, padding: 30 }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    return ' ' + context.dataset.label + ': ' + context.raw;
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: { color: '#f3f4f6' },
+                border: { display: false },
+                ticks: {
                   color: '#6b7280',
                   font: { size: 11, family: 'Inter, sans-serif' },
                   padding: 20

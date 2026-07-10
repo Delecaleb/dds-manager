@@ -116,6 +116,56 @@ class FinancialController extends Controller
             ];
         })->values();
 
+        // Daily Patient Statistics
+        $dailyVisits = \App\Models\OdProcedureLog::where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end])
+            ->selectRaw('DATE(ProcDate) as date, COUNT(DISTINCT PatNum) as cnt')
+            ->groupByRaw('DATE(ProcDate)')
+            ->pluck('cnt', 'date');
+
+        $dailyScheduled = \App\Models\OdAppointment::whereBetween('AptDateTime', [$start, $end])
+            ->where('AptStatus', 'Scheduled')
+            ->selectRaw('DATE(AptDateTime) as date, COUNT(DISTINCT PatNum) as cnt')
+            ->groupByRaw('DATE(AptDateTime)')
+            ->pluck('cnt', 'date');
+
+        $dailyNewScheduled = \App\Models\OdAppointment::whereBetween('AptDateTime', [$start, $end])
+            ->where('IsNewPatient', 'true')
+            ->selectRaw('DATE(AptDateTime) as date, COUNT(DISTINCT PatNum) as cnt')
+            ->groupByRaw('DATE(AptDateTime)')
+            ->pluck('cnt', 'date');
+
+        $dailyNewVisits = DB::table(function ($query) {
+            $query->from('od_procedure_logs')
+                ->where('ProcStatus', 'C')
+                ->select('PatNum')
+                ->selectRaw('MIN(DATE(ProcDate)) as first_visit')
+                ->groupBy('PatNum');
+        }, 'first_visits')
+            ->whereBetween('first_visit', [$start, $end])
+            ->select('first_visit as date')
+            ->selectRaw('COUNT(*) as cnt')
+            ->groupBy('first_visit')
+            ->pluck('cnt', 'date');
+
+        $allStatDates = collect(array_keys($dailyVisits->toArray()))
+            ->merge(array_keys($dailyScheduled->toArray()))
+            ->merge(array_keys($dailyNewScheduled->toArray()))
+            ->merge(array_keys($dailyNewVisits->toArray()))
+            ->unique()
+            ->sort()
+            ->values();
+
+        $dailyPatientStats = $allStatDates->map(function ($date) use ($dailyVisits, $dailyScheduled, $dailyNewScheduled, $dailyNewVisits) {
+            return [
+                'date' => $date,
+                'patient_visits' => (int) ($dailyVisits[$date] ?? 0),
+                'new_patient_visits' => (int) ($dailyNewVisits[$date] ?? 0),
+                'patient_scheduled' => (int) ($dailyScheduled[$date] ?? 0),
+                'new_patient_scheduled' => (int) ($dailyNewScheduled[$date] ?? 0),
+            ];
+        })->values();
+
         return response()->json(array_merge(
             $this->patientAnalytics->getPatientAnalytics($start, $end),
             $this->financialAnalytics->filterAnalysis($start, $end),
@@ -123,7 +173,8 @@ class FinancialController extends Controller
                 'utilization' => $utilizationData,
                 'adjustments_breakdown' => $adjustmentData,
                 'top_services' => $topServicesData,
-                'daily_revenue' => $dailyRevenueData
+                'daily_revenue' => $dailyRevenueData,
+                'daily_patient_stats' => $dailyPatientStats
             ]
         ));
     }
