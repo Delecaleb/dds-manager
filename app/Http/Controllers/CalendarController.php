@@ -50,11 +50,22 @@ class CalendarController extends Controller
      * raw ISO strings (with a 'T') or normalized dates/datetimes, so both are
      * matched via DATE(REPLACE(...)) which is correct either way.
      */
-    public function stats(Request $request, \App\Services\OpenDental\FinancialService $financialService)
+    public function stats(Request $request)
     {
         $date = $request->get('date') ?? date('Y-m-d');
 
-        $produced = (float) $financialService->netProduction($date, $date);
+        $gross = (float) OdProcedureLog::query()
+            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) = ?", [$date])
+            ->selectRaw('COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0) AS total')
+            ->value('total');
+
+        $adjustments = (float) \App\Models\OdAdjustment::query()
+            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) = ?", [$date])
+            ->selectRaw('COALESCE(SUM(CAST(AdjAmt AS DECIMAL(12,2))), 0) AS total')
+            ->value('total');
+
+        $produced = $gross - $adjustments;
 
         $scheduled = (float) OdAppointment::query()
             ->join('od_procedure_logs as pl', 'pl.AptNum', '=', 'od_appointments.AptNum')
