@@ -71,8 +71,16 @@ class OperationsController extends Controller
                 'percent-diff-last-year' => 'Percent Diff Last Year',
             ],
             'marketing' => [
-                'default' => 'Default',
+                'default' => 'Payors - New Patients',
+                'payor_existing' => 'Payors - Existing',
+                'referral_new_patient' => 'Referrals - New Patients',
+                'referral_existing' => 'Referrals - Existing',
                 'patient-analysis' => 'Patient Analysis',
+            ],
+            'monthly-practice-scorecards' => [
+                'default' => 'Default',
+                'diff-last-year' => 'Diff Last Year',
+                'percent-diff-last-year' => 'Percent Diff Last Year',
             ],
         ];
     }
@@ -174,6 +182,11 @@ class OperationsController extends Controller
                 $zip = request('zip', 'ALL');
                 return view('operations.tabs.marketing', $chrome + [
                     'spec' => $service->marketing($start, $end, $subtab, $clinics, $zip),
+                ]);
+
+            case 'monthly-practice-scorecards':
+                return view('operations.tabs.monthly-practice-scorecards', $chrome + [
+                    'spec' => $service->monthlyPracticeScorecards($start, $end, $subtab, $clinics),
                 ]);
 
             default:
