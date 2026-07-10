@@ -136,38 +136,33 @@
         </div>
 
         <div id="tabpanel-by_office" class="tab-panel hidden">
-          <x-data-table id="agingTable-by_office" min-width="2200px" max-height="600px">
+          <x-data-table id="agingTable-by_office" min-width="1400px" max-height="600px">
             <x-slot:head>
               <tr>
-                <th class="dt-col-sticky px-4 py-3 text-gray-900 font-extrabold min-w-[180px]">Guarantor</th>
-                <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Guarantor ID</th>
-                <th class="px-4 py-3 border-r border-gray-200 min-w-[240px]">Patient</th>
-                <th class="px-4 py-3 border-r border-gray-200 min-w-[140px]">Patient ID</th>
-                <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Office</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Current</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 30</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 60</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 90</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 120
+                <th class="dt-col-sticky px-4 py-3 text-gray-900 font-extrabold min-w-[60px]">#</th>
+                <th class="dt-col-sticky px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[200px]">
+                  Location</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Current</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 30</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 60</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 90</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 120
                 </th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 180
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 180
                 </th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 240
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 240
                 </th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 365
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 365
                 </th>
                 <th class="px-4 py-3 border-r border-gray-200 min-w-[120px]">Credit Balance</th>
                 <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Contract</th>
-                <th class="px-4 py-3 text-emerald-900 bg-emerald-50 min-w-[110px]">Total</th>
+                <th class="px-4 py-3 text-emerald-900 bg-emerald-50 min-w-[120px]">Total</th>
               </tr>
             </x-slot:head>
             <x-slot:foot>
               <tr class="bg-gray-50 font-bold text-gray-900 text-xs">
+                <td class="dt-col-sticky bg-gray-50 border-r border-gray-200"></td>
                 <td class="dt-col-sticky bg-gray-50 px-4 py-3.5 border-r border-gray-200 text-right">Overall Total:</td>
-                <td class="border-r border-gray-200"></td>
-                <td class="border-r border-gray-200"></td>
-                <td class="border-r border-gray-200"></td>
-                <td class="border-r border-gray-200"></td>
                 <td id="foot-current-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
                 <td id="foot-30-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
                 <td id="foot-60-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
@@ -564,9 +559,66 @@
       { data: 'total', className: 'px-4 py-3 bg-emerald-50/40 text-emerald-700 font-semibold' },
     ];
 
+    const formatOfficeCurrency = (val) => {
+      if (val === null || val === undefined) return '';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+    };
+
+    const renderOfficeCell = (data, type, row) => {
+      if (type !== 'display') return data.total;
+
+      let colorClass = 'bg-emerald-50 text-emerald-900'; // Default Green (Top 20%)
+      if (data.total > 100000) colorClass = 'bg-red-50 text-red-900';
+      else if (data.total > 50000) colorClass = 'bg-amber-50 text-amber-900';
+
+      return `<div class="flex flex-col gap-0 py-2 -mx-4 -my-3 px-4 ${colorClass} h-full justify-center min-h-[72px]">
+        <div class="font-bold leading-tight">${formatOfficeCurrency(data.total)}</div>
+        <div class="opacity-80 text-xs leading-tight">${formatOfficeCurrency(data.patient)}</div>
+        <div class="opacity-80 text-xs leading-tight">${formatOfficeCurrency(data.insurance)}</div>
+      </div>`;
+    };
+
+    const OFFICE_COLUMNS = [
+      {
+        data: null,
+        orderable: false,
+        render: (data, type, row, meta) => meta.row + 1,
+        className: 'dt-col-sticky px-4 py-3 text-center font-bold text-gray-500'
+      },
+      {
+        data: 'office',
+        orderable: false,
+        render: (data, type, row) => {
+          if (type !== 'display') return data;
+          return `<div class="flex flex-col gap-0 py-2 -mx-4 -my-3 px-4 h-full justify-center min-h-[72px] bg-white text-gray-900">
+            <div class="flex items-center justify-between">
+              <span class="font-bold">${data}</span>
+              <button class="text-gray-400 hover:text-emerald-500 transition p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
+              </button>
+            </div>
+            <div class="text-gray-500 text-xs leading-tight">- Patient</div>
+            <div class="text-gray-500 text-xs leading-tight">- Insurance</div>
+          </div>`;
+        },
+        className: 'dt-col-sticky border-r border-gray-200'
+      },
+      { data: 'bal_current', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_30', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_60', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_90', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_120', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_180', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_240', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_365', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'credit_balance', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'contract', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'total', render: renderOfficeCell, className: 'p-0 text-emerald-900 bg-emerald-50' },
+    ];
+
     const TAB_CONFIG = {
       responsible_party: { columns: FULL_COLUMNS, hasExtendedTotals: true },
-      by_office: { columns: FULL_COLUMNS, hasExtendedTotals: true },
+      by_office: { columns: OFFICE_COLUMNS, hasExtendedTotals: true },
       by_patient: { columns: FULL_COLUMNS, hasExtendedTotals: true },
       by_insurance: { columns: FULL_COLUMNS, hasExtendedTotals: true },
     };

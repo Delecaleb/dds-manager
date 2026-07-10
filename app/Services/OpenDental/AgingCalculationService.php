@@ -49,18 +49,18 @@ class AgingCalculationService
      */
     private const SORTABLE = [
         'guarantor_name' => 'guarantor_name',
-        'guarantor_id'   => 'guarantor_id',
-        'bal_current'    => 'bal_current',
-        'bal_30'         => 'bal_30',
-        'bal_60'         => 'bal_60',
-        'bal_90'         => 'bal_90',
-        'bal_120'        => 'bal_120',
-        'bal_180'        => 'bal_180',
-        'bal_240'        => 'bal_240',
-        'bal_365'        => 'bal_365',
+        'guarantor_id' => 'guarantor_id',
+        'bal_current' => 'bal_current',
+        'bal_30' => 'bal_30',
+        'bal_60' => 'bal_60',
+        'bal_90' => 'bal_90',
+        'bal_120' => 'bal_120',
+        'bal_180' => 'bal_180',
+        'bal_240' => 'bal_240',
+        'bal_365' => 'bal_365',
         'credit_balance' => 'credit_balance',
-        'contract'       => 'contract',
-        'total'          => 'total',
+        'contract' => 'contract',
+        'total' => 'total',
     ];
 
     public function guarantorAging(
@@ -139,9 +139,9 @@ class AgingCalculationService
         // request), then append a unique tiebreak so pagination is stable
         // across pages when the primary key has ties.
         $sortExpr = self::SORTABLE[$sortKey] ?? 'total';
-        $dir      = strtolower($sortDir) === 'asc' ? 'ASC' : 'DESC';
+        $dir = strtolower($sortDir) === 'asc' ? 'ASC' : 'DESC';
         $tieBreak = $groupBy === 'patient' ? 'patient_id' : 'guarantor_id';
-        $orderBy  = "ORDER BY {$sortExpr} {$dir}, {$tieBreak} ASC";
+        $orderBy = "ORDER BY {$sortExpr} {$dir}, {$tieBreak} ASC";
 
         if ($groupBy === 'patient') {
             $sql = 'SELECT
@@ -194,7 +194,7 @@ class AgingCalculationService
         return collect(DB::select($sql, $bindings));
     }
 
-    private function totals(string $asOfDate, ?string $search, bool $includeCredits, string $groupBy): array
+    public function totals(string $asOfDate, ?string $search, bool $includeCredits, string $groupBy): array
     {
         if ($groupBy === 'patient') {
             // Contract is a per-GUARANTOR balance, not per-patient. Summing
@@ -273,7 +273,7 @@ class AgingCalculationService
             return $rows;
         }
 
-        $ids = $rows->pluck('guarantor_id')->map(fn ($id) => (int) $id)->all();
+        $ids = $rows->pluck('guarantor_id')->map(fn($id) => (int) $id)->all();
 
         $families = DB::table('od_patients')
             ->whereIn('Guarantor', $ids)
