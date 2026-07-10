@@ -112,13 +112,11 @@ class FinancialController extends Controller
                 ->groupByRaw('DATE(DatePay)')
                 ->pluck('amount', 'date');
 
-            $allDates = collect(array_keys($dailyGross->toArray()))
-                ->merge(array_keys($dailyAdj->toArray()))
-                ->merge(array_keys($dailyWriteOffs->toArray()))
-                ->merge(array_keys($dailyColl->toArray()))
-                ->unique()
-                ->sort()
-                ->values();
+            $period = \Carbon\CarbonPeriod::create($start, $end);
+            $allDates = collect();
+            foreach ($period as $dt) {
+                $allDates->push($dt->toDateString());
+            }
 
             $response['daily_revenue'] = $allDates->map(function ($date) use ($dailyGross, $dailyAdj, $dailyWriteOffs, $dailyColl) {
                 $g = (float) ($dailyGross[$date] ?? 0);
@@ -169,13 +167,11 @@ class FinancialController extends Controller
                 ->groupBy('first_visit')
                 ->pluck('cnt', 'date');
 
-            $allStatDates = collect(array_keys($dailyVisits->toArray()))
-                ->merge(array_keys($dailyScheduled->toArray()))
-                ->merge(array_keys($dailyNewScheduled->toArray()))
-                ->merge(array_keys($dailyNewVisits->toArray()))
-                ->unique()
-                ->sort()
-                ->values();
+            $period = \Carbon\CarbonPeriod::create($start, $end);
+            $allStatDates = collect();
+            foreach ($period as $dt) {
+                $allStatDates->push($dt->toDateString());
+            }
 
             $response['daily_patient_stats'] = $allStatDates->map(function ($date) use ($dailyVisits, $dailyScheduled, $dailyNewScheduled, $dailyNewVisits) {
                 return [
