@@ -259,7 +259,7 @@ class KpisController extends Controller
             FROM od_appointments a
             JOIN od_procedure_logs pl ON a.AptNum = pl.AptNum
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE a.AptStatus = 'Complete'
+            WHERE a.AptStatus = 2
               AND pc.IsHygiene = 'false'
               AND pl.ProcStatus = 'C'
               AND a.Pattern IS NOT NULL AND a.Pattern != ''
@@ -289,7 +289,7 @@ class KpisController extends Controller
                 SUM(CASE WHEN NextAptNum IS NOT NULL AND NextAptNum != '0' THEN 1 ELSE 0 END) AS with_next
             FROM od_appointments a
             WHERE IsHygiene = 'false' 
-              AND AptStatus = 'Complete'
+              AND AptStatus = 2
               AND DATE(AptDateTime) BETWEEN ? AND ?
         ", [$start, $end]);
 
@@ -491,10 +491,10 @@ class KpisController extends Controller
         $aptStats = DB::selectOne("
             SELECT
                 COUNT(*) AS total,
-                SUM(CASE WHEN AptStatus IN ('Broken', 'NoShow') THEN 1 ELSE 0 END) AS broken
+                SUM(CASE WHEN AptStatus = 5 THEN 1 ELSE 0 END) AS broken
             FROM od_appointments
             WHERE DATE(AptDateTime) BETWEEN ? AND ?
-              AND AptStatus IN ('Scheduled', 'Complete', 'Cancelled', 'Broken', 'NoShow')
+              AND AptStatus IN (1, 2, 5)
         ", [$start, $end]);
         $noShowRate = $aptStats->total > 0 ? round(($aptStats->broken / $aptStats->total) * 100, 2) : 0;
 
@@ -965,7 +965,7 @@ class KpisController extends Controller
             $apts = \Illuminate\Support\Facades\DB::selectOne("
                 SELECT COUNT(DISTINCT a.AptNum) AS total_apts, AVG(LENGTH(a.Pattern) * 5) AS avg_mins, SUM(LENGTH(a.Pattern) * 5) / 60 AS total_hours
                 FROM od_appointments a JOIN od_procedure_logs pl ON a.AptNum = pl.AptNum JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE a.AptStatus = 'Complete' AND pc.IsHygiene = 'false' AND pl.ProcStatus = 'C' AND a.Pattern IS NOT NULL AND a.Pattern != '' AND DATE(a.AptDateTime) BETWEEN ? AND ? AND pl.ProvNum = ?
+                WHERE a.AptStatus = 2 AND pc.IsHygiene = 'false' AND pl.ProcStatus = 'C' AND a.Pattern IS NOT NULL AND a.Pattern != '' AND DATE(a.AptDateTime) BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [$start, $end, $pId]);
             $docAptCount = (int) $apts->total_apts;
             $avgAptMins = (float) $apts->avg_mins;
@@ -984,7 +984,7 @@ class KpisController extends Controller
             // Reappt
             $docReappt = \Illuminate\Support\Facades\DB::selectOne("
                 SELECT COUNT(*) AS total, SUM(CASE WHEN NextAptNum IS NOT NULL AND NextAptNum != '0' THEN 1 ELSE 0 END) AS with_next
-                FROM od_appointments a WHERE IsHygiene = 'false' AND AptStatus = 'Complete' AND DATE(AptDateTime) BETWEEN ? AND ? AND ProvNum = ?
+                FROM od_appointments a WHERE IsHygiene = 'false' AND AptStatus = 2 AND DATE(AptDateTime) BETWEEN ? AND ? AND ProvNum = ?
             ", [$start, $end, $pId]);
 
             // Exam count
@@ -1090,11 +1090,11 @@ class KpisController extends Controller
         ", [$start, $end, $specId]);
 
         $providersList = [];
-        
+
         // Averages tracking
         $totals = [];
         $counts = [];
-        
+
         foreach ($provs as $p) {
             $provNum = $p->ProvNum;
             $row = [
@@ -1170,8 +1170,12 @@ class KpisController extends Controller
 
             // Compute running totals for footer
             foreach ($row as $k => $v) {
-                if (!is_numeric($v) || in_array($k, ['ProvNum'])) continue;
-                if (!isset($totals[$k])) { $totals[$k] = 0; $counts[$k] = 0; }
+                if (!is_numeric($v) || in_array($k, ['ProvNum']))
+                    continue;
+                if (!isset($totals[$k])) {
+                    $totals[$k] = 0;
+                    $counts[$k] = 0;
+                }
                 $totals[$k] += $v;
                 $counts[$k]++;
             }
@@ -1213,7 +1217,7 @@ class KpisController extends Controller
         ], [
             'implant_placement_dollars' => ['D6010'],
             'sedations_dollars' => ['D9222', 'D9223', 'D9239', 'D9243', 'D9248'],
-        ], [], function($row, $start, $end, $provNum) {
+        ], [], function ($row, $start, $end, $provNum) {
             // Perio Codes $
             $row['perio_codes_dollars'] = round((float) \Illuminate\Support\Facades\DB::selectOne("
                 SELECT SUM(pl.ProcFee) AS sm
@@ -1234,7 +1238,7 @@ class KpisController extends Controller
                   AND pl.ProcStatus = 'C'
             ", [$start, $end, $provNum])->exam_cnt ?? 0;
             $row['treatment_plan_per_exam'] = $exams > 0 ? round($txFee / $exams, 2) : 0;
-            
+
             return $row;
         }));
     }
@@ -1253,8 +1257,8 @@ class KpisController extends Controller
             'invisalign_starts_count' => ['D8090', 'D8080'],
         ], [], [
             'total_active_patients_seen' => ['D8670', 'D8670A']
-        ], function($row, $start, $end, $provNum) {
-            
+        ], function ($row, $start, $end, $provNum) {
+
             $starts = \Illuminate\Support\Facades\DB::selectOne("
                 SELECT COUNT(*) AS cnt FROM od_procedure_logs pl 
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
@@ -1279,7 +1283,7 @@ class KpisController extends Controller
             'implant_placement_dollars' => ['D6010'],
             'sedations_dollars' => ['D9222', 'D9223', 'D9239', 'D9243', 'D9248'],
             'extractions_dollars' => ['D7140', 'D7210', 'D7220', 'D7230', 'D7240', 'D7241', 'D7250']
-        ], [], function($row, $start, $end, $provNum) {
+        ], [], function ($row, $start, $end, $provNum) {
             $txFee = \Illuminate\Support\Facades\DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus = 'TP' AND DateTP BETWEEN ? AND ? AND ProvNum = ?", [$start, $end, $provNum])->sm ?? 0;
             $exams = \Illuminate\Support\Facades\DB::selectOne("
                 SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
@@ -1313,8 +1317,8 @@ class KpisController extends Controller
             'total_consults' => ['D9310'],
         ], [
             'sedations' => ['D9220', 'D9221', 'D9230', 'D9612', 'D9243', 'D9239'],
-        ], [], function($row, $start, $end, $provNum) {
-            
+        ], [], function ($row, $start, $end, $provNum) {
+
             // Re-map workdays
             $row['total_working_days'] = $row['work_days'];
             $row['patients_per_day'] = $row['work_days'] > 0 ? round($row['patient_visits'] / $row['work_days'], 1) : 0;
@@ -1348,5 +1352,6 @@ class KpisController extends Controller
 
             return $row;
         }));
-    }}
+    }
+}
 

@@ -734,6 +734,6 @@
     });
   </script>
 
-  <x-patient-modal />
+  <x-app-components.patient-modal />
 
 </x-app-layout>

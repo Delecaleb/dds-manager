@@ -36,10 +36,10 @@ class DashboardController extends Controller
         $end = $request->input('end_date', now()->toDateString());
 
         $rows = DB::table('od_procedure_logs')
-            ->select(
-                'ClinicNum',
-                DB::raw('SUM(ProcFee) AS total_production'),
-                DB::raw('COUNT(DISTINCT PatNum) AS patient_count')
+            ->selectRaw(
+                'ClinicNum, ' .
+                \App\Helpers\MetricDefinitions::grossProduction('total_production') . ', ' .
+                \App\Helpers\MetricDefinitions::patientVisits('patient_count')
             )
             ->where('ProcStatus', 'C')
             ->whereBetween('ProcDate', [$start, $end])
@@ -103,7 +103,10 @@ class DashboardController extends Controller
         $patientVisits = DB::table('od_procedure_logs')
             ->where('ProvNum', $id)->where('ProcStatus', 'C')
             ->whereBetween('ProcDate', [$start, $end])
-            ->distinct('PatNum')->count('PatNum');
+            ->selectRaw('PatNum, DATE(ProcDate)')
+            ->distinct()
+            ->get()
+            ->count();
 
         $newPatientVisits = DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) as first_visit'))
@@ -131,10 +134,10 @@ class DashboardController extends Controller
 
         /* ── Daily production ────────────────────────── */
         $dailyProduction = DB::table('od_procedure_logs')
-            ->select(
-                DB::raw("DATE_FORMAT(ProcDate, '%Y-%m-%d') AS date"),
-                DB::raw('SUM(ProcFee) AS production'),
-                DB::raw('COUNT(DISTINCT PatNum) AS patient_count')
+            ->selectRaw(
+                "DATE_FORMAT(ProcDate, '%Y-%m-%d') AS date, " .
+                \App\Helpers\MetricDefinitions::grossProduction('production') . ', ' .
+                \App\Helpers\MetricDefinitions::patientVisits('patient_count')
             )
             ->where('ProvNum', $id)->where('ProcStatus', 'C')
             ->whereBetween('ProcDate', [$start, $end])
@@ -266,22 +269,22 @@ class DashboardController extends Controller
 
         $buildLocationStats = function ($s, $e) {
             $gross = DB::table('od_procedure_logs')
-                ->select('ClinicNum', DB::raw('SUM(ProcFee) AS val'))
+                ->selectRaw('ClinicNum, ' . \App\Helpers\MetricDefinitions::grossProduction('val'))
                 ->where('ProcStatus', 'C')->whereBetween('ProcDate', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
             $adj = DB::table('od_adjustments')
-                ->select('ClinicNum', DB::raw('SUM(AdjAmt) AS val'))
+                ->selectRaw('ClinicNum, ' . \App\Helpers\MetricDefinitions::adjustments('val'))
                 ->whereBetween('AdjDate', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
             $writeoffs = DB::table('od_claim_procs')
-                ->select('ClinicNum', DB::raw('SUM(WriteOff) AS val'))
+                ->selectRaw('ClinicNum, ' . \App\Helpers\MetricDefinitions::writeOffs('val'))
                 ->whereBetween('ProcDate', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
             $coll = DB::table('od_pay_splits')
-                ->select('ClinicNum', DB::raw('SUM(SplitAmt) AS val'))
+                ->selectRaw('ClinicNum, ' . \App\Helpers\MetricDefinitions::collections('val'))
                 ->whereBetween('DatePay', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
@@ -347,7 +350,7 @@ class DashboardController extends Controller
             $patientVisits = DB::table('od_procedure_logs')
                 ->where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$s, $e])
-                ->select('ClinicNum', DB::raw('COUNT(DISTINCT PatNum) as val'))
+                ->selectRaw('ClinicNum, ' . \App\Helpers\MetricDefinitions::patientVisits('val'))
                 ->groupBy('ClinicNum')
                 ->pluck('val', 'ClinicNum');
 

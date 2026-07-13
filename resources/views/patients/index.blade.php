@@ -215,7 +215,7 @@
             </div>
         </div>
 
-        <x-patient-modal />
+        <x-app-components.patient-modal />
 
     </div>
 

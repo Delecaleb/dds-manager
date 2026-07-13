@@ -1362,12 +1362,12 @@ class OperationsAnalyticsService
         $getGroups = function ($startRange, $endRange) use ($months, $metric, $clinics, $mIdx) {
             if ($metric === 'visits') {
                 $qTab = \Illuminate\Support\Facades\DB::table('od_procedure_logs')
-                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, COUNT(DISTINCT PatNum, ProcDate) as val")
+                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, " . \App\Helpers\MetricDefinitions::patientVisits('val'))
                     ->where('ProcStatus', 'C')
                     ->whereBetween('ProcDate', [$startRange, $endRange]);
             } else {
                 $qTab = \Illuminate\Support\Facades\DB::table('od_procedure_logs')
-                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(ProcFee) as val")
+                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, " . \App\Helpers\MetricDefinitions::grossProduction('val'))
                     ->where('ProcStatus', 'C')
                     ->whereBetween('ProcDate', [$startRange, $endRange]);
             }
@@ -1539,14 +1539,14 @@ class OperationsAnalyticsService
 
         if ($metric === 'visits') {
             $query = \Illuminate\Support\Facades\DB::table('od_procedure_logs')
-                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, COUNT(DISTINCT PatNum, ProcDate) as val")
+                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, " . \App\Helpers\MetricDefinitions::patientVisits('val'))
                 ->where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$start, $end]);
         } else {
             // production / collection 
             // In a real jarvis app, collection comes from od_claimproc or od_paysplit. For prototyping consistency, production uses ProcFee.
             $query = \Illuminate\Support\Facades\DB::table('od_procedure_logs')
-                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(ProcFee) as val")
+                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, " . \App\Helpers\MetricDefinitions::grossProduction('val'))
                 ->where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$start, $end]);
         }
@@ -1653,7 +1653,7 @@ class OperationsAnalyticsService
         ];
 
         $qLogs = \Illuminate\Support\Facades\DB::table('od_procedure_logs')
-            ->selectRaw("ClinicNum, ProvNum, SUM(ProcFee) as total_fee, COUNT(*) as c_procs, COUNT(DISTINCT PatNum) as c_visits")
+            ->selectRaw("ClinicNum, ProvNum, " . \App\Helpers\MetricDefinitions::grossProduction('total_fee') . ", COUNT(*) as c_procs, " . \App\Helpers\MetricDefinitions::patientVisits('c_visits'))
             ->where('ProcStatus', 'C')
             ->whereBetween('ProcDate', [$start, $end]);
 

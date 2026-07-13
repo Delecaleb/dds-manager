@@ -329,8 +329,25 @@
         // 2. DataTables Configuration
         let currentFilter = 'unconfirmed';
 
+        // Pre-XHR event handler to render skeleton screens inside tbody
+        $('#tasksTable').on('preXhr.dt', function (e, settings, data) {
+            var colsCount = $('#tasksTable thead th').length;
+            var skeletonRows = '';
+            for (var i = 0; i < 5; i++) {
+                skeletonRows += '<tr class="skeleton-row border-b border-gray-100 animate-pulse">';
+                for (var j = 0; j < colsCount; j++) {
+                    var width = 'w-16';
+                    if (j === 0) width = 'w-32';
+                    else if (j === 5 || j === 8) width = 'w-24';
+                    skeletonRows += '<td class="py-4 px-3 border-l border-gray-100 first:border-l-0"><div class="h-3.5 bg-gray-200 rounded ' + width + '"></div></td>';
+                }
+                skeletonRows += '</tr>';
+            }
+            $('#tasksTable tbody').html(skeletonRows);
+        });
+
         let tasksTable = $('#tasksTable').DataTable({
-            processing: true,
+            processing: false, // Disabled default processing popup to let skeleton loader present cleanly
             serverSide: true,
             pageLength: 20,
             layout: { topStart: null, topEnd: null, bottomStart: 'info', bottomEnd: 'paging' },

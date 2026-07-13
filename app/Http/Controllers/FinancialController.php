@@ -29,16 +29,22 @@ class FinancialController extends Controller
 
         $response = [];
 
-        if (in_array($section, ['all', 'kpis'])) {
+        if (in_array($section, ['all', 'revenue-kpis'])) {
             $response = array_merge(
                 $response,
-                $this->patientAnalytics->getPatientAnalytics($start, $end),
                 $this->financialAnalytics->filterAnalysis($start, $end)
             );
         }
 
+        if (in_array($section, ['all', 'patient-kpis'])) {
+            $response = array_merge(
+                $response,
+                $this->patientAnalytics->getPatientAnalytics($start, $end)
+            );
+        }
+
         // Utilization Data Chart (Provider Production)
-        if (in_array($section, ['all', 'utilization'])) {
+        if (in_array($section, ['all', 'utilization-chart'])) {
             $utilizationData = DB::select("
                 SELECT
                     CONCAT(pr.LName, ', ', pr.PName) AS provider,
@@ -56,8 +62,8 @@ class FinancialController extends Controller
             $response['utilization'] = $utilizationData;
         }
 
-        // Adjustment & Top Services Charts
-        if (in_array($section, ['all', 'charts'])) {
+        // Adjustment Chart
+        if (in_array($section, ['all', 'adjustment-chart'])) {
             $adjustmentData = DB::select("
                 SELECT
                     d.ItemName AS label,
@@ -69,6 +75,11 @@ class FinancialController extends Controller
                 ORDER BY ABS(SUM(a.AdjAmt)) DESC
             ", [$start, $end]);
 
+            $response['adjustments_breakdown'] = $adjustmentData;
+        }
+
+        // Top Services Chart
+        if (in_array($section, ['all', 'top-services-chart'])) {
             $topServicesData = DB::select("
                 SELECT
                     d.ItemName AS label,
@@ -83,34 +94,33 @@ class FinancialController extends Controller
                 LIMIT 5
             ", [$start, $end]);
 
-            $response['adjustments_breakdown'] = $adjustmentData;
             $response['top_services'] = $topServicesData;
         }
 
         // Daily Revenue Data
-        if (in_array($section, ['all', 'daily-revenue'])) {
+        if (in_array($section, ['all', 'daily-revenue-chart'])) {
             $dailyGross = DB::table('od_procedure_logs')
                 ->where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$start, $end])
-                ->selectRaw('DATE(ProcDate) as date, SUM(ProcFee) as amount')
+                ->selectRaw('DATE(ProcDate) as date, ' . \App\Helpers\MetricDefinitions::grossProduction('amount'))
                 ->groupByRaw('DATE(ProcDate)')
                 ->pluck('amount', 'date');
 
             $dailyAdj = DB::table('od_adjustments')
                 ->whereBetween('AdjDate', [$start, $end])
-                ->selectRaw('DATE(AdjDate) as date, SUM(AdjAmt) as amount')
+                ->selectRaw('DATE(AdjDate) as date, ' . \App\Helpers\MetricDefinitions::adjustments('amount'))
                 ->groupByRaw('DATE(AdjDate)')
                 ->pluck('amount', 'date');
 
             $dailyWriteOffs = DB::table('od_claim_procs')
                 ->whereBetween('ProcDate', [$start, $end])
-                ->selectRaw('DATE(ProcDate) as date, SUM(WriteOff) as amount')
+                ->selectRaw('DATE(ProcDate) as date, ' . \App\Helpers\MetricDefinitions::writeOffs('amount'))
                 ->groupByRaw('DATE(ProcDate)')
                 ->pluck('amount', 'date');
 
             $dailyColl = DB::table('od_pay_splits')
                 ->whereBetween('DatePay', [$start, $end])
-                ->selectRaw('DATE(DatePay) as date, SUM(SplitAmt) as amount')
+                ->selectRaw('DATE(DatePay) as date, ' . \App\Helpers\MetricDefinitions::collections('amount'))
                 ->groupByRaw('DATE(DatePay)')
                 ->pluck('amount', 'date');
 
@@ -137,22 +147,23 @@ class FinancialController extends Controller
         }
 
         // Daily Patient Statistics
-        if (in_array($section, ['all', 'daily-patient'])) {
+        if (in_array($section, ['all', 'daily-patient-chart'])) {
             $dailyVisits = \App\Models\OdProcedureLog::where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$start, $end])
-                ->selectRaw('DATE(ProcDate) as date, COUNT(DISTINCT PatNum) as cnt')
+                ->selectRaw('DATE(ProcDate) as date, ' . \App\Helpers\MetricDefinitions::patientVisits('cnt'))
                 ->groupByRaw('DATE(ProcDate)')
                 ->pluck('cnt', 'date');
 
             $dailyScheduled = \App\Models\OdAppointment::whereBetween('AptDateTime', [$start, $end])
-                ->where('AptStatus', 'Scheduled')
-                ->selectRaw('DATE(AptDateTime) as date, COUNT(DISTINCT PatNum) as cnt')
+                ->scheduled()
+                ->selectRaw('DATE(AptDateTime) as date, ' . \App\Helpers\MetricDefinitions::scheduledPatients('cnt'))
                 ->groupByRaw('DATE(AptDateTime)')
                 ->pluck('cnt', 'date');
 
             $dailyNewScheduled = \App\Models\OdAppointment::whereBetween('AptDateTime', [$start, $end])
+                ->scheduled()
                 ->where('IsNewPatient', 'true')
-                ->selectRaw('DATE(AptDateTime) as date, COUNT(DISTINCT PatNum) as cnt')
+                ->selectRaw('DATE(AptDateTime) as date, ' . \App\Helpers\MetricDefinitions::scheduledPatients('cnt'))
                 ->groupByRaw('DATE(AptDateTime)')
                 ->pluck('cnt', 'date');
 
@@ -557,14 +568,14 @@ class FinancialController extends Controller
             SELECT
                 p.PatNum                         AS patient_id,
                 CONCAT(p.LName, ', ', p.FName)   AS patient_name,
-                pl.ProcDate                      AS dates,
-                COUNT(DISTINCT pl.ProcDate)      AS count
+                GROUP_CONCAT(DISTINCT DATE_FORMAT(pl.ProcDate, '%Y-%m-%d') ORDER BY pl.ProcDate SEPARATOR ', ') AS dates,
+                COUNT(DISTINCT DATE(pl.ProcDate)) AS count
             FROM od_procedure_logs pl
             JOIN od_patients p ON pl.PatNum = p.PatNum
             WHERE pl.ProcStatus = 'C'
               AND pl.ProcDate BETWEEN ? AND ?
-            GROUP BY p.PatNum, p.LName, p.FName, pl.ProcDate
-            ORDER BY pl.ProcDate, p.LName
+            GROUP BY p.PatNum, p.LName, p.FName
+            ORDER BY count DESC, p.LName
         ", [$start, $end]);
 
         return array_map(fn($r) => [
@@ -610,14 +621,14 @@ class FinancialController extends Controller
             SELECT
                 p.PatNum                         AS patient_id,
                 CONCAT(p.LName, ', ', p.FName)   AS patient_name,
-                DATE(a.AptDateTime)              AS dates,
+                GROUP_CONCAT(DISTINCT DATE_FORMAT(a.AptDateTime, '%Y-%m-%d') ORDER BY a.AptDateTime SEPARATOR ', ') AS dates,
                 COUNT(*)                         AS count
             FROM od_appointments a
             JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
-              AND a.AptStatus = 'Scheduled'
-            GROUP BY p.PatNum, p.LName, p.FName, DATE(a.AptDateTime)
-            ORDER BY dates, p.LName
+              AND a.AptStatus = 1
+            GROUP BY p.PatNum, p.LName, p.FName
+            ORDER BY count DESC, p.LName
         ", [$start, $end]);
 
         return array_map(fn($r) => [
@@ -635,15 +646,15 @@ class FinancialController extends Controller
             SELECT
                 p.PatNum                         AS patient_id,
                 CONCAT(p.LName, ', ', p.FName)   AS patient_name,
-                DATE(a.AptDateTime)              AS dates,
+                GROUP_CONCAT(DISTINCT DATE_FORMAT(a.AptDateTime, '%Y-%m-%d') ORDER BY a.AptDateTime SEPARATOR ', ') AS dates,
                 COUNT(*)                         AS count
             FROM od_appointments a
             JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
-              AND a.AptStatus = 'Scheduled'
+              AND a.AptStatus = 1
               AND a.IsNewPatient = 'true'
-            GROUP BY p.PatNum, p.LName, p.FName, DATE(a.AptDateTime)
-            ORDER BY dates, p.LName
+            GROUP BY p.PatNum, p.LName, p.FName
+            ORDER BY count DESC, p.LName
         ", [$start, $end]);
 
         return array_map(fn($r) => [

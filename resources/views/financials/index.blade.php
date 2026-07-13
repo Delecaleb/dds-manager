@@ -389,7 +389,7 @@
           <div class="flex-1">
             <div class="flex items-center gap-1.5">
               <p class="text-xs font-bold uppercase tracking-wider text-gray-500">Patient Visits</p>
-              <button class="kpi-expand-btn" onclick="openBreakdown('patient_visits','Pts Visits')">
+              <button class="kpi-expand-btn" onclick="openPatientVisitsBreakdown('Pts Visits')">
                 <i data-lucide="arrow-up-right-square" class="w-4 h-4"></i>
               </button>
             </div>
@@ -410,7 +410,7 @@
           <div class="flex-1">
             <div class="flex items-center gap-1.5">
               <p class="text-xs font-bold uppercase tracking-wider text-gray-500">New Patient Visits</p>
-              <button class="kpi-expand-btn" onclick="openBreakdown('new_patient_visits','Npt Visits')">
+              <button class="kpi-expand-btn" onclick="openNewPatientVisitsBreakdown('New Patient Visits')">
                 <i data-lucide="arrow-up-right-square" class="w-4 h-4"></i>
               </button>
             </div>
@@ -431,7 +431,7 @@
           <div class="flex-1">
             <div class="flex items-center gap-1.5">
               <p class="text-xs font-bold uppercase tracking-wider text-gray-500">Patient Scheduled</p>
-              <button class="kpi-expand-btn" onclick="openBreakdown('patients_scheduled','Pts Sched')">
+              <button class="kpi-expand-btn" onclick="openPatientsScheduledBreakdown('Patients Scheduled')">
                 <i data-lucide="arrow-up-right-square" class="w-4 h-4"></i>
               </button>
             </div>
@@ -454,7 +454,7 @@
           <div class="flex-1">
             <div class="flex items-center gap-1.5">
               <p class="text-xs font-bold uppercase tracking-wider text-gray-500">New Patient Scheduled</p>
-              <button class="kpi-expand-btn" onclick="openBreakdown('new_patients_scheduled','Npt Sched')">
+              <button class="kpi-expand-btn" onclick="openNewPatientsScheduledBreakdown('New Patient Scheduled')">
                 <i data-lucide="arrow-up-right-square" class="w-4 h-4"></i>
               </button>
             </div>
@@ -748,7 +748,11 @@
     const baseUrl = "{{ url('') }}";
 
     function fmtMoney(v) {
-      return '$ ' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      var num = Number(v);
+      if (num < 0) {
+        return '($' + Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')';
+      }
+      return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     /* ── Main tab switching ──────────────────────────────────────────────────── */
@@ -798,7 +802,7 @@
       showSkeletons();
 
       // Load blocks concurrently to prevent massive response sizes generating bottlenecks
-      var sections = ['kpis', 'utilization', 'charts', 'daily-revenue', 'daily-patient'];
+      var sections = ['revenue-kpis', 'patient-kpis', 'utilization-chart', 'adjustment-chart', 'top-services-chart', 'daily-revenue-chart', 'daily-patient-chart'];
       sections.forEach(function (section) {
         $.get(baseUrl + '/financials/data', { start_date: start, end_date: end, section: section })
           .done(function (data) {
@@ -1719,9 +1723,8 @@
       document.getElementById('bkOverlay').classList.remove('hidden');
       document.body.style.overflow = 'hidden';
 
-      var dates = picker.selectedDates;
-      var start = dates.length >= 1 ? fmtDate(dates[0]) : fmtDate(firstOfMonth);
-      var end = dates.length >= 2 ? fmtDate(dates[1]) : fmtDate(today);
+      var start = _currentStartDate;
+      var end = _currentEndDate;
 
       fetch(baseUrl + '/financials/breakdown?type=' + type + '&start_date=' + start + '&end_date=' + end)
         .then(function (r) { return r.json(); })
@@ -1736,6 +1739,107 @@
         });
     }
 
+    function openPatientVisitsBreakdown(title) {
+      var modalId = 'breakdown-modal';
+      setDataTableModalLoading(modalId, 'Financial Breakdown - ' + title);
+
+      var start = _currentStartDate;
+      var end = _currentEndDate;
+
+      fetch(baseUrl + '/financials/breakdown?type=patient_visits&start_date=' + start + '&end_date=' + end)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var columns = [
+            { data: 'patient_id', title: 'Patient Id' },
+            { data: 'patient_name', title: 'Patient Name' },
+            { data: 'dates', title: 'Visit Date' },
+            { data: 'count', title: 'Number of visits' }
+          ];
+          openDataTableModal(modalId, 'Financial Breakdown - ' + title, columns, data);
+        })
+        .catch(function () {
+          alert('Failed to load data.');
+          closeDataTableModal(modalId);
+        });
+    }
+
+    function openNewPatientVisitsBreakdown(title) {
+      var modalId = 'breakdown-modal';
+      setDataTableModalLoading(modalId, 'Financial Breakdown - ' + title);
+
+      var start = _currentStartDate;
+      var end = _currentEndDate;
+
+      fetch(baseUrl + '/financials/breakdown?type=new_patient_visits&start_date=' + start + '&end_date=' + end)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var columns = [
+            { data: 'patient_id', title: 'Patient Id' },
+            { data: 'patient_name', title: 'Patient Name' },
+            { data: 'dates', title: 'First Visit Date' },
+            { data: 'service_codes', title: 'Service Code' },
+            {
+              data: 'amount', title: 'Production', render: function (val) {
+                return fmtMoney(val);
+              }
+            }
+          ];
+          openDataTableModal(modalId, 'Financial Breakdown - ' + title, columns, data);
+        })
+        .catch(function () {
+          alert('Failed to load data.');
+          closeDataTableModal(modalId);
+        });
+    }
+
+    function openPatientsScheduledBreakdown(title) {
+      var modalId = 'breakdown-modal';
+      setDataTableModalLoading(modalId, 'Financial Breakdown - ' + title);
+
+      var start = _currentStartDate;
+      var end = _currentEndDate;
+
+      fetch(baseUrl + '/financials/breakdown?type=patients_scheduled&start_date=' + start + '&end_date=' + end)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var columns = [
+            { data: 'patient_id', title: 'Patient Id' },
+            { data: 'patient_name', title: 'Patient Name' },
+            { data: 'dates', title: 'Appointment Date(s)' },
+            { data: 'count', title: 'Number of visits' }
+          ];
+          openDataTableModal(modalId, 'Financial Breakdown - ' + title, columns, data);
+        })
+        .catch(function () {
+          alert('Failed to load data.');
+          closeDataTableModal(modalId);
+        });
+    }
+
+    function openNewPatientsScheduledBreakdown(title) {
+      var modalId = 'breakdown-modal';
+      setDataTableModalLoading(modalId, 'Financial Breakdown - ' + title);
+
+      var start = _currentStartDate;
+      var end = _currentEndDate;
+
+      fetch(baseUrl + '/financials/breakdown?type=new_patients_scheduled&start_date=' + start + '&end_date=' + end)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var columns = [
+            { data: 'patient_id', title: 'Patient Id' },
+            { data: 'patient_name', title: 'Patient Name' },
+            { data: 'dates', title: 'Appointment Date(s)' },
+            { data: 'count', title: 'Number of visits' }
+          ];
+          openDataTableModal(modalId, 'Financial Breakdown - ' + title, columns, data);
+        })
+        .catch(function () {
+          alert('Failed to load data.');
+          closeDataTableModal(modalId);
+        });
+    }
+
     function closeBkModal() {
       document.getElementById('bkOverlay').classList.add('hidden');
       document.body.style.overflow = '';
@@ -1745,5 +1849,7 @@
       if (e.key === 'Escape') closeBkModal();
     });
   </script>
+
+  <x-app-components.datatable-modal id="breakdown-modal" />
 
 </x-app-layout>
