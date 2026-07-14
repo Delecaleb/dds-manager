@@ -75,7 +75,7 @@
 ────────────────────────────────────────────────────────────────────────────── */
 .dt-col-sticky {
     position: sticky !important;
-    left: 0 !important;
+    left: 0;
     background: inherit;
     box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.10);
     border-right: 1px solid #e5e7eb !important;

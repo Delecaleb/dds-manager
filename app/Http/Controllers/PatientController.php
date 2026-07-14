@@ -102,12 +102,19 @@ class PatientController extends Controller
             ->make(true);
     }
 
-    public function show($id)
+    public function show($id, Request $request)
     {
         $patient = OdPatient::where('PatNum', $id)->first();
 
         if (!$patient) {
-            return response()->json(['error' => 'Patient not found'], 404);
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['error' => 'Patient not found'], 404);
+            }
+            abort(404);
+        }
+
+        if (!$request->expectsJson() && !$request->ajax()) {
+            return redirect()->route('patients.index', ['open_patient_id' => $id]);
         }
 
         $dobStr = $patient->Birthdate ?? null;

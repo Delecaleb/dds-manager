@@ -32,8 +32,9 @@ class CalendarController extends Controller
     public function getResources(Request $request, CalendarService $calendar)
     {
         $date = $request->get('date') ?? date('Y-m-d');
+        $activeOnly = $request->get('active_only') == '1';
 
-        return response()->json($calendar->resources($date, $date));
+        return response()->json($calendar->resources($date, $date, $activeOnly));
     }
 
     /**
@@ -74,9 +75,63 @@ class CalendarController extends Controller
             ->selectRaw('COALESCE(SUM(CAST(pl.ProcFee AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
 
+        // Fetch active providers today from appointments on this date
+        $providerApts = OdAppointment::query()
+            ->whereIn('AptStatus', [1, 2, 4, 5])
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) = ?", [$date])
+            ->with('provider')
+            ->get();
+
+        $providersData = [];
+        $grouped = $providerApts->groupBy(function ($apt) {
+            return $apt->ProvNum ? (int) $apt->ProvNum : 0;
+        });
+
+        foreach ($grouped as $provNum => $apts) {
+            if ($provNum > 0) {
+                $firstApt = $apts->first();
+                $prov = $firstApt?->provider;
+                if ($prov) {
+                    $lastName = $prov->LName ?? '';
+                    $firstName = $prov->PName ?? '';
+                    $initials = (strlen($lastName) >= 2) ? substr($lastName, 0, 2) : substr($lastName, 0, 1);
+                    $specialtyText = ($provNum == 81) ? 'Invis' : (($provNum == 64) ? 'Gen' : 'General');
+                    $color = '#94a3b8';
+                    if ($provNum == 81) {
+                        $color = '#6DE5C1';
+                    } elseif ($provNum == 64) {
+                        $color = '#996BE5';
+                    }
+
+                    $providersData[] = [
+                        'id' => $provNum,
+                        'name' => trim($lastName . ', ' . $firstName),
+                        'initials' => $initials,
+                        'specialty' => $specialtyText,
+                        'count' => $apts->count(),
+                        'color' => $color
+                    ];
+                }
+            } else {
+                $providersData[] = [
+                    'id' => 0,
+                    'name' => 'Unassigned',
+                    'initials' => 'Un',
+                    'specialty' => '',
+                    'count' => $apts->count(),
+                    'color' => '#94a3b8'
+                ];
+            }
+        }
+
+        usort($providersData, function ($a, $b) {
+            return $b['count'] <=> $a['count'];
+        });
+
         return response()->json([
             'production' => $produced,
             'scheduled_production' => $scheduled,
+            'providers' => $providersData,
         ]);
     }
 

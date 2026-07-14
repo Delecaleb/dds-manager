@@ -20,6 +20,19 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite is dynamically typed and does not support STR_TO_DATE or MODIFY/MODIFY COLUMN.
+            // Simply make sure database has index.
+            try {
+                Schema::table('od_appointments', function (Blueprint $table) {
+                    $table->index('AptDateTime', 'od_appointments_aptdatetime_index');
+                });
+            } catch (\Exception $e) {
+                // Ignore if index already exists
+            }
+            return;
+        }
+
         // 1. Normalize the ISO 'T' separator to MySQL's space format.
         DB::statement("UPDATE od_appointments SET AptDateTime = REPLACE(AptDateTime, 'T', ' ') WHERE AptDateTime LIKE '%T%'");
 

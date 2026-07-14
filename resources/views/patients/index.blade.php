@@ -407,6 +407,13 @@
                     }
                 });
             });
+
+            // Auto-open patient modal if open_patient_id is in query params
+            const urlParams = new URLSearchParams(window.location.search);
+            const openPatientId = urlParams.get('open_patient_id');
+            if (openPatientId) {
+                openPatient(openPatientId);
+            }
         });
 
         $("#refreshPatients").click(function () { table.ajax.reload(); });
