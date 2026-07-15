@@ -104,6 +104,7 @@ class OdAppointment extends Model
     public function getDurationMinutesAttribute(): int
     {
         $pattern = $this->Pattern ?? '';
+
         return strlen($pattern) > 0 ? strlen($pattern) * 10 : 60;
     }
 }

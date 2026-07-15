@@ -27,7 +27,7 @@ class CalendarResourceTransformer
         ];
 
         if ($activeOnly) {
-            $activeOps = $appointments->pluck('Op')->unique()->map(fn($val) => (string) $val)->toArray();
+            $activeOps = $appointments->pluck('Op')->unique()->map(fn ($val) => (string) $val)->toArray();
 
             $filtered = [];
             foreach ($staticOpsOrder as $opKey) {
@@ -43,6 +43,7 @@ class CalendarResourceTransformer
         foreach ($staticOpsOrder as $opKey) {
             $result[] = $staticOps[$opKey];
         }
+
         return $result;
     }
 }

@@ -18,8 +18,7 @@ class PatientController extends Controller
 {
     public function __construct(
         protected AccountModuleService $ar
-    ) {
-    }
+    ) {}
 
     public function index()
     {
@@ -54,44 +53,47 @@ class PatientController extends Controller
             }, 'lifetime_collection');
 
         return DataTables::eloquent($query)
-            ->addColumn('id', fn($patient) => $patient->PatNum)
-            ->addColumn('name', fn($patient) => trim(($patient->LName ?? '') . ' ' . ($patient->FName ?? '')))
-            ->addColumn('patient_id', fn($patient) => $patient->PatNum)
-            ->addColumn('guarantor', fn($patient) => $patient->guarantor_name ?? '')
-            ->addColumn('guarantor_id', fn($patient) => $patient->Guarantor ?? '')
+            ->addColumn('id', fn ($patient) => $patient->PatNum)
+            ->addColumn('name', fn ($patient) => trim(($patient->LName ?? '').' '.($patient->FName ?? '')))
+            ->addColumn('patient_id', fn ($patient) => $patient->PatNum)
+            ->addColumn('guarantor', fn ($patient) => $patient->guarantor_name ?? '')
+            ->addColumn('guarantor_id', fn ($patient) => $patient->Guarantor ?? '')
             ->addColumn('age', function ($patient) {
                 $dobStr = $patient->Birthdate ?? null;
                 if ($dobStr && $dobStr !== '0001-01-01' && date_create($dobStr)) {
-                    return (new \DateTime($dobStr))->diff(new \DateTime())->y;
+                    return (new \DateTime($dobStr))->diff(new \DateTime)->y;
                 }
+
                 return 'N/A';
             })
             ->addColumn('gender', function ($patient) {
                 $genderMap = [0 => 'Male', 1 => 'Female', 2 => 'Unknown'];
                 $raw = $patient->Gender ?? '';
+
                 return is_numeric($raw) ? ($genderMap[intval($raw)] ?? 'Unknown') : ($raw ?: 'Unknown');
             })
-            ->addColumn('address', fn($patient) => trim(($patient->Address ?? '') . ' ' . ($patient->Address2 ?? '')))
-            ->addColumn('city', fn($patient) => $patient->City ?? '')
-            ->addColumn('state', fn($patient) => $patient->State ?? '')
-            ->addColumn('zip', fn($patient) => $patient->Zip ?? '')
-            ->addColumn('work_phone', fn($patient) => $patient->WkPhone ?? '')
-            ->addColumn('home_phone', fn($patient) => $patient->HmPhone ?? '')
-            ->addColumn('mobile_phone', fn($patient) => $patient->WirelessPhone ?? '')
-            ->addColumn('email', fn($patient) => $patient->Email ?? '')
+            ->addColumn('address', fn ($patient) => trim(($patient->Address ?? '').' '.($patient->Address2 ?? '')))
+            ->addColumn('city', fn ($patient) => $patient->City ?? '')
+            ->addColumn('state', fn ($patient) => $patient->State ?? '')
+            ->addColumn('zip', fn ($patient) => $patient->Zip ?? '')
+            ->addColumn('work_phone', fn ($patient) => $patient->WkPhone ?? '')
+            ->addColumn('home_phone', fn ($patient) => $patient->HmPhone ?? '')
+            ->addColumn('mobile_phone', fn ($patient) => $patient->WirelessPhone ?? '')
+            ->addColumn('email', fn ($patient) => $patient->Email ?? '')
             ->addColumn('birthdate', function ($patient) {
                 $dobStr = $patient->Birthdate ?? null;
                 if ($dobStr && $dobStr !== '0001-01-01' && date_create($dobStr)) {
                     return (new \DateTime($dobStr))->format('M d, Y');
                 }
+
                 return 'N/A';
             })
             ->addColumn('first_visit', function ($patient) {
                 return $patient->first_visit ? date('M d, Y', strtotime($patient->first_visit)) : 'N/A';
             })
-            ->addColumn('lifetime_value_production', fn($patient) => floatval($patient->lifetime_production))
-            ->addColumn('lifetime_value_collection', fn($patient) => floatval($patient->lifetime_collection))
-            ->addColumn('referral_source', fn($patient) => 'N/A')
+            ->addColumn('lifetime_value_production', fn ($patient) => floatval($patient->lifetime_production))
+            ->addColumn('lifetime_value_collection', fn ($patient) => floatval($patient->lifetime_collection))
+            ->addColumn('referral_source', fn ($patient) => 'N/A')
             ->filterColumn('name', function ($query, $keyword) {
                 $query->where(function ($q) use ($keyword) {
                     $q->where('LName', 'like', "%{$keyword}%")
@@ -106,14 +108,14 @@ class PatientController extends Controller
     {
         $patient = OdPatient::where('PatNum', $id)->first();
 
-        if (!$patient) {
+        if (! $patient) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(['error' => 'Patient not found'], 404);
             }
             abort(404);
         }
 
-        if (!$request->expectsJson() && !$request->ajax()) {
+        if (! $request->expectsJson() && ! $request->ajax()) {
             return redirect()->route('patients.index', ['open_patient_id' => $id]);
         }
 
@@ -123,7 +125,7 @@ class PatientController extends Controller
 
         if ($dobStr && $dobStr !== '0001-01-01' && date_create($dobStr)) {
             $dob = new \DateTime($dobStr);
-            $age = $dob->diff(new \DateTime())->y;
+            $age = $dob->diff(new \DateTime)->y;
             $birthdateFormatted = $dob->format('M d, Y');
         }
 
@@ -142,18 +144,18 @@ class PatientController extends Controller
         $nowStr = now()->format('Y-m-d H:i:s');
 
         $nextApt = $patientAppointments
-            ->filter(fn($apt) => ($apt->AptDateTime ?? '') >= $nowStr)
+            ->filter(fn ($apt) => ($apt->AptDateTime ?? '') >= $nowStr)
             ->sortBy('AptDateTime')
             ->first();
 
         $lastApt = $patientAppointments
-            ->filter(fn($apt) => ($apt->AptDateTime ?? '') < $nowStr)
+            ->filter(fn ($apt) => ($apt->AptDateTime ?? '') < $nowStr)
             ->sortByDesc('AptDateTime')
             ->first();
 
-        $completedCount = $patientAppointments->filter(fn($apt) => in_array($apt->AptStatus ?? '', [2, 'Complete', 'Completed']))->count();
-        $scheduledCount = $patientAppointments->filter(fn($apt) => in_array($apt->AptStatus ?? '', [1, 'Scheduled', 'Active', 'Scheduled/Active']))->count();
-        $brokenCount = $patientAppointments->filter(fn($apt) => in_array($apt->AptStatus ?? '', [5, 'Broken']))->count();
+        $completedCount = $patientAppointments->filter(fn ($apt) => in_array($apt->AptStatus ?? '', [2, 'Complete', 'Completed']))->count();
+        $scheduledCount = $patientAppointments->filter(fn ($apt) => in_array($apt->AptStatus ?? '', [1, 'Scheduled', 'Active', 'Scheduled/Active']))->count();
+        $brokenCount = $patientAppointments->filter(fn ($apt) => in_array($apt->AptStatus ?? '', [5, 'Broken']))->count();
         $totalApts = $completedCount + $scheduledCount + $brokenCount;
 
         $completedPct = $totalApts > 0 ? round(($completedCount / $totalApts) * 100, 2) : 0.00;
@@ -161,11 +163,10 @@ class PatientController extends Controller
         $brokenPct = $totalApts > 0 ? round(($brokenCount / $totalApts) * 100, 2) : 0.00;
 
         $lifetimeValue = floatval($patientProcedures->sum('ProcFee'));
-        $scheduledTP = $patientProcedures->filter(fn($p) => in_array($p->ProcStatus ?? '', ['Scheduled', 'Active', 'Accepted']));
-        $unscheduledTP = $patientProcedures->filter(fn($p) => !in_array($p->ProcStatus ?? '', ['Scheduled', 'Active', 'Accepted']));
+        $scheduledTP = $patientProcedures->filter(fn ($p) => in_array($p->ProcStatus ?? '', ['Scheduled', 'Active', 'Accepted']));
+        $unscheduledTP = $patientProcedures->filter(fn ($p) => ! in_array($p->ProcStatus ?? '', ['Scheduled', 'Active', 'Accepted']));
         $scheduledTPFee = floatval($scheduledTP->sum('ProcFee'));
         $unscheduledTPFee = floatval($unscheduledTP->sum('ProcFee'));
-
 
         $ledgerItems = [];
         foreach ($patientProcedures->where('ProcStatus', 'C') as $proc) {
@@ -176,14 +177,14 @@ class PatientController extends Controller
                 'description' => $proc->Descript ?? 'Procedure',
                 'tooth' => $proc->ToothNum ?? '',
                 'surface' => $proc->Surf ?? '',
-                'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
+                'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
                 'provider' => $provName,
                 'date' => isset($proc->ProcDate) ? date('M d, Y', strtotime($proc->ProcDate)) : '—',
                 'timestamp' => strtotime($proc->ProcDate ?? ''),
             ];
         }
 
-        usort($ledgerItems, fn($a, $b) => $b['timestamp'] <=> $a['timestamp']);
+        usort($ledgerItems, fn ($a, $b) => $b['timestamp'] <=> $a['timestamp']);
 
         $txplansItems = [];
         foreach ($patientProcedures as $proc) {
@@ -224,7 +225,7 @@ class PatientController extends Controller
                 'description' => $proc->Descript ?? 'Procedure',
                 'tooth' => $proc->ToothNum ?? '',
                 'surface' => $proc->Surf ?? '',
-                'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
+                'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
                 'provider' => $provName,
                 'status' => $statusText,
                 'planned' => $datePlanned,
@@ -234,13 +235,13 @@ class PatientController extends Controller
                 'timestamp' => strtotime($proc->ProcDate ?? ''),
             ];
         }
-        usort($txplansItems, fn($a, $b) => $b['timestamp'] <=> $a['timestamp']);
+        usort($txplansItems, fn ($a, $b) => $b['timestamp'] <=> $a['timestamp']);
 
         $notes = $patient->AddrNote ?? 'No activities or notes available.';
 
         return response()->json([
             'id' => $patient->PatNum,
-            'name' => ($patient->LName ?? '') . ', ' . ($patient->FName ?? ''),
+            'name' => ($patient->LName ?? '').', '.($patient->FName ?? ''),
             'age' => $age,
             'gender' => $gender,
             'birthdate' => $birthdateFormatted,
@@ -249,7 +250,7 @@ class PatientController extends Controller
             'work_phone' => $patient->WkPhone ?: 'N/A',
             'home_phone' => $patient->HmPhone ?: 'N/A',
             'email' => $patient->Email ?: 'N/A',
-            'address' => trim(($patient->Address ?? '') . ' ' . ($patient->Address2 ?? '')),
+            'address' => trim(($patient->Address ?? '').' '.($patient->Address2 ?? '')),
             'city' => $patient->City ?? '',
             'state' => $patient->State ?? '',
             'zip' => $patient->Zip ?? '',
@@ -308,7 +309,7 @@ class PatientController extends Controller
         $provMap = OdProvider::all()->pluck('LName', 'ProvNum')->toArray();
         $codeMap = OdProcedure::all()->keyBy('CodeNum');
 
-        $aptNums = $procedures->pluck('AptNum')->filter(fn($aptNum) => ($aptNum ?? 0) > 0)->unique();
+        $aptNums = $procedures->pluck('AptNum')->filter(fn ($aptNum) => ($aptNum ?? 0) > 0)->unique();
         $appointments = OdAppointment::whereIn('AptNum', $aptNums)->get()->keyBy('AptNum');
 
         $items = $procedures->map(function ($proc) use ($provMap, $codeMap, $appointments) {
@@ -351,7 +352,7 @@ class PatientController extends Controller
                 'description' => $description,
                 'tooth' => $proc->ToothNum ?? '',
                 'surface' => $proc->Surf ?? '',
-                'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
+                'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
                 'provider' => $provName,
                 'status' => $statusText,
                 'date_planned' => $datePlanned,
@@ -363,7 +364,7 @@ class PatientController extends Controller
         })
             ->sortByDesc('timestamp')
             ->values()
-            ->map(fn($item) => collect($item)->except('timestamp')->all());
+            ->map(fn ($item) => collect($item)->except('timestamp')->all());
 
         return response()->json($items);
     }
@@ -372,13 +373,13 @@ class PatientController extends Controller
     {
         $patient = OdPatient::where('PatNum', $patientId)->first();
 
-        if (!$patient) {
+        if (! $patient) {
             return response()->json([], 404);
         }
 
         $guarantorId = $patient->Guarantor ?? null;
 
-        if (!$guarantorId) {
+        if (! $guarantorId) {
             return response()->json([]);
         }
 
@@ -390,8 +391,8 @@ class PatientController extends Controller
 
         return response()->json($familyMembers->map(function ($m) use ($genderMap, $statusMap, $nowStr) {
             $mApts = OdAppointment::where('PatNum', $m->PatNum)->get();
-            $mNext = $mApts->filter(fn($apt) => ($apt->AptDateTime ?? '') >= $nowStr)->sortBy('AptDateTime')->first();
-            $mLast = $mApts->filter(fn($apt) => ($apt->AptDateTime ?? '') < $nowStr)->sortByDesc('AptDateTime')->first();
+            $mNext = $mApts->filter(fn ($apt) => ($apt->AptDateTime ?? '') >= $nowStr)->sortBy('AptDateTime')->first();
+            $mLast = $mApts->filter(fn ($apt) => ($apt->AptDateTime ?? '') < $nowStr)->sortByDesc('AptDateTime')->first();
 
             $mGenderRaw = $m->Gender ?? '';
             $mGender = is_numeric($mGenderRaw) ? ($genderMap[intval($mGenderRaw)] ?? 'Unknown') : ($mGenderRaw ?: 'Unknown');
@@ -399,7 +400,7 @@ class PatientController extends Controller
             $mStatus = is_numeric($mStatusRaw) ? ($statusMap[intval($mStatusRaw)] ?? 'Active') : ($mStatusRaw ?: 'Active');
 
             return [
-                'name' => ($m->LName ?? '') . ', ' . ($m->FName ?? ''),
+                'name' => ($m->LName ?? '').', '.($m->FName ?? ''),
                 'status' => $mStatus,
                 'gender' => $mGender,
                 'last_visit' => $mLast ? date('M d, Y', strtotime($mLast->AptDateTime)) : '—',
@@ -413,7 +414,7 @@ class PatientController extends Controller
     {
         $patient = OdPatient::where('PatNum', $patientId)->first();
 
-        if (!$patient) {
+        if (! $patient) {
             return response()->json(['name' => null], 404);
         }
 
@@ -422,7 +423,7 @@ class PatientController extends Controller
 
         return response()->json([
             'employer_num' => $employerNum,
-            'name' => $employerNum ? 'Employer #' . $employerNum : null,
+            'name' => $employerNum ? 'Employer #'.$employerNum : null,
             'note' => $employmentNote,
         ]);
     }
@@ -431,7 +432,7 @@ class PatientController extends Controller
     {
         $ar = OdPatientBalance::where('PatNum', $patientId)->first();
 
-        if (!$ar) {
+        if (! $ar) {
             return response()->json([
                 'total' => 0,
                 'insurance_claims' => 0,
@@ -441,7 +442,7 @@ class PatientController extends Controller
                     '30_days' => 0,
                     '60_days' => 0,
                     '90_days' => 0,
-                ]
+                ],
             ], 201);
         }
 
@@ -454,7 +455,7 @@ class PatientController extends Controller
                 '30_days' => number_format($ar->Bal_31_60 ?? 0, 2),
                 '60_days' => number_format($ar->Bal_61_90 ?? 0, 2),
                 '90_days' => number_format($ar->BalOver90 ?? 0, 2),
-            ]
+            ],
         ]);
     }
 
@@ -478,7 +479,7 @@ class PatientController extends Controller
             $arTransactions[] = [
                 'description' => $proc->Descript ?? 'Procedure',
                 'code' => $proc->ProcCode ?? ($proc->OldCode ?? '—'),
-                'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
+                'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
                 'provider' => $provName,
                 'date' => isset($proc->ProcDate) ? date('M d, Y', strtotime($proc->ProcDate)) : '—',
             ];
@@ -492,7 +493,7 @@ class PatientController extends Controller
             'thirty_days' => number_format($ar['Bal_31_60'] ?? 0, 2),
             'sixty_days' => number_format($ar['Bal_61_90'] ?? 0, 2),
             'ninety_days' => number_format($ar['BalOver90'] ?? 0, 2),
-            'transactions' => $arTransactions
+            'transactions' => $arTransactions,
         ]);
     }
 }

@@ -9,8 +9,7 @@ class AgingController extends Controller
 {
     public function __construct(
         protected AgingCalculationService $agingCalculationService
-    ) {
-    }
+    ) {}
 
     public function index()
     {
@@ -78,14 +77,14 @@ class AgingController extends Controller
             $sortDir
         );
 
-        $fmt = fn($v) => '$ ' . number_format((float) ($v ?? 0), 2);
+        $fmt = fn ($v) => '$ '.number_format((float) ($v ?? 0), 2);
         $zero = $fmt(0);
 
         return response()->json([
             'draw' => $draw,
             'recordsTotal' => $result['totalRecords'],
             'recordsFiltered' => $result['filteredRecords'],
-            'data' => $result['data']->map(fn($r) => [
+            'data' => $result['data']->map(fn ($r) => [
                 'guarantor_id' => $r->guarantor_id,
                 'patient_id' => $r->guarantor_id,
                 'guarantor_name' => $r->guarantor_name,
@@ -127,9 +126,9 @@ class AgingController extends Controller
 
         $totals = $this->agingCalculationService->totals($asOfDate, $search, $includeCredits, 'guarantor');
 
-        $fmt = fn($v) => '$ ' . number_format((float) ($v ?? 0), 2);
+        $fmt = fn ($v) => '$ '.number_format((float) ($v ?? 0), 2);
 
-        $fmtCell = fn($val) => [
+        $fmtCell = fn ($val) => [
             'total' => (float) ($val ?? 0),
             'patient' => (float) ($val ?? 0),
             'insurance' => 0,
@@ -154,7 +153,7 @@ class AgingController extends Controller
                     'credit_balance' => $fmtCell($totals['credit_total']),
                     'contract' => $fmtCell($totals['contract_total']),
                     'total' => $fmtCell($totals['grand_total']),
-                ]
+                ],
             ],
             'totals' => [
                 'current' => $fmt($totals['current_total']),
@@ -197,13 +196,13 @@ class AgingController extends Controller
             $sortDir
         );
 
-        $fmt = fn($v) => '$ ' . number_format((float) ($v ?? 0), 2);
+        $fmt = fn ($v) => '$ '.number_format((float) ($v ?? 0), 2);
 
         return response()->json([
             'draw' => $draw,
             'recordsTotal' => $result['totalRecords'],
             'recordsFiltered' => $result['filteredRecords'],
-            'data' => $result['data']->map(fn($r) => [
+            'data' => $result['data']->map(fn ($r) => [
                 'guarantor_id' => $r->guarantor_id,
                 'patient_id' => $r->patient_id,
                 'guarantor_name' => $r->guarantor_name,

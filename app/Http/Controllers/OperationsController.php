@@ -35,6 +35,11 @@ class OperationsController extends Controller
     private function subtabsByTab(): array
     {
         return [
+            'payors' => [
+                'default' => 'Default',
+                'diff-last-year' => 'Diff Last Year',
+                'percent-diff-last-year' => 'Percent Diff Last Year',
+            ],
             'offices' => [
                 'default' => 'Default',
                 'last-year' => 'Last Year',
@@ -91,7 +96,7 @@ class OperationsController extends Controller
      */
     public function index(string $tab = 'offices', ?string $subtab = null)
     {
-        if (!array_key_exists($tab, $this->tabs())) {
+        if (! array_key_exists($tab, $this->tabs())) {
             abort(404);
         }
 
@@ -108,7 +113,7 @@ class OperationsController extends Controller
      */
     public function data(Request $request, OperationsAnalyticsService $service, string $tab, ?string $subtab = null)
     {
-        if (!array_key_exists($tab, $this->tabs())) {
+        if (! array_key_exists($tab, $this->tabs())) {
             abort(404);
         }
 
@@ -131,6 +136,7 @@ class OperationsController extends Controller
 
             case 'production-details':
                 $group = array_values(array_filter(explode(',', (string) $request->input('group', '')), 'strlen'));
+
                 return view('operations.tabs.production-details', $chrome + [
                     'group' => $group,
                     'spec' => $service->productionDetails($start, $end, $group, $clinics),
@@ -143,7 +149,7 @@ class OperationsController extends Controller
 
             case 'payors':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->payors($start, $end, $clinics),
+                    'spec' => $service->payors($start, $end, $subtab, $clinics),
                 ]);
 
             case 'providers':
@@ -164,6 +170,7 @@ class OperationsController extends Controller
             case 'trends':
                 $metric = request('metric', 'production');
                 $lob = request('lob', '');
+
                 return view('operations.tabs.trends', $chrome + [
                     'spec' => $service->trends($start, $end, $subtab, $clinics, $metric, $lob),
                 ]);
@@ -180,6 +187,7 @@ class OperationsController extends Controller
 
             case 'marketing':
                 $zip = request('zip', 'ALL');
+
                 return view('operations.tabs.marketing', $chrome + [
                     'spec' => $service->marketing($start, $end, $subtab, $clinics, $zip),
                 ]);
@@ -199,6 +207,7 @@ class OperationsController extends Controller
     private function defaultSubtab(string $tab): string
     {
         $subtabs = $this->subtabsByTab()[$tab] ?? [];
+
         return $subtabs ? (string) array_key_first($subtabs) : 'default';
     }
 }

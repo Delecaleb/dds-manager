@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\Schema;
  * the column for fast date-range scans. The sync now normalizes AptDateTime
  * on write (AppointmentSyncService::transformRow), so future rows stay clean.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         if (DB::getDriverName() === 'sqlite') {
@@ -27,9 +28,10 @@ return new class extends Migration {
                 Schema::table('od_appointments', function (Blueprint $table) {
                     $table->index('AptDateTime', 'od_appointments_aptdatetime_index');
                 });
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Ignore if index already exists
             }
+
             return;
         }
 
@@ -67,6 +69,10 @@ return new class extends Migration {
         Schema::table('od_appointments', function (Blueprint $table) {
             $table->dropIndex('od_appointments_aptdatetime_index');
         });
+
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
 
         // Revert the type only. Values stay in normalized 'Y-m-d H:i:s' form
         // (the original 'T' separator is not restored — nothing relies on it).

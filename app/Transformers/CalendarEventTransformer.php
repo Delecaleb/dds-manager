@@ -2,8 +2,8 @@
 
 namespace App\Transformers;
 
-use App\Models\OdAppointment;
 use App\Enums\AppointmentStatus;
+use App\Models\OdAppointment;
 
 class CalendarEventTransformer
 {
@@ -30,7 +30,7 @@ class CalendarEventTransformer
         $endDt = (clone $startDt)->modify("+{$appointment->duration_minutes} minutes");
 
         // Match operatory tracking
-        $opKey = 'op-' . ($appointment->Op ?? '0');
+        $opKey = 'op-'.($appointment->Op ?? '0');
 
         $staticTitles = [
             '1' => 'DR-1',
@@ -42,9 +42,9 @@ class CalendarEventTransformer
             '7' => 'Unassigned 7',
             '8' => 'Unassigned 8',
             '9' => 'Unassigned 9',
-            '10' => 'Unassigned 10'
+            '10' => 'Unassigned 10',
         ];
-        $opTitle = $staticTitles[$appointment->Op] ?? ('Op ' . $appointment->Op);
+        $opTitle = $staticTitles[$appointment->Op] ?? ('Op '.$appointment->Op);
 
         return [
             'id' => $appointment->AptNum,
@@ -70,7 +70,7 @@ class CalendarEventTransformer
             'operatoryId' => $appointment->Op ?? '',
             'operatoryTitle' => $opTitle,
             'providerId' => $appointment->ProvNum ?? '',
-            'providerName' => $appointment->provider ? trim(($appointment->provider->LName ?? '') . ', ' . ($appointment->provider->PName ?? '')) : '',
+            'providerName' => $appointment->provider ? trim(($appointment->provider->LName ?? '').', '.($appointment->provider->PName ?? '')) : '',
             'duration' => $appointment->duration_minutes,
         ];
     }

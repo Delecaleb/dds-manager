@@ -612,7 +612,7 @@
 
       var data = _providerData.filter(function (r) {
         if (!search) return true;
-        var name = ((r.LName || '') + ' ' + (r.PName || '') + ' ' + (r.Abbr || '')).toLowerCase();
+        var name = ((r.LName || '') + ' ' + (r.PName || '') + ' ' + (r.Abbr || '') + ' ' + (r.specialty || '')).toLowerCase();
         return name.indexOf(search) !== -1;
       });
 
@@ -674,9 +674,9 @@
 
         /* Name + meta */
         html += '<div class="flex-1 min-w-0">';
-        html += '<p class="text-[10px] text-slate-400 font-medium">' + escHtml(row.Abbr || '') + '</p>';
-        html += '<p class="text-[10px] text-slate-400">8 Mile</p>';
-        html += '<p class="text-sm font-bold text-slate-900 truncate">' + name + ' <span class="text-slate-400 font-normal">(' + escHtml(row.ProvNum) + ')</span></p>';
+        html += '<p class="text-[10px] text-slate-400 font-medium">' + escHtml(row.specialty || row.Abbr || '') + '</p>';
+        html += '<p class="text-[10px] text-slate-400">' + escHtml(row.location || '8 Mile') + '</p>';
+        html += '<p class="text-sm font-bold text-slate-900 truncate">' + name + ' <span class="text-slate-400 font-normal">(' + escHtml(row.appointment_count ?? 0) + ')</span></p>';
         html += '</div>';
 
         /* Stats */
@@ -942,7 +942,7 @@
       });
 
       var dsNet = sortedData.map(function (d) { return d.net_production; });
-      var dsColors = dsNet.map(function (v) { return Number(v) >= 0 ? '#6ee7b7' : '#a855f7'; });
+      var dsAdj = sortedData.map(function (d) { return d.adjustments; });
 
       var ctx = document.getElementById('locUtilizationChart');
       if (!ctx) return;
@@ -955,13 +955,21 @@
       opts.scales.x.stacked = false;
       opts.scales.y.stacked = false;
       opts.scales.y.min = undefined; // allow negative
+      opts.scales.x.ticks = {
+        autoSkip: false,
+        font: { size: 11, weight: 'bold' },
+        color: '#1e293b',
+        maxRotation: 45,
+        minRotation: 0
+      };
 
       _locUtilizationChartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
           labels: labels,
           datasets: [
-            { label: 'Net Production', data: dsNet, backgroundColor: dsColors }
+            { label: 'Net Production', data: dsNet, backgroundColor: '#fbbf24' },
+            { label: 'Adjustment', data: dsAdj, backgroundColor: '#a855f7' }
           ]
         },
         options: opts
@@ -969,13 +977,13 @@
     }
 
     function exportLocUtilizationCsv() {
-      var rows = ['Provider,Net Production'];
+      var rows = ['Provider,Net Production,Adjustment'];
       var sortedData = _providerData.slice().sort(function (a, b) {
         return Number(b.net_production) - Number(a.net_production);
       });
       sortedData.forEach(function (r) {
         var name = (r.LName || '') + (r.PName ? ', ' + r.PName : '');
-        rows.push(['"' + name.replace(/"/g, '""') + '"', r.net_production].join(','));
+        rows.push(['"' + name.replace(/"/g, '""') + '"', r.net_production, r.adjustments].join(','));
       });
       downloadCsv('location-utilization.csv', rows);
     }

@@ -2,18 +2,17 @@
 
 namespace App\Http\Controllers;
 
-
-use App\Services\OpenDental\CalendarService;
+use App\Models\OdAdjustment;
 use App\Models\OdAppointment;
 use App\Models\OdProcedureLog;
-use Yajra\DataTables\Facades\DataTables;
+use App\Services\OpenDental\CalendarService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Yajra\DataTables\Facades\DataTables;
 
 class CalendarController extends Controller
 {
-
     public function index()
     {
         return view('calendar.index');
@@ -61,7 +60,7 @@ class CalendarController extends Controller
             ->selectRaw('COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
 
-        $adjustments = (float) \App\Models\OdAdjustment::query()
+        $adjustments = (float) OdAdjustment::query()
             ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) = ?", [$date])
             ->selectRaw('COALESCE(SUM(CAST(AdjAmt AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
@@ -105,11 +104,11 @@ class CalendarController extends Controller
 
                     $providersData[] = [
                         'id' => $provNum,
-                        'name' => trim($lastName . ', ' . $firstName),
+                        'name' => trim($lastName.', '.$firstName),
                         'initials' => $initials,
                         'specialty' => $specialtyText,
                         'count' => $apts->count(),
-                        'color' => $color
+                        'color' => $color,
                     ];
                 }
             } else {
@@ -119,7 +118,7 @@ class CalendarController extends Controller
                     'initials' => 'Un',
                     'specialty' => '',
                     'count' => $apts->count(),
-                    'color' => '#94a3b8'
+                    'color' => '#94a3b8',
                 ];
             }
         }
@@ -147,46 +146,49 @@ class CalendarController extends Controller
             ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
 
         return DataTables::of($query)
-            ->addColumn('location', fn($row) => '8 Mile')
-            ->addColumn('patient_name', fn($row) => trim(($row->patient?->FName ?? '') . ' ' . ($row->patient?->LName ?? '')))
-            ->addColumn('appointment_date', fn($row) => (new Carbon($row->AptDateTime))->format('M d, Y'))
-            ->addColumn('appointment_time', fn($row) => (new Carbon($row->AptDateTime))->format('h:i A'))
+            ->addColumn('location', fn ($row) => '8 Mile')
+            ->addColumn('patient_name', fn ($row) => trim(($row->patient?->FName ?? '').' '.($row->patient?->LName ?? '')))
+            ->addColumn('appointment_date', fn ($row) => (new Carbon($row->AptDateTime))->format('M d, Y'))
+            ->addColumn('appointment_time', fn ($row) => (new Carbon($row->AptDateTime))->format('h:i A'))
             ->addColumn('appointment_duration', function ($row) {
                 $pattern = $row->Pattern ?? '';
                 $minutes = strlen($pattern) > 0 ? strlen($pattern) * 10 : 60;
+
                 return "{$minutes}.00";
             })
-            ->addColumn('operatory_name', fn($row) => 'DR-' . ($row->Op ?? ''))
+            ->addColumn('operatory_name', fn ($row) => 'DR-'.($row->Op ?? ''))
             ->addColumn('appointment_status', function ($row) {
                 $map = [
                     1 => 'Scheduled',
                     2 => 'Completed',
                     4 => 'ASAP',
-                    5 => 'Broken'
+                    5 => 'Broken',
                 ];
+
                 return $map[$row->AptStatus] ?? 'Scheduled';
             })
             ->addColumn('patient_age', function ($row) {
-                if (!empty($row->patient?->Birthdate) && $row->patient?->Birthdate != '0001-01-01' && $row->patient?->Birthdate != '0000-00-00') {
+                if (! empty($row->patient?->Birthdate) && $row->patient?->Birthdate != '0001-01-01' && $row->patient?->Birthdate != '0000-00-00') {
                     return Carbon::parse($row->patient?->Birthdate)->age;
                 }
+
                 return '--';
             })
-            ->addColumn('patient_phone', fn($row) => $row->patient?->WirelessPhone ?: ($row->patient?->HmPhone ?: '--'))
-            ->addColumn('email_address', fn($row) => $row->patient?->Email ?: '--')
-            ->addColumn('patient_type', fn($row) => $row->IsNewPatient ? 'New Patient' : 'Existing')
-            ->addColumn('appointment_notes', fn($row) => $row->Note ?: '--')
-            ->addColumn('confirmation_status', fn($row) => $row->Confirmed ? 'Confirmed' : 'Unconfirmed')
-            ->addColumn('provider_name', fn($row) => $row->provider?->Abbr ?? 'Unknown')
-            ->addColumn('procedure_codes', fn($row) => $row->ProcDescript ?: '--')
+            ->addColumn('patient_phone', fn ($row) => $row->patient?->WirelessPhone ?: ($row->patient?->HmPhone ?: '--'))
+            ->addColumn('email_address', fn ($row) => $row->patient?->Email ?: '--')
+            ->addColumn('patient_type', fn ($row) => $row->IsNewPatient ? 'New Patient' : 'Existing')
+            ->addColumn('appointment_notes', fn ($row) => $row->Note ?: '--')
+            ->addColumn('confirmation_status', fn ($row) => $row->Confirmed ? 'Confirmed' : 'Unconfirmed')
+            ->addColumn('provider_name', fn ($row) => $row->provider?->Abbr ?? 'Unknown')
+            ->addColumn('procedure_codes', fn ($row) => $row->ProcDescript ?: '--')
             ->addColumn('production', function ($row) {
-                return '$ ' . number_format($row->production_total ?? 0, 2);
+                return '$ '.number_format($row->production_total ?? 0, 2);
             })
-            ->addColumn('primary_insurance', fn($row) => 'N/A')
-            ->addColumn('secondary_insurance', fn($row) => 'N/A')
-            ->addColumn('referral_source', fn($row) => 'Unknown')
-            ->addColumn('unscheduled_tx', fn($row) => '$ 0.00')
-            ->addColumn('last_visit_date', fn($row) => 'N/A')
+            ->addColumn('primary_insurance', fn ($row) => 'N/A')
+            ->addColumn('secondary_insurance', fn ($row) => 'N/A')
+            ->addColumn('referral_source', fn ($row) => 'Unknown')
+            ->addColumn('unscheduled_tx', fn ($row) => '$ 0.00')
+            ->addColumn('last_visit_date', fn ($row) => 'N/A')
             ->make(true);
     }
 
@@ -245,9 +247,9 @@ class CalendarController extends Controller
                     'booked_hours' => 'top',
                     'avg_lead_all' => 'bottom',
                     'avg_lead_new' => 'top',
-                    'avg_lead_emerg' => 'top'
-                ]
-            ]
+                    'avg_lead_emerg' => 'top',
+                ],
+            ],
         ];
 
         return DataTables::of(collect($data))->make(true);

@@ -2,11 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
 use App\Models\OdAppointment;
 use App\Models\OdProvider;
+use App\Models\User;
 use Tests\TestCase;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 class CalendarTest extends TestCase
 {
@@ -43,7 +42,7 @@ class CalendarTest extends TestCase
             'ProvNum' => 81,
             'LName' => 'Elias',
             'PName' => 'Kathy',
-            'Abbr' => 'ELIAS'
+            'Abbr' => 'ELIAS',
         ]);
 
         OdAppointment::create([
@@ -53,7 +52,7 @@ class CalendarTest extends TestCase
             'Pattern' => '//',
             'Op' => 2,
             'ProvNum' => $provider->ProvNum,
-            'AptDateTime' => '2026-07-14 10:00:00'
+            'AptDateTime' => '2026-07-14 10:00:00',
         ]);
 
         $response = $this->actingAs($this->user)
@@ -70,7 +69,7 @@ class CalendarTest extends TestCase
             'ProvNum' => 81,
             'LName' => 'Elias',
             'PName' => 'Kathy',
-            'Abbr' => 'ELIAS'
+            'Abbr' => 'ELIAS',
         ]);
 
         OdAppointment::create([
@@ -80,7 +79,7 @@ class CalendarTest extends TestCase
             'Pattern' => '//',
             'Op' => 2,
             'ProvNum' => $provider->ProvNum,
-            'AptDateTime' => '2026-07-14 10:00:00'
+            'AptDateTime' => '2026-07-14 10:00:00',
         ]);
 
         $response = $this->actingAs($this->user)
@@ -97,9 +96,9 @@ class CalendarTest extends TestCase
                         'initials',
                         'specialty',
                         'count',
-                        'color'
-                    ]
-                ]
+                        'color',
+                    ],
+                ],
             ])
             ->assertJsonFragment([
                 'id' => 81,
@@ -107,7 +106,7 @@ class CalendarTest extends TestCase
                 'initials' => 'El',
                 'specialty' => 'Invis',
                 'count' => 1,
-                'color' => '#6DE5C1'
+                'color' => '#6DE5C1',
             ]);
     }
 }

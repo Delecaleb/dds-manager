@@ -2,10 +2,10 @@
 
 namespace App\Services\Sync;
 
-use Exception;
-use Illuminate\Support\Facades\DB;
 use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
+use Exception;
+use Illuminate\Support\Facades\DB;
 
 abstract class BaseQuerySyncService
 {
@@ -17,10 +17,12 @@ abstract class BaseQuerySyncService
 
     protected int $sleepSeconds = 1;
 
+    /** Rows processed during the current sync() invocation (for reporting). */
+    protected int $processedThisRun = 0;
+
     public function __construct(
         protected QueryService $queryService
-    ) {
-    }
+    ) {}
 
     abstract protected function table(): string;
 
@@ -45,7 +47,7 @@ abstract class BaseQuerySyncService
 
     protected function normalizeDateTime($value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -67,7 +69,7 @@ abstract class BaseQuerySyncService
             ['module' => $this->module()],
             [
                 'status' => 'idle',
-                'total_processed' => 0
+                'total_processed' => 0,
             ]
         );
 
@@ -77,6 +79,9 @@ abstract class BaseQuerySyncService
             'finished_at' => null,
             'last_error' => null,
         ]);
+
+        $incremental = $log->last_primary_key !== null && $this->syncColumn() !== null;
+        echo "[{$this->module()}] ".($incremental ? 'incremental' : 'initial')." sync started...\n";
 
         try {
 
@@ -89,8 +94,13 @@ abstract class BaseQuerySyncService
             $log->update([
                 'status' => 'completed',
                 'finished_at' => now(),
-                'retry_count' => 0
+                'retry_count' => 0,
             ]);
+
+            $summary = $this->processedThisRun === 0
+                ? 'already up to date (0 new rows)'
+                : "{$this->processedThisRun} row(s) processed";
+            echo "[{$this->module()}] sync complete — {$summary}\n";
 
         } catch (Exception $e) {
 
@@ -98,8 +108,10 @@ abstract class BaseQuerySyncService
 
             $log->update([
                 'status' => 'failed',
-                'last_error' => $e->getMessage()
+                'last_error' => $e->getMessage(),
             ]);
+
+            echo "[{$this->module()}] sync FAILED after {$this->processedThisRun} row(s): {$e->getMessage()}\n";
 
             throw $e;
         }
@@ -128,7 +140,7 @@ abstract class BaseQuerySyncService
             $lastId = end($rows)[$this->primaryKey()];
 
             $log->update([
-                'last_primary_key' => $lastId
+                'last_primary_key' => $lastId,
             ]);
 
             $log->increment('total_processed', count($rows));
@@ -203,7 +215,7 @@ abstract class BaseQuerySyncService
         $model = $this->model();
 
         $records = array_map(
-            fn($row) => $this->transformRow($row),
+            fn ($row) => $this->transformRow($row),
             $rows
         );
 
@@ -234,11 +246,11 @@ abstract class BaseQuerySyncService
             } catch (Exception $e) {
 
                 if (
-                    !str_contains($e->getMessage(), 'Deadlock')
+                    ! str_contains($e->getMessage(), 'Deadlock')
                     &&
-                    !str_contains($e->getMessage(), 'Lock wait timeout')
+                    ! str_contains($e->getMessage(), 'Lock wait timeout')
                     &&
-                    !str_contains($e->getMessage(), 'server has gone away')
+                    ! str_contains($e->getMessage(), 'server has gone away')
                 ) {
                     throw $e;
                 }
