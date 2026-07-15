@@ -13,18 +13,18 @@ class OperationsController extends Controller
     private function tabs(): array
     {
         return [
-            'offices'                      => 'Offices',
-            'production-details'           => 'Production Details',
-            'payors'                       => 'Payors',
-            'performance'                  => 'Performance',
-            'providers'                    => 'Providers',
-            'services'                     => 'Services',
-            'trends'                       => 'Trends',
-            'cancellations'                => 'Cancellations',
-            'claims'                       => 'Claims',
-            'compliance'                   => 'Compliance',
-            'marketing'                    => 'Marketing',
-            'monthly-practice-scorecards'  => 'Monthly Practice Scorecards',
+            'offices' => 'Offices',
+            'production-details' => 'Production Details',
+            'payors' => 'Payors',
+            'performance' => 'Performance',
+            'providers' => 'Providers',
+            'services' => 'Services',
+            'trends' => 'Trends',
+            'cancellations' => 'Cancellations',
+            'claims' => 'Claims',
+            'compliance' => 'Compliance',
+            'marketing' => 'Marketing',
+            'monthly-practice-scorecards' => 'Monthly Practice Scorecards',
         ];
     }
 
@@ -35,21 +35,57 @@ class OperationsController extends Controller
     private function subtabsByTab(): array
     {
         return [
+            'payors' => [
+                'default' => 'Default',
+                'diff-last-year' => 'Diff Last Year',
+                'percent-diff-last-year' => 'Percent Diff Last Year',
+            ],
             'offices' => [
-                'default'                 => 'Default',
-                'last-year'               => 'Last Year',
-                'diff-last-year'          => 'Diff Last Year',
-                'percent-diff-last-year'  => 'Percent Diff Last Year',
+                'default' => 'Default',
+                'last-year' => 'Last Year',
+                'diff-last-year' => 'Diff Last Year',
+                'percent-diff-last-year' => 'Percent Diff Last Year',
             ],
             'cancellations' => [
-                'default'                 => 'Default',
-                'diff-last-year'          => 'Diff Last Year',
-                'percent-diff-last-year'  => 'Percent Diff Last Year',
+                'default' => 'Default',
+                'diff-last-year' => 'Diff Last Year',
+                'percent-diff-last-year' => 'Percent Diff Last Year',
+            ],
+            'performance' => [
+                'default' => 'Default',
+                'diff-last-year' => 'Diff Last Year',
+                'percent-diff-last-year' => 'Percent Diff Last Year',
+            ],
+            'services' => [
+                'default' => 'Default',
+                'diff-last-year' => 'Diff Last Year',
+                'percent-diff-last-year' => 'Percent Diff Last Year',
             ],
             'providers' => [
-                'default'                 => 'Default',
-                'diff-last-year'          => 'Diff Last Year',
-                'percent-diff-last-year'  => 'Percent Diff Last Year',
+                'default' => 'Default',
+                'diff-last-year' => 'Diff Last Year',
+                'percent-diff-last-year' => 'Percent Diff Last Year',
+            ],
+            'trends' => [
+                'default' => 'Default',
+                'compare' => 'Compare',
+            ],
+            'compliance' => [
+                'default' => 'Default',
+                'diff-last-year' => 'Diff Last Year',
+                'percent-diff-last-year' => 'Percent Diff Last Year',
+            ],
+            'marketing' => [
+                'default' => 'Payors - New Patients',
+                'payor_existing' => 'Payors - Existing',
+                'referral_new_patient' => 'Referrals - New Patients',
+                'referral_existing' => 'Referrals - Existing',
+                'patient-analysis' => 'Patient Analysis',
+            ],
+            'monthly-practice-scorecards' => [
+                'default' => 'Default',
+                'diff-last-year' => 'Diff Last Year',
+                'percent-diff-last-year' => 'Percent Diff Last Year',
             ],
         ];
     }
@@ -65,9 +101,9 @@ class OperationsController extends Controller
         }
 
         return view('operations.index', [
-            'tabs'         => $this->tabs(),
+            'tabs' => $this->tabs(),
             'subtabsByTab' => $this->subtabsByTab(),
-            'activeTab'    => $tab,
+            'activeTab' => $tab,
             'activeSubtab' => $subtab ?: $this->defaultSubtab($tab),
         ]);
     }
@@ -81,14 +117,14 @@ class OperationsController extends Controller
             abort(404);
         }
 
-        $start   = $request->input('start_date', now()->startOfMonth()->toDateString());
-        $end     = $request->input('end_date',   now()->toDateString());
-        $subtab  = $subtab ?: $this->defaultSubtab($tab);
+        $start = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $end = $request->input('end_date', now()->toDateString());
+        $subtab = $subtab ?: $this->defaultSubtab($tab);
         $clinics = array_filter(explode(',', (string) $request->input('clinics', '')), 'strlen');
 
         $chrome = [
-            'tab'          => $tab,
-            'subtabs'      => $this->subtabsByTab()[$tab] ?? [],
+            'tab' => $tab,
+            'subtabs' => $this->subtabsByTab()[$tab] ?? [],
             'activeSubtab' => $subtab,
         ];
 
@@ -100,9 +136,10 @@ class OperationsController extends Controller
 
             case 'production-details':
                 $group = array_values(array_filter(explode(',', (string) $request->input('group', '')), 'strlen'));
+
                 return view('operations.tabs.production-details', $chrome + [
                     'group' => $group,
-                    'spec'  => $service->productionDetails($start, $end, $group, $clinics),
+                    'spec' => $service->productionDetails($start, $end, $group, $clinics),
                 ]);
 
             case 'cancellations':
@@ -112,12 +149,52 @@ class OperationsController extends Controller
 
             case 'payors':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->payors($start, $end, $clinics),
+                    'spec' => $service->payors($start, $end, $subtab, $clinics),
                 ]);
 
             case 'providers':
                 return view('operations.tabs.table', $chrome + [
                     'spec' => $service->providers($start, $end, $subtab, $clinics),
+                ]);
+
+            case 'performance':
+                return view('operations.tabs.performance', $chrome + [
+                    'spec' => $service->performance($start, $end, $subtab, $clinics),
+                ]);
+
+            case 'services':
+                return view('operations.tabs.services', $chrome + [
+                    'spec' => $service->services($start, $end, $subtab, $clinics),
+                ]);
+
+            case 'trends':
+                $metric = request('metric', 'production');
+                $lob = request('lob', '');
+
+                return view('operations.tabs.trends', $chrome + [
+                    'spec' => $service->trends($start, $end, $subtab, $clinics, $metric, $lob),
+                ]);
+
+            case 'claims':
+                return view('operations.tabs.claims', $chrome + [
+                    'spec' => $service->claims($start, $end, $subtab, $clinics),
+                ]);
+
+            case 'compliance':
+                return view('operations.tabs.compliance', $chrome + [
+                    'spec' => $service->compliance($start, $end, $subtab, $clinics),
+                ]);
+
+            case 'marketing':
+                $zip = request('zip', 'ALL');
+
+                return view('operations.tabs.marketing', $chrome + [
+                    'spec' => $service->marketing($start, $end, $subtab, $clinics, $zip),
+                ]);
+
+            case 'monthly-practice-scorecards':
+                return view('operations.tabs.monthly-practice-scorecards', $chrome + [
+                    'spec' => $service->monthlyPracticeScorecards($start, $end, $subtab, $clinics),
                 ]);
 
             default:
@@ -130,6 +207,7 @@ class OperationsController extends Controller
     private function defaultSubtab(string $tab): string
     {
         $subtabs = $this->subtabsByTab()[$tab] ?? [];
+
         return $subtabs ? (string) array_key_first($subtabs) : 'default';
     }
 }

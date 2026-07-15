@@ -3,12 +3,14 @@
 use App\Http\Controllers\AgingController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DepositSlipController;
+use App\Http\Controllers\FinancialController;
+use App\Http\Controllers\FrontOfficeController;
+use App\Http\Controllers\HygieneRecallController;
 use App\Http\Controllers\KpisController;
+use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\FinancialController;
-use App\Http\Controllers\DepositSlipController;
-use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\ProviderPortalController;
 use App\Http\Controllers\TxMinerController;
 use Illuminate\Support\Facades\Route;
@@ -32,7 +34,6 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-
     Route::get('patients', [PatientController::class, 'index'])->name('patients.index');
     Route::get('patients/data', [PatientController::class, 'data'])->name('patients.data');
     Route::get('patients/{id}', [PatientController::class, 'show'])->name('patients.show');
@@ -45,8 +46,20 @@ Route::middleware('auth')->group(function () {
 
     Route::get('kpis', [KpisController::class, 'index'])->name('kpis.index');
     Route::get('kpis/hygiene', [KpisController::class, 'hygiene'])->name('kpis.hygiene');
+    Route::get('kpis/hygiene-providers', [KpisController::class, 'hygieneProviders'])->name('kpis.hygiene-providers');
     Route::get('kpis/doctor', [KpisController::class, 'doctor'])->name('kpis.doctor');
+    Route::get('kpis/doctor-providers', [KpisController::class, 'doctorProviders'])->name('kpis.doctor-providers');
     Route::get('kpis/office', [KpisController::class, 'office'])->name('kpis.office');
+    Route::get('kpis/endo', [KpisController::class, 'endo'])->name('kpis.endo');
+    Route::get('kpis/endo-providers', [KpisController::class, 'endoProviders'])->name('kpis.endo-providers');
+    Route::get('kpis/perio', [KpisController::class, 'perio'])->name('kpis.perio');
+    Route::get('kpis/perio-providers', [KpisController::class, 'perioProviders'])->name('kpis.perio-providers');
+    Route::get('kpis/ortho', [KpisController::class, 'ortho'])->name('kpis.ortho');
+    Route::get('kpis/ortho-providers', [KpisController::class, 'orthoProviders'])->name('kpis.ortho-providers');
+    Route::get('kpis/os', [KpisController::class, 'os'])->name('kpis.os');
+    Route::get('kpis/os-providers', [KpisController::class, 'osProviders'])->name('kpis.os-providers');
+    Route::get('kpis/pedo', [KpisController::class, 'pedo'])->name('kpis.pedo');
+    Route::get('kpis/pedo-providers', [KpisController::class, 'pedoProviders'])->name('kpis.pedo-providers');
 
     Route::get('provider-portal', [ProviderPortalController::class, 'index'])->name('provider-portal.index');
     Route::get('provider-portal/providers', [ProviderPortalController::class, 'providers'])->name('provider-portal.providers');
@@ -78,21 +91,21 @@ Route::middleware('auth')->group(function () {
     Route::get('snapshot', function () {
         return view('snapshot.index');
     })->name('snapshot.index');
-    Route::get('front-office', [\App\Http\Controllers\FrontOfficeController::class, 'index'])->name('front-office.index');
-    Route::get('front-office/stats', [\App\Http\Controllers\FrontOfficeController::class, 'stats'])->name('front-office.stats');
-    Route::get('front-office/broken-appointments', [\App\Http\Controllers\FrontOfficeController::class, 'brokenAppointments'])->name('front-office.broken-appointments');
-    Route::get('front-office/tasks', [\App\Http\Controllers\FrontOfficeController::class, 'tasks'])->name('front-office.tasks');
-    Route::get('front-office/tasks-data', [\App\Http\Controllers\FrontOfficeController::class, 'tasksData'])->name('front-office.tasks-data');
-    Route::get('front-office/collections', [\App\Http\Controllers\FrontOfficeController::class, 'collections'])->name('front-office.collections');
-    Route::get('front-office/collections-data', [\App\Http\Controllers\FrontOfficeController::class, 'collectionsData'])->name('front-office.collections-data');
-    Route::get('front-office/collections-stats', [\App\Http\Controllers\FrontOfficeController::class, 'collectionsStats'])->name('front-office.collections-stats');
-    Route::get('front-office/kpis', [\App\Http\Controllers\FrontOfficeController::class, 'kpis'])->name('front-office.kpis');
-    Route::get('front-office/kpi-data', [\App\Http\Controllers\FrontOfficeController::class, 'kpiData'])->name('front-office.kpi-data');
-    Route::get('front-office/performance', [\App\Http\Controllers\FrontOfficeController::class, 'performance'])->name('front-office.performance');
-    Route::get('front-office/performance-stats', [\App\Http\Controllers\FrontOfficeController::class, 'performanceStats'])->name('front-office.performance-stats');
-    Route::get('front-office/performance-reminders-data', [\App\Http\Controllers\FrontOfficeController::class, 'performanceRemindersData'])->name('front-office.performance-reminders-data');
-    Route::get('front-office/performance-non-reminders-data', [\App\Http\Controllers\FrontOfficeController::class, 'performanceNonRemindersData'])->name('front-office.performance-non-reminders-data');
-    Route::get('front-office/performance-totals-data', [\App\Http\Controllers\FrontOfficeController::class, 'performanceTotalsData'])->name('front-office.performance-totals-data');
+    Route::get('front-office', [FrontOfficeController::class, 'index'])->name('front-office.index');
+    Route::get('front-office/stats', [FrontOfficeController::class, 'stats'])->name('front-office.stats');
+    Route::get('front-office/broken-appointments', [FrontOfficeController::class, 'brokenAppointments'])->name('front-office.broken-appointments');
+    Route::get('front-office/tasks', [FrontOfficeController::class, 'tasks'])->name('front-office.tasks');
+    Route::get('front-office/tasks-data', [FrontOfficeController::class, 'tasksData'])->name('front-office.tasks-data');
+    Route::get('front-office/collections', [FrontOfficeController::class, 'collections'])->name('front-office.collections');
+    Route::get('front-office/collections-data', [FrontOfficeController::class, 'collectionsData'])->name('front-office.collections-data');
+    Route::get('front-office/collections-stats', [FrontOfficeController::class, 'collectionsStats'])->name('front-office.collections-stats');
+    Route::get('front-office/kpis', [FrontOfficeController::class, 'kpis'])->name('front-office.kpis');
+    Route::get('front-office/kpi-data', [FrontOfficeController::class, 'kpiData'])->name('front-office.kpi-data');
+    Route::get('front-office/performance', [FrontOfficeController::class, 'performance'])->name('front-office.performance');
+    Route::get('front-office/performance-stats', [FrontOfficeController::class, 'performanceStats'])->name('front-office.performance-stats');
+    Route::get('front-office/performance-reminders-data', [FrontOfficeController::class, 'performanceRemindersData'])->name('front-office.performance-reminders-data');
+    Route::get('front-office/performance-non-reminders-data', [FrontOfficeController::class, 'performanceNonRemindersData'])->name('front-office.performance-non-reminders-data');
+    Route::get('front-office/performance-totals-data', [FrontOfficeController::class, 'performanceTotalsData'])->name('front-office.performance-totals-data');
 
     Route::get('rcm', function () {
         return view('rcm.index');
@@ -104,8 +117,8 @@ Route::middleware('auth')->group(function () {
     Route::get('tx-miner', [TxMinerController::class, 'index'])->name('tx-miner.index');
     Route::get('tx-miner/data', [TxMinerController::class, 'data'])->name('tx-miner.data');
 
-    Route::get('hygiene-recall', [\App\Http\Controllers\HygieneRecallController::class, 'index'])->name('hygiene-recall.index');
-    Route::get('hygiene-recall/data', [\App\Http\Controllers\HygieneRecallController::class, 'data'])->name('hygiene-recall.data');
+    Route::get('hygiene-recall', [HygieneRecallController::class, 'index'])->name('hygiene-recall.index');
+    Route::get('hygiene-recall/data', [HygieneRecallController::class, 'data'])->name('hygiene-recall.data');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

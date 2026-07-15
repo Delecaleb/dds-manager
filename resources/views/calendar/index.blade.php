@@ -5,6 +5,14 @@
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar-scheduler@6.1.15/index.global.min.js'></script>
 
     <style>
+        .notes-cell {
+            max-width: 15rem;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            cursor: pointer;
+        }
+
         /* ---------- FullCalendar overrides ---------- */
         .fc .fc-toolbar {
             display: none !important;
@@ -46,6 +54,7 @@
             cursor: pointer;
             border-radius: 4px !important;
             border: none !important;
+            min-height: 42px !important;
         }
 
         .fc-event-main {
@@ -113,7 +122,11 @@
             animation: skel-pulse 1.6s ease-in-out infinite;
         }
     </style>
-
+    <header class="bg-white border-b border-gray-100 px-8 py-4 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+            <h1 class="text-3xl font-extrabold tracking-tight text-gray-900">Calendar</h1>
+        </div>
+    </header>
     <div class="flex flex-col bg-slate-50" style="min-height: calc(100vh - 64px);">
 
         {{-- ══════════════════ TOP TOOLBAR ══════════════════ --}}
@@ -185,10 +198,10 @@
                     <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
                         Production
                         <span class="text-slate-400 cursor-help"
-                              title="Display $ amount of what has been produced for the day">
+                            title="Display $ amount of what has been produced for the day">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </span>
                     </p>
@@ -198,10 +211,10 @@
                     <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
                         Scheduled Production
                         <span class="text-slate-400 cursor-help"
-                              title="Display $ amount of what has been scheduled for the day">
+                            title="Display $ amount of what has been scheduled for the day">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </span>
                     </p>
@@ -236,6 +249,12 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
                 </button>
+            </div>
+
+            {{-- ══════════════════ PROVIDER HEADER ══════════════════ --}}
+            <div id="provider-header"
+                class="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 overflow-x-auto select-none flex-shrink-0">
+                <!-- Rendered dynamically -->
             </div>
 
             {{-- ══════════════════ CALENDAR + SIDEBAR ══════════════════ --}}
@@ -837,7 +856,7 @@
                 nowIndicator: true,
                 slotDuration: '00:30:00',
                 slotMinTime: '06:00:00',
-                slotMaxTime: '21:00:00',
+                slotMaxTime: '20:00:00',
                 height: 'auto',
                 expandRows: false,
                 allDaySlot: false,
@@ -847,7 +866,8 @@
                 resources: function (info, success, fail) {
                     setProgress(20, 'Loading providers...');
                     const date = (info.startStr || info.start?.toISOString() || document.getElementById('calDate').value || '{{ date("Y-m-d") }}').substring(0, 10);
-                    fetch(baseUrl + '/calendar/resources?date=' + date)
+                    const activeOnly = document.getElementById('activeColumnsToggle').checked ? '1' : '0';
+                    fetch(baseUrl + '/calendar/resources?date=' + date + '&active_only=' + activeOnly)
                         .then(r => r.json())
                         .then(data => {
                             console.log('[FC Resources]', data);
@@ -884,20 +904,25 @@
                 eventContent: function (arg) {
                     const ext = arg.event.extendedProps;
                     const npBadge = ext.isNewPatient
-                        ? '<span style="background:#d1fae5;color:#065f46;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:4px;">NP</span>'
+                        ? '<span style="background:#ef4444;color:#ffffff;font-size:9.5px;padding:1px 5.5px;border-radius:3px;font-weight:800;margin-left:4px;display:inline-block;vertical-align:middle;">NP</span>'
                         : '';
                     const proc = ext.procedure
-                        ? `<div style="font-size:10px;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.85;">${ext.procedure}</div>`
+                        ? `<div style="font-size:10px;font-weight:600;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.95;">${ext.procedure}</div>`
+                        : '';
+                    const phone = ext.phone
+                        ? `<div style="font-size:9.5px;margin-top:1.5px;opacity:.9;font-weight:500;">${ext.phone}</div>`
                         : '';
                     const note = ext.note
-                        ? `<div style="font-size:9px;margin-top:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.7;">${ext.note.substring(0, 55)}</div>`
+                        ? `<div style="font-size:9.5px;margin-top:1.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;opacity:.75;line-height:1.2;">${ext.note}</div>`
                         : '';
                     return {
-                        html: `<div style="padding:4px 6px;height:100%;overflow:hidden;box-sizing:border-box;">
-                           <div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        html: `<div style="padding:4px 6px;height:100%;overflow:hidden;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-start;">
+                           <div style="font-size:11.5px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                ${arg.event.title}${npBadge}
                            </div>
-                           ${proc}${note}
+                           ${proc}
+                           ${phone}
+                           ${note}
                        </div>`
                     };
                 },
@@ -922,9 +947,17 @@
                 // ── Keep date picker in sync + re-fetch resources for new date ─
                 datesSet: function (info) {
                     const d = info.view.currentStart;
-                    const dateStr = d.toISOString().split('T')[0];
+
+                    // Extract local year, month, and day without toISOString() 
+                    // which modifies output based on timezone UTC offsets (e.g. -1 Day).
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+
                     document.getElementById('calDate').value = dateStr;
                     updateDateLabel(d);
+
                     // Resources are provider columns for the CURRENT date; they must be
                     // re-fetched whenever the visible date changes (FC does not do this automatically).
                     calendar.refetchResources();
@@ -938,6 +971,12 @@
             // initialise date label & clock
             updateDateLabel(new Date('{{ date("Y-m-d") }}T00:00:00'));
             startClock();
+
+            // ── Active Columns Toggle ───────────────────────────────────────
+            document.getElementById('activeColumnsToggle').addEventListener('change', function () {
+                showCalSkeleton('Updating columns...');
+                calendar.refetchResources();
+            });
 
             // ── Navigation buttons ────────────────────────────────────────
             document.getElementById('prevBtn').addEventListener('click', () => {
@@ -1014,8 +1053,40 @@
                 .then(s => {
                     prodEl.textContent = usd.format(parseFloat(s.production) || 0);
                     schedEl.textContent = usd.format(parseFloat(s.scheduled_production) || 0);
+                    renderProviderHeader(s.providers);
                 })
-                .catch(() => { prodEl.textContent = schedEl.textContent = '—'; });
+                .catch(() => {
+                    prodEl.textContent = schedEl.textContent = '—';
+                    renderProviderHeader([]);
+                });
+        }
+
+        // ── Provider Header Renderer ──────────────────────────────────────
+        function renderProviderHeader(providers) {
+            const container = document.getElementById('provider-header');
+            if (!container) return;
+
+            if (!providers || providers.length === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-400 py-1.5 align-middle">No active providers scheduled for today</p>';
+                return;
+            }
+
+            container.innerHTML = providers.map(p => {
+                const initialsColor = p.color;
+                const textColor = initialsColor === '#6DE5C1' ? 'text-slate-800' : 'text-white';
+                const specialtyText = p.specialty ? `${p.specialty} - ` : '';
+                return `
+                    <div class="flex items-center gap-2.5 bg-slate-50 border border-slate-200 rounded-full pl-2.5 pr-4 py-1.5 flex-shrink-0 shadow-sm transition hover:bg-slate-100">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${textColor}" style="background-color: ${initialsColor};">
+                            ${p.initials}
+                        </div>
+                        <div class="flex flex-col">
+                            <div class="text-xs font-bold text-slate-800">${p.name}</div>
+                            <div class="text-[10px] text-slate-500 font-medium">${specialtyText}(${p.count})</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         // ── Sidebar: show ─────────────────────────────────────────────────
@@ -1043,29 +1114,36 @@
         </div>` : '';
 
             document.getElementById('sidebar-body').innerHTML = `
-        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4">
-            <div class="flex items-start justify-between mb-2">
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-4 shadow-sm">
+            <div class="flex items-start justify-between mb-3 pb-2 border-b border-slate-200">
                 <h4 class="text-sm font-bold text-slate-900 leading-tight">${event.title}${npBadge}</h4>
-                <span class="text-[10px] text-slate-400 font-semibold whitespace-nowrap ml-2">ID: ${ext.patNum || '—'}</span>
+                <span class="text-[10px] text-slate-400 font-semibold whitespace-nowrap ml-2">Pat ID: ${ext.patNum || '—'}</span>
             </div>
-            <div class="space-y-1 text-xs text-slate-500">
-                <p><span class="font-semibold text-slate-700">Provider:</span> ${ext.doctor || '—'}</p>
-                <p><span class="font-semibold text-slate-700">Time:</span> ${start} – ${end}</p>
-                <p><span class="font-semibold text-slate-700">Operatory:</span> ${ext.operator || '—'}</p>
-                <p><span class="font-semibold text-slate-700">Procedure:</span> ${ext.procedure || '—'}</p>
-                <p class="flex items-center gap-1">
-                    <span class="font-semibold text-slate-700">Status:</span>
+            <div class="space-y-2 text-xs text-slate-600">
+                <p><span class="font-bold text-slate-700">Appointment Date:</span> ${ext.date || '—'}</p>
+                <p><span class="font-bold text-slate-700">Start Time:</span> ${start}</p>
+                <p><span class="font-bold text-slate-700">End Time:</span> ${end}</p>
+                <p><span class="font-bold text-slate-700">Operatory ID:</span> ${ext.operatoryId || '—'}</p>
+                <p><span class="font-bold text-slate-700">Operatory Title:</span> ${ext.operatoryTitle || '—'}</p>
+                <p class="flex items-center gap-1.5">
+                    <span class="font-bold text-slate-700">Status:</span>
                     <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${statusCls}">${status}</span>
                 </p>
+                <div class="pt-2 border-t border-slate-100 space-y-2">
+                    <p><span class="font-bold text-slate-700">Provider ID:</span> ${ext.providerId || '—'}</p>
+                    <p><span class="font-bold text-slate-700">Provider Name:</span> ${ext.providerName || '—'}</p>
+                    <p><span class="font-bold text-slate-700">Duration:</span> ${ext.duration || '—'} mins</p>
+                    <p><span class="font-bold text-slate-700">Procedures:</span> ${ext.procedure || '—'}</p>
+                </div>
             </div>
             ${noteBlock}
         </div>
 
         <div class="space-y-2">
-            <a href="${baseUrl}/patients/${ext.patNum}"
-               class="block w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 rounded text-sm text-center transition shadow-sm">
+            <button onclick="openPatient(${ext.patNum})"
+               class="block w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 rounded text-sm text-center transition shadow-sm cursor-pointer">
                View Patient
-            </a>
+            </button>
             <button onclick="closeSidebar()"
                 class="w-full bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-medium py-2 rounded text-xs transition">
                 Close
@@ -1192,6 +1270,9 @@
 
                     // Left align specific text columns
                     $('td:eq(5), td:eq(9), td:eq(10), td:eq(11), td:eq(12), td:eq(13), td:eq(14), td:eq(16), td:eq(17), td:eq(18)', row).removeClass('text-right').addClass('text-left');
+
+                    // Notes column truncation and hover attribute
+                    $('td:eq(11)', row).addClass('notes-cell').attr('data-note', data.appointment_notes || '');
                 },
                 footerCallback: function (row, data, start, end, display) {
                     var api = this.api();
@@ -1226,6 +1307,39 @@
 
             $('#calDate').on('change', function () {
                 if (aptDetailsTable) aptDetailsTable.ajax.reload();
+            });
+
+            // Notes hover cards
+            $(document).on('mouseenter', '.notes-cell', function (e) {
+                const note = $(this).attr('data-note');
+                if (!note || note === '—' || note.trim() === '') return;
+                const $card = $('#notes-hover-card');
+                $card.text(note);
+                $card.removeClass('hidden');
+
+                const rect = this.getBoundingClientRect();
+                const cardWidth = $card.outerWidth();
+                const cardHeight = $card.outerHeight();
+
+                let top = rect.top - cardHeight - 8;
+                let left = rect.left + (rect.width - cardWidth) / 2;
+
+                if (top < 10) {
+                    top = rect.bottom + 8;
+                }
+                if (left < 10) left = 10;
+                if (left + cardWidth > window.innerWidth - 10) {
+                    left = window.innerWidth - cardWidth - 10;
+                }
+
+                $card.css({
+                    top: top + 'px',
+                    left: left + 'px'
+                });
+            });
+
+            $(document).on('mouseleave', '.notes-cell', function () {
+                $('#notes-hover-card').addClass('hidden');
             });
         }
 
@@ -1263,17 +1377,17 @@
                     $('td:eq(0)', row).addClass('dt-col-sticky text-left font-medium px-4 py-3 bg-white shadow-sm border-white');
 
                     const columns = ['scheduled_appointments', 'provider_count', 'booked_hours', 'avg_lead_all', 'avg_lead_new', 'avg_lead_emerg'];
-                    
+
                     columns.forEach((col, index) => {
                         const td = $('td:eq(' + (index + 1) + ')', row);
                         const tier = data._tiers ? data._tiers[col] : 'mid';
                         td.addClass('px-4 py-3 text-right font-medium text-slate-800');
-                        
+
                         let bgColor = 'bg-yellow-100/70';
                         let arrow = '<svg class="w-3.5 h-3.5 text-yellow-600 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
-                        
+
                         if (tier === 'top') {
-                            bgColor = 'bg-[#c5f5dd]'; 
+                            bgColor = 'bg-[#c5f5dd]';
                             arrow = '<svg class="w-3.5 h-3.5 text-emerald-600 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>';
                         } else if (tier === 'bottom') {
                             bgColor = 'bg-[#ffcfd2]';
@@ -1288,9 +1402,9 @@
                 footerCallback: function (row, data, start, end, display) {
                     if (data.length > 0) {
                         const first = data[0];
-                        ['scheduled_appointments','provider_count','booked_hours','avg_lead_all','avg_lead_new','avg_lead_emerg'].forEach((col, idx) => {
-                            $('.capacity-total-' + (idx+1)).text(first[col]);
-                            $('.capacity-avg-' + (idx+1)).text(first[col]);
+                        ['scheduled_appointments', 'provider_count', 'booked_hours', 'avg_lead_all', 'avg_lead_new', 'avg_lead_emerg'].forEach((col, idx) => {
+                            $('.capacity-total-' + (idx + 1)).text(first[col]);
+                            $('.capacity-avg-' + (idx + 1)).text(first[col]);
                         });
                     }
                 }
@@ -1304,5 +1418,11 @@
             });
         }
     </script>
+
+    <x-app-components.patient-modal />
+
+    <div id="notes-hover-card"
+        class="fixed hidden bg-slate-900/95 backdrop-blur-sm text-white rounded-lg p-2.5 shadow-xl max-w-xs z-50 leading-relaxed text-xs border border-slate-800 pointer-events-none transition-opacity duration-150 font-normal">
+    </div>
 
 </x-app-layout>

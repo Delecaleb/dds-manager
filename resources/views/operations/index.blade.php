@@ -9,7 +9,13 @@
 
             {{-- Filters --}}
             <div class="flex flex-wrap items-center gap-2.5">
-                <x-daterange-picker id="opsDateRange" on-apply="opsDateApplied" />
+                <div id="opsDateRangeWrapper">
+                    <x-daterange-picker id="opsDateRange" on-apply="opsDateApplied" />
+                </div>
+                <div id="opsMonthPickerWrapper" class="hidden">
+                    <input type="month" id="opsMonthPicker" value="{{ date('Y-m') }}"
+                        class="appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 font-bold text-slate-700 shadow-sm focus:outline-none focus:border-[#00bfa5] h-[34px] min-w-[150px]">
+                </div>
 
                 <div class="relative min-w-[140px]">
                     <select id="opsLocation"
@@ -38,12 +44,12 @@
             </div>
 
             {{-- Main tab nav --}}
-            <div class="border-b border-slate-200 w-full flex flex-wrap gap-x-6 gap-y-2 text-slate-400 font-medium text-sm pt-2">
+            <div
+                class="border-b border-slate-200 w-full flex flex-wrap gap-x-6 gap-y-2 text-slate-400 font-medium text-sm pt-2">
                 @foreach ($tabs as $slug => $label)
-                    <a href="{{ route('operations.tab', $slug) }}"
-                       data-ops-tab="{{ $slug }}"
-                       class="ops-tab pb-2 border-b-2 transition-all duration-150 whitespace-nowrap
-                              {{ $slug === $activeTab ? 'border-[#00bfa5] text-black font-bold' : 'border-transparent hover:text-slate-600' }}">
+                    <a href="{{ route('operations.tab', $slug) }}" data-ops-tab="{{ $slug }}"
+                        class="ops-tab pb-2 border-b-2 transition-all duration-150 whitespace-nowrap
+                                      {{ $slug === $activeTab ? 'border-[#00bfa5] text-black font-bold' : 'border-transparent hover:text-slate-600' }}">
                         {{ $label }}
                     </a>
                 @endforeach
@@ -62,23 +68,38 @@
     <script>
         (function () {
             const CONFIG = {
-                activeTab:    @json($activeTab),
+                activeTab: @json($activeTab),
                 activeSubtab: @json($activeSubtab),
-                dataBase:     "{{ url('operations/data') }}",
-                pageBase:     "{{ url('operations') }}",
+                dataBase: "{{ url('operations/data') }}",
+                pageBase: "{{ url('operations') }}",
             };
 
             const content = document.getElementById('ops-content');
             let current = { tab: CONFIG.activeTab, subtab: CONFIG.activeSubtab, extra: {} };
 
             function dateParams() {
-                const drp = window.jQuery && jQuery('#opsDateRange').data('daterangepicker');
+                const isClaims = current.tab === 'claims';
                 const clinic = document.getElementById('opsLocation')?.value ?? '';
                 const params = new URLSearchParams();
-                if (drp) {
-                    params.set('start_date', drp.startDate.format('YYYY-MM-DD'));
-                    params.set('end_date', drp.endDate.format('YYYY-MM-DD'));
+
+                if (isClaims) {
+                    const monthVal = document.getElementById('opsMonthPicker').value;
+                    if (monthVal) {
+                        params.set('start_date', monthVal + '-01');
+                        // Calculate last day of the chosen month
+                        const parts = monthVal.split('-');
+                        const d = new Date(parts[0], parts[1], 0);
+                        const endStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                        params.set('end_date', endStr);
+                    }
+                } else {
+                    const drp = window.jQuery && jQuery('#opsDateRange').data('daterangepicker');
+                    if (drp) {
+                        params.set('start_date', drp.startDate.format('YYYY-MM-DD'));
+                        params.set('end_date', drp.endDate.format('YYYY-MM-DD'));
+                    }
                 }
+
                 if (clinic !== '') params.set('clinics', clinic);
                 return params;
             }
@@ -103,6 +124,11 @@
             function loadTab(tab, subtab, push, extra) {
                 current = { tab, subtab: subtab || 'default', extra: extra || {} };
                 setActiveTab(tab);
+
+                const isClaims = tab === 'claims';
+                document.getElementById('opsDateRangeWrapper').classList.toggle('hidden', isClaims);
+                document.getElementById('opsMonthPickerWrapper').classList.toggle('hidden', !isClaims);
+
                 content.innerHTML =
                     '<div class="flex items-center justify-center py-20 text-slate-400 text-sm gap-2">' +
                     '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Loading…</div>';
@@ -115,6 +141,12 @@
                     .then(r => r.text())
                     .then(html => {
                         content.innerHTML = html;
+                        Array.from(content.querySelectorAll("script")).forEach(oldScript => {
+                            const newScript = document.createElement("script");
+                            Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+                            newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+                            oldScript.parentNode.replaceChild(newScript, oldScript);
+                        });
                         if (window.lucide) lucide.createIcons();
                     })
                     .catch(() => {
@@ -180,6 +212,8 @@
             document.getElementById('opsUpdateBtn').addEventListener('click',
                 () => loadTab(current.tab, current.subtab, false, current.extra));
             document.getElementById('opsLocation').addEventListener('change',
+                () => loadTab(current.tab, current.subtab, false, current.extra));
+            document.getElementById('opsMonthPicker').addEventListener('change',
                 () => loadTab(current.tab, current.subtab, false, current.extra));
 
             // Browser back/forward

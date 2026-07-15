@@ -99,10 +99,14 @@
                 <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 30</th>
                 <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 60</th>
                 <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 90</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 120</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 180</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 240</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 365</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 120
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 180
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 240
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 365
+                </th>
                 <th class="px-4 py-3 border-r border-gray-200 min-w-[120px]">Credit Balance</th>
                 <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Contract</th>
                 <th class="px-4 py-3 text-emerald-900 bg-emerald-50 min-w-[110px]">Total</th>
@@ -110,67 +114,66 @@
             </x-slot:head>
             <x-slot:foot>
               <tr class="bg-gray-50 font-bold text-gray-900 text-xs">
-                <td class="dt-col-sticky bg-gray-50 px-4 py-3.5 border-r border-gray-200 text-right">Total:</td>
+                <td class="dt-col-sticky bg-gray-50 px-4 py-3.5 border-r border-gray-200 text-right">Overall Total:</td>
                 <td class="border-r border-gray-200"></td>
                 <td class="border-r border-gray-200"></td>
                 <td class="border-r border-gray-200"></td>
                 <td class="border-r border-gray-200"></td>
-                <td id="foot-current-responsible_party"      class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-30-responsible_party"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-60-responsible_party"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-90-responsible_party"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-120-responsible_party"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-180-responsible_party"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-240-responsible_party"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-365-responsible_party"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-credit-responsible_party"       class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-contract-responsible_party"     class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-total-responsible_party"        class="px-4 py-3.5">—</td>
+                <td id="foot-current-responsible_party" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-30-responsible_party" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-60-responsible_party" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-90-responsible_party" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-120-responsible_party" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-180-responsible_party" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-240-responsible_party" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-365-responsible_party" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-credit-responsible_party" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-contract-responsible_party" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-total-responsible_party" class="px-4 py-3.5">—</td>
               </tr>
             </x-slot:foot>
           </x-data-table>
         </div>
 
         <div id="tabpanel-by_office" class="tab-panel hidden">
-          <x-data-table id="agingTable-by_office" min-width="2200px" max-height="600px">
+          <x-data-table id="agingTable-by_office" min-width="1400px" max-height="600px">
             <x-slot:head>
               <tr>
-                <th class="dt-col-sticky px-4 py-3 text-gray-900 font-extrabold min-w-[180px]">Guarantor</th>
-                <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Guarantor ID</th>
-                <th class="px-4 py-3 border-r border-gray-200 min-w-[240px]">Patient</th>
-                <th class="px-4 py-3 border-r border-gray-200 min-w-[140px]">Patient ID</th>
-                <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Office</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Current</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 30</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 60</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 90</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 120</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 180</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 240</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 365</th>
+                <th class="dt-col-sticky px-4 py-3 text-gray-900 font-extrabold min-w-[60px]">#</th>
+                <th class="dt-col-sticky px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[200px]">
+                  Location</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Current</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 30</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 60</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 90</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 120
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 180
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 240
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[120px]">Over 365
+                </th>
                 <th class="px-4 py-3 border-r border-gray-200 min-w-[120px]">Credit Balance</th>
                 <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Contract</th>
-                <th class="px-4 py-3 text-emerald-900 bg-emerald-50 min-w-[110px]">Total</th>
+                <th class="px-4 py-3 text-emerald-900 bg-emerald-50 min-w-[120px]">Total</th>
               </tr>
             </x-slot:head>
             <x-slot:foot>
               <tr class="bg-gray-50 font-bold text-gray-900 text-xs">
-                <td class="dt-col-sticky bg-gray-50 px-4 py-3.5 border-r border-gray-200 text-right">Total:</td>
-                <td class="border-r border-gray-200"></td>
-                <td class="border-r border-gray-200"></td>
-                <td class="border-r border-gray-200"></td>
-                <td class="border-r border-gray-200"></td>
-                <td id="foot-current-by_office"      class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-30-by_office"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-60-by_office"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-90-by_office"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-120-by_office"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-180-by_office"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-240-by_office"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-365-by_office"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-credit-by_office"       class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-contract-by_office"     class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-total-by_office"        class="px-4 py-3.5">—</td>
+                <td class="dt-col-sticky bg-gray-50 border-r border-gray-200"></td>
+                <td class="dt-col-sticky bg-gray-50 px-4 py-3.5 border-r border-gray-200 text-right">Overall Total:</td>
+                <td id="foot-current-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-30-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-60-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-90-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-120-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-180-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-240-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-365-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-credit-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-contract-by_office" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-total-by_office" class="px-4 py-3.5">—</td>
               </tr>
             </x-slot:foot>
           </x-data-table>
@@ -189,10 +192,14 @@
                 <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 30</th>
                 <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 60</th>
                 <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 90</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 120</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 180</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 240</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 365</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 120
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 180
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 240
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 365
+                </th>
                 <th class="px-4 py-3 border-r border-gray-200 min-w-[120px]">Credit Balance</th>
                 <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Contract</th>
                 <th class="px-4 py-3 text-emerald-900 bg-emerald-50 min-w-[110px]">Total</th>
@@ -200,22 +207,22 @@
             </x-slot:head>
             <x-slot:foot>
               <tr class="bg-gray-50 font-bold text-gray-900 text-xs">
-                <td class="dt-col-sticky bg-gray-50 px-4 py-3.5 border-r border-gray-200 text-right">Total:</td>
+                <td class="dt-col-sticky bg-gray-50 px-4 py-3.5 border-r border-gray-200 text-right">Overall Total:</td>
                 <td class="border-r border-gray-200"></td>
                 <td class="border-r border-gray-200"></td>
                 <td class="border-r border-gray-200"></td>
                 <td class="border-r border-gray-200"></td>
-                <td id="foot-current-by_patient"      class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-30-by_patient"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-60-by_patient"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-90-by_patient"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-120-by_patient"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-180-by_patient"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-240-by_patient"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-365-by_patient"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-credit-by_patient"       class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-contract-by_patient"     class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-total-by_patient"        class="px-4 py-3.5">—</td>
+                <td id="foot-current-by_patient" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-30-by_patient" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-60-by_patient" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-90-by_patient" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-120-by_patient" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-180-by_patient" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-240-by_patient" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-365-by_patient" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-credit-by_patient" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-contract-by_patient" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-total-by_patient" class="px-4 py-3.5">—</td>
               </tr>
             </x-slot:foot>
           </x-data-table>
@@ -234,10 +241,14 @@
                 <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 30</th>
                 <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 60</th>
                 <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 90</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 120</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 180</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 240</th>
-                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 365</th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 120
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 180
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 240
+                </th>
+                <th class="px-4 py-3 border-r border-gray-200 text-emerald-900 bg-emerald-50 min-w-[100px]">Over 365
+                </th>
                 <th class="px-4 py-3 border-r border-gray-200 min-w-[120px]">Credit Balance</th>
                 <th class="px-4 py-3 border-r border-gray-200 min-w-[110px]">Contract</th>
                 <th class="px-4 py-3 text-emerald-900 bg-emerald-50 min-w-[110px]">Total</th>
@@ -245,22 +256,22 @@
             </x-slot:head>
             <x-slot:foot>
               <tr class="bg-gray-50 font-bold text-gray-900 text-xs">
-                <td class="dt-col-sticky bg-gray-50 px-4 py-3.5 border-r border-gray-200 text-right">Total:</td>
+                <td class="dt-col-sticky bg-gray-50 px-4 py-3.5 border-r border-gray-200 text-right">Overall Total:</td>
                 <td class="border-r border-gray-200"></td>
                 <td class="border-r border-gray-200"></td>
                 <td class="border-r border-gray-200"></td>
                 <td class="border-r border-gray-200"></td>
-                <td id="foot-current-by_insurance"      class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-30-by_insurance"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-60-by_insurance"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-90-by_insurance"           class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-120-by_insurance"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-180-by_insurance"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-240-by_insurance"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-365-by_insurance"          class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-credit-by_insurance"       class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-contract-by_insurance"     class="px-4 py-3.5 border-r border-gray-200">—</td>
-                <td id="foot-total-by_insurance"        class="px-4 py-3.5">—</td>
+                <td id="foot-current-by_insurance" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-30-by_insurance" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-60-by_insurance" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-90-by_insurance" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-120-by_insurance" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-180-by_insurance" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-240-by_insurance" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-365-by_insurance" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-credit-by_insurance" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-contract-by_insurance" class="px-4 py-3.5 border-r border-gray-200">—</td>
+                <td id="foot-total-by_insurance" class="px-4 py-3.5">—</td>
               </tr>
             </x-slot:foot>
           </x-data-table>
@@ -300,7 +311,7 @@
           <x-slot:foot>
             <tr class="bg-gray-200 font-bold text-gray-900 text-xs text-right">
               <td class="dt-col-sticky bg-gray-200 border-r border-gray-300"></td>
-              <td class="dt-col-sticky bg-gray-200 px-4 py-3.5 border-r border-gray-300">Total:</td>
+              <td class="dt-col-sticky bg-gray-200 px-4 py-3.5 border-r border-gray-300">Overall Total:</td>
               <td id="office-foot-current" class="px-4 py-3.5 border-r border-gray-300">—</td>
               <td id="office-foot-30" class="px-4 py-3.5 border-r border-gray-300">—</td>
               <td id="office-foot-60" class="px-4 py-3.5 border-r border-gray-300">—</td>
@@ -319,23 +330,27 @@
 
       <!-- By Patient Container -->
       <div id="byPatientContainer" class="hidden">
-        
+
         <!-- Info Banner (Patient specific) -->
-        <div class="mb-6 text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg p-3.5 flex items-center shadow-xs">
+        <div
+          class="mb-6 text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg p-3.5 flex items-center shadow-xs">
           <i class="fa-solid fa-circle-info mr-2.5 text-blue-500 text-sm"></i>
-          <span>Values display Guarantor balances. Individual Patient Aging values can be viewed by selecting the breakout button next to the Guarantor name.</span>
+          <span>Values display Guarantor balances. Individual Patient Aging values can be viewed by selecting the
+            breakout button next to the Guarantor name.</span>
         </div>
-        
+
         <x-data-table id="patientTable" min-width="1400px" max-height="600px">
           <x-slot:head>
             <tr>
-              <th class="dt-col-sticky px-4 py-3 text-gray-900 font-extrabold bg-white border-r border-gray-200 min-w-[200px]">
+              <th
+                class="dt-col-sticky px-4 py-3 text-gray-900 font-extrabold bg-white border-r border-gray-200 min-w-[200px]">
                 <div class="flex items-center justify-between">
                   <span>Guarantor</span>
                   <i class="fa-solid fa-arrows-up-down text-[10px] text-gray-400"></i>
                 </div>
               </th>
-              <th class="dt-col-sticky px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[120px]">Guarantor ID</th>
+              <th class="dt-col-sticky px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[120px]">
+                Guarantor ID</th>
               <th class="px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[200px]">Patient</th>
               <th class="px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[120px]">Patient ID</th>
               <th class="px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[100px]">Office</th>
@@ -355,21 +370,21 @@
           <x-slot:foot>
             <tr class="bg-gray-200 font-bold text-gray-900 text-xs text-right">
               <td class="dt-col-sticky bg-gray-200 border-r border-gray-300"></td>
-              <td class="dt-col-sticky bg-gray-200 px-4 py-3.5 border-r border-gray-300">Total:</td>
+              <td class="dt-col-sticky bg-gray-200 px-4 py-3.5 border-r border-gray-300">Overall Total:</td>
               <td class="border-r border-gray-300"></td>
               <td class="border-r border-gray-300"></td>
               <td class="border-r border-gray-300"></td>
               <td id="patient-foot-current" class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="patient-foot-30"      class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="patient-foot-60"      class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="patient-foot-90"      class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="patient-foot-120"     class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="patient-foot-180"     class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="patient-foot-240"     class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="patient-foot-365"     class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="patient-foot-credit"  class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="patient-foot-30" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="patient-foot-60" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="patient-foot-90" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="patient-foot-120" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="patient-foot-180" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="patient-foot-240" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="patient-foot-365" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="patient-foot-credit" class="px-4 py-3.5 border-r border-gray-300">—</td>
               <td id="patient-foot-contract" class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="patient-foot-total"   class="px-4 py-3.5">—</td>
+              <td id="patient-foot-total" class="px-4 py-3.5">—</td>
             </tr>
           </x-slot:foot>
         </x-data-table>
@@ -377,7 +392,7 @@
 
       <!-- By Insurance Container -->
       <div id="byInsuranceContainer" class="hidden">
-        
+
         <!-- Toolbar Row -->
         <div class="flex flex-wrap items-center justify-between gap-4 mb-4 mt-2">
           <div class="flex items-center gap-1">
@@ -386,17 +401,21 @@
             <span class="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-1 rounded">Bottom 20%</span>
           </div>
           <div class="flex items-center gap-2 ml-auto">
-            <select class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:border-emerald-500 font-medium text-gray-700 w-44">
-                <option value="all">INSURANCE: 0 selected</option>
+            <select
+              class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:border-emerald-500 font-medium text-gray-700 w-44">
+              <option value="all">INSURANCE: 0 selected</option>
             </select>
-            <button class="bg-emerald-500 text-white font-semibold flex items-center justify-center hover:bg-emerald-600 transition px-4 py-1 rounded shadow-xs text-sm">
-                Get Report
+            <button
+              class="bg-emerald-500 text-white font-semibold flex items-center justify-center hover:bg-emerald-600 transition px-4 py-1 rounded shadow-xs text-sm">
+              Get Report
             </button>
             <div class="relative">
-              <input type="text" id="insuranceSearch" placeholder="Search..." class="border border-gray-300 rounded px-3 py-1 text-sm focus:outline-none focus:border-emerald-500 pr-8 w-40">
+              <input type="text" id="insuranceSearch" placeholder="Search..."
+                class="border border-gray-300 rounded px-3 py-1 text-sm focus:outline-none focus:border-emerald-500 pr-8 w-40">
               <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-2 text-gray-400 text-xs"></i>
             </div>
-            <button class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1 rounded text-sm hover:bg-emerald-50 transition shadow-xs">
+            <button
+              class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1 rounded text-sm hover:bg-emerald-50 transition shadow-xs">
               Export CSV
             </button>
           </div>
@@ -405,13 +424,15 @@
         <x-data-table id="insuranceTable" min-width="1400px" max-height="600px">
           <x-slot:head>
             <tr>
-              <th class="dt-col-sticky px-4 py-3 text-gray-900 font-extrabold bg-white border-r border-gray-200 min-w-[200px]">
+              <th
+                class="dt-col-sticky px-4 py-3 text-gray-900 font-extrabold bg-white border-r border-gray-200 min-w-[200px]">
                 <div class="flex items-center justify-between">
                   <span>Guarantor</span>
                   <i class="fa-solid fa-arrows-up-down text-[10px] text-gray-400"></i>
                 </div>
               </th>
-              <th class="dt-col-sticky px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[120px]">Guarantor ID</th>
+              <th class="dt-col-sticky px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[120px]">
+                Guarantor ID</th>
               <th class="px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[200px]">Patient</th>
               <th class="px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[120px]">Patient ID</th>
               <th class="px-4 py-3 border-r border-gray-200 text-gray-900 font-extrabold min-w-[150px]">Insurance</th>
@@ -436,16 +457,16 @@
               <td class="border-r border-gray-300"></td>
               <td class="border-r border-gray-300"></td>
               <td id="insurance-foot-current" class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="insurance-foot-30"      class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="insurance-foot-60"      class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="insurance-foot-90"      class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="insurance-foot-120"     class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="insurance-foot-180"     class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="insurance-foot-240"     class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="insurance-foot-365"     class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="insurance-foot-credit"  class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="insurance-foot-30" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="insurance-foot-60" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="insurance-foot-90" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="insurance-foot-120" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="insurance-foot-180" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="insurance-foot-240" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="insurance-foot-365" class="px-4 py-3.5 border-r border-gray-300">—</td>
+              <td id="insurance-foot-credit" class="px-4 py-3.5 border-r border-gray-300">—</td>
               <td id="insurance-foot-contract" class="px-4 py-3.5 border-r border-gray-300">—</td>
-              <td id="insurance-foot-total"   class="px-4 py-3.5">—</td>
+              <td id="insurance-foot-total" class="px-4 py-3.5">—</td>
             </tr>
           </x-slot:foot>
         </x-data-table>
@@ -456,7 +477,10 @@
 
   <style>
     /* DataTables pagination styling — applies to every tab's table wrapper */
-    #agingTabs .dt-layout-row:last-child { padding: 1rem 0 0; }
+    #agingTabs .dt-layout-row:last-child {
+      padding: 1rem 0 0;
+    }
+
     #agingTabs .dt-paging button {
       border: 1px solid #d1d5db;
       border-radius: 0.375rem;
@@ -468,14 +492,27 @@
       margin: 0 1px;
       line-height: 1.4;
     }
+
     #agingTabs .dt-paging button.current {
       background: #059669;
       color: #fff;
       border-color: #059669;
     }
-    #agingTabs .dt-paging button:hover:not(.current) { background: #f9fafb; }
-    #agingTabs .dt-info { font-size: 0.75rem; color: #6b7280; }
-    #agingTabs .dt-length label { font-size: 0.75rem; color: #6b7280; }
+
+    #agingTabs .dt-paging button:hover:not(.current) {
+      background: #f9fafb;
+    }
+
+    #agingTabs .dt-info {
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+
+    #agingTabs .dt-length label {
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+
     #agingTabs .dt-length select {
       border: 1px solid #d1d5db;
       border-radius: 0.375rem;
@@ -522,11 +559,68 @@
       { data: 'total', className: 'px-4 py-3 bg-emerald-50/40 text-emerald-700 font-semibold' },
     ];
 
+    const formatOfficeCurrency = (val) => {
+      if (val === null || val === undefined) return '';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+    };
+
+    const renderOfficeCell = (data, type, row) => {
+      if (type !== 'display') return data.total;
+
+      let colorClass = 'bg-emerald-50 text-emerald-900'; // Default Green (Top 20%)
+      if (data.total > 100000) colorClass = 'bg-red-50 text-red-900';
+      else if (data.total > 50000) colorClass = 'bg-amber-50 text-amber-900';
+
+      return `<div class="flex flex-col gap-0 py-2 -mx-4 -my-3 px-4 ${colorClass} h-full justify-center min-h-[72px]">
+        <div class="font-bold leading-tight">${formatOfficeCurrency(data.total)}</div>
+        <div class="opacity-80 text-xs leading-tight">${formatOfficeCurrency(data.patient)}</div>
+        <div class="opacity-80 text-xs leading-tight">${formatOfficeCurrency(data.insurance)}</div>
+      </div>`;
+    };
+
+    const OFFICE_COLUMNS = [
+      {
+        data: null,
+        orderable: false,
+        render: (data, type, row, meta) => meta.row + 1,
+        className: 'dt-col-sticky px-4 py-3 text-center font-bold text-gray-500'
+      },
+      {
+        data: 'office',
+        orderable: false,
+        render: (data, type, row) => {
+          if (type !== 'display') return data;
+          return `<div class="flex flex-col gap-0 py-2 -mx-4 -my-3 px-4 h-full justify-center min-h-[72px] bg-white text-gray-900">
+            <div class="flex items-center justify-between">
+              <span class="font-bold">${data}</span>
+              <button class="text-gray-400 hover:text-emerald-500 transition p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
+              </button>
+            </div>
+            <div class="text-gray-500 text-xs leading-tight">- Patient</div>
+            <div class="text-gray-500 text-xs leading-tight">- Insurance</div>
+          </div>`;
+        },
+        className: 'dt-col-sticky border-r border-gray-200'
+      },
+      { data: 'bal_current', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_30', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_60', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_90', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_120', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_180', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_240', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'bal_365', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'credit_balance', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'contract', render: renderOfficeCell, className: 'p-0 border-r border-gray-200' },
+      { data: 'total', render: renderOfficeCell, className: 'p-0 text-emerald-900 bg-emerald-50' },
+    ];
+
     const TAB_CONFIG = {
       responsible_party: { columns: FULL_COLUMNS, hasExtendedTotals: true },
-      by_office:         { columns: FULL_COLUMNS, hasExtendedTotals: true },
-      by_patient:        { columns: FULL_COLUMNS, hasExtendedTotals: true },
-      by_insurance:      { columns: FULL_COLUMNS, hasExtendedTotals: true },
+      by_office: { columns: OFFICE_COLUMNS, hasExtendedTotals: true },
+      by_patient: { columns: FULL_COLUMNS, hasExtendedTotals: true },
+      by_insurance: { columns: FULL_COLUMNS, hasExtendedTotals: true },
     };
 
     const tables = {};
@@ -640,6 +734,6 @@
     });
   </script>
 
-  <x-patient-modal />
+  <x-app-components.patient-modal />
 
 </x-app-layout>

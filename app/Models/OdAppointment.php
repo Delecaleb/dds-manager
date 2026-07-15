@@ -4,6 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * ApptStatus Enum mappings in OpenDental:
+ * 0 - None: No appointment should ever have this status.
+ * 1 - Scheduled: Shows as a regularly scheduled appointment.
+ * 2 - Complete: Shows greyed out.
+ * 3 - UnschedList: Only shows on unscheduled list.
+ * 4 - ASAP: Deprecated in 17.4.1. Use Appointment.Priority instead.
+ * 5 - Broken: Shows with a big X on it.
+ * 6 - Planned: Planned appointment. Only shows in Chart module.
+ * 7 - PtNote: Patient "post-it" note on the schedule.
+ * 8 - PtNoteCompleted: Patient "post-it" note completed.
+ */
 class OdAppointment extends Model
 {
     protected $fillable = [
@@ -49,20 +61,29 @@ class OdAppointment extends Model
 
     public $incrementing = false;
 
+    public function scopeScheduled($query)
+    {
+        return $query->where('AptStatus', 1);
+    }
+
+    public function scopeInDateRange($query, $start, $end)
+    {
+        return $query->whereBetween('AptDateTime', [$start, $end]);
+    }
+
     public function scheduledPatients($start, $end)
     {
-        return OdAppointment::whereBetween('AptDateTime', [$start, $end])
-            ->where('AptStatus', 'Scheduled')
-            ->distinct('PatNum')
-            ->count('PatNum');
+        return $this->inDateRange($start, $end)
+            ->scheduled()
+            ->count();
     }
 
     public function newPatientsScheduled($start, $end)
     {
-        return OdAppointment::whereBetween('AptDateTime', [$start, $end])
+        return $this->inDateRange($start, $end)
+            ->scheduled()
             ->where('IsNewPatient', 'true')
-            ->distinct('PatNum')
-            ->count('PatNum');
+            ->count();
     }
 
     public function patient()
@@ -83,6 +104,7 @@ class OdAppointment extends Model
     public function getDurationMinutesAttribute(): int
     {
         $pattern = $this->Pattern ?? '';
+
         return strlen($pattern) > 0 ? strlen($pattern) * 10 : 60;
     }
 }

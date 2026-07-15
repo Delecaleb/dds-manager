@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="https://cdn.tailwindcss.com/3.4.17">
     <script src="https://code.jquery.com/jquery-4.0.0.min.js"
         integrity="sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body class="bg-slate-50 text-slate-800 font-sans antialiased">
@@ -139,7 +140,7 @@
                 </button>
                 <div class="flex items-center gap-2">
                     <i data-lucide="bar-chart-big" class="text-blue-600 w-5 h-5"></i>
-                    <span class="font-bold text-md tracking-tight text-slate-900">DDS Manager Dashboard</span>
+                    <span class="font-bold text-md tracking-tight text-slate-900">DDS Manager</span>
                 </div>
             </div>
             <div class="flex items-center gap-3"></div>

@@ -10,20 +10,19 @@ class CalendarService
 {
     public function __construct(
         protected AppointmentRepository $appointments
-    ) {
-    }
+    ) {}
 
     public function events($start, $end)
     {
         $collection = $this->appointments->getAppointmentsByDateRange($start, $end);
 
-        return $collection->map(fn($apt) => CalendarEventTransformer::transform($apt))->toArray();
+        return $collection->map(fn ($apt) => CalendarEventTransformer::transform($apt))->toArray();
     }
 
-    public function resources($start, $end)
+    public function resources($start, $end, $activeOnly = false)
     {
         $collection = $this->appointments->getAppointmentsByDateRange($start, $end);
 
-        return CalendarResourceTransformer::transform($collection);
+        return CalendarResourceTransformer::transform($collection, $activeOnly);
     }
 }

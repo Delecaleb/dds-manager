@@ -59,8 +59,8 @@
     $groups  = $spec['groups'] ?? [];
     // Leading (ungrouped) columns the group header's empty cell must span.
     $leadSpan = max(1, count($columns) - array_sum(array_column($groups, 'span')));
-    $thBase  = 'text-xs font-semibold py-3 px-3 border-l border-slate-300 text-slate-600';
-    $tdBase  = 'text-xs py-2 px-3 border-l border-t border-slate-200';
+    $thBase  = 'text-xs font-extrabold py-3 px-4 border-r border-gray-200 text-gray-900';
+    $tdBase  = 'text-xs py-3 px-4 border-r border-gray-200';
 
     // Per-column percentile thresholds (needs ≥2 rows to be meaningful).
     $heat = [];
@@ -130,25 +130,35 @@
     </div>
 
     {{-- Table --}}
-    <div class="overflow-x-auto border-t border-slate-200">
-        <table class="w-full text-left border-collapse whitespace-nowrap">
-            <thead>
+    <div class="overflow-x-auto border-t border-slate-200 max-h-[70vh]">
+        <table class="w-full text-left border-collapse whitespace-nowrap" style="min-width: max-content;">
+            <thead class="sticky top-0 z-50 shadow-sm bg-white ring-1 ring-gray-200">
                 @if (! empty($groups))
-                    <tr class="bg-[#cbd5e1]">
-                        <th colspan="{{ $leadSpan }}" class="{{ $thBase }} bg-[#cbd5e1]" style="min-width:12rem"></th>
+                    <tr class="bg-white">
+                        <th colspan="{{ $leadSpan }}" class="{{ $thBase }}"></th>
                         @foreach ($groups as $group)
                             <th colspan="{{ $group['span'] }}"
-                                class="{{ $thBase }} text-slate-700 font-bold text-left pl-4">
+                                class="{{ $thBase }} text-center">
                                 {{ $group['label'] }}
                             </th>
                         @endforeach
                     </tr>
                 @endif
-                <tr class="bg-[#e2e8f0]">
+                @if (!empty($spec['header_groups']))
+                    <tr class="bg-white">
+                        @foreach ($spec['header_groups'] as $hg)
+                            <th colspan="{{ $hg['colspan'] ?? 1 }}" class="{{ $thBase }} {{ $hg['class'] ?? '' }}">
+                                {{ $hg['label'] ?? '' }}
+                            </th>
+                        @endforeach
+                    </tr>
+                @endif
+                <tr class="bg-white">
                     @foreach ($columns as $col)
                         <th class="{{ $thBase }}
                                    {{ ($col['type'] ?? 'text') === 'text' ? 'text-left' : 'text-right' }}
-                                   {{ ! empty($col['sticky']) ? 'sticky left-0 bg-[#e2e8f0] z-10' : '' }}"
+                                   {{ ! empty($col['sticky']) ? 'tb:sm:stick-to-left bg-white' : '' }}
+                                   {{ (! empty($col['sticky']) && $loop->index === 1) ? 'tb:sm:stick-shadow-r' : '' }}"
                             @if (! empty($col['sticky'])) style="min-width:12rem" @else style="min-width:8rem" @endif>
                             {{ $col['label'] }}
                         </th>
@@ -156,54 +166,100 @@
                 </tr>
             </thead>
 
-            <tbody>
+            <tbody class="divide-y divide-gray-100 break-words whitespace-normal">
                 @forelse ($spec['rows'] as $row)
-                    <tr class="odd:bg-slate-50/60 even:bg-white hover:bg-slate-100/60">
-                        @foreach ($columns as $col)
-                            @php
-                                $type = $col['type'] ?? 'text';
-                                $heatClass = ($type === 'text' || ! empty($col['sticky']))
-                                    ? ''
-                                    : ops_heat_class($heat, $col['key'], $row[$col['key']] ?? null);
+                    <tr class="hover:bg-gray-50/80 transition bg-white">
+                        @foreach ($columns as $i => $col)
+                            @php 
+                                $type = $col['type'] ?? 'text'; 
+                                $cellClasses = "px-4 py-3 border-r border-gray-200 text-gray-700 text-xs";
+                                $isSticky = !empty($col['sticky']);
+                                if ($isSticky) {
+                                    $cellClasses .= " tb:sm:stick-to-left bg-white";
+                                    if ($loop->index === 1) {
+                                        $cellClasses .= " tb:sm:stick-shadow-r";
+                                    }
+                                }
+                                
+                                if ($type === 'yn_badge') {
+                                    $isY = in_array(strtolower((string)($row[$col['key']] ?? '')), ['y', 'yes', 'true', '1']);
+                                    $cellClasses .= $isY ? ' bg-emerald-50 text-emerald-700 font-semibold text-center' : ' bg-red-50 text-red-700 font-semibold text-center';
+                                    $cellContent = $isY ? 'Y' : 'N';
+                                } else {
+                                    $cellClasses .= " font-medium text-right";
+                                    $cellContent = ops_fmt($row[$col['key']] ?? null, $type);
+                                    if ($type === 'text') $cellClasses = str_replace('text-right', 'text-left', $cellClasses);
+                                }
                             @endphp
-                            <td class="{{ $tdBase }} {{ $heatClass }}
-                                       {{ $type === 'text' ? 'text-left font-medium text-slate-700' : 'text-right text-slate-600' }}
-                                       {{ ! empty($col['sticky']) ? 'sticky left-0 bg-inherit font-semibold text-slate-800' : '' }}">
-                                {{ ops_fmt($row[$col['key']] ?? null, $type) }}
+                            <td class="{{ $cellClasses }} {{ ops_heat_class($heat, $col['key'], $row[$col['key']] ?? null) }}">
+                                {!! $cellContent !!}
                             </td>
                         @endforeach
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ count($columns) }}" class="py-12 text-center text-slate-400 text-sm">
+                        <td colspan="{{ count($columns) }}" class="py-12 text-center text-gray-400 text-sm">
                             No data for the selected range.
                         </td>
                     </tr>
                 @endforelse
             </tbody>
 
-            @if (! empty($spec['rows']))
-                <tfoot class="bg-[#e2e8f0] font-semibold text-slate-700">
-                    <tr>
-                        @foreach ($columns as $i => $col)
-                            @php $type = $col['type'] ?? 'text'; @endphp
-                            <td class="text-xs py-2 px-3 border-l border-t border-slate-300 text-right
-                                       {{ ! empty($col['sticky']) ? 'sticky left-0 bg-[#e2e8f0]' : '' }}">
-                                {{ $i === 0 ? 'Average:' : ops_fmt($spec['average'][$col['key']] ?? null, $type) }}
-                            </td>
-                        @endforeach
-                    </tr>
-                    <tr>
-                        @foreach ($columns as $i => $col)
-                            @php $type = $col['type'] ?? 'text'; @endphp
-                            <td class="text-xs py-2 px-3 border-l border-t border-slate-300 text-right
-                                       {{ ! empty($col['sticky']) ? 'sticky left-0 bg-[#e2e8f0]' : '' }}">
-                                {{ $i === 0 ? 'Total:' : ops_fmt($spec['total'][$col['key']] ?? null, $type) }}
-                            </td>
-                        @endforeach
-                    </tr>
-                </tfoot>
-            @endif
+            <tfoot class="sticky bottom-0 z-50 bg-gray-50 border-t border-gray-200 shadow-sm">
+                @if(($spec['is_compare'] ?? false) && isset($spec['total']) && is_array($spec['total']))
+                    @foreach(['current' => 'Current', 'previous' => 'Previous', 'difference' => 'Difference'] as $key => $label)
+                        <tr class="bg-gray-50 text-gray-900 font-bold text-xs text-right">
+                            @foreach ($spec['columns'] as $col)
+                                @if ($loop->first)
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right tb:sm:stick-to-left tb:sm:stick-shadow-r bg-gray-50">
+                                        {{ $loop->parent->first ? 'Total:' : '' }}
+                                    </td>
+                                @elseif($col['key'] === 'type_label')
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-left">
+                                        {{ $label }}
+                                    </td>
+                                @else
+                                    <td class="px-4 py-3.5 border-r border-gray-300">
+                                        {{ ops_fmt($spec['total'][$key][$col['key']] ?? 0, $col['type']) }}
+                                    </td>
+                                @endif
+                            @endforeach
+                        </tr>
+                    @endforeach
+                @else
+                    @if (! empty($spec['average']))
+                        <tr class="bg-gray-50 text-gray-900 font-bold text-xs text-right">
+                            @foreach ($spec['columns'] as $col)
+                                @if ($loop->first)
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right tb:sm:stick-to-left tb:sm:stick-shadow-r bg-gray-50">
+                                        Average:
+                                    </td>
+                                @else
+                                    <td class="px-4 py-3.5 border-r border-gray-300">
+                                        {{ ops_fmt($spec['average'][$col['key']] ?? null, $col['type']) }}
+                                    </td>
+                                @endif
+                            @endforeach
+                        </tr>
+                    @endif
+
+                    @if (! empty($spec['total']))
+                        <tr class="bg-gray-200 text-gray-900 font-bold text-xs text-right border-t border-gray-300">
+                            @foreach ($spec['columns'] as $col)
+                                @if ($loop->first)
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right tb:sm:stick-to-left tb:sm:stick-shadow-r bg-gray-200">
+                                        Total:
+                                    </td>
+                                @else
+                                    <td class="px-4 py-3.5 border-r border-gray-300">
+                                        {{ ops_fmt($spec['total'][$col['key']] ?? null, $col['type']) }}
+                                    </td>
+                                @endif
+                            @endforeach
+                        </tr>
+                    @endif
+                @endif
+            </tfoot>
         </table>
     </div>
 </div>

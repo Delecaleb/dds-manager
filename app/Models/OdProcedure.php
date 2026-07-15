@@ -46,7 +46,7 @@ class OdProcedure extends Model
         'DiagnosticCodes',
     ];
 
-    protected $primaryKey = 'ProcNum';
+    protected $primaryKey = 'CodeNum';
 
     public $incrementing = false;
 }

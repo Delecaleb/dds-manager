@@ -100,4 +100,73 @@ class OperationsTest extends TestCase
         $this->assertEquals(700.00, $total['pp_production']);  // 1400 / 2 procedures
         $this->assertEquals(600.00, $total['pp_collection']);  // 1200 / 2 procedures
     }
+
+    public function test_payors_tab_returns_totals_for_all_columns(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Seed claim procs
+        DB::table('od_claim_procs')->insert([
+            [
+                'ClaimProcNum' => 1,
+                'Status' => 1,
+                'ClaimPaymentNum' => 0,
+                'PlanNum' => 1,
+                'ClinicNum' => 1,
+                'FeeBilled' => '1000.00',
+                'WriteOff' => '200.00',
+                'InsPayAmt' => '800.00',
+                'ProcDate' => '2026-07-05',
+                'PatNum' => 101,
+            ],
+            [
+                'ClaimProcNum' => 2,
+                'Status' => 1,
+                'ClaimPaymentNum' => 0,
+                'PlanNum' => 1,
+                'ClinicNum' => 1,
+                'FeeBilled' => '500.00',
+                'WriteOff' => '100.00',
+                'InsPayAmt' => '400.00',
+                'ProcDate' => '2026-07-06',
+                'PatNum' => 102,
+            ],
+        ]);
+
+        $response = $this->get(route('operations.data', [
+            'tab' => 'payors',
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-07-15',
+        ]));
+
+        $response->assertOk();
+
+        $spec = $response->original->getData()['spec'] ?? null;
+        $this->assertNotNull($spec);
+
+        $total = $spec['total'];
+
+        // Assert By Payor totals
+        $this->assertEquals(1500.00, $total['gross']);
+        $this->assertEquals(-300.00, $total['adjustment']);
+        $this->assertEquals(100.00, $total['pct_ttl']);
+        $this->assertEquals(1200.00, $total['net']);
+        $this->assertEquals(1200.00, $total['collection']);
+        $this->assertEquals(2, $total['pts_visits']);
+        $this->assertEquals(2, $total['npt_visit']);
+        $this->assertNull($total['case_acceptance']);
+
+        // Assert Per Working Day totals
+        $this->assertEquals(600.00, $total['pwd_production']);
+        $this->assertEquals(1.0, $total['pwd_pts_visit']);
+        $this->assertEquals(1.0, $total['pwd_npt_visit']);
+
+        // Assert Per Patient Visit totals
+        $this->assertEquals(600.00, $total['ppv_production']);
+        $this->assertEquals(1.0, $total['ppv_procedures']);
+
+        // Assert Per Procedure totals
+        $this->assertEquals(600.00, $total['pp_production']);
+    }
 }

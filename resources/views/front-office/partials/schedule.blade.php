@@ -331,7 +331,7 @@
         // Initialization Scripts
         let hygieneChart, unscheduledChart;
 
-        const chartConfig = {
+        const foSchedChartConfigA = {
             type: 'doughnut',
             options: {
                 responsive: true,
@@ -344,7 +344,7 @@
 
         try {
             hygieneChart = new Chart(document.getElementById('hygieneRecallChart').getContext('2d'), {
-                ...chartConfig,
+                ...foSchedChartConfigA,
                 data: {
                     labels: ['0-3 Months', '3-6 Months', '6-9 Months', '9-12 Months', '12+ Months'],
                     datasets: [{
@@ -357,7 +357,7 @@
             });
 
             unscheduledChart = new Chart(document.getElementById('unscheduledTxChart').getContext('2d'), {
-                ...chartConfig,
+                ...foSchedChartConfigA,
                 data: {
                     labels: ['0-3 Months', '3-6 Months', '6-9 Months', '9-12 Months', '12+ Months'],
                     datasets: [{
@@ -525,46 +525,6 @@
                 { data: 'description', name: 'description', className: 'text-gray-500 font-normal max-w-xs truncate' }
             ],
             order: [[7, 'desc']]
-        });
-
-        // Initialize Doughnut Charts
-        const chartConfig = {
-            type: 'doughnut',
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '65%',
-                plugins: { legend: { display: false }, tooltip: { enabled: true } },
-                borderWidth: 0
-            }
-        };
-
-        const hygieneCtx = document.getElementById('hygieneRecallChart').getContext('2d');
-        new Chart(hygieneCtx, {
-            ...chartConfig,
-            data: {
-                labels: ['0-3 Months', '3-6 Months', '6-9 Months', '9-12 Months', '12+ Months'],
-                datasets: [{
-                    data: [0, 0, 84, 90, 841], // TODO: Hook to API
-                    backgroundColor: ['#5ce6a1', '#a85cf0', '#42cbf5', '#ff7b72', '#ffd166'],
-                    borderWidth: 0,
-                    hoverOffset: 4
-                }]
-            }
-        });
-
-        const unscheduledCtx = document.getElementById('unscheduledTxChart').getContext('2d');
-        new Chart(unscheduledCtx, {
-            ...chartConfig,
-            data: {
-                labels: ['0-3 Months', '3-6 Months', '6-9 Months', '9-12 Months', '12+ Months'],
-                datasets: [{
-                    data: [460, 400, 454, 401, 6986], // TODO: Hook to API
-                    backgroundColor: ['#5ce6a1', '#a85cf0', '#42cbf5', '#ff7b72', '#ffd166'],
-                    borderWidth: 0,
-                    hoverOffset: 4
-                }]
-            }
         });
 
         // Initial Hydration

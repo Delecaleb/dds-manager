@@ -26,7 +26,11 @@ class SyncOpenDentalClaimProcs extends Command
      */
     public function handle()
     {
+        $this->info('start Syncing claim procedures...');
+        logger('Claimproc started');
         $syncService = app(ClaimProcSyncService::class);
         $syncService->sync();
+        logger('Claimproc finished');
+        $this->info('finished Syncing claim procedures...');
     }
 }

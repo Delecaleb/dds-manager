@@ -81,12 +81,24 @@ class OdProcedureLog extends Model
 
     public $incrementing = false;
 
+    public function scopeCompleted($query)
+    {
+        return $query->where('ProcStatus', 'C');
+    }
+
+    public function scopeInDateRange($query, $start, $end)
+    {
+        return $query->whereBetween('ProcDate', [$start, $end]);
+    }
+
     public function patientVisits($start, $end)
     {
-        return OdProcedureLog::whereBetween('ProcDate', [$start, $end])
-            ->where('ProcStatus', 'C')
-            ->distinct('PatNum')
-            ->count('PatNum');
+        return $this->inDateRange($start, $end)
+            ->completed()
+            ->selectRaw('DATE(ProcDate), PatNum')
+            ->distinct()
+            ->get()
+            ->count();
     }
 
     public function newPatientVisits($start, $end)

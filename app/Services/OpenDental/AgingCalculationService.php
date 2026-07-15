@@ -49,18 +49,18 @@ class AgingCalculationService
      */
     private const SORTABLE = [
         'guarantor_name' => 'guarantor_name',
-        'guarantor_id'   => 'guarantor_id',
-        'bal_current'    => 'bal_current',
-        'bal_30'         => 'bal_30',
-        'bal_60'         => 'bal_60',
-        'bal_90'         => 'bal_90',
-        'bal_120'        => 'bal_120',
-        'bal_180'        => 'bal_180',
-        'bal_240'        => 'bal_240',
-        'bal_365'        => 'bal_365',
+        'guarantor_id' => 'guarantor_id',
+        'bal_current' => 'bal_current',
+        'bal_30' => 'bal_30',
+        'bal_60' => 'bal_60',
+        'bal_90' => 'bal_90',
+        'bal_120' => 'bal_120',
+        'bal_180' => 'bal_180',
+        'bal_240' => 'bal_240',
+        'bal_365' => 'bal_365',
         'credit_balance' => 'credit_balance',
-        'contract'       => 'contract',
-        'total'          => 'total',
+        'contract' => 'contract',
+        'total' => 'total',
     ];
 
     public function guarantorAging(
@@ -124,9 +124,9 @@ class AgingCalculationService
     {
         $joinAlias = $groupBy === 'patient' ? 'p' : 'g';
 
-        $sql = 'SELECT COUNT(*) as cnt FROM (' . $this->baseSql($includeCredits, $groupBy) . ') base
-                JOIN od_patients ' . $joinAlias . ' ON ' . $joinAlias . '.PatNum = base.row_id
-                WHERE 1=1 ' . $this->searchClause($search, $joinAlias);
+        $sql = 'SELECT COUNT(*) as cnt FROM ('.$this->baseSql($includeCredits, $groupBy).') base
+                JOIN od_patients '.$joinAlias.' ON '.$joinAlias.'.PatNum = base.row_id
+                WHERE 1=1 '.$this->searchClause($search, $joinAlias);
 
         $bindings = array_merge($this->dateBindings($asOfDate), $this->searchBindings($search));
 
@@ -139,9 +139,9 @@ class AgingCalculationService
         // request), then append a unique tiebreak so pagination is stable
         // across pages when the primary key has ties.
         $sortExpr = self::SORTABLE[$sortKey] ?? 'total';
-        $dir      = strtolower($sortDir) === 'asc' ? 'ASC' : 'DESC';
+        $dir = strtolower($sortDir) === 'asc' ? 'ASC' : 'DESC';
         $tieBreak = $groupBy === 'patient' ? 'patient_id' : 'guarantor_id';
-        $orderBy  = "ORDER BY {$sortExpr} {$dir}, {$tieBreak} ASC";
+        $orderBy = "ORDER BY {$sortExpr} {$dir}, {$tieBreak} ASC";
 
         if ($groupBy === 'patient') {
             $sql = 'SELECT
@@ -155,12 +155,12 @@ class AgingCalculationService
                         base.total,
                         COALESCE(contract_agg.contract, 0) AS contract,
                         CASE WHEN base.total < 0 THEN -base.total ELSE 0 END AS credit_balance
-                    FROM (' . $this->baseSql($includeCredits, 'patient') . ') base
+                    FROM ('.$this->baseSql($includeCredits, 'patient').') base
                     JOIN od_patients p ON p.PatNum = base.row_id
                     JOIN od_patients g ON g.PatNum = base.guarantor_id
-                    LEFT JOIN (' . $this->contractSql() . ') contract_agg ON contract_agg.guarantor_id = base.guarantor_id
-                    WHERE 1=1 ' . $this->searchClause($search, 'p') . '
-                    ' . $orderBy . '
+                    LEFT JOIN ('.$this->contractSql().') contract_agg ON contract_agg.guarantor_id = base.guarantor_id
+                    WHERE 1=1 '.$this->searchClause($search, 'p').'
+                    '.$orderBy.'
                     LIMIT ? OFFSET ?';
 
             $bindings = array_merge($this->dateBindings($asOfDate), $this->searchBindings($search), [$length, $start]);
@@ -182,11 +182,11 @@ class AgingCalculationService
                     base.total,
                     COALESCE(contract_agg.contract, 0) AS contract,
                     CASE WHEN base.total < 0 THEN -base.total ELSE 0 END AS credit_balance
-                FROM (' . $this->baseSql($includeCredits, 'guarantor') . ') base
+                FROM ('.$this->baseSql($includeCredits, 'guarantor').') base
                 JOIN od_patients g ON g.PatNum = base.row_id
-                LEFT JOIN (' . $this->contractSql() . ') contract_agg ON contract_agg.guarantor_id = base.row_id
-                WHERE 1=1 ' . $this->searchClause($search, 'g') . '
-                ' . $orderBy . '
+                LEFT JOIN ('.$this->contractSql().') contract_agg ON contract_agg.guarantor_id = base.row_id
+                WHERE 1=1 '.$this->searchClause($search, 'g').'
+                '.$orderBy.'
                 LIMIT ? OFFSET ?';
 
         $bindings = array_merge($this->dateBindings($asOfDate), $this->searchBindings($search), [$length, $start]);
@@ -194,7 +194,7 @@ class AgingCalculationService
         return collect(DB::select($sql, $bindings));
     }
 
-    private function totals(string $asOfDate, ?string $search, bool $includeCredits, string $groupBy): array
+    public function totals(string $asOfDate, ?string $search, bool $includeCredits, string $groupBy): array
     {
         if ($groupBy === 'patient') {
             // Contract is a per-GUARANTOR balance, not per-patient. Summing
@@ -218,16 +218,16 @@ class AgingCalculationService
                             SELECT COALESCE(SUM(contract_agg.contract), 0)
                             FROM (
                                 SELECT DISTINCT base2.guarantor_id
-                                FROM (' . $innerBase . ') base2
+                                FROM ('.$innerBase.') base2
                                 JOIN od_patients p2 ON p2.PatNum = base2.row_id
-                                WHERE 1=1 ' . $this->searchClause($search, 'p2') . '
+                                WHERE 1=1 '.$this->searchClause($search, 'p2').'
                             ) g_ids
-                            LEFT JOIN (' . $this->contractSql() . ') contract_agg ON contract_agg.guarantor_id = g_ids.guarantor_id
+                            LEFT JOIN ('.$this->contractSql().') contract_agg ON contract_agg.guarantor_id = g_ids.guarantor_id
                         ) AS contract_total,
                         COALESCE(SUM(base.total), 0) AS grand_total
-                    FROM (' . $innerBase . ') base
+                    FROM ('.$innerBase.') base
                     JOIN od_patients p ON p.PatNum = base.row_id
-                    WHERE 1=1 ' . $this->searchClause($search, 'p');
+                    WHERE 1=1 '.$this->searchClause($search, 'p');
 
             $bindings = array_merge(
                 $this->dateBindings($asOfDate),
@@ -251,10 +251,10 @@ class AgingCalculationService
                     COALESCE(SUM(CASE WHEN base.total < 0 THEN -base.total ELSE 0 END), 0) AS credit_total,
                     COALESCE(SUM(contract_agg.contract), 0) AS contract_total,
                     COALESCE(SUM(base.total), 0) AS grand_total
-                FROM (' . $this->baseSql($includeCredits, 'guarantor') . ') base
+                FROM ('.$this->baseSql($includeCredits, 'guarantor').') base
                 JOIN od_patients g ON g.PatNum = base.row_id
-                LEFT JOIN (' . $this->contractSql() . ') contract_agg ON contract_agg.guarantor_id = base.row_id
-                WHERE 1=1 ' . $this->searchClause($search, 'g');
+                LEFT JOIN ('.$this->contractSql().') contract_agg ON contract_agg.guarantor_id = base.row_id
+                WHERE 1=1 '.$this->searchClause($search, 'g');
 
         $bindings = array_merge($this->dateBindings($asOfDate), $this->searchBindings($search));
 
@@ -392,7 +392,7 @@ class AgingCalculationService
      */
     private function contractSql(): string
     {
-        return "
+        return '
             SELECT
                 ppc.Guarantor AS guarantor_id,
                 SUM(CAST(ppc.Principal AS DECIMAL(12,2)) - COALESCE(pd.paid, 0)) AS contract
@@ -402,6 +402,6 @@ class AgingCalculationService
                 FROM od_pay_splits WHERE PayPlanChargeNum <> 0 GROUP BY PayPlanChargeNum
             ) pd ON pd.PayPlanChargeNum = ppc.PayPlanChargeNum
             GROUP BY ppc.Guarantor
-        ";
+        ';
     }
 }

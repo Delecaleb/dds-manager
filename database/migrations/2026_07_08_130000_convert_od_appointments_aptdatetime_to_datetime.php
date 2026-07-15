@@ -22,9 +22,15 @@ return new class extends Migration
     public function up(): void
     {
         if (DB::getDriverName() === 'sqlite') {
-            Schema::table('od_appointments', function (Blueprint $table) {
-                $table->index('AptDateTime', 'od_appointments_aptdatetime_index');
-            });
+            // SQLite is dynamically typed and does not support STR_TO_DATE or MODIFY/MODIFY COLUMN.
+            // Simply make sure database has index.
+            try {
+                Schema::table('od_appointments', function (Blueprint $table) {
+                    $table->index('AptDateTime', 'od_appointments_aptdatetime_index');
+                });
+            } catch (Exception $e) {
+                // Ignore if index already exists
+            }
 
             return;
         }

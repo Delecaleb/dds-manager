@@ -5,11 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\OdAppointment;
 use App\Models\OdPatient;
 use App\Models\OdProcedureLog;
-use App\Models\OdProvider;
 use App\Models\OdRecall;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 use Yajra\DataTables\Facades\DataTables;
 
 class FrontOfficeController extends Controller
@@ -19,6 +18,7 @@ class FrontOfficeController extends Controller
         if ($request->ajax()) {
             return view('front-office.partials.schedule');
         }
+
         return view('front-office.index', ['activeTab' => 'schedule']);
     }
 
@@ -27,6 +27,7 @@ class FrontOfficeController extends Controller
         if ($request->ajax()) {
             return view('front-office.partials.collections');
         }
+
         return view('front-office.index', ['activeTab' => 'collections']);
     }
 
@@ -50,7 +51,7 @@ class FrontOfficeController extends Controller
             ->whereBetween('ProcDate', [$lastYearStart, $lastYearEnd])
             ->sum('ProcFee');
 
-        // Note: For now, $100k is used as simple monthly goal for UI ratio mapping till Goals system added. 
+        // Note: For now, $100k is used as simple monthly goal for UI ratio mapping till Goals system added.
         $monthlyGoal = 109286.00;
         $pctGoal = $monthlyGoal > 0 ? round(($monthlyProduction / $monthlyGoal) * 100, 2) : 0;
 
@@ -93,10 +94,11 @@ class FrontOfficeController extends Controller
                 // If patient has 'IsNewPatient' field, use it. Otherwise, simple naive check via Appointments count
                 $isNew = false;
                 // If this is their ONLY appointment in history (very basic new patient check) -> OpenDental commonly defines New Patient via ProcCodes but simple count fallback is easy:
-                if (!empty($apt->PatNum)) {
+                if (! empty($apt->PatNum)) {
                     $count = OdAppointment::where('PatNum', $apt->PatNum)->count();
-                    if ($count <= 1)
+                    if ($count <= 1) {
                         $isNew = true;
+                    }
                 }
 
                 if ($isNew) {
@@ -118,7 +120,7 @@ class FrontOfficeController extends Controller
         $brokenScheduled = 0;
 
         $patNums = $brokenApts->pluck('PatNum')->unique()->toArray();
-        if (!empty($patNums)) {
+        if (! empty($patNums)) {
             $futureApts = OdAppointment::whereIn('PatNum', $patNums)
                 ->where('AptDateTime', '>', $endOfMonth)
                 ->whereIn('AptStatus', [1, 2, 4])
@@ -164,16 +166,17 @@ class FrontOfficeController extends Controller
         $recallBuckets = [0, 0, 0, 0, 0];
         foreach ($recalls as $r) {
             $monthsPast = Carbon::parse($r->DateDue)->diffInMonths(Carbon::parse($endOfMonth));
-            if ($monthsPast <= 3)
+            if ($monthsPast <= 3) {
                 $recallBuckets[0]++;
-            elseif ($monthsPast <= 6)
+            } elseif ($monthsPast <= 6) {
                 $recallBuckets[1]++;
-            elseif ($monthsPast <= 9)
+            } elseif ($monthsPast <= 9) {
                 $recallBuckets[2]++;
-            elseif ($monthsPast <= 12)
+            } elseif ($monthsPast <= 12) {
                 $recallBuckets[3]++;
-            else
+            } else {
                 $recallBuckets[4]++;
+            }
         }
 
         // 4. Unscheduled TX
@@ -186,20 +189,21 @@ class FrontOfficeController extends Controller
 
         $txBuckets = [
             'count' => [0, 0, 0, 0, 0],
-            'amount' => [0, 0, 0, 0, 0]
+            'amount' => [0, 0, 0, 0, 0],
         ];
 
         foreach ($tpProcs as $tp) {
             $monthsPast = Carbon::parse($tp->DateTP)->diffInMonths(Carbon::parse($endOfMonth));
             $idx = 4;
-            if ($monthsPast <= 3)
+            if ($monthsPast <= 3) {
                 $idx = 0;
-            elseif ($monthsPast <= 6)
+            } elseif ($monthsPast <= 6) {
                 $idx = 1;
-            elseif ($monthsPast <= 9)
+            } elseif ($monthsPast <= 9) {
                 $idx = 2;
-            elseif ($monthsPast <= 12)
+            } elseif ($monthsPast <= 12) {
                 $idx = 3;
+            }
 
             $txBuckets['count'][$idx]++;
             $txBuckets['amount'][$idx] += (float) $tp->ProcFee;
@@ -212,31 +216,31 @@ class FrontOfficeController extends Controller
                 'percent_goal' => $pctGoal,
                 'prior_year' => floatval($priorYearProduction),
                 'diff_goal' => $productionDiff,
-                'diff_year' => $yearDiff
+                'diff_year' => $yearDiff,
             ],
             'daily' => [
                 'actuals' => $dailyActuals,
-                'goals' => $dailyGoals
+                'goals' => $dailyGoals,
             ],
             'visits' => [
                 'new' => $dailyNew,
-                'existing' => $dailyExisting
+                'existing' => $dailyExisting,
             ],
             'opportunities' => [
                 'broken' => [
                     'total' => $brokenTotal,
                     'scheduled' => $brokenScheduled,
-                    'unscheduled' => $brokenUnscheduled
+                    'unscheduled' => $brokenUnscheduled,
                 ],
                 'hygiene' => [
                     'total' => $hygTotal,
                     'scheduled' => $hygScheduled,
                     'unscheduled' => $hygUnscheduled,
-                    'rate' => $hygReapptRate
-                ]
+                    'rate' => $hygReapptRate,
+                ],
             ],
             'recall_due' => $recallBuckets,
-            'unscheduled_tx' => $txBuckets
+            'unscheduled_tx' => $txBuckets,
         ]);
     }
 
@@ -255,9 +259,9 @@ class FrontOfficeController extends Controller
 
         return DataTables::eloquent($query)
             ->addColumn('patient_name', function ($apt) {
-                return trim(($apt->patient->FName ?? '') . ' ' . ($apt->patient->LName ?? ''));
+                return trim(($apt->patient->FName ?? '').' '.($apt->patient->LName ?? ''));
             })
-            ->addColumn('status', fn($apt) => 'BROKEN')
+            ->addColumn('status', fn ($apt) => 'BROKEN')
             ->addColumn('amount', function ($apt) {
                 // Simple estimate using procedures planned in the appointment? Fast fallback: 0
                 return 0; // In OD, broken appointments normally zero out the fees, but you can sum attached proc fees if they were kept
@@ -265,7 +269,7 @@ class FrontOfficeController extends Controller
             ->addColumn('phone', function ($apt) {
                 return $apt->patient->HmPhone ?? ($apt->patient->WirelessPhone ?? '');
             })
-            ->addColumn('insurance', fn($apt) => 'N/A') // Deep dive mapping required via od_patplans for real Carrier
+            ->addColumn('insurance', fn ($apt) => 'N/A') // Deep dive mapping required via od_patplans for real Carrier
             ->addColumn('provider_name', function ($apt) {
                 return $apt->provider->LName ?? '—';
             })
@@ -275,7 +279,7 @@ class FrontOfficeController extends Controller
             ->addColumn('time', function ($apt) {
                 return $apt->AptDateTime ? date('h:i a', strtotime($apt->AptDateTime)) : '';
             })
-            ->addColumn('type', fn($apt) => 'Cancellation')
+            ->addColumn('type', fn ($apt) => 'Cancellation')
             ->addColumn('description', function ($apt) {
                 return $apt->ProcDescript ?? ($apt->Note ?? '');
             })
@@ -287,6 +291,7 @@ class FrontOfficeController extends Controller
         if ($request->ajax()) {
             return view('front-office.partials.tasks');
         }
+
         return view('front-office.index', ['activeTab' => 'tasks']);
     }
 
@@ -294,13 +299,15 @@ class FrontOfficeController extends Controller
     {
         $filter = $request->get('filter', 'unconfirmed');
         $month = $request->get('month');
-        if (!$month)
+        if (! $month) {
             $month = now()->format('Y-m');
+        }
 
         try {
             $targetDate = Carbon::createFromFormat('Y-m', $month);
-            if (!$targetDate)
+            if (! $targetDate) {
                 $targetDate = now();
+            }
         } catch (\Exception $e) {
             $targetDate = now();
         }
@@ -328,7 +335,7 @@ class FrontOfficeController extends Controller
 
         return DataTables::eloquent($query)
             ->addColumn('patient_name', function ($apt) {
-                return trim(($apt->patient->FName ?? '') . ' ' . ($apt->patient->LName ?? ''));
+                return trim(($apt->patient->FName ?? '').' '.($apt->patient->LName ?? ''));
             })
             ->addColumn('age', function ($apt) {
                 return $apt->patient && $apt->patient->Birthdate ? Carbon::parse($apt->patient->Birthdate)->age : '';
@@ -384,35 +391,37 @@ class FrontOfficeController extends Controller
 
         return DataTables::of($query)
             ->addColumn('guarantor', function ($row) {
-                $name = trim(($row->GuarantorLName ?? '') . ', ' . ($row->GuarantorFName ?? ''));
-                if (!$name || $name == ',')
+                $name = trim(($row->GuarantorLName ?? '').', '.($row->GuarantorFName ?? ''));
+                if (! $name || $name == ',') {
                     $name = 'Unknown Guarantor';
+                }
+
                 return $name;
             })
             ->addColumn('current', function ($row) {
-                return $row->Bal_0_30 > 0 ? '$ ' . number_format($row->Bal_0_30, 2) : '$ 0';
+                return $row->Bal_0_30 > 0 ? '$ '.number_format($row->Bal_0_30, 2) : '$ 0';
             })
             ->addColumn('over_30', function ($row) {
-                return $row->Bal_31_60 > 0 ? '$ ' . number_format($row->Bal_31_60, 2) : '$ 0';
+                return $row->Bal_31_60 > 0 ? '$ '.number_format($row->Bal_31_60, 2) : '$ 0';
             })
             ->addColumn('over_60', function ($row) {
-                return $row->Bal_61_90 > 0 ? '$ ' . number_format($row->Bal_61_90, 2) : '$ 0';
+                return $row->Bal_61_90 > 0 ? '$ '.number_format($row->Bal_61_90, 2) : '$ 0';
             })
             ->addColumn('over_90', function ($row) {
-                return $row->BalOver90 > 0 ? '$ ' . number_format($row->BalOver90, 2) : '$ 0';
+                return $row->BalOver90 > 0 ? '$ '.number_format($row->BalOver90, 2) : '$ 0';
             })
             ->addColumn('over_120', function ($row) {
                 return '-';
             })
             ->addColumn('total', function ($row) {
-                return $row->BalTotal > 0 ? '$ ' . number_format($row->BalTotal, 2) : '$ 0';
+                return $row->BalTotal > 0 ? '$ '.number_format($row->BalTotal, 2) : '$ 0';
             })
             ->make(true);
     }
 
     public function collectionsStats(Request $request)
     {
-        $stats = clone OdPatient::query()->select(
+        $stats = OdPatient::query()->select(
             DB::raw('SUM(CAST(Bal_0_30 AS DECIMAL(10,2))) as Bal_0_30'),
             DB::raw('SUM(CAST(Bal_31_60 AS DECIMAL(10,2))) as Bal_31_60'),
             DB::raw('SUM(CAST(Bal_61_90 AS DECIMAL(10,2))) as Bal_61_90'),
@@ -421,8 +430,8 @@ class FrontOfficeController extends Controller
         )->first();
 
         // Ins/Pts Collect
-        $pts_collection = clone OdProcedureLog::query()->where('ProcStatus', 2)->sum('ProcFee');
-        $ins_collection = clone OdPatient::query()->sum(DB::raw('CAST(InsEst AS DECIMAL(10,2))'));
+        $pts_collection = OdProcedureLog::query()->where('ProcStatus', 2)->sum('ProcFee');
+        $ins_collection = OdPatient::query()->sum(DB::raw('CAST(InsEst AS DECIMAL(10,2))'));
 
         return response()->json([
             'balances' => [
@@ -431,12 +440,12 @@ class FrontOfficeController extends Controller
                 'over_60' => (float) ($stats->Bal_61_90 ?? 0),
                 'over_90' => (float) ($stats->BalOver90 ?? 0),
                 'over_120' => 0.00,
-                'total' => (float) ($stats->BalTotal ?? 0)
+                'total' => (float) ($stats->BalTotal ?? 0),
             ],
             'collections' => [
                 'pts' => (float) $pts_collection,
-                'ins' => (float) $ins_collection
-            ]
+                'ins' => (float) $ins_collection,
+            ],
         ]);
     }
 
@@ -445,6 +454,7 @@ class FrontOfficeController extends Controller
         if ($request->ajax()) {
             return view('front-office.partials.kpis');
         }
+
         return view('front-office.index', ['activeTab' => 'kpis']);
     }
 
@@ -452,13 +462,15 @@ class FrontOfficeController extends Controller
     {
         $section = $request->get('section');
         $month = $request->get('month');
-        if (!$month)
+        if (! $month) {
             $month = now()->format('Y-m');
+        }
 
         try {
             $targetDate = Carbon::createFromFormat('Y-m', $month);
-            if (!$targetDate)
+            if (! $targetDate) {
                 $targetDate = now();
+            }
         } catch (\Exception $e) {
             $targetDate = now();
         }
@@ -476,7 +488,7 @@ class FrontOfficeController extends Controller
 
         $docProduction = OdProcedureLog::where('ProcStatus', 2)->whereBetween('ProcDate', [$startOfMonth, $endOfMonth])->sum('ProcFee');
 
-        // Dynamic Data Mappings per section. 
+        // Dynamic Data Mappings per section.
         // Note: For KPI fields where OpenDental core DB does not natively store analytical time-series logs
         // we adhere strictly to the rule: "use - for missing data" rather than fake values.
 
@@ -492,7 +504,7 @@ class FrontOfficeController extends Controller
                 ['id' => 'pat_added', 'current' => '-', 'target' => '-', 'last' => '-'],
                 ['id' => 'pat_viewed', 'current' => '-', 'target' => '-', 'last' => '-'],
                 ['id' => 'new_pat_rev', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'unsch_hyg_ret', 'current' => '-', 'target' => '-', 'last' => '-']
+                ['id' => 'unsch_hyg_ret', 'current' => '-', 'target' => '-', 'last' => '-'],
             ];
         } elseif ($section === 'doctor') {
             $data = [
@@ -511,7 +523,7 @@ class FrontOfficeController extends Controller
                 ['id' => 'doc_unsch_tx', 'current' => '-', 'target' => '-', 'last' => '-'],
                 ['id' => 'doc_supplies', 'current' => '-', 'target' => '-', 'last' => '-'],
                 ['id' => 'doc_med_supplies', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_tot_prod', 'current' => $docProduction, 'target' => '-', 'last' => '-']
+                ['id' => 'doc_tot_prod', 'current' => $docProduction, 'target' => '-', 'last' => '-'],
             ];
         } elseif ($section === 'hygiene') {
             $data = [
@@ -536,13 +548,13 @@ class FrontOfficeController extends Controller
                 ['id' => 'hyg_tot_visits', 'current' => '-', 'target' => '-', 'last' => '-'],
                 ['id' => 'hyg_unfilled_dt', 'current' => '-', 'target' => '-', 'last' => '-'],
                 ['id' => 'hyg_avg_prod_visit', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_case_acc', 'current' => '-', 'target' => '-', 'last' => '-']
+                ['id' => 'hyg_case_acc', 'current' => '-', 'target' => '-', 'last' => '-'],
             ];
         }
 
         return response()->json([
             'section' => $section,
-            'data' => $data
+            'data' => $data,
         ]);
     }
 
@@ -551,6 +563,7 @@ class FrontOfficeController extends Controller
         if ($request->ajax()) {
             return view('front-office.partials.performance');
         }
+
         return view('front-office.index', ['activeTab' => 'performance']);
     }
 
@@ -563,7 +576,7 @@ class FrontOfficeController extends Controller
     public function performanceRemindersData(Request $request)
     {
         // Expected Data mapping logic goes here for true Reminder Contacts
-        // Returning true empty Collections natively forces DataTables to display the "No data" warning dynamically 
+        // Returning true empty Collections natively forces DataTables to display the "No data" warning dynamically
         // without relying on manual placeholders, honoring the user constraint flawlessly.
         return DataTables::of(collect([]))->make(true);
     }
