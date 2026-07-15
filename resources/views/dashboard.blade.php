@@ -499,7 +499,11 @@
 
     /* ── Helpers ──────────────────────────────────────── */
     function fmtMoney(v) {
-      return '$' + Number(v ?? 0).toLocaleString('en-US', {
+      var n = Number(v ?? 0);
+      if (n < 0) {
+        return '($' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')';
+      }
+      return '$' + n.toLocaleString('en-US', {
         minimumFractionDigits: 2, maximumFractionDigits: 2
       });
     }
