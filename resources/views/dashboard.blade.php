@@ -34,15 +34,13 @@
     }
   </style>
   <header class="bg-white border-b border-gray-100 px-8 py-4 flex justify-between items-center">
-    <div class="flex items-center space-x-2">
-      <h1 class="text-3xl font-extrabold tracking-tight text-gray-900">Dashboard</h1>
-    </div>
+
   </header>
   <!-- ── HEADER ─────────────────────────────────────────── -->
   <header
     class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-20">
     <div class="flex items-center gap-3">
-      <h2 class="text-sm font-semibold text-slate-700 tracking-wide">Dashboard</h2>
+      <h2 class="text-3xl font-semibold text-slate-700 tracking-wide">Dashboard</h2>
       <!-- Location selector -->
       <div class="relative">
         <select
