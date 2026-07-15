@@ -381,7 +381,7 @@
     </section>
 
     <div class="font-bold border-b p-3 text-sm text-gray-700">Patients</div>
-    <section class="grid grid-cols-1 md:grid-cols-5 gap-6">
+    <section class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
 
       {{-- Patient Visits --}}
       <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-xs flex flex-col justify-between">
@@ -468,6 +468,29 @@
         </div>
         <div class="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
           First-time patients booked in the period
+        </div>
+      </div>
+
+      {{-- Broken / Cancelled --}}
+      <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-xs flex flex-col justify-between">
+        <div class="flex justify-between items-start">
+          <div class="flex-1">
+            <div class="flex items-center gap-1.5">
+              <p class="text-xs font-bold uppercase tracking-wider text-gray-500">Broken/Cancelled</p>
+              <button class="kpi-expand-btn" onclick="openBrokenCancelledBreakdown('Broken & Cancelled')">
+                <i data-lucide="arrow-up-right-square" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <h4 class="text-3xl font-black text-gray-900 mt-2" id="broken-cancelled">
+              <span class="skel h-8 w-16"></span>
+            </h4>
+          </div>
+          <div class="p-3 bg-red-50 rounded-lg text-red-600">
+            <i class="fa-solid fa-user-xmark text-xl"></i>
+          </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
+          D9986 / D9987 procedures
         </div>
       </div>
 
@@ -773,7 +796,7 @@
       $('#adjustment-rate').html('<span class="skel h-3 w-14"></span>');
       $('#collection-rate').html('<span class="skel h-8 w-24"></span>');
       $('#collections-amt').html('<span class="skel h-3 w-20"></span>');
-      $('#patient-visits, #patients-scheduled, #new-patients-scheduled, #new-patient-visits, #patient-avg-production')
+      $('#patient-visits, #patients-scheduled, #new-patients-scheduled, #new-patient-visits, #patient-avg-production, #broken-cancelled')
         .html('<span class="skel h-8 w-16"></span>');
       $('#fetchError').addClass('hidden');
     }
@@ -789,6 +812,7 @@
       if (data.patient_scheduled !== undefined) $('#patients-scheduled').text(data.patient_scheduled);
       if (data.new_patients_scheduled !== undefined) $('#new-patients-scheduled').text(data.new_patients_scheduled);
       if (data.new_patient_visit !== undefined) $('#new-patient-visits').text(data.new_patient_visit);
+      if (data.broken_cancelled !== undefined) $('#broken-cancelled').text(data.broken_cancelled);
       if (data.patient_avg_production !== undefined) $('#patient-avg-production').text(fmtMoney(data.patient_avg_production));
 
       if (data.daily_revenue !== undefined) renderDailyRevenueChart(data.daily_revenue);
@@ -1231,11 +1255,9 @@
       ],
       collection: [
         { key: 'provider', title: 'Provider' },
-        { key: 'description', title: 'Description' },
-        { key: 'type', title: 'Type', cls: 'text-center' },
-        { key: 'count', title: 'Count', cls: 'text-center', fmt: 'int' },
-        { key: 'service_fee', title: 'Service Fee', cls: 'text-right', fmt: 'money' },
-        { key: 'total_payments', title: 'Total Payments', cls: 'text-right', fmt: 'money' },
+        { key: 'payment_date', title: 'Date', cls: 'text-center' },
+        { key: 'description', title: 'Method' },
+        { key: 'total_payments', title: 'Amount', cls: 'text-right', fmt: 'money' },
       ],
     };
 
@@ -1783,6 +1805,30 @@
                 return fmtMoney(val);
               }
             }
+          ];
+          openDataTableModal(modalId, 'Financial Breakdown - ' + title, columns, data);
+        })
+        .catch(function () {
+          alert('Failed to load data.');
+          closeDataTableModal(modalId);
+        });
+    }
+
+    function openBrokenCancelledBreakdown(title) {
+      var modalId = 'breakdown-modal';
+      setDataTableModalLoading(modalId, 'Financial Breakdown - ' + title);
+
+      var start = _currentStartDate;
+      var end = _currentEndDate;
+
+      fetch(baseUrl + '/financials/breakdown?type=broken_cancelled&start_date=' + start + '&end_date=' + end)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var columns = [
+            { data: 'patient_id', title: 'Patient Id' },
+            { data: 'patient_name', title: 'Patient Name' },
+            { data: 'dates', title: 'Procedure Date' },
+            { data: 'type', title: 'Type' }
           ];
           openDataTableModal(modalId, 'Financial Breakdown - ' + title, columns, data);
         })

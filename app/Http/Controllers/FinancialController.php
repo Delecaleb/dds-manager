@@ -184,19 +184,29 @@ class FinancialController extends Controller
                 ->groupBy('first_visit')
                 ->pluck('cnt', 'date');
 
+            $dailyCancelled = DB::table('od_procedure_logs as pl')
+                ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
+                ->where('pl.ProcStatus', 'C')
+                ->whereIn('pc.ProcCode', ['D9986', 'D9987'])
+                ->whereBetween('pl.ProcDate', [$start, $end])
+                ->selectRaw('DATE(pl.ProcDate) as date, COUNT(*) as cnt')
+                ->groupByRaw('DATE(pl.ProcDate)')
+                ->pluck('cnt', 'date');
+
             $period = CarbonPeriod::create($start, $end);
             $allStatDates = collect();
             foreach ($period as $dt) {
                 $allStatDates->push($dt->toDateString());
             }
 
-            $response['daily_patient_stats'] = $allStatDates->map(function ($date) use ($dailyVisits, $dailyScheduled, $dailyNewScheduled, $dailyNewVisits) {
+            $response['daily_patient_stats'] = $allStatDates->map(function ($date) use ($dailyVisits, $dailyScheduled, $dailyNewScheduled, $dailyNewVisits, $dailyCancelled) {
                 return [
                     'date' => $date,
                     'patient_visits' => (int) ($dailyVisits[$date] ?? 0),
                     'new_patient_visits' => (int) ($dailyNewVisits[$date] ?? 0),
                     'patient_scheduled' => (int) ($dailyScheduled[$date] ?? 0),
                     'new_patient_scheduled' => (int) ($dailyNewScheduled[$date] ?? 0),
+                    'broken_cancelled' => (int) ($dailyCancelled[$date] ?? 0),
                 ];
             })->values();
         }
@@ -323,18 +333,17 @@ class FinancialController extends Controller
         $rows = DB::select("
             SELECT
                 {$provExpr}                     AS provider,
-                'Payment'                        AS description,
-                'Payment'                        AS type,
-                COUNT(*)                         AS cnt,
-                SUM(ps.SplitAmt)                 AS service_fee,
-                SUM(ps.SplitAmt)                 AS total_payments
+                COALESCE(pt.ItemName, 'Payment') AS description,
+                ps.DatePay                       AS payment_date,
+                ps.SplitAmt                      AS total_payments
             FROM od_pay_splits ps
             LEFT JOIN od_providers pr ON ps.ProvNum = pr.ProvNum
+            LEFT JOIN od_payments p ON ps.PayNum = p.PayNum
+            LEFT JOIN od_definitions pt ON p.PayType = pt.DefNum
             WHERE ps.DatePay BETWEEN ? AND ?
               AND ps.SplitAmt != 0
               {$provFilter}
-            GROUP BY ps.ProvNum, pr.LName, pr.PName
-            ORDER BY total_payments DESC
+            ORDER BY ps.DatePay DESC
         ", $bindings);
 
         $n = count($rows);
@@ -348,7 +357,7 @@ class FinancialController extends Controller
             };
         }
 
-        $totalCount = (int) array_sum(array_map(fn($r) => $r->cnt, $rows));
+        $totalCount = count($rows);
         $totalPay = (float) array_sum(array_map(fn($r) => $r->total_payments, $rows));
 
         $providers = DB::table('od_providers')
@@ -388,9 +397,7 @@ class FinancialController extends Controller
             'rows' => array_map(fn($r) => [
                 'provider' => $r->provider ?? 'Unknown',
                 'description' => $r->description,
-                'type' => $r->type,
-                'count' => (int) $r->cnt,
-                'service_fee' => round((float) $r->service_fee, 2),
+                'payment_date' => $r->payment_date,
                 'total_payments' => round((float) $r->total_payments, 2),
                 'tier' => $r->tier,
             ], $rows),
@@ -416,6 +423,7 @@ class FinancialController extends Controller
             'new_patient_visits' => $this->bkNewPatientVisits($start, $end),
             'patients_scheduled' => $this->bkPatientsScheduled($start, $end),
             'new_patients_scheduled' => $this->bkNewPatientsScheduled($start, $end),
+            'broken_cancelled' => $this->bkBrokenCancelled($start, $end),
             'avg_production_per_patient' => $this->bkAvgProductionPerPatient($start, $end),
             default => [],
         };
@@ -691,6 +699,32 @@ class FinancialController extends Controller
             'patient_name' => $r->patient_name,
             'count' => (int) $r->count,
             'amount' => round((float) $r->amount, 2),
+        ], $rows);
+    }
+
+    // ── Broken & Cancelled Appointments ────────────────────────────────────────
+    private function bkBrokenCancelled(string $start, string $end): array
+    {
+        $rows = DB::select("
+            SELECT
+                p.PatNum                         AS patient_id,
+                CONCAT(p.LName, ', ', p.FName)   AS patient_name,
+                pl.ProcDate                      AS dates,
+                pc.ProcCode                      AS service_codes
+            FROM od_procedure_logs pl
+            JOIN od_patients   p  ON pl.PatNum  = p.PatNum
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
+            WHERE pl.ProcStatus = 'C'
+              AND pc.ProcCode IN ('D9986', 'D9987')
+              AND pl.ProcDate BETWEEN ? AND ?
+            ORDER BY dates, p.LName
+        ", [$start, $end]);
+
+        return array_map(fn($r) => [
+            'patient_id' => $r->patient_id,
+            'patient_name' => $r->patient_name,
+            'dates' => $r->dates,
+            'type' => $r->service_codes === 'D9986' ? 'No-Show' : 'Cancelled',
         ], $rows);
     }
 }
