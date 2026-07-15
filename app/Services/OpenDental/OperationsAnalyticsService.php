@@ -34,37 +34,117 @@ class OperationsAnalyticsService
     /**
      * Offices tab.
      *
-     * @param  string    $subtab   default | last-year | diff-last-year | percent-diff-last-year
-     * @param  int[]     $clinics  restrict to these ClinicNums (empty = all)
+     * @param  string  $subtab  default | last-year | diff-last-year | percent-diff-last-year
+     * @param  int[]  $clinics  restrict to these ClinicNums (empty = all)
      */
     public function offices(string $start, string $end, string $subtab = 'default', array $clinics = []): array
     {
         $columns = $this->officeColumns();
         $percentDiff = $subtab === 'percent-diff-last-year';
 
+        $calculateAbsoluteTotal = function (array $rows) {
+            $totalGross = array_sum(array_column($rows, 'gross'));
+            $totalAdjustment = array_sum(array_column($rows, 'adjustment'));
+            $totalNet = array_sum(array_column($rows, 'net'));
+            $totalCollection = array_sum(array_column($rows, 'collection'));
+            $totalPtsVisit = array_sum(array_column($rows, 'pts_visit'));
+            $totalUniquePts = array_sum(array_column($rows, 'unique_pts'));
+            $totalNptVisit = array_sum(array_column($rows, 'npt_visit'));
+            $totalNewPatientDollars = array_sum(array_column($rows, 'new_patient_dollars'));
+            $totalWorkingDays = array_sum(array_column($rows, 'working_days'));
+            $totalProcedures = array_sum(array_column($rows, 'procedures'));
+
+            $adjPct = $totalGross > 0 ? round($totalAdjustment / $totalGross * 100, 2) : 0;
+            $collPct = $totalNet > 0 ? round($totalCollection / $totalNet * 100, 2) : 0;
+
+            $pwdProduction = $totalWorkingDays > 0 ? round($totalNet / $totalWorkingDays, 2) : 0;
+            $pwdCollection = $totalWorkingDays > 0 ? round($totalCollection / $totalWorkingDays, 2) : 0;
+            $pwdPtsVisit = $totalWorkingDays > 0 ? round($totalPtsVisit / $totalWorkingDays, 2) : 0;
+            $pwdNptVisit = $totalWorkingDays > 0 ? round($totalNptVisit / $totalWorkingDays, 2) : 0;
+
+            $ppvProduction = $totalPtsVisit > 0 ? round($totalNet / $totalPtsVisit, 2) : 0;
+            $ppvCollection = $totalPtsVisit > 0 ? round($totalCollection / $totalPtsVisit, 2) : 0;
+            $ppvProcedures = $totalPtsVisit > 0 ? round($totalProcedures / $totalPtsVisit, 2) : 0;
+
+            $ppProduction = $totalProcedures > 0 ? round($totalNet / $totalProcedures, 2) : 0;
+            $ppCollection = $totalProcedures > 0 ? round($totalCollection / $totalProcedures, 2) : 0;
+
+            return [
+                'gross' => $totalGross,
+                'adjustment' => $totalAdjustment,
+                'adj_pct' => $adjPct,
+                'net' => $totalNet,
+                'collection' => $totalCollection,
+                'coll_pct' => $collPct,
+                'pts_visit' => $totalPtsVisit,
+                'unique_pts' => $totalUniquePts,
+                'npt_visit' => $totalNptVisit,
+                'new_patient_dollars' => $totalNewPatientDollars,
+                'act_pts_reservation' => null,
+                'act_pts' => null,
+                'retention' => null,
+                'working_days' => $totalWorkingDays,
+                'pwd_production' => $pwdProduction,
+                'pwd_collection' => $pwdCollection,
+                'pwd_pts_visit' => $pwdPtsVisit,
+                'pwd_npt_visit' => $pwdNptVisit,
+                'ppv_production' => $ppvProduction,
+                'ppv_collection' => $ppvCollection,
+                'ppv_procedures' => $ppvProcedures,
+                'pp_production' => $ppProduction,
+                'pp_collection' => $ppCollection,
+            ];
+        };
+
         if ($subtab === 'last-year') {
             [$start, $end] = $this->shiftYear($start, $end);
             $rows = $this->officeRows($start, $end, $clinics);
+            $total = $calculateAbsoluteTotal($rows);
         } elseif ($subtab === 'diff-last-year' || $percentDiff) {
             [$lyStart, $lyEnd] = $this->shiftYear($start, $end);
-            $current = $this->keyByClinic($this->officeRows($start, $end, $clinics));
-            $last    = $this->keyByClinic($this->officeRows($lyStart, $lyEnd, $clinics));
-            $rows    = $this->combine($current, $last, $columns, $percentDiff);
+            $currentRows = $this->officeRows($start, $end, $clinics);
+            $lastRows = $this->officeRows($lyStart, $lyEnd, $clinics);
+
+            $current = $this->keyByClinic($currentRows);
+            $last = $this->keyByClinic($lastRows);
+            $rows = $this->combine($current, $last, $columns, $percentDiff);
+
+            $currentTotal = $calculateAbsoluteTotal($currentRows);
+            $lastTotal = $calculateAbsoluteTotal($lastRows);
+
+            $total = [];
+            foreach ($columns as $col) {
+                $key = $col['key'];
+                if (($col['type'] ?? '') === 'text') {
+                    continue;
+                }
+                $a = $currentTotal[$key] ?? null;
+                $b = $lastTotal[$key] ?? null;
+
+                if ($a === null || $b === null) {
+                    $total[$key] = null;
+                } elseif ($percentDiff) {
+                    $total[$key] = $b != 0 ? round(($a - $b) / abs($b) * 100, 2) : null;
+                } else {
+                    $total[$key] = round($a - $b, 2);
+                }
+            }
         } else {
             $rows = $this->officeRows($start, $end, $clinics);
+            $total = $calculateAbsoluteTotal($rows);
         }
 
         return [
-            'groups'  => [
+            'groups' => [
                 ['label' => 'By Office',         'span' => 14],
                 ['label' => 'Per Working Day',   'span' => 4],
                 ['label' => 'Per Patient Visit', 'span' => 3],
                 ['label' => 'Per Procedure',     'span' => 2],
             ],
             'columns' => $percentDiff ? $this->asPercentColumns($columns) : $columns,
-            'rows'    => $rows,
+            'rows' => $rows,
             'average' => $this->aggregate($rows, $columns, 'avg'),
-            'total'   => $this->aggregate($rows, $columns, $percentDiff ? 'avg' : 'total'),
+            'total' => $total,
         ];
     }
 
@@ -81,14 +161,14 @@ class OperationsAnalyticsService
     public function payors(string $start, string $end, array $clinics = []): array
     {
         $columns = $this->payorColumns();
-        $rows    = $this->payorRows($start, $end, $clinics);
+        $rows = $this->payorRows($start, $end, $clinics);
 
         return [
-            'groups'  => [],
+            'groups' => [],
             'columns' => $columns,
-            'rows'    => $rows,
+            'rows' => $rows,
             'average' => $this->aggregate($rows, $columns, 'avg'),
-            'total'   => $this->aggregate($rows, $columns, 'total'),
+            'total' => $this->aggregate($rows, $columns, 'total'),
         ];
     }
 
@@ -97,7 +177,7 @@ class OperationsAnalyticsService
         return [
             ['key' => 'payor',      'label' => 'Payor',           'type' => 'text',    'sticky' => true],
             ['key' => 'location',   'label' => 'Location',        'type' => 'text'],
-            ['key' => 'gross',      'label' => 'Gross Production','type' => 'money',   'agg' => 'sum'],
+            ['key' => 'gross',      'label' => 'Gross Production', 'type' => 'money',   'agg' => 'sum'],
             ['key' => 'net',        'label' => 'Net Production',  'type' => 'money',   'agg' => 'sum'],
             ['key' => 'pct_ttl',    'label' => '% of TTL',        'type' => 'percent', 'heat' => false],
             ['key' => 'adjustment', 'label' => 'Adjustment',      'type' => 'money',   'agg' => 'sum'],
@@ -110,12 +190,13 @@ class OperationsAnalyticsService
     /** @return array<int, array<string, mixed>> */
     private function payorRows(string $start, string $end, array $clinics): array
     {
+        $concat = $this->concatPatNumProcDate();
         $q = DB::table('od_claim_procs')
-            ->selectRaw('PlanNum, ClinicNum,
+            ->selectRaw("PlanNum, ClinicNum,
                 SUM(FeeBilled)                                AS gross,
                 SUM(WriteOff)                                 AS writeoff,
                 SUM(InsPayAmt)                                AS collection,
-                COUNT(DISTINCT CONCAT(PatNum, "|", ProcDate)) AS pts_visits')
+                COUNT(DISTINCT {$concat}) AS pts_visits")
             ->whereBetween('ProcDate', [$start, $end]);
         if ($clinics) {
             $q->whereIn('ClinicNum', $clinics);
@@ -128,31 +209,31 @@ class OperationsAnalyticsService
         $totalNet = 0.0;
         $staged = [];
         foreach ($claims as $c) {
-            $gross    = (float) $c->gross;
+            $gross = (float) $c->gross;
             $writeoff = (float) $c->writeoff;
-            $net      = $gross - abs($writeoff);
+            $net = $gross - abs($writeoff);
             $totalNet += $net;
             $staged[] = [$c, $gross, $writeoff, $net];
         }
 
         $rows = [];
         foreach ($staged as [$c, $gross, $writeoff, $net]) {
-            $key = $c->PlanNum . '|' . $c->ClinicNum;
+            $key = $c->PlanNum.'|'.$c->ClinicNum;
             $rows[] = [
                 'clinic_num' => (int) $c->ClinicNum,
-                'payor'      => $this->payorLabel($c->PlanNum),
-                'location'   => $this->clinicNames[(int) $c->ClinicNum] ?? ('Location ' . $c->ClinicNum),
-                'gross'      => round($gross, 2),
-                'net'        => round($net, 2),
-                'pct_ttl'    => $totalNet != 0 ? round($net / $totalNet * 100, 2) : 0,
+                'payor' => $this->payorLabel($c->PlanNum),
+                'location' => $this->clinicNames[(int) $c->ClinicNum] ?? ('Location '.$c->ClinicNum),
+                'gross' => round($gross, 2),
+                'net' => round($net, 2),
+                'pct_ttl' => $totalNet != 0 ? round($net / $totalNet * 100, 2) : 0,
                 'adjustment' => round(-abs($writeoff), 2),
                 'collection' => round((float) $c->collection, 2),
                 'pts_visits' => (int) $c->pts_visits,
-                'npt_visit'  => (int) ($npt[$key] ?? 0),
+                'npt_visit' => (int) ($npt[$key] ?? 0),
             ];
         }
 
-        usort($rows, fn($a, $b) => $b['net'] <=> $a['net']);
+        usort($rows, fn ($a, $b) => $b['net'] <=> $a['net']);
 
         return $rows;
     }
@@ -175,22 +256,23 @@ class OperationsAnalyticsService
 
         $out = [];
         foreach ($q->groupBy('cp.PlanNum', 'cp.ClinicNum')->get() as $r) {
-            $out[$r->PlanNum . '|' . $r->ClinicNum] = (int) $r->npt;
+            $out[$r->PlanNum.'|'.$r->ClinicNum] = (int) $r->npt;
         }
+
         return $out;
     }
 
     /** Human label for a plan. Carrier names require a carrier sync; number is the fallback. */
     private function payorLabel($planNum): string
     {
-        return ((int) $planNum) > 0 ? 'Plan ' . $planNum : 'No Insurance';
+        return ((int) $planNum) > 0 ? 'Plan '.$planNum : 'No Insurance';
     }
 
     /**
      * Cancellations tab.
      *
-     * @param  string  $subtab   default | diff-last-year | percent-diff-last-year
-     * @param  int[]   $clinics
+     * @param  string  $subtab  default | diff-last-year | percent-diff-last-year
+     * @param  int[]  $clinics
      */
     public function cancellations(string $start, string $end, string $subtab = 'default', array $clinics = []): array
     {
@@ -200,18 +282,18 @@ class OperationsAnalyticsService
         if ($subtab === 'diff-last-year' || $percentDiff) {
             [$lyStart, $lyEnd] = $this->shiftYear($start, $end);
             $current = $this->keyByClinic($this->cancellationRows($start, $end, $clinics));
-            $last    = $this->keyByClinic($this->cancellationRows($lyStart, $lyEnd, $clinics));
-            $rows    = $this->combine($current, $last, $columns, $percentDiff);
+            $last = $this->keyByClinic($this->cancellationRows($lyStart, $lyEnd, $clinics));
+            $rows = $this->combine($current, $last, $columns, $percentDiff);
         } else {
             $rows = $this->cancellationRows($start, $end, $clinics);
         }
 
         return [
-            'groups'  => [],
+            'groups' => [],
             'columns' => $percentDiff ? $this->asPercentColumns($columns) : $columns,
-            'rows'    => $rows,
+            'rows' => $rows,
             'average' => $this->aggregate($rows, $columns, 'avg'),
-            'total'   => $this->aggregate($rows, $columns, $percentDiff ? 'avg' : 'total'),
+            'total' => $this->aggregate($rows, $columns, $percentDiff ? 'avg' : 'total'),
         ];
     }
 
@@ -219,26 +301,26 @@ class OperationsAnalyticsService
      * Production Details tab — production breakdown by location, optionally
      * expanded by provider and/or date via the toggles.
      *
-     * @param  string[]  $group    subset of ['provider','date']
-     * @param  int[]     $clinics
+     * @param  string[]  $group  subset of ['provider','date']
+     * @param  int[]  $clinics
      */
     public function productionDetails(string $start, string $end, array $group = [], array $clinics = []): array
     {
-        $dims    = array_values(array_intersect(['provider', 'date'], $group));
+        $dims = array_values(array_intersect(['provider', 'date'], $group));
         $columns = $this->productionDetailColumns($dims);
-        $rows    = $this->productionDetailRows($start, $end, $dims, $clinics);
+        $rows = $this->productionDetailRows($start, $end, $dims, $clinics);
 
         return [
-            'groups'  => [
+            'groups' => [
                 ['label' => 'By Office',         'span' => 5],
                 ['label' => 'Per Working Day',   'span' => 4],
                 ['label' => 'Per Patient Visit', 'span' => 3],
                 ['label' => 'Per Procedure',     'span' => 2],
             ],
             'columns' => $columns,
-            'rows'    => $rows,
+            'rows' => $rows,
             'average' => $this->aggregate($rows, $columns, 'avg'),
-            'total'   => $this->aggregate($rows, $columns, 'total'),
+            'total' => $this->aggregate($rows, $columns, 'total'),
         ];
     }
 
@@ -258,7 +340,7 @@ class OperationsAnalyticsService
             ['key' => 'adjustment',     'label' => 'Adjustment',   'type' => 'money',  'agg' => 'sum'],
             ['key' => 'collection',     'label' => 'Collection',   'type' => 'money',  'agg' => 'sum'],
             ['key' => 'pts_visits',     'label' => 'Pts Visits',   'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'new_pts_visit',  'label' => 'New Pts Visit','type' => 'number', 'agg' => 'sum'],
+            ['key' => 'new_pts_visit',  'label' => 'New Pts Visit', 'type' => 'number', 'agg' => 'sum'],
             // Per Working Day
             ['key' => 'pwd_production', 'label' => 'Production',    'type' => 'money'],
             ['key' => 'pwd_collection', 'label' => 'Collection',   'type' => 'money'],
@@ -278,65 +360,65 @@ class OperationsAnalyticsService
     private function productionDetailRows(string $start, string $end, array $dims, array $clinics): array
     {
         $prod = $this->pdGroupedProduction($start, $end, $dims, $clinics);
-        $adj  = $this->pdGroupedSum('od_adjustments', 'AdjAmt',   'AdjDate',  $dims, $start, $end, $clinics);
-        $coll = $this->pdGroupedSum('od_pay_splits',  'SplitAmt', 'DatePay',  $dims, $start, $end, $clinics);
-        $wo   = $this->pdGroupedSum('od_claim_procs', 'WriteOff', 'ProcDate', $dims, $start, $end, $clinics);
-        $npt  = $this->pdGroupedNewPatients($start, $end, $dims, $clinics);
+        $adj = $this->pdGroupedSum('od_adjustments', 'AdjAmt', 'AdjDate', $dims, $start, $end, $clinics);
+        $coll = $this->pdGroupedSum('od_pay_splits', 'SplitAmt', 'DatePay', $dims, $start, $end, $clinics);
+        $wo = $this->pdGroupedSum('od_claim_procs', 'WriteOff', 'ProcDate', $dims, $start, $end, $clinics);
+        $npt = $this->pdGroupedNewPatients($start, $end, $dims, $clinics);
 
         $keys = array_values(array_unique(array_merge(
             array_keys($prod), array_keys($adj), array_keys($coll)
         )));
 
         $withProvider = in_array('provider', $dims, true);
-        $withDate     = in_array('date', $dims, true);
-        $providers    = $withProvider ? DB::table('od_providers')->get()->keyBy('ProvNum') : collect();
+        $withDate = in_array('date', $dims, true);
+        $providers = $withProvider ? DB::table('od_providers')->get()->keyBy('ProvNum') : collect();
 
         $rows = [];
         foreach ($keys as $key) {
-            $parts  = explode('|', $key);
-            $i      = 0;
+            $parts = explode('|', $key);
+            $i = 0;
             $clinic = $parts[$i++];
-            $prov   = $withProvider ? ($parts[$i++] ?? null) : null;
-            $date   = $withDate ? ($parts[$i++] ?? null) : null;
+            $prov = $withProvider ? ($parts[$i++] ?? null) : null;
+            $date = $withDate ? ($parts[$i++] ?? null) : null;
 
-            $p           = $prod[$key] ?? null;
-            $gross       = (float) ($p->gross ?? 0);
-            $adjustment  = (float) ($adj[$key] ?? 0);
-            $writeoff    = (float) ($wo[$key] ?? 0);
-            $collection  = (float) ($coll[$key] ?? 0);
-            $net         = $gross - abs($adjustment) - abs($writeoff);
-            $ptsVisits   = (int)   ($p->pts_visits ?? 0);
-            $procedures  = (int)   ($p->procedures ?? 0);
-            $workingDays = (int)   ($p->working_days ?? 0);
-            $nptVisits   = (int)   ($npt[$key] ?? 0);
+            $p = $prod[$key] ?? null;
+            $gross = (float) ($p->gross ?? 0);
+            $adjustment = (float) ($adj[$key] ?? 0);
+            $writeoff = (float) ($wo[$key] ?? 0);
+            $collection = (float) ($coll[$key] ?? 0);
+            $net = $gross - abs($adjustment) - abs($writeoff);
+            $ptsVisits = (int) ($p->pts_visits ?? 0);
+            $procedures = (int) ($p->procedures ?? 0);
+            $workingDays = (int) ($p->working_days ?? 0);
+            $nptVisits = (int) ($npt[$key] ?? 0);
 
             $row = [
-                'row_key'        => $key,
-                'clinic_num'     => (int) $clinic,
-                'location'       => $this->clinicNames[(int) $clinic] ?? ('Location ' . $clinic),
-                'production'     => round($net, 2),
-                'adjustment'     => round($adjustment, 2),
-                'collection'     => round($collection, 2),
-                'pts_visits'     => $ptsVisits,
-                'new_pts_visit'  => $nptVisits,
+                'row_key' => $key,
+                'clinic_num' => (int) $clinic,
+                'location' => $this->clinicNames[(int) $clinic] ?? ('Location '.$clinic),
+                'production' => round($net, 2),
+                'adjustment' => round($adjustment, 2),
+                'collection' => round($collection, 2),
+                'pts_visits' => $ptsVisits,
+                'new_pts_visit' => $nptVisits,
                 'pwd_production' => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
                 'pwd_collection' => $workingDays > 0 ? round($collection / $workingDays, 2) : 0,
-                'pwd_pts_visit'  => $workingDays > 0 ? round($ptsVisits / $workingDays, 2) : 0,
-                'pwd_npt_visit'  => $workingDays > 0 ? round($nptVisits / $workingDays, 2) : 0,
+                'pwd_pts_visit' => $workingDays > 0 ? round($ptsVisits / $workingDays, 2) : 0,
+                'pwd_npt_visit' => $workingDays > 0 ? round($nptVisits / $workingDays, 2) : 0,
                 'ppv_production' => $ptsVisits > 0 ? round($net / $ptsVisits, 2) : 0,
                 'ppv_collection' => $ptsVisits > 0 ? round($collection / $ptsVisits, 2) : 0,
                 'ppv_procedures' => $ptsVisits > 0 ? round($procedures / $ptsVisits, 2) : 0,
-                'pp_production'  => $procedures > 0 ? round($net / $procedures, 2) : 0,
-                'pp_collection'  => $procedures > 0 ? round($collection / $procedures, 2) : 0,
+                'pp_production' => $procedures > 0 ? round($net / $procedures, 2) : 0,
+                'pp_collection' => $procedures > 0 ? round($collection / $procedures, 2) : 0,
             ];
 
             if ($withProvider) {
                 $pv = $providers[$prov] ?? null;
                 $row['provider'] = $pv
-                    ? trim(($pv->LName ?? '') . (($pv->LName && $pv->PName) ? ', ' : '') . ($pv->PName ?? ''))
-                    : ('Provider ' . $prov);
+                    ? trim(($pv->LName ?? '').(($pv->LName && $pv->PName) ? ', ' : '').($pv->PName ?? ''))
+                    : ('Provider '.$prov);
                 if ($row['provider'] === '') {
-                    $row['provider'] = 'Provider ' . $prov;
+                    $row['provider'] = 'Provider '.$prov;
                 }
             }
             if ($withDate) {
@@ -346,7 +428,7 @@ class OperationsAnalyticsService
             $rows[] = $row;
         }
 
-        usort($rows, fn($a, $b) => ($b['production'] <=> $a['production']));
+        usort($rows, fn ($a, $b) => ($b['production'] <=> $a['production']));
 
         return $rows;
     }
@@ -354,12 +436,13 @@ class OperationsAnalyticsService
     /** Completed-procedure metrics grouped by the active dimensions. Keyed by composite. */
     private function pdGroupedProduction(string $start, string $end, array $dims, array $clinics): array
     {
+        $concat = $this->concatPatNumProcDate();
         $q = DB::table('od_procedure_logs')
-            ->selectRaw('ClinicNum,
+            ->selectRaw("ClinicNum,
                 SUM(ProcFee)                                  AS gross,
                 COUNT(*)                                      AS procedures,
-                COUNT(DISTINCT CONCAT(PatNum, "|", ProcDate)) AS pts_visits,
-                COUNT(DISTINCT ProcDate)                      AS working_days')
+                COUNT(DISTINCT {$concat}) AS pts_visits,
+                COUNT(DISTINCT ProcDate)                      AS working_days")
             ->where('ProcStatus', 'C')
             ->whereBetween('ProcDate', [$start, $end]);
 
@@ -380,6 +463,7 @@ class OperationsAnalyticsService
         foreach ($q->groupBy($groupCols)->get() as $r) {
             $out[$this->pdKey($r, $dims)] = $r;
         }
+
         return $out;
     }
 
@@ -407,6 +491,7 @@ class OperationsAnalyticsService
         foreach ($q->groupBy($groupCols)->get() as $r) {
             $out[$this->pdKey($r, $dims)] = (float) $r->total;
         }
+
         return $out;
     }
 
@@ -443,6 +528,7 @@ class OperationsAnalyticsService
         foreach ($q->groupBy($groupCols)->get() as $r) {
             $out[$this->pdKey($r, $dims)] = (int) $r->npt;
         }
+
         return $out;
     }
 
@@ -456,14 +542,15 @@ class OperationsAnalyticsService
         if (in_array('date', $dims, true)) {
             $parts[] = substr((string) $r->grp_date, 0, 10);
         }
+
         return implode('|', $parts);
     }
 
     /**
      * Providers tab — one row per provider per location.
      *
-     * @param  string  $subtab   default | diff-last-year | percent-diff-last-year
-     * @param  int[]   $clinics
+     * @param  string  $subtab  default | diff-last-year | percent-diff-last-year
+     * @param  int[]  $clinics
      */
     public function providers(string $start, string $end, string $subtab = 'default', array $clinics = []): array
     {
@@ -473,14 +560,14 @@ class OperationsAnalyticsService
         if ($subtab === 'diff-last-year' || $percentDiff) {
             [$lyStart, $lyEnd] = $this->shiftYear($start, $end);
             $current = $this->keyByField($this->providerRows($start, $end, $clinics), 'row_key');
-            $last    = $this->keyByField($this->providerRows($lyStart, $lyEnd, $clinics), 'row_key');
-            $rows    = $this->combine($current, $last, $columns, $percentDiff);
+            $last = $this->keyByField($this->providerRows($lyStart, $lyEnd, $clinics), 'row_key');
+            $rows = $this->combine($current, $last, $columns, $percentDiff);
         } else {
             $rows = $this->providerRows($start, $end, $clinics);
         }
 
         return [
-            'groups'  => [
+            'groups' => [
                 ['label' => 'By Provider',       'span' => 9],
                 ['label' => 'Per Working Day',   'span' => 4],
                 ['label' => 'Per Patient Visit', 'span' => 3],
@@ -488,9 +575,9 @@ class OperationsAnalyticsService
                 ['label' => 'Provider Goals',    'span' => 3],
             ],
             'columns' => $percentDiff ? $this->asPercentColumns($columns) : $columns,
-            'rows'    => $rows,
+            'rows' => $rows,
             'average' => $this->aggregate($rows, $columns, 'avg'),
-            'total'   => $this->aggregate($rows, $columns, $percentDiff ? 'avg' : 'total'),
+            'total' => $this->aggregate($rows, $columns, $percentDiff ? 'avg' : 'total'),
         ];
     }
 
@@ -533,12 +620,13 @@ class OperationsAnalyticsService
     private function providerRows(string $start, string $end, array $clinics): array
     {
         // Production-side metrics grouped by clinic + provider.
+        $concat = $this->concatPatNumProcDate();
         $prodQ = DB::table('od_procedure_logs')
-            ->selectRaw('ClinicNum, ProvNum,
+            ->selectRaw("ClinicNum, ProvNum,
                 SUM(ProcFee)                                  AS gross,
                 COUNT(*)                                      AS procedures,
-                COUNT(DISTINCT CONCAT(PatNum, "|", ProcDate)) AS pts_visits,
-                COUNT(DISTINCT ProcDate)                      AS working_days')
+                COUNT(DISTINCT {$concat}) AS pts_visits,
+                COUNT(DISTINCT ProcDate)                      AS working_days")
             ->where('ProcStatus', 'C')
             ->whereBetween('ProcDate', [$start, $end]);
         if ($clinics) {
@@ -546,70 +634,70 @@ class OperationsAnalyticsService
         }
         $prod = $prodQ->groupBy('ClinicNum', 'ProvNum')->get();
 
-        $adj = $this->sumByClinicProvider('od_adjustments', 'AdjAmt',   'AdjDate',  $start, $end, $clinics);
-        $wo  = $this->sumByClinicProvider('od_claim_procs', 'WriteOff', 'ProcDate', $start, $end, $clinics);
-        $col   = $this->sumByClinicProvider('od_pay_splits',  'SplitAmt', 'DatePay',  $start, $end, $clinics);
-        $npt   = $this->newPatientsByClinicProvider($start, $end, $clinics);
+        $adj = $this->sumByClinicProvider('od_adjustments', 'AdjAmt', 'AdjDate', $start, $end, $clinics);
+        $wo = $this->sumByClinicProvider('od_claim_procs', 'WriteOff', 'ProcDate', $start, $end, $clinics);
+        $col = $this->sumByClinicProvider('od_pay_splits', 'SplitAmt', 'DatePay', $start, $end, $clinics);
+        $npt = $this->newPatientsByClinicProvider($start, $end, $clinics);
         $hours = $this->scheduledHoursByClinicProvider($start, $end, $clinics);
 
         $providers = DB::table('od_providers')->get()->keyBy('ProvNum');
 
         $rows = [];
         foreach ($prod as $p) {
-            $key         = $p->ClinicNum . '|' . $p->ProvNum;
-            $gross       = (float) $p->gross;
-            $adjustment  = (float) ($adj[$key] ?? 0);
-            $writeoff    = (float) ($wo[$key] ?? 0);
-            $collection  = (float) ($col[$key] ?? 0);
-            $net         = $gross - abs($adjustment) - abs($writeoff);
-            $ptsVisits   = (int) $p->pts_visits;
-            $procedures  = (int) $p->procedures;
+            $key = $p->ClinicNum.'|'.$p->ProvNum;
+            $gross = (float) $p->gross;
+            $adjustment = (float) ($adj[$key] ?? 0);
+            $writeoff = (float) ($wo[$key] ?? 0);
+            $collection = (float) ($col[$key] ?? 0);
+            $net = $gross - abs($adjustment) - abs($writeoff);
+            $ptsVisits = (int) $p->pts_visits;
+            $procedures = (int) $p->procedures;
             $workingDays = (int) $p->working_days;
-            $nptVisits   = (int) ($npt[$key] ?? 0);
+            $nptVisits = (int) ($npt[$key] ?? 0);
 
             $prov = $providers[$p->ProvNum] ?? null;
             $name = $prov
-                ? trim(($prov->LName ?? '') . (($prov->LName && $prov->PName) ? ', ' : '') . ($prov->PName ?? ''))
-                : ('Provider ' . $p->ProvNum);
+                ? trim(($prov->LName ?? '').(($prov->LName && $prov->PName) ? ', ' : '').($prov->PName ?? ''))
+                : ('Provider '.$p->ProvNum);
 
             // Production Goal = Hourly Goal (OpenDental) × scheduled hours in range.
             // Null when either input is missing (matches Jarvis "goal can't calculate").
             $hourlyGoal = (float) ($prov->HourlyProdGoalAmt ?? 0);
             $schedHours = (float) ($hours[$key] ?? 0);
-            $goal       = ($hourlyGoal > 0 && $schedHours > 0) ? round($hourlyGoal * $schedHours, 2) : null;
+            $goal = ($hourlyGoal > 0 && $schedHours > 0) ? round($hourlyGoal * $schedHours, 2) : null;
 
             $rows[] = [
-                'row_key'          => $key,
-                'clinic_num'       => (int) $p->ClinicNum,
-                'location'         => $this->clinicNames[(int) $p->ClinicNum] ?? ('Location ' . $p->ClinicNum),
-                'provider'         => $name !== '' ? $name : ('Provider ' . $p->ProvNum),
-                'provider_id'      => $p->ProvNum . ($prov && $prov->Abbr ? ' - ' . $prov->Abbr : ''),
-                'gross'            => round($gross, 2),
-                'net'              => round($net, 2),
-                'adjustment'       => round($adjustment, 2),
-                'collection'       => round($collection, 2),
-                'pts_visits'       => $ptsVisits,
-                'npt_visits'       => $nptVisits,
-                'working_days'     => $workingDays,
-                'procedures'       => $procedures,
-                'retention'        => null, // business rule pending
-                'pwd_production'   => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
-                'pwd_collection'   => $workingDays > 0 ? round($collection / $workingDays, 2) : 0,
-                'pwd_pts_visits'   => $workingDays > 0 ? round($ptsVisits / $workingDays, 2) : 0,
-                'pwd_npt_visits'   => $workingDays > 0 ? round($nptVisits / $workingDays, 2) : 0,
-                'ppv_production'   => $ptsVisits > 0 ? round($net / $ptsVisits, 2) : 0,
-                'ppv_collection'   => $ptsVisits > 0 ? round($collection / $ptsVisits, 2) : 0,
-                'ppv_procedures'   => $ptsVisits > 0 ? round($procedures / $ptsVisits, 2) : 0,
-                'pp_production'    => $procedures > 0 ? round($net / $procedures, 2) : 0,
-                'pp_collection'    => $procedures > 0 ? round($collection / $procedures, 2) : 0,
-                'production_goal'  => $goal,
-                'actual_production'=> round($net, 2),
-                'variance'         => $goal !== null ? round($net - $goal, 2) : null,
+                'row_key' => $key,
+                'clinic_num' => (int) $p->ClinicNum,
+                'location' => $this->clinicNames[(int) $p->ClinicNum] ?? ('Location '.$p->ClinicNum),
+                'provider' => $name !== '' ? $name : ('Provider '.$p->ProvNum),
+                'provider_id' => $p->ProvNum.($prov && $prov->Abbr ? ' - '.$prov->Abbr : ''),
+                'gross' => round($gross, 2),
+                'net' => round($net, 2),
+                'adjustment' => round($adjustment, 2),
+                'collection' => round($collection, 2),
+                'pts_visits' => $ptsVisits,
+                'npt_visits' => $nptVisits,
+                'working_days' => $workingDays,
+                'procedures' => $procedures,
+                'retention' => null, // business rule pending
+                'pwd_production' => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
+                'pwd_collection' => $workingDays > 0 ? round($collection / $workingDays, 2) : 0,
+                'pwd_pts_visits' => $workingDays > 0 ? round($ptsVisits / $workingDays, 2) : 0,
+                'pwd_npt_visits' => $workingDays > 0 ? round($nptVisits / $workingDays, 2) : 0,
+                'ppv_production' => $ptsVisits > 0 ? round($net / $ptsVisits, 2) : 0,
+                'ppv_collection' => $ptsVisits > 0 ? round($collection / $ptsVisits, 2) : 0,
+                'ppv_procedures' => $ptsVisits > 0 ? round($procedures / $ptsVisits, 2) : 0,
+                'pp_production' => $procedures > 0 ? round($net / $procedures, 2) : 0,
+                'pp_collection' => $procedures > 0 ? round($collection / $procedures, 2) : 0,
+                'production_goal' => $goal,
+                'actual_production' => round($net, 2),
+                'variance' => $goal !== null ? round($net - $goal, 2) : null,
             ];
         }
 
         // Highest producers first, matching Jarvis default ordering.
-        usort($rows, fn($a, $b) => $b['gross'] <=> $a['gross']);
+        usort($rows, fn ($a, $b) => $b['gross'] <=> $a['gross']);
 
         return $rows;
     }
@@ -626,8 +714,9 @@ class OperationsAnalyticsService
 
         $out = [];
         foreach ($q->groupBy('ClinicNum', 'ProvNum')->get() as $r) {
-            $out[$r->ClinicNum . '|' . $r->ProvNum] = (float) $r->total;
+            $out[$r->ClinicNum.'|'.$r->ProvNum] = (float) $r->total;
         }
+
         return $out;
     }
 
@@ -648,8 +737,9 @@ class OperationsAnalyticsService
 
         $out = [];
         foreach ($q->groupBy('ClinicNum', 'ProvNum')->get() as $r) {
-            $out[$r->ClinicNum . '|' . $r->ProvNum] = (float) $r->hours;
+            $out[$r->ClinicNum.'|'.$r->ProvNum] = (float) $r->hours;
         }
+
         return $out;
     }
 
@@ -673,8 +763,9 @@ class OperationsAnalyticsService
 
         $out = [];
         foreach ($q->groupBy('pl.ClinicNum', 'pl.ProvNum')->get() as $r) {
-            $out[$r->ClinicNum . '|' . $r->ProvNum] = (int) $r->npt;
+            $out[$r->ClinicNum.'|'.$r->ProvNum] = (int) $r->npt;
         }
+
         return $out;
     }
 
@@ -685,7 +776,7 @@ class OperationsAnalyticsService
             ['key' => 'cancellation',                     'label' => 'Cancellation',              'type' => 'number',  'agg' => 'sum', 'heat' => 'invert'],
             ['key' => 'cancellation_dollars',             'label' => 'Cancellation $',            'type' => 'money',   'agg' => 'sum', 'heat' => 'invert'],
             ['key' => 'cancellation_rescheduled',         'label' => 'Cancellation Rescheduled',  'type' => 'number',  'agg' => 'sum'],
-            ['key' => 'cancellation_rescheduled_dollars', 'label' => 'Cancellation Rescheduled $','type' => 'money',   'agg' => 'sum'],
+            ['key' => 'cancellation_rescheduled_dollars', 'label' => 'Cancellation Rescheduled $', 'type' => 'money',   'agg' => 'sum'],
             ['key' => 'cancellation_pct',                 'label' => '% Cancellation',            'type' => 'percent', 'heat' => 'invert'],
             ['key' => 'rescheduled_pct',                  'label' => '% Rescheduled',             'type' => 'percent'],
             ['key' => 'total_appointments',               'label' => 'Total Appointments Count',  'type' => 'number',  'agg' => 'sum'],
@@ -709,7 +800,7 @@ class OperationsAnalyticsService
         $dollarsQ = DB::table('od_appointments as a')
             ->join('od_procedure_logs as pl', function ($join) {
                 $join->on('pl.AptNum', '=', 'a.AptNum')
-                     ->orOn('pl.PlannedAptNum', '=', 'a.AptNum');
+                    ->orOn('pl.PlannedAptNum', '=', 'a.AptNum');
             })
             ->where('a.AptStatus', '5')
             ->whereRaw('LEFT(a.AptDateTime, 10) BETWEEN ? AND ?', [$start, $end])
@@ -725,18 +816,18 @@ class OperationsAnalyticsService
         $rows = [];
         foreach ($clinicNums as $c) {
             $cancellation = (int) ($broken[$c] ?? 0);
-            $total        = (int) ($totals[$c] ?? 0);
+            $total = (int) ($totals[$c] ?? 0);
 
             $rows[] = [
-                'clinic_num'                       => (int) $c,
-                'location'                         => $this->clinicNames[(int) $c] ?? ('Location ' . $c),
-                'cancellation'                     => $cancellation,
-                'cancellation_dollars'             => round((float) ($dollars[$c] ?? 0), 2),
-                'cancellation_rescheduled'         => null, // rescheduling rule pending
+                'clinic_num' => (int) $c,
+                'location' => $this->clinicNames[(int) $c] ?? ('Location '.$c),
+                'cancellation' => $cancellation,
+                'cancellation_dollars' => round((float) ($dollars[$c] ?? 0), 2),
+                'cancellation_rescheduled' => null, // rescheduling rule pending
                 'cancellation_rescheduled_dollars' => null,
-                'cancellation_pct'                 => $total > 0 ? round($cancellation / $total * 100, 2) : 0,
-                'rescheduled_pct'                  => null,
-                'total_appointments'               => $total,
+                'cancellation_pct' => $total > 0 ? round($cancellation / $total * 100, 2) : 0,
+                'rescheduled_pct' => null,
+                'total_appointments' => $total,
             ];
         }
 
@@ -779,7 +870,7 @@ class OperationsAnalyticsService
             ['key' => 'unique_pts',          'label' => '# of Unique Pts',       'type' => 'number',  'agg' => 'sum'],
             ['key' => 'npt_visit',           'label' => 'Npt Visit',             'type' => 'number',  'agg' => 'sum'],
             ['key' => 'new_patient_dollars', 'label' => 'New Patient $',         'type' => 'money',   'agg' => 'sum'],
-            ['key' => 'act_pts_reservation', 'label' => 'Act Pts w/ Reservation','type' => 'number',  'agg' => 'sum'],
+            ['key' => 'act_pts_reservation', 'label' => 'Act Pts w/ Reservation', 'type' => 'number',  'agg' => 'sum'],
             ['key' => 'act_pts',             'label' => 'Act Pts',               'type' => 'number',  'agg' => 'sum'],
             ['key' => 'retention',           'label' => 'Retention',             'type' => 'percent'],
             ['key' => 'working_days',        'label' => 'Working Days',          'type' => 'number'],
@@ -806,9 +897,9 @@ class OperationsAnalyticsService
     private function officeRows(string $start, string $end, array $clinics): array
     {
         $prod = $this->productionMetrics($start, $end, $clinics);
-        $adj  = $this->sumByClinic('od_adjustments', 'AdjAmt',   'AdjDate', $start, $end, $clinics);
-        $coll = $this->sumByClinic('od_pay_splits',  'SplitAmt', 'DatePay', $start, $end, $clinics);
-        $wo   = $this->sumByClinic('od_claim_procs', 'WriteOff', 'ProcDate', $start, $end, $clinics);
+        $adj = $this->sumByClinic('od_adjustments', 'AdjAmt', 'AdjDate', $start, $end, $clinics);
+        $coll = $this->sumByClinic('od_pay_splits', 'SplitAmt', 'DatePay', $start, $end, $clinics);
+        $wo = $this->sumByClinic('od_claim_procs', 'WriteOff', 'ProcDate', $start, $end, $clinics);
         $newp = $this->newPatientMetrics($start, $end, $clinics);
 
         $clinicNums = array_values(array_unique(array_merge(
@@ -820,44 +911,45 @@ class OperationsAnalyticsService
 
         $rows = [];
         foreach ($clinicNums as $c) {
-            $p           = $prod[$c] ?? null;
-            $gross       = (float) ($p->gross ?? 0);
-            $adjustment  = (float) ($adj[$c] ?? 0);
-            $writeoff    = (float) ($wo[$c] ?? 0);
-            $collection  = (float) ($coll[$c] ?? 0);
-            $net         = $gross - abs($adjustment) - abs($writeoff);
-            $ptsVisit    = (int)   ($p->pts_visit ?? 0);
-            $procedures  = (int)   ($p->procedures ?? 0);
-            $workingDays = (int)   ($p->working_days ?? 0);
-            $npt         = (int)   ($newp[$c]['npt_visit'] ?? 0);
-            $nptDollars  = (float) ($newp[$c]['new_patient_dollars'] ?? 0);
+            $p = $prod[$c] ?? null;
+            $gross = (float) ($p->gross ?? 0);
+            $adjustment = (float) ($adj[$c] ?? 0);
+            $writeoff = (float) ($wo[$c] ?? 0);
+            $collection = (float) ($coll[$c] ?? 0);
+            $net = $gross - abs($adjustment) - abs($writeoff);
+            $ptsVisit = (int) ($p->pts_visit ?? 0);
+            $procedures = (int) ($p->procedures ?? 0);
+            $workingDays = (int) ($p->working_days ?? 0);
+            $npt = (int) ($newp[$c]['npt_visit'] ?? 0);
+            $nptDollars = (float) ($newp[$c]['new_patient_dollars'] ?? 0);
 
             $rows[] = [
-                'clinic_num'          => (int) $c,
-                'location'            => $this->clinicNames[(int) $c] ?? ('Location ' . $c),
-                'gross'               => round($gross, 2),
-                'adjustment'          => round($adjustment, 2),
-                'adj_pct'             => $gross > 0 ? round($adjustment / $gross * 100, 2) : 0,
-                'net'                 => round($net, 2),
-                'collection'          => round($collection, 2),
-                'coll_pct'            => $net > 0 ? round($collection / $net * 100, 2) : 0,
-                'pts_visit'           => $ptsVisit,
-                'unique_pts'          => (int) ($p->unique_pts ?? 0),
-                'npt_visit'           => $npt,
+                'clinic_num' => (int) $c,
+                'location' => $this->clinicNames[(int) $c] ?? ('Location '.$c),
+                'gross' => round($gross, 2),
+                'adjustment' => round($adjustment, 2),
+                'adj_pct' => $gross > 0 ? round($adjustment / $gross * 100, 2) : 0,
+                'net' => round($net, 2),
+                'collection' => round($collection, 2),
+                'coll_pct' => $net > 0 ? round($collection / $net * 100, 2) : 0,
+                'pts_visit' => $ptsVisit,
+                'unique_pts' => (int) ($p->unique_pts ?? 0),
+                'npt_visit' => $npt,
                 'new_patient_dollars' => round($nptDollars, 2),
                 'act_pts_reservation' => null, // business rule pending — see controller notes
-                'act_pts'             => null,
-                'retention'           => null,
-                'working_days'        => $workingDays,
-                'pwd_production'      => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
-                'pwd_collection'      => $workingDays > 0 ? round($collection / $workingDays, 2) : 0,
-                'pwd_pts_visit'       => $workingDays > 0 ? round($ptsVisit / $workingDays, 2) : 0,
-                'pwd_npt_visit'       => $workingDays > 0 ? round($npt / $workingDays, 2) : 0,
-                'ppv_production'      => $ptsVisit > 0 ? round($net / $ptsVisit, 2) : 0,
-                'ppv_collection'      => $ptsVisit > 0 ? round($collection / $ptsVisit, 2) : 0,
-                'ppv_procedures'      => $ptsVisit > 0 ? round($procedures / $ptsVisit, 2) : 0,
-                'pp_production'       => $procedures > 0 ? round($net / $procedures, 2) : 0,
-                'pp_collection'       => $procedures > 0 ? round($collection / $procedures, 2) : 0,
+                'act_pts' => null,
+                'retention' => null,
+                'procedures' => $procedures,
+                'working_days' => $workingDays,
+                'pwd_production' => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
+                'pwd_collection' => $workingDays > 0 ? round($collection / $workingDays, 2) : 0,
+                'pwd_pts_visit' => $workingDays > 0 ? round($ptsVisit / $workingDays, 2) : 0,
+                'pwd_npt_visit' => $workingDays > 0 ? round($npt / $workingDays, 2) : 0,
+                'ppv_production' => $ptsVisit > 0 ? round($net / $ptsVisit, 2) : 0,
+                'ppv_collection' => $ptsVisit > 0 ? round($collection / $ptsVisit, 2) : 0,
+                'ppv_procedures' => $ptsVisit > 0 ? round($procedures / $ptsVisit, 2) : 0,
+                'pp_production' => $procedures > 0 ? round($net / $procedures, 2) : 0,
+                'pp_collection' => $procedures > 0 ? round($collection / $procedures, 2) : 0,
             ];
         }
 
@@ -867,13 +959,14 @@ class OperationsAnalyticsService
     /** Production-side metrics from completed procedures, keyed by ClinicNum. */
     private function productionMetrics(string $start, string $end, array $clinics): array
     {
+        $concat = $this->concatPatNumProcDate();
         $q = DB::table('od_procedure_logs')
-            ->selectRaw('ClinicNum,
+            ->selectRaw("ClinicNum,
                 SUM(ProcFee)                                  AS gross,
                 COUNT(*)                                      AS procedures,
                 COUNT(DISTINCT PatNum)                        AS unique_pts,
-                COUNT(DISTINCT CONCAT(PatNum, "|", ProcDate)) AS pts_visit,
-                COUNT(DISTINCT ProcDate)                      AS working_days')
+                COUNT(DISTINCT {$concat}) AS pts_visit,
+                COUNT(DISTINCT ProcDate)                      AS working_days")
             ->where('ProcStatus', 'C')
             ->whereBetween('ProcDate', [$start, $end]);
 
@@ -908,7 +1001,7 @@ class OperationsAnalyticsService
         $out = [];
         foreach ($q->groupBy('pl.ClinicNum')->get() as $r) {
             $out[$r->ClinicNum] = [
-                'npt_visit'           => (int) $r->npt_visit,
+                'npt_visit' => (int) $r->npt_visit,
                 'new_patient_dollars' => (float) $r->new_patient_dollars,
             ];
         }
@@ -956,6 +1049,7 @@ class OperationsAnalyticsService
         foreach ($rows as $row) {
             $out[$row[$field]] = $row;
         }
+
         return $out;
     }
 
@@ -971,7 +1065,7 @@ class OperationsAnalyticsService
         $rows = [];
         foreach ($clinicNums as $c) {
             $cur = $current[$c] ?? [];
-            $ly  = $last[$c] ?? [];
+            $ly = $last[$c] ?? [];
             $row = ['clinic_num' => (int) $c];
 
             foreach ($columns as $col) {
@@ -979,6 +1073,7 @@ class OperationsAnalyticsService
 
                 if (($col['type'] ?? '') === 'text') {
                     $row[$key] = $cur[$key] ?? $ly[$key] ?? null;
+
                     continue;
                 }
 
@@ -1007,6 +1102,7 @@ class OperationsAnalyticsService
             if (($col['type'] ?? '') !== 'text') {
                 $col['type'] = 'percent';
             }
+
             return $col;
         }, $columns);
     }
@@ -1046,5 +1142,12 @@ class OperationsAnalyticsService
         }
 
         return $out;
+    }
+
+    private function concatPatNumProcDate(): string
+    {
+        return DB::getDriverName() === 'sqlite'
+            ? "PatNum || '|' || ProcDate"
+            : "CONCAT(PatNum, '|', ProcDate)";
     }
 }

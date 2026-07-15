@@ -2,10 +2,10 @@
 
 namespace App\Services\Sync;
 
-use Exception;
-use Illuminate\Support\Facades\DB;
 use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
+use Exception;
+use Illuminate\Support\Facades\DB;
 
 abstract class BaseQuerySyncService
 {
@@ -15,10 +15,12 @@ abstract class BaseQuerySyncService
 
     protected int $sleepSeconds = 1;
 
+    /** Rows processed during the current sync() invocation (for reporting). */
+    protected int $processedThisRun = 0;
+
     public function __construct(
         protected QueryService $queryService
-    ) {
-    }
+    ) {}
 
     abstract protected function table(): string;
 
@@ -86,33 +88,41 @@ abstract class BaseQuerySyncService
             ['module' => $this->module()],
             [
                 'status' => 'idle',
-                'total_processed' => 0
+                'total_processed' => 0,
             ]
         );
 
         $log->update([
             'status' => 'running',
             'started_at' => now(),
-            'last_error' => null
+            'last_error' => null,
         ]);
+
+        $incremental = $log->last_primary_key !== null && $this->syncColumn() !== null;
+        echo "[{$this->module()}] ".($incremental ? 'incremental' : 'initial')." sync started...\n";
 
         try {
 
-            if ($log->last_primary_key === null || $this->syncColumn() === null) {
+            if ($incremental) {
 
-                $this->runInitialSync($log);
+                $this->runIncrementalSync($log);
 
             } else {
 
-                $this->runIncrementalSync($log);
+                $this->runInitialSync($log);
 
             }
 
             $log->update([
                 'status' => 'completed',
                 'finished_at' => now(),
-                'retry_count' => 0
+                'retry_count' => 0,
             ]);
+
+            $summary = $this->processedThisRun === 0
+                ? 'already up to date (0 new rows)'
+                : "{$this->processedThisRun} row(s) processed";
+            echo "[{$this->module()}] sync complete — {$summary}\n";
 
         } catch (Exception $e) {
 
@@ -120,8 +130,10 @@ abstract class BaseQuerySyncService
 
             $log->update([
                 'status' => 'failed',
-                'last_error' => $e->getMessage()
+                'last_error' => $e->getMessage(),
             ]);
+
+            echo "[{$this->module()}] sync FAILED after {$this->processedThisRun} row(s): {$e->getMessage()}\n";
 
             throw $e;
         }
@@ -156,7 +168,7 @@ abstract class BaseQuerySyncService
                     $model::updateOrCreate(
 
                         [
-                            $this->primaryKey() => $row[$this->primaryKey()]
+                            $this->primaryKey() => $row[$this->primaryKey()],
                         ],
 
                         $this->transformRow($row)
@@ -166,12 +178,13 @@ abstract class BaseQuerySyncService
                     $lastId = $row[$this->primaryKey()];
 
                     $log->increment('total_processed');
+                    $this->processedThisRun++;
                 }
 
             });
 
             $log->update([
-                'last_primary_key' => $lastId
+                'last_primary_key' => $lastId,
             ]);
 
             echo "Synced through ID {$lastId}\n";
@@ -215,7 +228,7 @@ abstract class BaseQuerySyncService
                     $model::updateOrCreate(
 
                         [
-                            $this->primaryKey() => $row[$this->primaryKey()]
+                            $this->primaryKey() => $row[$this->primaryKey()],
                         ],
 
                         $this->transformRow($row)
@@ -227,12 +240,13 @@ abstract class BaseQuerySyncService
                     }
 
                     $log->increment('total_processed');
+                    $this->processedThisRun++;
                 }
 
             });
 
             $log->update([
-                'last_synced_at' => $lastSync
+                'last_synced_at' => $lastSync,
             ]);
 
             echo "Synced through {$lastSync}\n";
@@ -257,7 +271,6 @@ abstract class BaseQuerySyncService
                 if ($attempt >= $this->maxRetries) {
 
                     throw $e;
-
                 }
 
                 $wait = pow(2, $attempt);
@@ -273,5 +286,4 @@ abstract class BaseQuerySyncService
         }
 
     }
-
 }
