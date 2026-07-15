@@ -1256,8 +1256,11 @@
       collection: [
         { key: 'provider', title: 'Provider' },
         { key: 'payment_date', title: 'Date', cls: 'text-center' },
-        { key: 'description', title: 'Method' },
-        { key: 'total_payments', title: 'Amount', cls: 'text-right', fmt: 'money' },
+        { key: 'description', title: 'Description' },
+        { key: 'type', title: 'Type', cls: 'text-center' },
+        { key: 'count', title: 'Count', cls: 'text-center', fmt: 'int' },
+        { key: 'service_fee', title: 'Service Fee', cls: 'text-right', fmt: 'money' },
+        { key: 'total_payments', title: 'Total Payment', cls: 'text-right', fmt: 'money' },
       ],
     };
 
@@ -1457,7 +1460,7 @@
 
       // Footer: Average + Total
       var valueKey = _sc.tab === 'production' ? 'total_production' : 'total_payments';
-      var allRows = _sc.filtered;
+      var allRows = _sc.data.rows; // Compute grand totals against the entire dataset
       var totalVal = allRows.reduce(function (s, r) { return s + (r[valueKey] || 0); }, 0);
       var avgVal = allRows.length > 0 ? totalVal / allRows.length : 0;
       var totalCnt = allRows.reduce(function (s, r) { return s + (r.count || 0); }, 0);

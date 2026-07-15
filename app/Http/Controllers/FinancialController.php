@@ -334,6 +334,9 @@ class FinancialController extends Controller
             SELECT
                 {$provExpr}                     AS provider,
                 COALESCE(pt.ItemName, 'Payment') AS description,
+                'Payment'                        AS type,
+                1                                AS cnt,
+                ps.SplitAmt                      AS service_fee,
                 ps.DatePay                       AS payment_date,
                 ps.SplitAmt                      AS total_payments
             FROM od_pay_splits ps
@@ -396,8 +399,11 @@ class FinancialController extends Controller
             ], array_slice($topPayments, 0, 6)),
             'rows' => array_map(fn($r) => [
                 'provider' => $r->provider ?? 'Unknown',
-                'description' => $r->description,
                 'payment_date' => $r->payment_date,
+                'description' => $r->description,
+                'type' => $r->type,
+                'count' => (int) $r->cnt,
+                'service_fee' => round((float) $r->service_fee, 2),
                 'total_payments' => round((float) $r->total_payments, 2),
                 'tier' => $r->tier,
             ], $rows),
