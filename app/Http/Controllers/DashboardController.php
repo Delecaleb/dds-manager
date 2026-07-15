@@ -56,8 +56,8 @@ class DashboardController extends Controller
 
         $rows = DB::table('od_procedure_logs')
             ->selectRaw(
-                'ClinicNum, '.
-                MetricDefinitions::grossProduction('total_production').', '.
+                'ClinicNum, ' .
+                MetricDefinitions::grossProduction('total_production') . ', ' .
                 MetricDefinitions::patientVisits('patient_count')
             )
             ->where('ProcStatus', 'C')
@@ -75,7 +75,7 @@ class DashboardController extends Controller
                 return [
                     'rank' => $i + 1,
                     'clinic_num' => $row->ClinicNum,
-                    'location' => $this->clinicNames[(int) $row->ClinicNum] ?? 'Location '.$row->ClinicNum,
+                    'location' => $this->clinicNames[(int) $row->ClinicNum] ?? 'Location ' . $row->ClinicNum,
                     'total_production' => round($row->total_production, 2),
                     'patient_count' => $row->patient_count,
                     'avg_production' => $avg,
@@ -90,7 +90,7 @@ class DashboardController extends Controller
         $end = $request->input('end_date', now()->toDateString());
 
         $provider = DB::table('od_providers')->where('ProvNum', $id)->first();
-        if (! $provider) {
+        if (!$provider) {
             return response()->json(['error' => 'Provider not found'], 404);
         }
 
@@ -144,15 +144,15 @@ class DashboardController extends Controller
         /* ── Daily production ────────────────────────── */
         $dailyProduction = DB::table('od_procedure_logs')
             ->selectRaw(
-                "DATE_FORMAT(ProcDate, '%Y-%m-%d') AS date, ".
-                MetricDefinitions::grossProduction('production').', '.
+                "DATE_FORMAT(ProcDate, '%Y-%m-%d') AS date, " .
+                MetricDefinitions::grossProduction('production') . ', ' .
                 MetricDefinitions::patientVisits('patient_count')
             )
             ->where('ProvNum', $id)->where('ProcStatus', 'C')
             ->whereBetween('ProcDate', [$start, $end])
             ->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m-%d')"))
             ->orderBy('date')->get()
-            ->map(fn ($r) => [
+            ->map(fn($r) => [
                 'date' => $r->date,
                 'production' => round($r->production, 2),
                 'per_visit' => $r->patient_count > 0 ? round($r->production / $r->patient_count, 2) : 0,
@@ -187,7 +187,7 @@ class DashboardController extends Controller
             ->whereBetween('ProcDate', [$start, $end])
             ->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m-%d')"))
             ->orderBy('date')->get()
-            ->map(fn ($r) => [
+            ->map(fn($r) => [
                 'date' => $r->date,
                 'rate' => $r->total > 0 ? round($r->completed / $r->total * 100, 2) : 0,
             ]);
@@ -262,7 +262,7 @@ class DashboardController extends Controller
             ->leftJoinSub($writeoffSub, 'w', 'p.ProvNum', '=', 'w.ProvNum')
             ->leftJoinSub($collSub, 'c', 'p.ProvNum', '=', 'c.ProvNum')
             ->leftJoinSub($aptsSub, 'apt', 'p.ProvNum', '=', 'apt.ProvNum')
-            ->where('p.IsHidden', 'false')
+            ->whereIn('p.IsHidden', ['false', '0', 0, false])
             ->where(function ($q) {
                 $q->whereRaw('COALESCE(g.gross, 0) != 0')
                     ->orWhereRaw('COALESCE(a.adjustments, 0) != 0')
@@ -299,22 +299,22 @@ class DashboardController extends Controller
 
         $buildLocationStats = function ($s, $e) {
             $gross = DB::table('od_procedure_logs')
-                ->selectRaw('ClinicNum, '.MetricDefinitions::grossProduction('val'))
+                ->selectRaw('ClinicNum, ' . MetricDefinitions::grossProduction('val'))
                 ->where('ProcStatus', 'C')->whereBetween('ProcDate', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
             $adj = DB::table('od_adjustments')
-                ->selectRaw('ClinicNum, '.MetricDefinitions::adjustments('val'))
+                ->selectRaw('ClinicNum, ' . MetricDefinitions::adjustments('val'))
                 ->whereBetween('AdjDate', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
             $writeoffs = DB::table('od_claim_procs')
-                ->selectRaw('ClinicNum, '.MetricDefinitions::writeOffs('val'))
+                ->selectRaw('ClinicNum, ' . MetricDefinitions::writeOffs('val'))
                 ->whereBetween('ProcDate', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
             $coll = DB::table('od_pay_splits')
-                ->selectRaw('ClinicNum, '.MetricDefinitions::collections('val'))
+                ->selectRaw('ClinicNum, ' . MetricDefinitions::collections('val'))
                 ->whereBetween('DatePay', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
@@ -354,7 +354,7 @@ class DashboardController extends Controller
 
             $result[] = [
                 'clinic_num' => $cNum,
-                'location' => $this->clinicNames[(int) $cNum] ?? 'Location '.$cNum,
+                'location' => $this->clinicNames[(int) $cNum] ?? 'Location ' . $cNum,
                 'gross_production' => round($cg, 2),
                 'gross_production_last' => round($lg, 2),
                 'adjustments' => round($ca, 2),
@@ -380,7 +380,7 @@ class DashboardController extends Controller
             $patientVisits = DB::table('od_procedure_logs')
                 ->where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$s, $e])
-                ->selectRaw('ClinicNum, '.MetricDefinitions::patientVisits('val'))
+                ->selectRaw('ClinicNum, ' . MetricDefinitions::patientVisits('val'))
                 ->groupBy('ClinicNum')
                 ->pluck('val', 'ClinicNum');
 
@@ -412,7 +412,7 @@ class DashboardController extends Controller
         foreach ($allClinicNums as $cNum) {
             $result[] = [
                 'clinic_num' => $cNum,
-                'location' => $this->clinicNames[(int) $cNum] ?? 'Location '.$cNum,
+                'location' => $this->clinicNames[(int) $cNum] ?? 'Location ' . $cNum,
                 'patient_visits' => $currentStats['patientVisits']->get($cNum, 0),
                 'patient_visits_last' => $lastYearStats['patientVisits']->get($cNum, 0),
                 'new_patient_visits' => $currentStats['newPatientVisits']->get($cNum, 0),

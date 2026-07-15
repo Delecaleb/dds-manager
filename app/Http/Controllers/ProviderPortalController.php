@@ -8,9 +8,15 @@ use Illuminate\Support\Facades\DB;
 class ProviderPortalController extends Controller
 {
     private array $specialtyMap = [
-        0 => 'General',      1 => 'Endodontics',  2 => 'Orthodontics',
-        3 => 'Periodontics', 4 => 'Prosthetics',  5 => 'Oral Surgery',
-        6 => 'Pediatric',    7 => 'Denturist',     8 => 'Hygienist',
+        0 => 'General',
+        1 => 'Endodontics',
+        2 => 'Orthodontics',
+        3 => 'Periodontics',
+        4 => 'Prosthetics',
+        5 => 'Oral Surgery',
+        6 => 'Pediatric',
+        7 => 'Denturist',
+        8 => 'Hygienist',
         268 => 'Invisalign',
     ];
 
@@ -22,15 +28,15 @@ class ProviderPortalController extends Controller
     public function providers()
     {
         $rows = DB::table('od_providers')
-            ->where('IsHidden', 'false')
+            ->whereIn('IsHidden', ['false', '0', 0, false])
             ->orderBy('LName')
             ->orderBy('PName')
             ->get(['ProvNum', 'LName', 'PName', 'Specialty']);
 
-        return response()->json($rows->map(fn ($p) => [
-            'id'     => (int) $p->ProvNum,
-            'name'   => trim("{$p->LName}, {$p->PName}"),
-            'type'   => $this->specialtyMap[(int) $p->Specialty] ?? 'General',
+        return response()->json($rows->map(fn($p) => [
+            'id' => (int) $p->ProvNum,
+            'name' => trim("{$p->LName}, {$p->PName}"),
+            'type' => $this->specialtyMap[(int) $p->Specialty] ?? 'General',
             'is_hyg' => (int) $p->Specialty === 8,
         ])->values());
     }
@@ -38,16 +44,16 @@ class ProviderPortalController extends Controller
     public function chart(Request $request)
     {
         $start = $request->input('start_date', now()->startOfYear()->toDateString());
-        $end   = $request->input('end_date',   now()->toDateString());
-        $mode  = $request->input('mode', 'daily');
+        $end = $request->input('end_date', now()->toDateString());
+        $mode = $request->input('mode', 'daily');
         $provs = array_values(array_filter((array) $request->input('providers', [])));
-        $type  = $request->input('provider_type', 'all');
+        $type = $request->input('provider_type', 'all');
 
         [$groupExpr, $labelExpr] = $this->periodExprs($mode, 'pl');
 
-        $bindings    = [$start, $end];
-        $provFilter  = '';
-        $typeFilter  = '';
+        $bindings = [$start, $end];
+        $provFilter = '';
+        $typeFilter = '';
 
         if (!empty($provs)) {
             $ph = implode(',', array_fill(0, count($provs), '?'));
@@ -74,8 +80,8 @@ class ProviderPortalController extends Controller
             ORDER BY {$groupExpr}
         ", $bindings);
 
-        return response()->json(array_map(fn ($r) => [
-            'label'      => $r->label,
+        return response()->json(array_map(fn($r) => [
+            'label' => $r->label,
             'production' => round((float) $r->production, 2),
         ], $rows));
     }
@@ -83,14 +89,14 @@ class ProviderPortalController extends Controller
     public function table(Request $request)
     {
         $start = $request->input('start_date', now()->startOfYear()->toDateString());
-        $end   = $request->input('end_date',   now()->toDateString());
-        $mode  = $request->input('mode', 'daily');
+        $end = $request->input('end_date', now()->toDateString());
+        $mode = $request->input('mode', 'daily');
         $provs = array_values(array_filter((array) $request->input('providers', [])));
-        $type  = $request->input('provider_type', 'all');
+        $type = $request->input('provider_type', 'all');
 
         [$groupExpr, $labelExpr] = $this->periodExprs($mode, 'pl');
 
-        $bindings   = [$start, $end];
+        $bindings = [$start, $end];
         $provFilter = '';
         $typeFilter = '';
 
@@ -128,7 +134,7 @@ class ProviderPortalController extends Controller
             JOIN od_providers p   ON pl.ProvNum  = p.ProvNum
             WHERE pl.ProcStatus = 'C'
               AND pl.ProcDate BETWEEN ? AND ?
-              AND p.IsHidden = 'false'
+              AND p.IsHidden IN ('false', '0', 0)
               {$provFilter}
               {$typeFilter}
             GROUP BY p.ProvNum, p.LName, p.PName, p.Specialty, {$groupExpr}
@@ -136,32 +142,32 @@ class ProviderPortalController extends Controller
         ", $bindings);
 
         return response()->json(array_map(function ($r) {
-            $prodPerVisit = $r->visits > 0   ? round($r->total_prod / $r->visits, 2)   : 0;
-            $visitsPerDay = $r->work_days > 0 ? round($r->visits / $r->work_days, 2)   : 0;
-            $avgHygDay    = $r->hyg_days > 0  ? round($r->hyg_prod / $r->hyg_days, 2)  : 0;
-            $wht  = (int) $r->whitening;
-            $irr  = (int) $r->irrigation;
-            $flu  = (int) $r->fluoride;
-            $sea  = (int) $r->sealants;
-            $las  = (int) $r->laser;
-            $tbr  = (int) $r->toothbrushes;
+            $prodPerVisit = $r->visits > 0 ? round($r->total_prod / $r->visits, 2) : 0;
+            $visitsPerDay = $r->work_days > 0 ? round($r->visits / $r->work_days, 2) : 0;
+            $avgHygDay = $r->hyg_days > 0 ? round($r->hyg_prod / $r->hyg_days, 2) : 0;
+            $wht = (int) $r->whitening;
+            $irr = (int) $r->irrigation;
+            $flu = (int) $r->fluoride;
+            $sea = (int) $r->sealants;
+            $las = (int) $r->laser;
+            $tbr = (int) $r->toothbrushes;
 
             return [
-                'provider'       => $r->provider_name,
-                'office'         => '8 Mile',
-                'provider_type'  => $this->specialtyMap[(int) $r->Specialty] ?? 'General',
-                'date'           => $r->period,
-                'avg_rev_hyg'    => $avgHygDay,
+                'provider' => $r->provider_name,
+                'office' => '8 Mile',
+                'provider_type' => $this->specialtyMap[(int) $r->Specialty] ?? 'General',
+                'date' => $r->period,
+                'avg_rev_hyg' => $avgHygDay,
                 'prod_per_visit' => $prodPerVisit,
-                'visits_day'     => $visitsPerDay,
-                'whitening'      => $wht,
-                'irrigation'     => $irr,
-                'fluoride'       => $flu,
-                'sealants'       => $sea,
-                'laser'          => $las,
-                'toothbrushes'   => $tbr,
-                'adj_total'      => $wht + $irr + $flu + $sea + $las + $tbr,
-                'retention'      => null,
+                'visits_day' => $visitsPerDay,
+                'whitening' => $wht,
+                'irrigation' => $irr,
+                'fluoride' => $flu,
+                'sealants' => $sea,
+                'laser' => $las,
+                'toothbrushes' => $tbr,
+                'adj_total' => $wht + $irr + $flu + $sea + $las + $tbr,
+                'retention' => null,
             ];
         }, $rows));
     }
@@ -170,9 +176,9 @@ class ProviderPortalController extends Controller
     {
         $d = "{$alias}.ProcDate";
         return match ($mode) {
-            'weekly'  => ["YEARWEEK({$d}, 1)", "DATE_FORMAT(MIN({$d}), '%Y-%m-%d')"],
+            'weekly' => ["YEARWEEK({$d}, 1)", "DATE_FORMAT(MIN({$d}), '%Y-%m-%d')"],
             'monthly' => ["DATE_FORMAT({$d}, '%Y-%m')", "DATE_FORMAT({$d}, '%Y-%m')"],
-            default   => ["DATE_FORMAT({$d}, '%Y-%m-%d')", "DATE_FORMAT({$d}, '%Y-%m-%d')"],
+            default => ["DATE_FORMAT({$d}, '%Y-%m-%d')", "DATE_FORMAT({$d}, '%Y-%m-%d')"],
         };
     }
 }
