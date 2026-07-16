@@ -2271,88 +2271,317 @@ class OperationsAnalyticsService
     {
         $columns = [
             ['key' => 'location', 'label' => 'Location', 'type' => 'text', 'sticky' => true],
-            ['key' => 'provider', 'label' => 'Provider', 'type' => 'text', 'sticky' => true],
+            ['key' => 'provider', 'label' => 'Provider', 'type' => 'text', 'sticky' => true, 'class' => 'border-r-[6px] border-white'],
+            ['key' => 'total_prod', 'label' => 'Production', 'type' => 'money', 'drilldown' => true],
+            ['key' => 'total_visits', 'label' => 'Patients Visits', 'type' => 'number', 'class' => 'border-r-[6px] border-white', 'drilldown' => true],
             ['key' => 'pwd_prod', 'label' => 'Production', 'type' => 'money'],
-            ['key' => 'pwd_visits', 'label' => 'Patients Visits', 'type' => 'number'],
+            ['key' => 'pwd_proc', 'label' => 'Procedures', 'type' => 'number', 'class' => 'border-r-[6px] border-white'],
             ['key' => 'ppv_prod', 'label' => 'Production', 'type' => 'money'],
             ['key' => 'ppv_proc', 'label' => 'Procedures', 'type' => 'number'],
+            ['key' => 'ppv_fil', 'label' => 'Fillings', 'type' => 'number'],
+            ['key' => 'ppv_crn', 'label' => 'Crowns', 'type' => 'number'],
+            ['key' => 'ppv_ext', 'label' => 'Extraction', 'type' => 'number'],
+            ['key' => 'ppv_pulp', 'label' => 'Pulpotomy', 'type' => 'number'],
+            ['key' => 'ppv_root', 'label' => 'Root Canals', 'type' => 'number', 'class' => 'border-r-[6px] border-white'],
+
+            // Per Procedure
             ['key' => 'pp_prod', 'label' => 'Production', 'type' => 'money'],
-            ['key' => 'pp_proc', 'label' => 'Procedures', 'type' => 'number'],
-            ['key' => 'pp_fil', 'label' => 'Fillings', 'type' => 'number'],
-            ['key' => 'pp_crn', 'label' => 'Crowns', 'type' => 'number'],
-            ['key' => 'pp_ext', 'label' => 'Extraction', 'type' => 'number'],
-            ['key' => 'pp_pulp', 'label' => 'Pulpotomy', 'type' => 'number'],
-            ['key' => 'pp_root', 'label' => 'Root Canals', 'type' => 'number'],
-            ['key' => 'total_prod', 'label' => 'Production', 'type' => 'money'],
         ];
 
         $headerGroups = [
             ['label' => '', 'colspan' => 1, 'class' => 'tb:sm:stick-to-left border-white dark:border-gray-800'],
-            ['label' => '', 'colspan' => 1, 'class' => 'tb:sm:stick-to-left tb:sm:stick-shadow-r border-white dark:border-gray-800'],
-            ['label' => 'Provider', 'colspan' => 2, 'class' => 'border-r-8 border-white dark:border-gray-800'],
-            ['label' => 'Per Working Day', 'colspan' => 2, 'class' => 'border-r-8 border-white dark:border-gray-800'],
-            ['label' => 'Per Patient Visit', 'colspan' => 7, 'class' => 'border-r-8 border-white dark:border-gray-800'],
-            ['label' => 'Per Procedure', 'colspan' => 1, 'class' => 'border-r-8 border-white dark:border-gray-800'],
+            ['label' => '', 'colspan' => 1, 'class' => 'tb:sm:stick-to-left tb:sm:stick-shadow-r border-r-[6px] border-white'],
+            ['label' => 'Provider', 'colspan' => 2, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white'],
+            ['label' => 'Per Working Day', 'colspan' => 2, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white'],
+            ['label' => 'Per Patient Visit', 'colspan' => 7, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white'],
+            ['label' => 'Per Procedure', 'colspan' => 1, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs'],
         ];
 
-        $qLogs = DB::table('od_procedure_logs')
-            ->selectRaw('ClinicNum, ProvNum, ' . MetricDefinitions::grossProduction('total_fee') . ', COUNT(*) as c_procs, ' . MetricDefinitions::patientVisits('c_visits'))
-            ->where('ProcStatus', 'C')
-            ->whereBetween('ProcDate', [$start, $end]);
+        $percentDiff = $subtab === 'percent-diff-last-year';
+        $providers = DB::table('od_providers')->get()->keyBy('ProvNum');
 
-        if ($clinics) {
-            $qLogs->whereIn('ClinicNum', $clinics);
-        }
-        $res = $qLogs->groupBy('ClinicNum', 'ProvNum')->get();
+        $calculateTotalAndAverage = function (array $tableRows) {
+            $t_fee = array_sum(array_column($tableRows, '_total_fee'));
+            $t_visits = array_sum(array_column($tableRows, '_c_visits'));
+            $t_procs = array_sum(array_column($tableRows, '_c_procs'));
+            $t_days = array_sum(array_column($tableRows, '_days_worked'));
+            $t_fil = array_sum(array_column($tableRows, '_c_fil'));
+            $t_crn = array_sum(array_column($tableRows, '_c_crn'));
+            $t_ext = array_sum(array_column($tableRows, '_c_ext'));
+            $t_pulp = array_sum(array_column($tableRows, '_c_pulp'));
+            $t_root = array_sum(array_column($tableRows, '_c_root'));
 
-        $tableRows = [];
-        $total = array_fill_keys(array_column($columns, 'key'), 0);
-
-        foreach ($res as $l) {
-            $r = [
-                'row_key' => $l->ClinicNum . '_' . $l->ProvNum,
-                'location' => $this->clinicNames[$l->ClinicNum] ?? 'Location ' . $l->ClinicNum,
-                'provider' => 'Provider ' . $l->ProvNum,
-                'pwd_prod' => (float) $l->total_fee / 20,
-                'pwd_visits' => (int) $l->c_visits,
-                'ppv_prod' => $l->c_visits > 0 ? (float) $l->total_fee / $l->c_visits : 0,
-                'ppv_proc' => $l->c_visits > 0 ? (float) $l->c_procs / $l->c_visits : 0,
-                'pp_prod' => $l->c_procs > 0 ? (float) $l->total_fee / $l->c_procs : 0,
-                'pp_proc' => (int) $l->c_procs,
-                'pp_fil' => 0,
-                'pp_crn' => 0,
-                'pp_ext' => 0,
-                'pp_pulp' => 0,
-                'pp_root' => 0,
-                'total_prod' => (float) $l->total_fee,
+            $total = [
+                'total_prod' => $t_fee,
+                'total_visits' => $t_visits,
+                'pwd_prod' => $t_days > 0 ? $t_fee / $t_days : 0,
+                'pwd_proc' => $t_days > 0 ? $t_procs / $t_days : 0,
+                'ppv_prod' => $t_visits > 0 ? $t_fee / $t_visits : 0,
+                'ppv_proc' => $t_visits > 0 ? $t_procs / $t_visits : 0,
+                'ppv_fil' => $t_visits > 0 ? $t_fil / $t_visits : 0,
+                'ppv_crn' => $t_visits > 0 ? $t_crn / $t_visits : 0,
+                'ppv_ext' => $t_visits > 0 ? $t_ext / $t_visits : 0,
+                'ppv_pulp' => $t_visits > 0 ? $t_pulp / $t_visits : 0,
+                'ppv_root' => $t_visits > 0 ? $t_root / $t_visits : 0,
+                'pp_prod' => $t_procs > 0 ? $t_fee / $t_procs : 0,
             ];
-            $tableRows[] = $r;
 
+            $cCount = max(1, count($tableRows));
+            $avg = [];
             foreach ($total as $k => $v) {
-                if ($k === 'location' || $k === 'provider' || $k === 'row_key') {
-                    continue;
-                }
-                $total[$k] += $r[$k];
+                $avg[$k] = (float) $v / $cCount;
             }
-        }
+            return [$total, $avg];
+        };
 
-        $cCount = count($tableRows) ?: 1;
-        $avg = [];
-        foreach ($total as $k => $v) {
-            if ($k === 'location' || $k === 'provider') {
-                continue;
+        if ($subtab === 'last-year') {
+            [$start, $end] = $this->shiftYear($start, $end);
+            $rows = $this->complianceRows($start, $end, $clinics, $providers);
+            [$total, $avg] = $calculateTotalAndAverage($rows);
+        } elseif ($subtab === 'diff-last-year' || $percentDiff) {
+            [$lyStart, $lyEnd] = $this->shiftYear($start, $end);
+            $currentRows = $this->complianceRows($start, $end, $clinics, $providers);
+            $lastRows = $this->complianceRows($lyStart, $lyEnd, $clinics, $providers);
+
+            $current = collect($currentRows)->keyBy('row_key')->toArray();
+            $last = collect($lastRows)->keyBy('row_key')->toArray();
+
+            $rows = [];
+            $allKeys = array_unique(array_merge(array_keys($current), array_keys($last)));
+
+            foreach ($allKeys as $k) {
+                $c = $current[$k] ?? null;
+                $l = $last[$k] ?? null;
+                $base = $c ?: $l;
+
+                $r = [
+                    'row_key' => $base['row_key'],
+                    'location' => $base['location'],
+                    'provider' => $base['provider'],
+                    'title' => $base['title'] ?? '',
+                ];
+
+                $fmt = function ($v, $type) {
+                    if ($v === null || $v === '--')
+                        return '--';
+                    if ($type === 'money') {
+                        return '$ ' . number_format((float) $v, 2);
+                    }
+                    if ($type === 'number') {
+                        $v = (float) $v;
+                        return floor($v) == $v ? number_format($v) : number_format($v, 2);
+                    }
+                    if ($type === 'percent') {
+                        return number_format((float) $v, 2) . '%';
+                    }
+                    return $v;
+                };
+
+                foreach ($columns as $col) {
+                    $key = $col['key'];
+                    if (in_array($key, ['location', 'provider', 'title']))
+                        continue;
+
+                    $vCurrent = $c ? ($c[$key] ?? 0) : 0;
+                    $vLast = $l ? ($l[$key] ?? 0) : 0;
+
+                    if ($percentDiff) {
+                        $r[$key] = $vLast != 0 ? round(($vCurrent - $vLast) / abs($vLast) * 100, 2) : ($vCurrent > 0 ? 100 : 0);
+                    } elseif ($subtab === 'diff-last-year') {
+                        $r[$key] = $fmt($vCurrent, $col['type'] ?? 'number') . '<br><span class="text-xs text-gray-400">' . $fmt($vLast, $col['type'] ?? 'number') . '</span>';
+                    } else {
+                        $r[$key] = round($vCurrent - $vLast, 2);
+                    }
+                }
+                $rows[] = $r;
             }
-            $avg[$k] = $v / $cCount;
+
+            // Total/Avg diff calculation
+            [$currentTotal, $currentAvg] = $calculateTotalAndAverage($currentRows);
+            [$lastTotal, $lastAvg] = $calculateTotalAndAverage($lastRows);
+
+            $total = [];
+            $avg = [];
+            foreach ($columns as $col) {
+                $key = $col['key'];
+                if (in_array($key, ['location', 'provider', 'title']))
+                    continue;
+
+                $tC = $currentTotal[$key] ?? 0;
+                $tL = $lastTotal[$key] ?? 0;
+                $aC = $currentAvg[$key] ?? 0;
+                $aL = $lastAvg[$key] ?? 0;
+
+                if ($percentDiff) {
+                    $total[$key] = $tL != 0 ? round(($tC - $tL) / abs($tL) * 100, 2) : ($tC > 0 ? 100 : 0);
+                    $avg[$key] = $aL != 0 ? round(($aC - $aL) / abs($aL) * 100, 2) : ($aC > 0 ? 100 : 0);
+                } elseif ($subtab === 'diff-last-year') {
+                    $total[$key] = $fmt($tC, $col['type'] ?? 'number') . '<br><span class="text-xs text-gray-400">' . $fmt($tL, $col['type'] ?? 'number') . '</span>';
+                    $avg[$key] = $fmt($aC, $col['type'] ?? 'number') . '<br><span class="text-xs text-gray-400">' . $fmt($aL, $col['type'] ?? 'number') . '</span>';
+                } else {
+                    $total[$key] = round($tC - $tL, 2);
+                    $avg[$key] = round($aC - $aL, 2);
+                }
+            }
+        } else {
+            $rows = $this->complianceRows($start, $end, $clinics, $providers);
+            [$total, $avg] = $calculateTotalAndAverage($rows);
         }
 
         return [
             'header_groups' => $headerGroups,
-            'columns' => $columns,
-            'rows' => $tableRows,
+            'groups' => [],
+            'columns' => $subtab === 'diff-last-year' ? $this->asHtmlColumns($columns) : ($percentDiff ? $this->asPercentColumns($columns) : $columns),
+            'rows' => collect($rows)->sortByDesc('total_prod')->values()->toArray(),
             'total' => $total,
             'average' => $avg,
-            'groups' => [], // Natively parsed dynamically
         ];
+    }
+
+    private function complianceRows(string $start, string $end, array $clinics, $providers): array
+    {
+        $logTable = (new \App\Models\OdProcedureLog)->getTable();
+        $codeTable = (new \App\Models\OdProcedure)->getTable();
+
+        $qLogs = DB::table("$logTable as pl")
+            ->leftJoin("$codeTable as pc", 'pl.CodeNum', '=', 'pc.CodeNum')
+            ->selectRaw('
+                pl.ClinicNum, pl.ProvNum, 
+                ' . MetricDefinitions::grossProduction('total_fee') . ', 
+                COUNT(*) as c_procs, 
+                ' . MetricDefinitions::patientVisits('c_visits') . ',
+                SUM(CASE WHEN pc.ProcCode BETWEEN "D2140" AND "D2394" THEN 1 ELSE 0 END) as c_fil,
+                SUM(CASE WHEN pc.ProcCode BETWEEN "D2710" AND "D2799" THEN 1 ELSE 0 END) as c_crn,
+                SUM(CASE WHEN pc.ProcCode BETWEEN "D7111" AND "D7250" THEN 1 ELSE 0 END) as c_ext,
+                SUM(CASE WHEN pc.ProcCode IN ("D3220", "D3221", "D3222") THEN 1 ELSE 0 END) as c_pulp,
+                SUM(CASE WHEN pc.ProcCode BETWEEN "D3310" AND "D3330" THEN 1 ELSE 0 END) as c_root
+            ')
+            ->where('pl.ProcStatus', 'C')
+            ->whereBetween('pl.ProcDate', [$start, $end]);
+
+        if ($clinics) {
+            $qLogs->whereIn('pl.ClinicNum', $clinics);
+        }
+        $res = $qLogs->groupBy('pl.ClinicNum', 'pl.ProvNum')->get();
+
+        // Pre-fetch drill-down patient details for all providers
+        $patTable = (new \App\Models\OdPatient)->getTable();
+
+        $drillQ = DB::table("$logTable as pl")
+            ->join("$patTable as p", 'pl.PatNum', '=', 'p.PatNum')
+            ->selectRaw('pl.ProvNum, pl.PatNum, p.FName, p.LName, MIN(pl.ProcDate) as first_date, MAX(pl.ProcDate) as last_date, SUM(pl.ProcFee) as total_prod')
+            ->where('pl.ProcStatus', 'C')
+            ->whereBetween('pl.ProcDate', [$start, $end]);
+        if ($clinics) {
+            $drillQ->whereIn('pl.ClinicNum', $clinics);
+        }
+        $patientDetails = $drillQ->groupBy('pl.ProvNum', 'pl.PatNum', 'p.FName', 'p.LName')
+            ->orderBy('total_prod', 'desc')
+            ->get();
+
+        $drills = [];
+        foreach ($patientDetails as $pd) {
+            $d1 = \Carbon\Carbon::parse($pd->first_date)->format('M d, Y');
+            $d2 = \Carbon\Carbon::parse($pd->last_date)->format('M d, Y');
+            $dates = ($d1 === $d2) ? $d1 : "$d1 - $d2";
+
+            $drills[$pd->ProvNum][] = [
+                'Patient ID' => $pd->PatNum,
+                'Patient' => trim($pd->LName . ', ' . $pd->FName),
+                'Dates' => $dates,
+                'Production' => (float) $pd->total_prod,
+            ];
+        }
+
+        // Pre-fetch drill-down patient visits for all providers
+        $visitsQ = DB::table("$logTable as pl")
+            ->join("$patTable as p", 'pl.PatNum', '=', 'p.PatNum')
+            ->selectRaw('pl.ProvNum, pl.PatNum, p.FName, p.LName, COUNT(DISTINCT pl.ProcDate) as visit_count, GROUP_CONCAT(DISTINCT pl.ProcDate ORDER BY pl.ProcDate SEPARATOR ", ") as visit_days')
+            ->where('pl.ProcStatus', 'C')
+            ->whereBetween('pl.ProcDate', [$start, $end]);
+        if ($clinics) {
+            $visitsQ->whereIn('pl.ClinicNum', $clinics);
+        }
+        $visitsDetails = $visitsQ->groupBy('pl.ProvNum', 'pl.PatNum', 'p.FName', 'p.LName')
+            ->orderBy('visit_count', 'desc')
+            ->get();
+
+        $drillsVisits = [];
+        foreach ($visitsDetails as $pd) {
+            $daysArray = explode(', ', $pd->visit_days);
+            $formattedDays = array_map(function ($d) {
+                return \Carbon\Carbon::parse($d)->format('M d');
+            }, $daysArray);
+
+            $drillsVisits[$pd->ProvNum][] = [
+                'Patient ID' => $pd->PatNum,
+                'Patient' => trim($pd->LName . ', ' . $pd->FName),
+                'Visit days' => implode(', ', $formattedDays),
+                '# of Visits' => (int) $pd->visit_count,
+            ];
+        }
+
+        // Active Working Days distinct calculation
+        $daysQ = DB::table("$logTable as pl")
+            ->selectRaw('pl.ProvNum, COUNT(DISTINCT pl.ProcDate) as days_worked')
+            ->where('pl.ProcStatus', 'C')
+            ->whereBetween('pl.ProcDate', [$start, $end]);
+        if ($clinics) {
+            $daysQ->whereIn('pl.ClinicNum', $clinics);
+        }
+        $daysWorked = $daysQ->groupBy('pl.ProvNum')->pluck('days_worked', 'ProvNum');
+
+        $tableRows = [];
+
+        foreach ($res as $l) {
+            $prov = $providers[$l->ProvNum] ?? null;
+            $name = $prov
+                ? trim(($prov->LName ?? '') . (($prov->LName && $prov->PName) ? ', ' : '') . ($prov->PName ?? ''))
+                : ('Provider ' . $l->ProvNum);
+
+            $tableRows[] = [
+                'row_key' => $l->ClinicNum . '_' . $l->ProvNum,
+                'location' => $this->clinicNames[$l->ClinicNum] ?? 'Location ' . $l->ClinicNum,
+                'provider' => $name,
+                'total_prod' => (float) $l->total_fee,
+                'total_visits' => (int) $l->c_visits,
+                '_total_fee' => (float) $l->total_fee,
+                '_c_visits' => (int) $l->c_visits,
+                '_c_procs' => (int) $l->c_procs,
+                '_days_worked' => $daysWorked[$l->ProvNum] ?? 0,
+                '_c_fil' => (int) $l->c_fil,
+                '_c_crn' => (int) $l->c_crn,
+                '_c_ext' => (int) $l->c_ext,
+                '_c_pulp' => (int) $l->c_pulp,
+                '_c_root' => (int) $l->c_root,
+
+                'pwd_prod' => isset($daysWorked[$l->ProvNum]) && $daysWorked[$l->ProvNum] > 0 ? (float) $l->total_fee / $daysWorked[$l->ProvNum] : 0,
+                'pwd_proc' => isset($daysWorked[$l->ProvNum]) && $daysWorked[$l->ProvNum] > 0 ? (int) $l->c_procs / $daysWorked[$l->ProvNum] : 0,
+                'ppv_prod' => $l->c_visits > 0 ? (float) $l->total_fee / $l->c_visits : 0,
+                'ppv_proc' => $l->c_visits > 0 ? (float) $l->c_procs / $l->c_visits : 0,
+                'ppv_fil' => $l->c_visits > 0 ? (float) $l->c_fil / $l->c_visits : 0,
+                'ppv_crn' => $l->c_visits > 0 ? (float) $l->c_crn / $l->c_visits : 0,
+                'ppv_ext' => $l->c_visits > 0 ? (float) $l->c_ext / $l->c_visits : 0,
+                'ppv_pulp' => $l->c_visits > 0 ? (float) $l->c_pulp / $l->c_visits : 0,
+                'ppv_root' => $l->c_visits > 0 ? (float) $l->c_root / $l->c_visits : 0,
+                'pp_prod' => $l->c_procs > 0 ? (float) $l->total_fee / $l->c_procs : 0,
+                'title' => $name,
+                'total_prod_details' => $drills[$l->ProvNum] ?? [],
+                'total_visits_details' => $drillsVisits[$l->ProvNum] ?? [],
+            ];
+        }
+
+        return $tableRows;
+    }
+
+    private function asHtmlColumns(array $columns): array
+    {
+        return array_map(function ($c) {
+            if (($c['type'] ?? '') !== 'text') {
+                $c['type'] = 'html';
+            }
+            return $c;
+        }, $columns);
     }
 
     /**
@@ -2364,15 +2593,106 @@ class OperationsAnalyticsService
         if ($subtab === 'patient-analysis') {
             $endCarbon = \Carbon\Carbon::parse($end)->endOfDay();
             $startCarbon = \Carbon\Carbon::parse($start)->startOfDay();
+        }
 
-            $baseFilter = function ($q) use ($clinics, $zip) {
-                if (!empty($clinics)) {
-                    $q->whereIn('pl.ClinicNum', $clinics);
-                }
-                if ($zip !== 'ALL') {
-                    $q->where('p.Zip', $zip);
-                }
-            };
+        $baseFilter = function ($q) use ($clinics, $zip) {
+            if (!empty($clinics)) {
+                $q->whereIn('pl.ClinicNum', $clinics);
+            }
+            if ($zip !== 'ALL') {
+                $q->where('p.Zip', $zip);
+            }
+        };
+
+        // --- GLOBAL MARKETING CHARTS (ALWAYS FETCHED) ---
+        // Get ZIPs list for filter
+        $allZips = DB::table('od_patients')
+            ->select('Zip')
+            ->whereNotNull('Zip')
+            ->where('Zip', '!=', '')
+            ->distinct()
+            ->pluck('Zip')
+            ->toArray();
+
+        // 1) Find New Patients within the date range
+        $firstVisit = DB::table('od_procedure_logs')
+            ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
+            ->where('ProcStatus', 'C')
+            ->groupBy('PatNum');
+
+        $newPatsQuery = DB::table('od_procedure_logs as pl')
+            ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
+            ->select('pl.PatNum', 'fv.first_date')
+            ->where('pl.ProcStatus', 'C')
+            ->whereBetween('fv.first_date', [$start, $end]);
+
+        if (!empty($clinics)) {
+            $newPatsQuery->whereIn('pl.ClinicNum', $clinics);
+        }
+
+        $newPatRows = $newPatsQuery->groupBy('pl.PatNum', 'fv.first_date')->get();
+        $newPatIds = $newPatRows->pluck('PatNum')->toArray();
+        $newPatFirstDates = $newPatRows->pluck('first_date', 'PatNum')->toArray();
+
+        // 2) Find all procedure logs within the range (active patients)
+        $allOpsQuery = DB::table('od_procedure_logs as pl')
+            ->join('od_patients as p', 'p.PatNum', '=', 'pl.PatNum')
+            ->leftJoin('od_claim_procs as cp', 'cp.PatNum', '=', 'p.PatNum')
+            ->select(
+                'pl.PatNum',
+                'pl.ProcDate',
+                'pl.ProcFee',
+                'p.City',
+                'p.EmployerNum',
+                'p.Zip',
+                'cp.PlanNum'
+            )
+            ->where('pl.ProcStatus', 'C')
+            ->whereBetween('pl.ProcDate', [$start, $end]);
+
+        if (!empty($clinics)) {
+            $allOpsQuery->whereIn('pl.ClinicNum', $clinics);
+        }
+        if ($zip !== 'ALL') {
+            $allOpsQuery->where('p.Zip', $zip);
+        }
+
+        $allOps = $allOpsQuery->get();
+
+        // 3) Group donut variables
+        $referrals = [];
+        $payors = [];
+        $employers = [];
+        $zips = [];
+
+        foreach ($allOps as $op) {
+            $isNewPat = in_array($op->PatNum, $newPatIds);
+            if ($isNewPat) {
+                $ref = $op->City ?: 'Unknown Referral';
+                $referrals[$ref] = ($referrals[$ref] ?? 0) + 1;
+
+                $pay = $op->PlanNum ? 'Plan ' . $op->PlanNum : 'No Insurance';
+                $payors[$pay] = ($payors[$pay] ?? 0) + 1;
+
+                $emp = $op->EmployerNum ? 'Employer ' . $op->EmployerNum : 'No Employer';
+                $employers[$emp] = ($employers[$emp] ?? 0) + 1;
+            }
+
+            $zipCode = trim($op->Zip) ?: 'No Zip';
+            $zips[$zipCode] = ($zips[$zipCode] ?? 0) + 1;
+        }
+
+        arsort($referrals);
+        arsort($payors);
+        arsort($employers);
+        arsort($zips);
+
+        $topReferrals = array_slice($referrals, 0, 10, true);
+        $topPayorsChart = array_slice($payors, 0, 10, true);
+        $topEmployers = array_slice($employers, 0, 10, true);
+        $topZips = array_slice($zips, 0, 10, true);
+
+        if ($subtab === 'patient-analysis') {
 
             // 1. Gender
             $firstVisit = DB::table('od_procedure_logs')
@@ -2520,91 +2840,13 @@ class OperationsAnalyticsService
                 'ages24' => $ages24,
                 'goals' => $goals,
                 'volume' => $volumeArr,
-                'available_zips' => [], // Dynamic on controller via global fetch if needed
+                'available_zips' => $allZips,
+                'top_zips' => $topZips,
+                'referrals_chart' => $topReferrals,
+                'payors_chart' => $topPayorsChart,
+                'employers_chart' => $topEmployers,
             ];
         }
-
-        // Get ZIPs list for filter
-        $allZips = DB::table('od_patients')
-            ->select('Zip')
-            ->whereNotNull('Zip')
-            ->where('Zip', '!=', '')
-            ->distinct()
-            ->pluck('Zip')
-            ->toArray();
-
-        // 1) Find New Patients within the date range
-        $firstVisit = DB::table('od_procedure_logs')
-            ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-            ->where('ProcStatus', 'C')
-            ->groupBy('PatNum');
-
-        $newPatsQuery = DB::table('od_procedure_logs as pl')
-            ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
-            ->select('pl.PatNum', 'fv.first_date')
-            ->where('pl.ProcStatus', 'C')
-            ->whereBetween('fv.first_date', [$start, $end]);
-
-        if (!empty($clinics)) {
-            $newPatsQuery->whereIn('pl.ClinicNum', $clinics);
-        }
-
-        $newPatRows = $newPatsQuery->groupBy('pl.PatNum', 'fv.first_date')->get();
-        $newPatIds = $newPatRows->pluck('PatNum')->toArray();
-        $newPatFirstDates = $newPatRows->pluck('first_date', 'PatNum')->toArray();
-
-        // 2) Find all procedure logs within the range (active patients)
-        $allOpsQuery = DB::table('od_procedure_logs as pl')
-            ->join('od_patients as p', 'p.PatNum', '=', 'pl.PatNum')
-            ->leftJoin('od_claim_procs as cp', 'cp.PatNum', '=', 'p.PatNum')
-            ->select(
-                'pl.PatNum',
-                'pl.ProcDate',
-                'pl.ProcFee',
-                'p.City',
-                'p.EmployerNum',
-                'p.Zip',
-                'cp.PlanNum'
-            )
-            ->where('pl.ProcStatus', 'C')
-            ->whereBetween('pl.ProcDate', [$start, $end]);
-
-        if (!empty($clinics)) {
-            $allOpsQuery->whereIn('pl.ClinicNum', $clinics);
-        }
-        if ($zip !== 'ALL') {
-            $allOpsQuery->where('p.Zip', $zip);
-        }
-
-        $allOps = $allOpsQuery->get();
-
-        // 3) Group donut variables
-        $referrals = [];
-        $payors = [];
-        $employers = [];
-        $zips = [];
-
-        foreach ($allOps as $op) {
-            $isNewPat = in_array($op->PatNum, $newPatIds);
-            if ($isNewPat) {
-                $ref = $op->City ?: 'Unknown Referral';
-                $referrals[$ref] = ($referrals[$ref] ?? 0) + 1;
-
-                $pay = $op->PlanNum ? 'Plan ' . $op->PlanNum : 'No Insurance';
-                $payors[$pay] = ($payors[$pay] ?? 0) + 1;
-
-                $emp = $op->EmployerNum ? 'Employer ' . $op->EmployerNum : 'No Employer';
-                $employers[$emp] = ($employers[$emp] ?? 0) + 1;
-            }
-
-            $zipCode = trim($op->Zip) ?: 'No Zip';
-            $zips[$zipCode] = ($zips[$zipCode] ?? 0) + 1;
-        }
-
-        arsort($referrals);
-        arsort($payors);
-        arsort($employers);
-        arsort($zips);
 
         // 4) Compute the subtab-specific detailed table data
         $isReferral = str_contains($subtab ?? 'default', 'referral');
