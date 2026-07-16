@@ -18,7 +18,7 @@
         <ul class="flex border-b border-slate-200 mt-4 gap-1">
             @foreach ($subtabs as $s => $label)
                 <a href="#" data-ops-subtab="{{ $s }}" class="text-xs font-bold px-5 py-2.5 rounded-t tracking-wide whitespace-nowrap border break-words transition-colors
-                                  {{ $s === ($activeSubtab ?? 'default')
+                                          {{ $s === ($activeSubtab ?? 'default')
                     ? 'bg-white text-slate-800 border-x-slate-200 border-t-slate-200 border-b-white -mb-px relative z-10'
                     : 'bg-slate-50 text-slate-400 border-transparent hover:text-slate-600' }}">
                     {{ $label }}
@@ -151,6 +151,7 @@
                             }
                         },
                         x: {
+                            offset: true,
                             grid: { display: false },
                             ticks: {
                                 font: { size: 10, family: 'Inter, sans-serif' },

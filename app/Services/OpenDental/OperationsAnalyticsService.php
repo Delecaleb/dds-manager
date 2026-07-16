@@ -1884,6 +1884,9 @@ class OperationsAnalyticsService
      */
     public function trends(string $start, string $end, string $subtab = 'default', array $clinics = [], string $metric = 'production', string $lob = ''): array
     {
+        // Offset end by -1 month so we don't include the current month in the 13-month trailing view
+        $end = (new \DateTime($end))->modify('-1 month')->modify('last day of this month')->format('Y-m-d');
+
         $currentStart = (new \DateTime($end))->modify('-12 months')->modify('first day of this month')->format('Y-m-d');
         [$labels, $currentData] = $this->getTrendData($currentStart, $end, $clinics, $metric);
 
@@ -1988,10 +1991,7 @@ class OperationsAnalyticsService
                     $qAdj->whereIn('ClinicNum', $clinics);
                 }
                 foreach ($qAdj->groupBy('ClinicNum', DB::raw("DATE_FORMAT(AdjDate, '%Y-%m')"))->get() as $row) {
-                    // Using abs() like in providers() "gross - abs(adj) - abs(wo)" - wait, in typical setups adjustments are both + and -.
-                    // The standard providers() calculates: $net = $gross - abs($adjustment) - abs($writeoff);
-                    // Let's mirror this exactly: subtract abs(val).
-                    $addToBucket((int) $row->ClinicNum, $row->month, -abs($row->val));
+                    $addToBucket((int) $row->ClinicNum, $row->month, $row->val);
                 }
 
                 // WriteOffs
@@ -2002,7 +2002,7 @@ class OperationsAnalyticsService
                     $qWo->whereIn('ClinicNum', $clinics);
                 }
                 foreach ($qWo->groupBy('ClinicNum', DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $row) {
-                    $addToBucket((int) $row->ClinicNum, $row->month, -abs($row->val));
+                    $addToBucket((int) $row->ClinicNum, $row->month, $row->val);
                 }
             }
 
@@ -2186,7 +2186,7 @@ class OperationsAnalyticsService
             }
             foreach ($qAdj->groupBy(DB::raw("DATE_FORMAT(AdjDate, '%Y-%m')"))->get() as $res) {
                 if (isset($buckets[$res->month])) {
-                    $buckets[$res->month] -= abs((float) $res->val);
+                    $buckets[$res->month] += (float) $res->val;
                 }
             }
 
@@ -2199,7 +2199,7 @@ class OperationsAnalyticsService
             }
             foreach ($qWo->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $res) {
                 if (isset($buckets[$res->month])) {
-                    $buckets[$res->month] -= abs((float) $res->val);
+                    $buckets[$res->month] += (float) $res->val;
                 }
             }
         }
