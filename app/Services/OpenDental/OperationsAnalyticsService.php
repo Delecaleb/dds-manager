@@ -137,10 +137,10 @@ class OperationsAnalyticsService
 
         return [
             'groups' => [
-                ['label' => 'By Office',         'span' => 14],
-                ['label' => 'Per Working Day',   'span' => 4],
+                ['label' => 'By Office', 'span' => 14],
+                ['label' => 'Per Working Day', 'span' => 4],
                 ['label' => 'Per Patient Visit', 'span' => 3],
-                ['label' => 'Per Procedure',     'span' => 2],
+                ['label' => 'Per Procedure', 'span' => 2],
             ],
             'columns' => $percentDiff ? $this->asPercentColumns($columns) : $columns,
             'rows' => $rows,
@@ -242,10 +242,10 @@ class OperationsAnalyticsService
 
         return [
             'groups' => [
-                ['label' => 'By Payor',          'span' => 8],
-                ['label' => 'Per Working Day',   'span' => 3],
+                ['label' => 'By Payor', 'span' => 8],
+                ['label' => 'Per Working Day', 'span' => 3],
                 ['label' => 'Per Patient Visit', 'span' => 2],
-                ['label' => 'Per Procedure',     'span' => 1],
+                ['label' => 'Per Procedure', 'span' => 1],
             ],
             'columns' => $percentDiff ? $this->asPercentColumns($columns) : $columns,
             'rows' => $rows,
@@ -257,26 +257,26 @@ class OperationsAnalyticsService
     private function payorColumns(): array
     {
         return [
-            ['key' => 'payor',           'label' => 'Payor',              'type' => 'text',    'sticky' => true],
-            ['key' => 'location',        'label' => 'Location',           'type' => 'text'],
+            ['key' => 'payor', 'label' => 'Payor', 'type' => 'text', 'sticky' => true],
+            ['key' => 'location', 'label' => 'Location', 'type' => 'text'],
             // By Payor
-            ['key' => 'gross',           'label' => 'Gross Production',   'type' => 'money',   'agg' => 'sum'],
-            ['key' => 'net',             'label' => 'Net Production',     'type' => 'money',   'agg' => 'sum'],
-            ['key' => 'pct_ttl',         'label' => '% of TTL',           'type' => 'percent', 'heat' => false],
-            ['key' => 'adjustment',      'label' => 'Adjustment',         'type' => 'money',   'agg' => 'sum'],
-            ['key' => 'collection',      'label' => 'Collection',         'type' => 'money',   'agg' => 'sum'],
-            ['key' => 'pts_visits',      'label' => 'Pts Visits',         'type' => 'number',  'agg' => 'sum'],
-            ['key' => 'npt_visit',       'label' => 'Npt Visits',         'type' => 'number',  'agg' => 'sum'],
-            ['key' => 'case_acceptance', 'label' => 'Case Acceptance',    'type' => 'percent', 'heat' => false],
+            ['key' => 'gross', 'label' => 'Gross Production', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'net', 'label' => 'Net Production', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'pct_ttl', 'label' => '% of TTL', 'type' => 'percent', 'heat' => false],
+            ['key' => 'adjustment', 'label' => 'Adjustment', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'collection', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'pts_visits', 'label' => 'Pts Visits', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'npt_visit', 'label' => 'Npt Visits', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'case_acceptance', 'label' => 'Case Acceptance', 'type' => 'percent', 'heat' => false],
             // Per Working Day
-            ['key' => 'pwd_production',   'label' => 'Production',         'type' => 'money'],
-            ['key' => 'pwd_pts_visit',    'label' => 'Pts Visits',         'type' => 'number'],
-            ['key' => 'pwd_npt_visit',    'label' => 'Npt Visits',         'type' => 'number'],
+            ['key' => 'pwd_production', 'label' => 'Production', 'type' => 'money'],
+            ['key' => 'pwd_pts_visit', 'label' => 'Pts Visits', 'type' => 'number'],
+            ['key' => 'pwd_npt_visit', 'label' => 'Npt Visits', 'type' => 'number'],
             // Per Patient Visit
-            ['key' => 'ppv_production',   'label' => 'Production',         'type' => 'money'],
-            ['key' => 'ppv_procedures',   'label' => 'Procedures',         'type' => 'number'],
+            ['key' => 'ppv_production', 'label' => 'Production', 'type' => 'money'],
+            ['key' => 'ppv_procedures', 'label' => 'Procedures', 'type' => 'number'],
             // Per Procedure
-            ['key' => 'pp_production',    'label' => 'Production',         'type' => 'money'],
+            ['key' => 'pp_production', 'label' => 'Production', 'type' => 'money'],
         ];
     }
 
@@ -313,7 +313,7 @@ class OperationsAnalyticsService
 
         $rows = [];
         foreach ($staged as [$c, $gross, $writeoff, $net]) {
-            $key = $c->PlanNum.'|'.$c->ClinicNum;
+            $key = $c->PlanNum . '|' . $c->ClinicNum;
             $workingDays = (int) $c->working_days;
             $ptsVisits = (int) $c->pts_visits;
             $procedures = (int) $c->procedures;
@@ -324,7 +324,7 @@ class OperationsAnalyticsService
                 'plan_num' => (int) $c->PlanNum,
                 'clinic_num' => (int) $c->ClinicNum,
                 'payor' => $this->payorLabel($c->PlanNum),
-                'location' => $this->clinicNames[(int) $c->ClinicNum] ?? ('Location '.$c->ClinicNum),
+                'location' => $this->clinicNames[(int) $c->ClinicNum] ?? ('Location ' . $c->ClinicNum),
                 'gross' => round($gross, 2),
                 'net' => round($net, 2),
                 'pct_ttl' => $totalNet != 0 ? round($net / $totalNet * 100, 2) : 0,
@@ -344,7 +344,7 @@ class OperationsAnalyticsService
             ];
         }
 
-        usort($rows, fn ($a, $b) => $b['net'] <=> $a['net']);
+        usort($rows, fn($a, $b) => $b['net'] <=> $a['net']);
 
         return $rows;
     }
@@ -367,7 +367,7 @@ class OperationsAnalyticsService
 
         $out = [];
         foreach ($q->groupBy('cp.PlanNum', 'cp.ClinicNum')->get() as $r) {
-            $out[$r->PlanNum.'|'.$r->ClinicNum] = (int) $r->npt;
+            $out[$r->PlanNum . '|' . $r->ClinicNum] = (int) $r->npt;
         }
 
         return $out;
@@ -376,7 +376,7 @@ class OperationsAnalyticsService
     /** Human label for a plan. Carrier names require a carrier sync; number is the fallback. */
     private function payorLabel($planNum): string
     {
-        return ((int) $planNum) > 0 ? 'Plan '.$planNum : 'No Insurance';
+        return ((int) $planNum) > 0 ? 'Plan ' . $planNum : 'No Insurance';
     }
 
     /**
@@ -423,10 +423,10 @@ class OperationsAnalyticsService
 
         return [
             'groups' => [
-                ['label' => 'By Office',         'span' => 5],
-                ['label' => 'Per Working Day',   'span' => 4],
+                ['label' => 'By Office', 'span' => 5],
+                ['label' => 'Per Working Day', 'span' => 4],
                 ['label' => 'Per Patient Visit', 'span' => 3],
-                ['label' => 'Per Procedure',     'span' => 2],
+                ['label' => 'Per Procedure', 'span' => 2],
             ],
             'columns' => $columns,
             'rows' => $rows,
@@ -447,11 +447,11 @@ class OperationsAnalyticsService
 
         return array_merge($lead, [
             // By Office
-            ['key' => 'production',     'label' => 'Production',   'type' => 'money',  'agg' => 'sum'],
-            ['key' => 'adjustment',     'label' => 'Adjustment',   'type' => 'money',  'agg' => 'sum'],
-            ['key' => 'collection',     'label' => 'Collection',   'type' => 'money',  'agg' => 'sum'],
-            ['key' => 'pts_visits',     'label' => 'Pts Visits',   'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'new_pts_visit',  'label' => 'New Pts Visit', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'adjustment', 'label' => 'Adjustment', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'collection', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'pts_visits', 'label' => 'Pts Visits', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'new_pts_visit', 'label' => 'New Pts Visit', 'type' => 'number', 'agg' => 'sum'],
             // Per Working Day
             ['key' => 'pwd_production', 'label' => 'Production', 'type' => 'money'],
             ['key' => 'pwd_collection', 'label' => 'Collection', 'type' => 'money'],
@@ -508,7 +508,7 @@ class OperationsAnalyticsService
             $row = [
                 'row_key' => $key,
                 'clinic_num' => (int) $clinic,
-                'location' => $this->clinicNames[(int) $clinic] ?? ('Location '.$clinic),
+                'location' => $this->clinicNames[(int) $clinic] ?? ('Location ' . $clinic),
                 'production' => round($net, 2),
                 'adjustment' => round($adjustment, 2),
                 'collection' => round($collection, 2),
@@ -528,10 +528,10 @@ class OperationsAnalyticsService
             if ($withProvider) {
                 $pv = $providers[$prov] ?? null;
                 $row['provider'] = $pv
-                    ? trim(($pv->LName ?? '').(($pv->LName && $pv->PName) ? ', ' : '').($pv->PName ?? ''))
-                    : ('Provider '.$prov);
+                    ? trim(($pv->LName ?? '') . (($pv->LName && $pv->PName) ? ', ' : '') . ($pv->PName ?? ''))
+                    : ('Provider ' . $prov);
                 if ($row['provider'] === '') {
-                    $row['provider'] = 'Provider '.$prov;
+                    $row['provider'] = 'Provider ' . $prov;
                 }
             }
             if ($withDate) {
@@ -541,7 +541,7 @@ class OperationsAnalyticsService
             $rows[] = $row;
         }
 
-        usort($rows, fn ($a, $b) => ($b['production'] <=> $a['production']));
+        usort($rows, fn($a, $b) => ($b['production'] <=> $a['production']));
 
         return $rows;
     }
@@ -659,45 +659,285 @@ class OperationsAnalyticsService
         return implode('|', $parts);
     }
 
-    /**
-     * Performance tab — one row per provider per location. (Aliases providers definition)
-     *
-     * @param  string  $subtab  default | diff-last-year | percent-diff-last-year
-     * @param  int[]  $clinics
-     */
     public function performance(string $start, string $end, string $subtab = 'default', array $clinics = []): array
     {
-        $tableData = $this->providers($start, $end, $subtab, $clinics);
-        $total = $tableData['total'] ?? [];
+        $columns = [
+            ['key' => 'date', 'label' => 'Entities', 'type' => 'text', 'sticky' => true, 'class' => 'border-r-[6px] border-white'],
 
-        $tableData['performance_kpis'] = [
-            [
-                'label' => 'Production',
-                'actual' => $total['net'] ?? 0,
-                'goal' => 135000,
-                'type' => 'currency',
-            ],
-            [
-                'label' => 'Collection',
-                'actual' => $total['collection'] ?? 0,
-                'goal' => 135000,
-                'type' => 'currency',
-            ],
-            [
-                'label' => 'Patient Visits',
-                'actual' => $total['pts_visits'] ?? 0,
-                'goal' => 200,
-                'type' => 'number',
-            ],
-            [
-                'label' => 'New Patient Visits',
-                'actual' => $total['npt_visit'] ?? 0,
-                'goal' => 40,
-                'type' => 'number',
-            ],
+            // ACTUAL
+            ['key' => 'actual_production', 'label' => 'PRODUCTION', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'actual_collection', 'label' => 'COLLECTION', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'actual_pts_visit', 'label' => 'PTS VISIT', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'actual_npt_visit', 'label' => 'NPT VISIT', 'type' => 'number', 'agg' => 'sum', 'class' => 'border-r-[6px] border-white'],
+
+            // SCHEDULE
+            ['key' => 'sched_production', 'label' => 'PRODUCTION', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'sched_pts_visit', 'label' => 'PTS VISIT', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'sched_new_pts_visit', 'label' => 'NEW PTS VISIT', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'open_appt_hours', 'label' => 'OPEN APPT. HOURS', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'unscheduled', 'label' => 'UNSCHEDULED', 'type' => 'number', 'agg' => 'sum', 'class' => 'border-r-[6px] border-white'],
+
+            // VARIANCE
+            ['key' => 'var_production', 'label' => 'PRODUCTION', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'var_pts_visit', 'label' => 'PTS VISIT', 'type' => 'number', 'agg' => 'sum', 'class' => 'border-r-[6px] border-white'],
+
+            // AVERAGE
+            ['key' => 'avg_actual_pvd_visit', 'label' => 'ACTUAL PVD VISIT', 'type' => 'number'],
+            ['key' => 'avg_actual_pvd_prod', 'label' => 'ACTUAL PVD PROD', 'type' => 'money'],
+            ['key' => 'adj_discounts', 'label' => 'ADJ & DISCOUNTS', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'adj_percentage', 'label' => 'ADJ PERCENTAGE', 'type' => 'percent', 'class' => 'border-r-[6px] border-white'],
+
+            // PLACEMENTS
+            ['key' => 'actual_placements', 'label' => 'ACTUAL PLACEMENTS', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'adj_placements', 'label' => 'ADJ PLACEMENTS', 'type' => 'number', 'agg' => 'sum'],
         ];
 
-        return $tableData;
+        $headerGroups = [
+            ['label' => '', 'colspan' => 1, 'class' => 'border-r-[6px] border-white'],
+            ['label' => 'ACTUAL', 'colspan' => 4, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white'],
+            ['label' => 'SCHEDULE', 'colspan' => 5, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white'],
+            ['label' => 'VARIANCE', 'colspan' => 2, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white'],
+            ['label' => 'AVERAGE', 'colspan' => 4, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white'],
+            ['label' => 'PLACEMENTS', 'colspan' => 2, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs'],
+        ];
+
+        $startCarbon = \Carbon\Carbon::parse($start);
+        $endCarbon = \Carbon\Carbon::parse($end);
+
+        $dates = [];
+        $current = $startCarbon->copy();
+        while ($current->lte($endCarbon)) {
+            $dates[$current->format('Y-m-d')] = $current->format('l - F d, Y');
+            $current->addDay();
+        }
+
+        // --- ACTUAL METRICS ---
+        $actualProdQuery = DB::table('od_procedure_logs')
+            ->selectRaw("ProcDate as d, SUM(ProcFee) as gross, COUNT(DISTINCT PatNum) as pts_visits")
+            ->where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end]);
+        if ($clinics) {
+            $actualProdQuery->whereIn('ClinicNum', $clinics);
+        }
+        $actualProd = $actualProdQuery->groupBy('ProcDate')->get()->keyBy('d');
+
+        $colQuery = DB::table('od_pay_splits')
+            ->selectRaw("DatePay as d, SUM(SplitAmt) as total")
+            ->whereBetween('DatePay', [$start, $end]);
+        if ($clinics) {
+            $colQuery->whereIn('ClinicNum', $clinics);
+        }
+        $actualCol = $colQuery->groupBy('DatePay')->pluck('total', 'd');
+
+        $firstVisit = DB::table('od_procedure_logs')
+            ->select('PatNum', DB::raw('MIN(ProcDate) as first_date'))
+            ->where('ProcStatus', 'C')
+            ->groupBy('PatNum');
+        $nptQuery = DB::table('od_procedure_logs as pl')
+            ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
+            ->selectRaw('pl.ProcDate as d, COUNT(DISTINCT pl.PatNum) as npt')
+            ->where('pl.ProcStatus', 'C')
+            ->whereColumn('pl.ProcDate', 'fv.first_date')
+            ->whereBetween('pl.ProcDate', [$start, $end]);
+        if ($clinics) {
+            $nptQuery->whereIn('pl.ClinicNum', $clinics);
+        }
+        $actualNpt = $nptQuery->groupBy('pl.ProcDate')->pluck('npt', 'd');
+
+        // --- SCHEDULE METRICS ---
+        $schedApptsQuery = DB::table('od_appointments')
+            ->selectRaw("LEFT(AptDateTime, 10) as d, COUNT(*) as total")
+            ->where('AptStatus', '1') // Scheduled
+            ->whereRaw("LEFT(AptDateTime, 10) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinics) {
+            $schedApptsQuery->whereIn('ClinicNum', $clinics);
+        }
+        $schedAppts = $schedApptsQuery->groupBy(DB::raw("LEFT(AptDateTime, 10)"))->pluck('total', 'd');
+
+        $schedNptQuery = DB::table('od_appointments')
+            ->selectRaw("LEFT(AptDateTime, 10) as d, COUNT(*) as total")
+            ->where('AptStatus', '1')
+            ->where('IsNewPatient', 1)
+            ->whereRaw("LEFT(AptDateTime, 10) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinics) {
+            $schedNptQuery->whereIn('ClinicNum', $clinics);
+        }
+        $schedNpt = $schedNptQuery->groupBy(DB::raw("LEFT(AptDateTime, 10)"))->pluck('total', 'd');
+
+        $schedProdQuery = DB::table('od_appointments as a')
+            ->join('od_procedure_logs as pl', function ($j) {
+                $j->on('pl.AptNum', '=', 'a.AptNum')
+                    ->orOn('pl.PlannedAptNum', '=', 'a.AptNum');
+            })
+            ->selectRaw("LEFT(a.AptDateTime, 10) as d, SUM(pl.ProcFee) as total")
+            ->where('a.AptStatus', '1')
+            ->whereRaw("LEFT(a.AptDateTime, 10) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinics) {
+            $schedProdQuery->whereIn('a.ClinicNum', $clinics);
+        }
+        $schedProd = $schedProdQuery->groupBy(DB::raw("LEFT(a.AptDateTime, 10)"))->pluck('total', 'd');
+
+        $unscheduledQuery = DB::table('od_appointments')
+            ->selectRaw("LEFT(AptDateTime, 10) as d, COUNT(*) as total")
+            ->where('AptStatus', '5') // Broken/Unscheduled
+            ->whereRaw("LEFT(AptDateTime, 10) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinics) {
+            $unscheduledQuery->whereIn('ClinicNum', $clinics);
+        }
+        $unscheduledData = $unscheduledQuery->groupBy(DB::raw("LEFT(AptDateTime, 10)"))->pluck('total', 'd');
+
+        // --- AVERAGE METRICS ---
+        $adjQuery = DB::table('od_adjustments')
+            ->selectRaw("AdjDate as d, SUM(AdjAmt) as total")
+            ->whereBetween('AdjDate', [$start, $end]);
+        if ($clinics) {
+            $adjQuery->whereIn('ClinicNum', $clinics);
+        }
+        $adjData = $adjQuery->groupBy('AdjDate')->pluck('total', 'd');
+
+        $provCountQuery = DB::table('od_procedure_logs')
+            ->selectRaw("ProcDate as d, COUNT(DISTINCT ProvNum) as providers")
+            ->where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$start, $end]);
+        if ($clinics) {
+            $provCountQuery->whereIn('ClinicNum', $clinics);
+        }
+        $provCount = $provCountQuery->groupBy('ProcDate')->pluck('providers', 'd');
+
+        $rows = [];
+        $tot_ap = 0;
+        $tot_ac = 0;
+        $tot_apv = 0;
+        $tot_anv = 0;
+        $tot_sp = 0;
+        $tot_spv = 0;
+        $tot_snv = 0;
+        $tot_oah = 0;
+        $tot_uns = 0;
+        $tot_adj = 0;
+        $sum_provs = 0;
+        $tot_days = 0;
+
+        foreach ($dates as $d => $dateLabel) {
+            $ap = (float) ($actualProd[$d]->gross ?? 0);
+            $ac = (float) ($actualCol[$d] ?? 0);
+            $apv = (int) ($actualProd[$d]->pts_visits ?? 0);
+            $anv = (int) ($actualNpt[$d] ?? 0);
+
+            $sp = (float) ($schedProd[$d] ?? 0);
+            $spv = (int) ($schedAppts[$d] ?? 0);
+            $snv = (int) ($schedNpt[$d] ?? 0);
+            $oah = 0.0;
+            $uns = (int) ($unscheduledData[$d] ?? 0);
+
+            $var_p = $ap - $sp;
+            $var_v = $apv - $spv;
+
+            $numProv = (int) ($provCount[$d] ?? 0);
+            $avg_pv = $numProv > 0 ? round($apv / $numProv, 2) : 0;
+            $avg_pp = $numProv > 0 ? round($ap / $numProv, 2) : 0;
+
+            $adj = (float) ($adjData[$d] ?? 0);
+            $adj_pct = $ap != 0 ? round(($adj / $ap) * 100, 2) : 0;
+
+            $rows[] = [
+                'date' => $dateLabel,
+                'actual_production' => $ap,
+                'actual_collection' => $ac,
+                'actual_pts_visit' => $apv,
+                'actual_npt_visit' => $anv,
+
+                'sched_production' => $sp,
+                'sched_pts_visit' => $spv,
+                'sched_new_pts_visit' => $snv,
+                'open_appt_hours' => $oah,
+                'unscheduled' => $uns,
+
+                'var_production' => $var_p,
+                'var_pts_visit' => $var_v,
+
+                'avg_actual_pvd_visit' => $avg_pv,
+                'avg_actual_pvd_prod' => $avg_pp,
+                'adj_discounts' => $adj,
+                'adj_percentage' => $adj_pct,
+
+                'actual_placements' => 0,
+                'adj_placements' => 0,
+            ];
+
+            $tot_ap += $ap;
+            $tot_ac += $ac;
+            $tot_apv += $apv;
+            $tot_anv += $anv;
+            $tot_sp += $sp;
+            $tot_spv += $spv;
+            $tot_snv += $snv;
+            $tot_oah += $oah;
+            $tot_uns += $uns;
+            $tot_adj += $adj;
+            $sum_provs += $numProv;
+            $tot_days++;
+        }
+
+        $totalAveragePvdVisit = $sum_provs > 0 ? round($tot_apv / $sum_provs, 2) : 0;
+        $totalAveragePvdProd = $sum_provs > 0 ? round($tot_ap / $sum_provs, 2) : 0;
+        $totalAdjPct = $tot_ap != 0 ? round(($tot_adj / $tot_ap) * 100, 2) : 0;
+
+        $totalRow = [
+            'actual_production' => $tot_ap,
+            'actual_collection' => $tot_ac,
+            'actual_pts_visit' => $tot_apv,
+            'actual_npt_visit' => $tot_anv,
+            'sched_production' => $tot_sp,
+            'sched_pts_visit' => $tot_spv,
+            'sched_new_pts_visit' => $tot_snv,
+            'open_appt_hours' => $tot_oah,
+            'unscheduled' => $tot_uns,
+            'var_production' => $tot_ap - $tot_sp,
+            'var_pts_visit' => $tot_apv - $tot_spv,
+            'avg_actual_pvd_visit' => $totalAveragePvdVisit,
+            'avg_actual_pvd_prod' => $totalAveragePvdProd,
+            'adj_discounts' => $tot_adj,
+            'adj_percentage' => $totalAdjPct,
+            'actual_placements' => 0,
+            'adj_placements' => 0,
+        ];
+
+        return [
+            'header_groups' => $headerGroups,
+            'groups' => [], // Ensure standard groups aren't processed
+            'columns' => $columns,
+            'rows' => $rows,
+            'average' => $this->aggregate($rows, $columns, 'avg'),
+            'total' => $totalRow,
+            'is_compare' => false,
+            'performance_kpis' => [
+                [
+                    'label' => 'Production',
+                    'actual' => $tot_ap,
+                    'goal' => 135000,
+                    'type' => 'currency',
+                ],
+                [
+                    'label' => 'Collection',
+                    'actual' => $tot_ac,
+                    'goal' => 135000,
+                    'type' => 'currency',
+                ],
+                [
+                    'label' => 'Patient Visits',
+                    'actual' => $tot_apv,
+                    'goal' => 200,
+                    'type' => 'number',
+                ],
+                [
+                    'label' => 'New Patient Visits',
+                    'actual' => $tot_anv,
+                    'goal' => 40,
+                    'type' => 'number',
+                ],
+            ]
+        ];
     }
 
     /**
@@ -711,19 +951,86 @@ class OperationsAnalyticsService
         $columns = $this->providerColumns();
         $percentDiff = $subtab === 'percent-diff-last-year';
 
+        $calculateAbsoluteTotal = function (array $rows) {
+            $totalGross = array_sum(array_column($rows, 'gross'));
+            $totalNet = array_sum(array_column($rows, 'net'));
+            $totalAdjustment = array_sum(array_column($rows, 'adjustment'));
+            $totalCollection = array_sum(array_column($rows, 'collection'));
+            $totalPtsVisits = array_sum(array_column($rows, 'pts_visits'));
+            $totalNptVisits = array_sum(array_column($rows, 'npt_visits'));
+            $totalWorkingDays = array_sum(array_column($rows, 'working_days'));
+            $totalProcedures = array_sum(array_column($rows, 'procedures'));
+            // Filter out nulls for goals
+            $goals = array_filter(array_column($rows, 'production_goal'), fn($v) => $v !== null);
+            $totalGoal = count($goals) > 0 ? array_sum($goals) : null;
+
+            return [
+                'gross' => $totalGross,
+                'net' => $totalNet,
+                'adjustment' => $totalAdjustment,
+                'collection' => $totalCollection,
+                'pts_visits' => $totalPtsVisits,
+                'npt_visits' => $totalNptVisits,
+                'working_days' => $totalWorkingDays,
+                'procedures' => $totalProcedures,
+                'retention' => null,
+                'pwd_production' => $totalWorkingDays > 0 ? round($totalNet / $totalWorkingDays, 2) : 0,
+                'pwd_collection' => $totalWorkingDays > 0 ? round($totalCollection / $totalWorkingDays, 2) : 0,
+                'pwd_pts_visits' => $totalWorkingDays > 0 ? round($totalPtsVisits / $totalWorkingDays, 2) : 0,
+                'pwd_npt_visits' => $totalWorkingDays > 0 ? round($totalNptVisits / $totalWorkingDays, 2) : 0,
+                'ppv_production' => $totalPtsVisits > 0 ? round($totalNet / $totalPtsVisits, 2) : 0,
+                'ppv_collection' => $totalPtsVisits > 0 ? round($totalCollection / $totalPtsVisits, 2) : 0,
+                'ppv_procedures' => $totalPtsVisits > 0 ? round($totalProcedures / $totalPtsVisits, 2) : 0,
+                'pp_production' => $totalProcedures > 0 ? round($totalNet / $totalProcedures, 2) : 0,
+                'pp_collection' => $totalProcedures > 0 ? round($totalCollection / $totalProcedures, 2) : 0,
+                'production_goal' => $totalGoal,
+                'actual_production' => $totalNet,
+                'variance' => $totalGoal !== null ? round($totalNet - $totalGoal, 2) : null,
+            ];
+        };
+
         if ($subtab === 'diff-last-year' || $percentDiff) {
             [$lyStart, $lyEnd] = $this->shiftYear($start, $end);
-            $current = $this->keyByField($this->providerRows($start, $end, $clinics), 'row_key');
-            $last = $this->keyByField($this->providerRows($lyStart, $lyEnd, $clinics), 'row_key');
+            $currentRows = $this->providerRows($start, $end, $clinics);
+            $lastRows = $this->providerRows($lyStart, $lyEnd, $clinics);
+
+            $current = $this->keyByField($currentRows, 'row_key');
+            $last = $this->keyByField($lastRows, 'row_key');
             $rows = $this->combine($current, $last, $columns, $percentDiff);
+
+            $currentTotal = $calculateAbsoluteTotal($currentRows);
+            $lastTotal = $calculateAbsoluteTotal($lastRows);
+
+            $total = [];
+            foreach ($columns as $col) {
+                $key = $col['key'];
+                if (($col['type'] ?? '') === 'text') {
+                    continue;
+                }
+                $a = $currentTotal[$key] ?? null;
+                $b = $lastTotal[$key] ?? null;
+
+                if ($a === null || $b === null) {
+                    $total[$key] = null;
+                } elseif ($percentDiff) {
+                    $total[$key] = $b != 0 ? round(($a - $b) / abs($b) * 100, 2) : null;
+                } else {
+                    $total[$key] = round($a - $b, 2);
+                }
+            }
+        } elseif ($subtab === 'last-year') {
+            [$start, $end] = $this->shiftYear($start, $end);
+            $rows = $this->providerRows($start, $end, $clinics);
+            $total = $calculateAbsoluteTotal($rows);
         } else {
             $rows = $this->providerRows($start, $end, $clinics);
+            $total = $calculateAbsoluteTotal($rows);
         }
 
         return [
             'groups' => [
-                ['label' => 'By Provider',       'span' => 9],
-                ['label' => 'Per Working Day',   'span' => 4],
+                ['label' => 'By Provider', 'span' => 9],
+                ['label' => 'Per Working Day', 'span' => 4],
                 ['label' => 'Per Patient Visit', 'span' => 3],
                 ['label' => 'Per Procedure', 'span' => 2],
                 ['label' => 'Provider Goals', 'span' => 3],
@@ -731,7 +1038,7 @@ class OperationsAnalyticsService
             'columns' => $percentDiff ? $this->asPercentColumns($columns) : $columns,
             'rows' => $rows,
             'average' => $this->aggregate($rows, $columns, 'avg'),
-            'total' => $this->aggregate($rows, $columns, $percentDiff ? 'avg' : 'total'),
+            'total' => $total,
         ];
     }
 
@@ -798,7 +1105,7 @@ class OperationsAnalyticsService
 
         $rows = [];
         foreach ($prod as $p) {
-            $key = $p->ClinicNum.'|'.$p->ProvNum;
+            $key = $p->ClinicNum . '|' . $p->ProvNum;
             $gross = (float) $p->gross;
             $adjustment = (float) ($adj[$key] ?? 0);
             $writeoff = (float) ($wo[$key] ?? 0);
@@ -811,8 +1118,8 @@ class OperationsAnalyticsService
 
             $prov = $providers[$p->ProvNum] ?? null;
             $name = $prov
-                ? trim(($prov->LName ?? '').(($prov->LName && $prov->PName) ? ', ' : '').($prov->PName ?? ''))
-                : ('Provider '.$p->ProvNum);
+                ? trim(($prov->LName ?? '') . (($prov->LName && $prov->PName) ? ', ' : '') . ($prov->PName ?? ''))
+                : ('Provider ' . $p->ProvNum);
 
             // Production Goal = Hourly Goal (OpenDental) × scheduled hours in range.
             // Null when either input is missing (matches Jarvis "goal can't calculate").
@@ -823,9 +1130,9 @@ class OperationsAnalyticsService
             $rows[] = [
                 'row_key' => $key,
                 'clinic_num' => (int) $p->ClinicNum,
-                'location' => $this->clinicNames[(int) $p->ClinicNum] ?? ('Location '.$p->ClinicNum),
-                'provider' => $name !== '' ? $name : ('Provider '.$p->ProvNum),
-                'provider_id' => $p->ProvNum.($prov && $prov->Abbr ? ' - '.$prov->Abbr : ''),
+                'location' => $this->clinicNames[(int) $p->ClinicNum] ?? ('Location ' . $p->ClinicNum),
+                'provider' => $name !== '' ? $name : ('Provider ' . $p->ProvNum),
+                'provider_id' => $p->ProvNum . ($prov && $prov->Abbr ? ' - ' . $prov->Abbr : ''),
                 'gross' => round($gross, 2),
                 'net' => round($net, 2),
                 'adjustment' => round($adjustment, 2),
@@ -851,7 +1158,7 @@ class OperationsAnalyticsService
         }
 
         // Highest producers first, matching Jarvis default ordering.
-        usort($rows, fn ($a, $b) => $b['gross'] <=> $a['gross']);
+        usort($rows, fn($a, $b) => $b['gross'] <=> $a['gross']);
 
         return $rows;
     }
@@ -868,7 +1175,7 @@ class OperationsAnalyticsService
 
         $out = [];
         foreach ($q->groupBy('ClinicNum', 'ProvNum')->get() as $r) {
-            $out[$r->ClinicNum.'|'.$r->ProvNum] = (float) $r->total;
+            $out[$r->ClinicNum . '|' . $r->ProvNum] = (float) $r->total;
         }
 
         return $out;
@@ -891,7 +1198,7 @@ class OperationsAnalyticsService
 
         $out = [];
         foreach ($q->groupBy('ClinicNum', 'ProvNum')->get() as $r) {
-            $out[$r->ClinicNum.'|'.$r->ProvNum] = (float) $r->hours;
+            $out[$r->ClinicNum . '|' . $r->ProvNum] = (float) $r->hours;
         }
 
         return $out;
@@ -917,7 +1224,7 @@ class OperationsAnalyticsService
 
         $out = [];
         foreach ($q->groupBy('pl.ClinicNum', 'pl.ProvNum')->get() as $r) {
-            $out[$r->ClinicNum.'|'.$r->ProvNum] = (int) $r->npt;
+            $out[$r->ClinicNum . '|' . $r->ProvNum] = (int) $r->npt;
         }
 
         return $out;
@@ -926,14 +1233,14 @@ class OperationsAnalyticsService
     private function cancellationColumns(): array
     {
         return [
-            ['key' => 'location',                         'label' => 'Location',                  'type' => 'text',    'sticky' => true],
-            ['key' => 'cancellation',                     'label' => 'Cancellation',              'type' => 'number',  'agg' => 'sum', 'heat' => 'invert'],
-            ['key' => 'cancellation_dollars',             'label' => 'Cancellation $',            'type' => 'money',   'agg' => 'sum', 'heat' => 'invert'],
-            ['key' => 'cancellation_rescheduled',         'label' => 'Cancellation Rescheduled',  'type' => 'number',  'agg' => 'sum'],
-            ['key' => 'cancellation_rescheduled_dollars', 'label' => 'Cancellation Rescheduled $', 'type' => 'money',   'agg' => 'sum'],
-            ['key' => 'cancellation_pct',                 'label' => '% Cancellation',            'type' => 'percent', 'heat' => 'invert'],
-            ['key' => 'rescheduled_pct',                  'label' => '% Rescheduled',             'type' => 'percent'],
-            ['key' => 'total_appointments',               'label' => 'Total Appointments Count',  'type' => 'number',  'agg' => 'sum'],
+            ['key' => 'location', 'label' => 'Location', 'type' => 'text', 'sticky' => true],
+            ['key' => 'cancellation', 'label' => 'Cancellation', 'type' => 'number', 'agg' => 'sum', 'heat' => 'invert'],
+            ['key' => 'cancellation_dollars', 'label' => 'Cancellation $', 'type' => 'money', 'agg' => 'sum', 'heat' => 'invert'],
+            ['key' => 'cancellation_rescheduled', 'label' => 'Cancellation Rescheduled', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'cancellation_rescheduled_dollars', 'label' => 'Cancellation Rescheduled $', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'cancellation_pct', 'label' => '% Cancellation', 'type' => 'percent', 'heat' => 'invert'],
+            ['key' => 'rescheduled_pct', 'label' => '% Rescheduled', 'type' => 'percent'],
+            ['key' => 'total_appointments', 'label' => 'Total Appointments Count', 'type' => 'number', 'agg' => 'sum'],
         ];
     }
 
@@ -974,7 +1281,7 @@ class OperationsAnalyticsService
 
             $rows[] = [
                 'clinic_num' => (int) $c,
-                'location' => $this->clinicNames[(int) $c] ?? ('Location '.$c),
+                'location' => $this->clinicNames[(int) $c] ?? ('Location ' . $c),
                 'cancellation' => $cancellation,
                 'cancellation_dollars' => round((float) ($dollars[$c] ?? 0), 2),
                 'cancellation_rescheduled' => null, // rescheduling rule pending
@@ -1014,20 +1321,20 @@ class OperationsAnalyticsService
         return [
             ['key' => 'location', 'label' => 'Location', 'type' => 'text', 'sticky' => true],
             // By Office
-            ['key' => 'gross',               'label' => 'Gross Prod',            'type' => 'money',   'agg' => 'sum'],
-            ['key' => 'adjustment',          'label' => 'Adjustment',            'type' => 'money',   'agg' => 'sum'],
-            ['key' => 'adj_pct',             'label' => 'Adjustment % of Prod',  'type' => 'percent'],
-            ['key' => 'net',                 'label' => 'Net Prod',              'type' => 'money',   'agg' => 'sum'],
-            ['key' => 'collection',          'label' => 'Collection',            'type' => 'money',   'agg' => 'sum'],
-            ['key' => 'coll_pct',            'label' => 'Collection %',          'type' => 'percent'],
-            ['key' => 'pts_visit',           'label' => 'Pts Visit',             'type' => 'number',  'agg' => 'sum'],
-            ['key' => 'unique_pts',          'label' => '# of Unique Pts',       'type' => 'number',  'agg' => 'sum'],
-            ['key' => 'npt_visit',           'label' => 'Npt Visit',             'type' => 'number',  'agg' => 'sum'],
-            ['key' => 'new_patient_dollars', 'label' => 'New Patient $',         'type' => 'money',   'agg' => 'sum'],
-            ['key' => 'act_pts_reservation', 'label' => 'Act Pts w/ Reservation', 'type' => 'number',  'agg' => 'sum'],
-            ['key' => 'act_pts',             'label' => 'Act Pts',               'type' => 'number',  'agg' => 'sum'],
-            ['key' => 'retention',           'label' => 'Retention',             'type' => 'percent'],
-            ['key' => 'working_days',        'label' => 'Working Days',          'type' => 'number'],
+            ['key' => 'gross', 'label' => 'Gross Prod', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'adjustment', 'label' => 'Adjustment', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'adj_pct', 'label' => 'Adjustment % of Prod', 'type' => 'percent'],
+            ['key' => 'net', 'label' => 'Net Prod', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'collection', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'coll_pct', 'label' => 'Collection %', 'type' => 'percent'],
+            ['key' => 'pts_visit', 'label' => 'Pts Visit', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'unique_pts', 'label' => '# of Unique Pts', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'npt_visit', 'label' => 'Npt Visit', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'new_patient_dollars', 'label' => 'New Patient $', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'act_pts_reservation', 'label' => 'Act Pts w/ Reservation', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'act_pts', 'label' => 'Act Pts', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'retention', 'label' => 'Retention', 'type' => 'percent'],
+            ['key' => 'working_days', 'label' => 'Working Days', 'type' => 'number'],
             // Per Working Day
             ['key' => 'pwd_production', 'label' => 'Production', 'type' => 'money'],
             ['key' => 'pwd_collection', 'label' => 'Collection', 'type' => 'money'],
@@ -1079,7 +1386,7 @@ class OperationsAnalyticsService
 
             $rows[] = [
                 'clinic_num' => (int) $c,
-                'location' => $this->clinicNames[(int) $c] ?? ('Location '.$c),
+                'location' => $this->clinicNames[(int) $c] ?? ('Location ' . $c),
                 'gross' => round($gross, 2),
                 'adjustment' => round($adjustment, 2),
                 'adj_pct' => $gross > 0 ? round($adjustment / $gross * 100, 2) : 0,
@@ -1253,7 +1560,7 @@ class OperationsAnalyticsService
     {
         $out = [];
         foreach ($rows as $r) {
-            $out[$r['plan_num'].'|'.$r['clinic_num']] = $r;
+            $out[$r['plan_num'] . '|' . $r['clinic_num']] = $r;
         }
 
         return $out;
@@ -1379,7 +1686,7 @@ class OperationsAnalyticsService
         $topServices = [];
         foreach ($topServicesQuery as $ts) {
             $topServices[] = [
-                'label' => $ts->ProcCode.' '.$ts->Descript,
+                'label' => $ts->ProcCode . ' ' . $ts->Descript,
                 'count' => (int) $ts->cnt,
             ];
         }
@@ -1388,8 +1695,8 @@ class OperationsAnalyticsService
         $nptYtdVisits = 0;
         $nptMtdVisits = 0;
 
-        $ytdStart = substr($end, 0, 4).'-01-01'; // yyyy-01-01
-        $mtdStart = substr($end, 0, 7).'-01';    // yyyy-mm-01
+        $ytdStart = substr($end, 0, 4) . '-01-01'; // yyyy-01-01
+        $mtdStart = substr($end, 0, 7) . '-01';    // yyyy-mm-01
 
         $firstVisits = DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) as first_date'))
@@ -1418,7 +1725,7 @@ class OperationsAnalyticsService
             ->select('pt.PatNum', 'pt.Birthdate')
             ->where('pl.ProcStatus', 'C')
             ->whereBetween('pl.ProcDate', [$start, $end])
-            ->where('pt.PatStatus', 1); // 1 = Active
+            ->where('pt.PatStatus', 0); // 0 = Patient (Active)
 
         if ($clinics) {
             $qAct->whereIn('pl.ClinicNum', $clinics);
@@ -1427,43 +1734,43 @@ class OperationsAnalyticsService
         $activePatients = $qAct->distinct()->get();
 
         $brackets = [
-            '0-5' => 0,
-            '6-12' => 0,
-            '13-17' => 0,
-            '18-25' => 0,
-            '26-35' => 0,
-            '36-45' => 0,
-            '46-60' => 0,
-            '61+' => 0,
+            '0-9' => 0,
+            '10-19' => 0,
+            '20-29' => 0,
+            '30-39' => 0,
+            '40-49' => 0,
+            '50-59' => 0,
+            '60-69' => 0,
+            '>=70' => 0,
         ];
 
         $totalActive = 0;
         $currentDate = new \DateTime($end);
 
         foreach ($activePatients as $pt) {
-            if (! $pt->Birthdate || $pt->Birthdate == '0001-01-01' || $pt->Birthdate == '1880-01-01') {
+            if (!$pt->Birthdate || $pt->Birthdate == '0001-01-01' || $pt->Birthdate == '1880-01-01') {
                 continue;
             }
             try {
                 $dob = new \DateTime($pt->Birthdate);
                 $age = $currentDate->diff($dob)->y;
 
-                if ($age <= 5) {
-                    $brackets['0-5']++;
-                } elseif ($age <= 12) {
-                    $brackets['6-12']++;
-                } elseif ($age <= 17) {
-                    $brackets['13-17']++;
-                } elseif ($age <= 25) {
-                    $brackets['18-25']++;
-                } elseif ($age <= 35) {
-                    $brackets['26-35']++;
-                } elseif ($age <= 45) {
-                    $brackets['36-45']++;
-                } elseif ($age <= 60) {
-                    $brackets['46-60']++;
+                if ($age <= 9) {
+                    $brackets['0-9']++;
+                } elseif ($age <= 19) {
+                    $brackets['10-19']++;
+                } elseif ($age <= 29) {
+                    $brackets['20-29']++;
+                } elseif ($age <= 39) {
+                    $brackets['30-39']++;
+                } elseif ($age <= 49) {
+                    $brackets['40-49']++;
+                } elseif ($age <= 59) {
+                    $brackets['50-59']++;
+                } elseif ($age <= 69) {
+                    $brackets['60-69']++;
                 } else {
-                    $brackets['61+']++;
+                    $brackets['>=70']++;
                 }
 
                 $totalActive++;
@@ -1549,15 +1856,15 @@ class OperationsAnalyticsService
         foreach ($data as $r) {
             $prov = $providers[$r->ProvNum] ?? null;
             $name = $prov
-                ? trim(($prov->LName ?? '').(($prov->LName && $prov->PName) ? ', ' : '').($prov->PName ?? ''))
-                : ('Provider '.$r->ProvNum);
+                ? trim(($prov->LName ?? '') . (($prov->LName && $prov->PName) ? ', ' : '') . ($prov->PName ?? ''))
+                : ('Provider ' . $r->ProvNum);
 
             $catName = isset($cats[$r->ProcCat]) ? $cats[$r->ProcCat]->ItemName : 'General';
 
             $rows[] = [
-                'row_key' => $r->ClinicNum.'|'.$r->ProvNum.'|'.$r->ProcCode,
+                'row_key' => $r->ClinicNum . '|' . $r->ProvNum . '|' . $r->ProcCode,
                 'service' => $r->Descript,
-                'location' => $this->clinicNames[(int) $r->ClinicNum] ?? ('Location '.$r->ClinicNum),
+                'location' => $this->clinicNames[(int) $r->ClinicNum] ?? ('Location ' . $r->ClinicNum),
                 'provider' => $name,
                 'code' => $r->ProcCode,
                 'type' => $catName,
@@ -1567,7 +1874,7 @@ class OperationsAnalyticsService
             ];
         }
 
-        usort($rows, fn ($a, $b) => $b['count'] <=> $a['count']);
+        usort($rows, fn($a, $b) => $b['count'] <=> $a['count']);
 
         return $rows;
     }
@@ -1616,8 +1923,8 @@ class OperationsAnalyticsService
         // The table columns use the Current year's month labels
         while ($tDt->format('Y-m') <= $eDt->format('Y-m')) {
             $m = $tDt->format('Y-m');
-            $months[$m] = 'm_'.$mIdx;
-            $columns[] = ['key' => 'm_'.$mIdx, 'label' => $tDt->format('M Y'), 'type' => $metricType, 'agg' => 'sum'];
+            $months[$m] = 'm_' . $mIdx;
+            $columns[] = ['key' => 'm_' . $mIdx, 'label' => $tDt->format('M Y'), 'type' => $metricType, 'agg' => 'sum'];
             $tDt->modify('+1 month');
             $mIdx++;
         }
@@ -1630,12 +1937,12 @@ class OperationsAnalyticsService
         $getGroups = function ($startRange, $endRange) use ($metric, $clinics, $mIdx) {
             if ($metric === 'visits') {
                 $qTab = DB::table('od_procedure_logs')
-                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, ".MetricDefinitions::patientVisits('val'))
+                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, " . MetricDefinitions::patientVisits('val'))
                     ->where('ProcStatus', 'C')
                     ->whereBetween('ProcDate', [$startRange, $endRange]);
             } else {
                 $qTab = DB::table('od_procedure_logs')
-                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, ".MetricDefinitions::grossProduction('val'))
+                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, " . MetricDefinitions::grossProduction('val'))
                     ->where('ProcStatus', 'C')
                     ->whereBetween('ProcDate', [$startRange, $endRange]);
             }
@@ -1649,22 +1956,22 @@ class OperationsAnalyticsService
             $grouped = [];
             foreach ($tabData as $row) {
                 $loc = (int) $row->ClinicNum;
-                if (! isset($grouped[$loc])) {
+                if (!isset($grouped[$loc])) {
                     $grouped[$loc] = [];
                     for ($i = 0; $i < $mIdx; $i++) {
-                        $grouped[$loc]['m_'.$i] = 0;
+                        $grouped[$loc]['m_' . $i] = 0;
                     }
                 }
 
                 // Align chronological months to m_0 .. m_12
                 // Since data fetched is strictly inside the 13-month range, we can just sort the months sequentially.
                 // Wait! To be absolutely safe we can calculate month offset from the startRange
-                $rowDate = new \DateTime($row->month.'-01');
-                $startDate = new \DateTime(substr($startRange, 0, 7).'-01');
+                $rowDate = new \DateTime($row->month . '-01');
+                $startDate = new \DateTime(substr($startRange, 0, 7) . '-01');
                 $diffMonths = ($rowDate->format('Y') - $startDate->format('Y')) * 12 + ($rowDate->format('m') - $startDate->format('m'));
 
                 if ($diffMonths >= 0 && $diffMonths < $mIdx) {
-                    $grouped[$loc]['m_'.$diffMonths] = (float) $row->val;
+                    $grouped[$loc]['m_' . $diffMonths] = (float) $row->val;
                 }
             }
 
@@ -1685,7 +1992,7 @@ class OperationsAnalyticsService
             $allLocs = array_unique(array_merge(array_keys($currGrouped), array_keys($prevGrouped)));
 
             foreach ($allLocs as $loc) {
-                $locName = $this->clinicNames[$loc] ?? ('Location '.$loc);
+                $locName = $this->clinicNames[$loc] ?? ('Location ' . $loc);
                 $curr = $currGrouped[$loc] ?? array_fill(0, $mIdx, 0);
                 $prev = $prevGrouped[$loc] ?? array_fill(0, $mIdx, 0);
 
@@ -1694,27 +2001,27 @@ class OperationsAnalyticsService
                 $pVals = [];
                 $dVals = [];
                 for ($i = 0; $i < $mIdx; $i++) {
-                    $c = $curr['m_'.$i] ?? 0;
-                    $p = $prev['m_'.$i] ?? 0;
-                    $cVals['m_'.$i] = $c;
-                    $pVals['m_'.$i] = $p;
-                    $dVals['m_'.$i] = $c - $p;
+                    $c = $curr['m_' . $i] ?? 0;
+                    $p = $prev['m_' . $i] ?? 0;
+                    $cVals['m_' . $i] = $c;
+                    $pVals['m_' . $i] = $p;
+                    $dVals['m_' . $i] = $c - $p;
                 }
 
                 $tableRows[] = array_merge([
-                    'row_key' => 'loc_'.$loc.'_curr',
+                    'row_key' => 'loc_' . $loc . '_curr',
                     'location' => $locName,
                     'type_label' => 'Current',
                 ], $cVals);
 
                 $tableRows[] = array_merge([
-                    'row_key' => 'loc_'.$loc.'_prev',
+                    'row_key' => 'loc_' . $loc . '_prev',
                     'location' => '',
                     'type_label' => 'Previous',
                 ], $pVals);
 
                 $tableRows[] = array_merge([
-                    'row_key' => 'loc_'.$loc.'_diff',
+                    'row_key' => 'loc_' . $loc . '_diff',
                     'location' => '',
                     'type_label' => 'Difference',
                 ], $dVals);
@@ -1725,14 +2032,14 @@ class OperationsAnalyticsService
             $currGrouped = $getGroups($thirt_start, $end);
             foreach ($currGrouped as $loc => $vals) {
                 $r = [
-                    'row_key' => 'loc_'.$loc,
-                    'location' => $this->clinicNames[$loc] ?? ('Location '.$loc),
+                    'row_key' => 'loc_' . $loc,
+                    'location' => $this->clinicNames[$loc] ?? ('Location ' . $loc),
                 ];
                 foreach ($vals as $k => $v) {
                     $r[$k] = $v;
                 }
                 $lastYearVal = $vals['m_0'];
-                $currVal = $vals['m_'.($mIdx - 1)];
+                $currVal = $vals['m_' . ($mIdx - 1)];
 
                 if ($lastYearVal > 0) {
                     $r['diff'] = round((($currVal - $lastYearVal) / $lastYearVal) * 100, 2);
@@ -1760,22 +2067,22 @@ class OperationsAnalyticsService
             $pTot = [];
             $dTot = [];
             for ($i = 0; $i < $mIdx; $i++) {
-                $cTot['m_'.$i] = 0;
-                $pTot['m_'.$i] = 0;
-                $dTot['m_'.$i] = 0;
+                $cTot['m_' . $i] = 0;
+                $pTot['m_' . $i] = 0;
+                $dTot['m_' . $i] = 0;
             }
             foreach ($tableRows as $r) {
                 if ($r['type_label'] === 'Current') {
                     for ($i = 0; $i < $mIdx; $i++) {
-                        $cTot['m_'.$i] += $r['m_'.$i];
+                        $cTot['m_' . $i] += $r['m_' . $i];
                     }
                 } elseif ($r['type_label'] === 'Previous') {
                     for ($i = 0; $i < $mIdx; $i++) {
-                        $pTot['m_'.$i] += $r['m_'.$i];
+                        $pTot['m_' . $i] += $r['m_' . $i];
                     }
                 } elseif ($r['type_label'] === 'Difference') {
                     for ($i = 0; $i < $mIdx; $i++) {
-                        $dTot['m_'.$i] += $r['m_'.$i];
+                        $dTot['m_' . $i] += $r['m_' . $i];
                     }
                 }
             }
@@ -1813,14 +2120,14 @@ class OperationsAnalyticsService
 
         if ($metric === 'visits') {
             $query = DB::table('od_procedure_logs')
-                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, ".MetricDefinitions::patientVisits('val'))
+                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, " . MetricDefinitions::patientVisits('val'))
                 ->where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$start, $end]);
         } else {
             // production / collection
             // In a real jarvis app, collection comes from od_claimproc or od_paysplit. For prototyping consistency, production uses ProcFee.
             $query = DB::table('od_procedure_logs')
-                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, ".MetricDefinitions::grossProduction('val'))
+                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, " . MetricDefinitions::grossProduction('val'))
                 ->where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$start, $end]);
         }
@@ -1850,7 +2157,7 @@ class OperationsAnalyticsService
         ];
 
         for ($i = 1; $i <= $daysNum; $i++) {
-            $columns[] = ['key' => 'd_'.$i, 'label' => (string) $i, 'type' => 'yn_badge'];
+            $columns[] = ['key' => 'd_' . $i, 'label' => (string) $i, 'type' => 'yn_badge'];
         }
 
         // We leverage od_procedure_logs generically simulating daily batch volume checks to secure structural stability
@@ -1871,7 +2178,7 @@ class OperationsAnalyticsService
         $grouped = [];
         foreach ($tabData as $row) {
             $loc = (int) $row->ClinicNum;
-            if (! isset($grouped[$loc])) {
+            if (!isset($grouped[$loc])) {
                 $grouped[$loc] = [];
             }
             if ($row->c > 0) {
@@ -1884,11 +2191,11 @@ class OperationsAnalyticsService
         foreach ($locs as $loc) {
             $vals = $grouped[$loc] ?? [];
             $r = [
-                'row_key' => 'loc_'.$loc,
-                'location' => $this->clinicNames[$loc] ?? ('Location '.$loc),
+                'row_key' => 'loc_' . $loc,
+                'location' => $this->clinicNames[$loc] ?? ('Location ' . $loc),
             ];
             for ($i = 1; $i <= $daysNum; $i++) {
-                $r['d_'.$i] = isset($vals[$i]) ? 'Y' : 'N';
+                $r['d_' . $i] = isset($vals[$i]) ? 'Y' : 'N';
             }
             $tableRows[] = $r;
         }
@@ -1929,7 +2236,7 @@ class OperationsAnalyticsService
         ];
 
         $qLogs = DB::table('od_procedure_logs')
-            ->selectRaw('ClinicNum, ProvNum, '.MetricDefinitions::grossProduction('total_fee').', COUNT(*) as c_procs, '.MetricDefinitions::patientVisits('c_visits'))
+            ->selectRaw('ClinicNum, ProvNum, ' . MetricDefinitions::grossProduction('total_fee') . ', COUNT(*) as c_procs, ' . MetricDefinitions::patientVisits('c_visits'))
             ->where('ProcStatus', 'C')
             ->whereBetween('ProcDate', [$start, $end]);
 
@@ -1943,9 +2250,9 @@ class OperationsAnalyticsService
 
         foreach ($res as $l) {
             $r = [
-                'row_key' => $l->ClinicNum.'_'.$l->ProvNum,
-                'location' => $this->clinicNames[$l->ClinicNum] ?? 'Location '.$l->ClinicNum,
-                'provider' => 'Provider '.$l->ProvNum,
+                'row_key' => $l->ClinicNum . '_' . $l->ProvNum,
+                'location' => $this->clinicNames[$l->ClinicNum] ?? 'Location ' . $l->ClinicNum,
+                'provider' => 'Provider ' . $l->ProvNum,
                 'pwd_prod' => (float) $l->total_fee / 20,
                 'pwd_visits' => (int) $l->c_visits,
                 'ppv_prod' => $l->c_visits > 0 ? (float) $l->total_fee / $l->c_visits : 0,
@@ -1999,7 +2306,7 @@ class OperationsAnalyticsService
             $startCarbon = \Carbon\Carbon::parse($start)->startOfDay();
 
             $baseFilter = function ($q) use ($clinics, $zip) {
-                if (! empty($clinics)) {
+                if (!empty($clinics)) {
                     $q->whereIn('pl.ClinicNum', $clinics);
                 }
                 if ($zip !== 'ALL') {
@@ -2178,7 +2485,7 @@ class OperationsAnalyticsService
             ->where('pl.ProcStatus', 'C')
             ->whereBetween('fv.first_date', [$start, $end]);
 
-        if (! empty($clinics)) {
+        if (!empty($clinics)) {
             $newPatsQuery->whereIn('pl.ClinicNum', $clinics);
         }
 
@@ -2202,7 +2509,7 @@ class OperationsAnalyticsService
             ->where('pl.ProcStatus', 'C')
             ->whereBetween('pl.ProcDate', [$start, $end]);
 
-        if (! empty($clinics)) {
+        if (!empty($clinics)) {
             $allOpsQuery->whereIn('pl.ClinicNum', $clinics);
         }
         if ($zip !== 'ALL') {
@@ -2223,10 +2530,10 @@ class OperationsAnalyticsService
                 $ref = $op->City ?: 'Unknown Referral';
                 $referrals[$ref] = ($referrals[$ref] ?? 0) + 1;
 
-                $pay = $op->PlanNum ? 'Plan '.$op->PlanNum : 'No Insurance';
+                $pay = $op->PlanNum ? 'Plan ' . $op->PlanNum : 'No Insurance';
                 $payors[$pay] = ($payors[$pay] ?? 0) + 1;
 
-                $emp = $op->EmployerNum ? 'Employer '.$op->EmployerNum : 'No Employer';
+                $emp = $op->EmployerNum ? 'Employer ' . $op->EmployerNum : 'No Employer';
                 $employers[$emp] = ($employers[$emp] ?? 0) + 1;
             }
 
@@ -2249,7 +2556,7 @@ class OperationsAnalyticsService
             if ($isExisting && $isPatNew) {
                 continue;
             }
-            if (! $isExisting && ! $isPatNew) {
+            if (!$isExisting && !$isPatNew) {
                 continue;
             }
 
@@ -2257,7 +2564,7 @@ class OperationsAnalyticsService
                 ? $this->getReferralName($op->City, $op->PatNum)
                 : $this->getPayorName($op->PlanNum);
 
-            if (! isset($grouped[$groupName])) {
+            if (!isset($grouped[$groupName])) {
                 $grouped[$groupName] = [
                     'entity' => $groupName,
                     'patient_ids' => [],
@@ -2269,7 +2576,7 @@ class OperationsAnalyticsService
             $grouped[$groupName]['patient_ids'][$op->PatNum] = true;
             $grouped[$groupName]['production'] += (float) $op->ProcFee;
 
-            if (! $isExisting) {
+            if (!$isExisting) {
                 $firstDate = $newPatFirstDates[$op->PatNum] ?? null;
                 if ($firstDate && substr($op->ProcDate, 0, 10) === substr($firstDate, 0, 10)) {
                     $grouped[$groupName]['first_visit_production'] += (float) $op->ProcFee;
@@ -2289,7 +2596,7 @@ class OperationsAnalyticsService
         // Fetch basic info for patients (for details popups)
         $patientsInfo = [];
         $lifetimeData = [];
-        if (! empty($flatPatIds)) {
+        if (!empty($flatPatIds)) {
             $patientsInfo = DB::table('od_patients')
                 ->select('PatNum', 'LName', 'FName', 'HmPhone', 'Email')
                 ->whereIn('PatNum', $flatPatIds)
@@ -2335,7 +2642,7 @@ class OperationsAnalyticsService
                 $pat = $patientsInfo[$pid] ?? null;
                 $details[] = [
                     'pat_num' => $pid,
-                    'name' => $pat ? ($pat->FName.' '.$pat->LName) : ('Patient '.$pid),
+                    'name' => $pat ? ($pat->FName . ' ' . $pat->LName) : ('Patient ' . $pid),
                     'phone' => $pat ? $pat->HmPhone : '—',
                     'email' => $pat ? $pat->Email : '—',
                     'production' => $patientRangeProd[$pid] ?? 0.0,
@@ -2370,7 +2677,7 @@ class OperationsAnalyticsService
         }
         unset($row);
 
-        usort($tableRows, fn ($a, $b) => $b['production'] <=> $a['production']);
+        usort($tableRows, fn($a, $b) => $b['production'] <=> $a['production']);
 
         // Color coding tiers
         $numRows = count($tableRows);
@@ -2402,7 +2709,7 @@ class OperationsAnalyticsService
 
         foreach ($tableRows as $tr) {
             $totalFooter['production'] += $tr['production'];
-            if (! $isExisting) {
+            if (!$isExisting) {
                 $totalFooter['first_visit_production'] += $tr['first_visit_production'];
             }
             $totalFooter['visits'] += $tr['visits'];
@@ -2512,7 +2819,7 @@ class OperationsAnalyticsService
             10 => 'Ameritas Active Life',
         ];
 
-        return $carriers[$planNum] ?? ($carriers[$planNum % 10 + 1].' (Plan '.$planNum.')');
+        return $carriers[$planNum] ?? ($carriers[$planNum % 10 + 1] . ' (Plan ' . $planNum . ')');
     }
 
     private function getReferralName($cityVal, $patNum): string
@@ -2532,10 +2839,10 @@ class OperationsAnalyticsService
             ];
             $idx = (int) $patNum % 10;
 
-            return $sources[$idx].' - '.($patNum % 100 + 120);
+            return $sources[$idx] . ' - ' . ($patNum % 100 + 120);
         }
 
-        return $cityVal.' Referral Center';
+        return $cityVal . ' Referral Center';
     }
 
     public function monthlyPracticeScorecards(string $start, string $end, ?string $subtab, array $clinics): array

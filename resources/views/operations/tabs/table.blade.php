@@ -134,11 +134,23 @@
         <table class="w-full text-left border-collapse whitespace-nowrap" style="min-width: max-content;">
             <thead class="sticky top-0 z-50 shadow-sm bg-white ring-1 ring-gray-200">
                 @if (! empty($groups))
+                    @php
+                        $currentIndex = $leadSpan - 1;
+                        if (isset($columns[$currentIndex])) {
+                            $columns[$currentIndex]['class'] = trim(($columns[$currentIndex]['class'] ?? '') . ' border-r-[6px] border-white');
+                        }
+                        foreach ($groups as $g) {
+                            $currentIndex += $g['span'];
+                            if (isset($columns[$currentIndex])) {
+                                $columns[$currentIndex]['class'] = trim(($columns[$currentIndex]['class'] ?? '') . ' border-r-[6px] border-white');
+                            }
+                        }
+                    @endphp
                     <tr class="bg-white">
-                        <th colspan="{{ $leadSpan }}" class="{{ $thBase }}"></th>
+                        <th colspan="{{ $leadSpan }}" class="{{ $thBase }} border-r-[6px] border-white"></th>
                         @foreach ($groups as $group)
                             <th colspan="{{ $group['span'] }}"
-                                class="{{ $thBase }} text-center">
+                                class="{{ $thBase }} text-center border-r-[6px] border-white">
                                 {{ $group['label'] }}
                             </th>
                         @endforeach
@@ -158,7 +170,8 @@
                         <th class="{{ $thBase }}
                                    {{ ($col['type'] ?? 'text') === 'text' ? 'text-left' : 'text-right' }}
                                    {{ ! empty($col['sticky']) ? 'tb:sm:stick-to-left bg-white' : '' }}
-                                   {{ (! empty($col['sticky']) && $loop->index === 1) ? 'tb:sm:stick-shadow-r' : '' }}"
+                                   {{ (! empty($col['sticky']) && $loop->index === 1) ? 'tb:sm:stick-shadow-r' : '' }}
+                                   {{ $col['class'] ?? '' }}"
                             @if (! empty($col['sticky'])) style="min-width:12rem" @else style="min-width:8rem" @endif>
                             {{ $col['label'] }}
                         </th>
@@ -190,6 +203,9 @@
                                     $cellContent = ops_fmt($row[$col['key']] ?? null, $type);
                                     if ($type === 'text') $cellClasses = str_replace('text-right', 'text-left', $cellClasses);
                                 }
+                                if (isset($col['class'])) {
+                                    $cellClasses .= " " . $col['class'];
+                                }
                             @endphp
                             <td class="{{ $cellClasses }} {{ ops_heat_class($heat, $col['key'], $row[$col['key']] ?? null) }}">
                                 {!! $cellContent !!}
@@ -215,11 +231,11 @@
                                         {{ $loop->parent->first ? 'Total:' : '' }}
                                     </td>
                                 @elseif($col['key'] === 'type_label')
-                                    <td class="px-4 py-3.5 border-r border-gray-300 text-left">
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-left {{ $col['class'] ?? '' }}">
                                         {{ $label }}
                                     </td>
                                 @else
-                                    <td class="px-4 py-3.5 border-r border-gray-300">
+                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $col['class'] ?? '' }}">
                                         {{ ops_fmt($spec['total'][$key][$col['key']] ?? 0, $col['type']) }}
                                     </td>
                                 @endif
@@ -235,7 +251,7 @@
                                         Average:
                                     </td>
                                 @else
-                                    <td class="px-4 py-3.5 border-r border-gray-300">
+                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $col['class'] ?? '' }}">
                                         {{ ops_fmt($spec['average'][$col['key']] ?? null, $col['type']) }}
                                     </td>
                                 @endif
@@ -251,7 +267,7 @@
                                         Total:
                                     </td>
                                 @else
-                                    <td class="px-4 py-3.5 border-r border-gray-300">
+                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $col['class'] ?? '' }}">
                                         {{ ops_fmt($spec['total'][$col['key']] ?? null, $col['type']) }}
                                     </td>
                                 @endif
