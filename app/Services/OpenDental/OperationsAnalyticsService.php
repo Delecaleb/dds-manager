@@ -1725,7 +1725,7 @@ class OperationsAnalyticsService
             ->select('pt.PatNum', 'pt.Birthdate')
             ->where('pl.ProcStatus', 'C')
             ->whereBetween('pl.ProcDate', [$start, $end])
-            ->where('pt.PatStatus', 0); // 0 = Patient (Active)
+            ->where('pt.PatStatus', '0'); // 0 = Patient (Active)
 
         if ($clinics) {
             $qAct->whereIn('pl.ClinicNum', $clinics);
@@ -1935,43 +1935,74 @@ class OperationsAnalyticsService
 
         // Helper to query tab data
         $getGroups = function ($startRange, $endRange) use ($metric, $clinics, $mIdx) {
-            if ($metric === 'visits') {
-                $qTab = DB::table('od_procedure_logs')
-                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, " . MetricDefinitions::patientVisits('val'))
-                    ->where('ProcStatus', 'C')
-                    ->whereBetween('ProcDate', [$startRange, $endRange]);
-            } else {
-                $qTab = DB::table('od_procedure_logs')
-                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, " . MetricDefinitions::grossProduction('val'))
-                    ->where('ProcStatus', 'C')
-                    ->whereBetween('ProcDate', [$startRange, $endRange]);
-            }
-            if ($clinics) {
-                $qTab->whereIn('ClinicNum', $clinics);
-            }
-            $tabData = $qTab->groupBy('ClinicNum', DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get();
-
-            // Note: when getting "last year", the `$row->month` will strictly be last year's months (e.g. 2024 instead of 2025).
-            // To align them to the SAME array keys (m_0..m_12) as the current year, we must shift the fetched month forward 1 year computationally!
             $grouped = [];
-            foreach ($tabData as $row) {
-                $loc = (int) $row->ClinicNum;
+
+            $ensureBucket = function ($loc) use (&$grouped, $mIdx) {
                 if (!isset($grouped[$loc])) {
                     $grouped[$loc] = [];
                     for ($i = 0; $i < $mIdx; $i++) {
                         $grouped[$loc]['m_' . $i] = 0;
                     }
                 }
+            };
 
-                // Align chronological months to m_0 .. m_12
-                // Since data fetched is strictly inside the 13-month range, we can just sort the months sequentially.
-                // Wait! To be absolutely safe we can calculate month offset from the startRange
-                $rowDate = new \DateTime($row->month . '-01');
+            $addToBucket = function ($loc, $monthStr, $val) use (&$grouped, $startRange, $mIdx, $ensureBucket) {
+                $ensureBucket($loc);
+                $rowDate = new \DateTime($monthStr . '-01');
                 $startDate = new \DateTime(substr($startRange, 0, 7) . '-01');
                 $diffMonths = ($rowDate->format('Y') - $startDate->format('Y')) * 12 + ($rowDate->format('m') - $startDate->format('m'));
-
                 if ($diffMonths >= 0 && $diffMonths < $mIdx) {
-                    $grouped[$loc]['m_' . $diffMonths] = (float) $row->val;
+                    $grouped[$loc]['m_' . $diffMonths] += (float) $val;
+                }
+            };
+
+            if ($metric === 'visits') {
+                $qTab = DB::table('od_procedure_logs')
+                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, " . MetricDefinitions::patientVisits('val'))
+                    ->where('ProcStatus', 'C')
+                    ->whereBetween('ProcDate', [$startRange, $endRange]);
+                if ($clinics) {
+                    $qTab->whereIn('ClinicNum', $clinics);
+                }
+                foreach ($qTab->groupBy('ClinicNum', DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $row) {
+                    $addToBucket((int) $row->ClinicNum, $row->month, $row->val);
+                }
+            } else {
+                // Gross Production
+                $qGross = DB::table('od_procedure_logs')
+                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(ProcFee) as val")
+                    ->where('ProcStatus', 'C')
+                    ->whereBetween('ProcDate', [$startRange, $endRange]);
+                if ($clinics) {
+                    $qGross->whereIn('ClinicNum', $clinics);
+                }
+                foreach ($qGross->groupBy('ClinicNum', DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $row) {
+                    $addToBucket((int) $row->ClinicNum, $row->month, $row->val); // Add gross
+                }
+
+                // Adjustments
+                $qAdj = DB::table('od_adjustments')
+                    ->selectRaw("ClinicNum, DATE_FORMAT(AdjDate, '%Y-%m') as month, SUM(AdjAmt) as val")
+                    ->whereBetween('AdjDate', [$startRange, $endRange]);
+                if ($clinics) {
+                    $qAdj->whereIn('ClinicNum', $clinics);
+                }
+                foreach ($qAdj->groupBy('ClinicNum', DB::raw("DATE_FORMAT(AdjDate, '%Y-%m')"))->get() as $row) {
+                    // Using abs() like in providers() "gross - abs(adj) - abs(wo)" - wait, in typical setups adjustments are both + and -.
+                    // The standard providers() calculates: $net = $gross - abs($adjustment) - abs($writeoff);
+                    // Let's mirror this exactly: subtract abs(val).
+                    $addToBucket((int) $row->ClinicNum, $row->month, -abs($row->val));
+                }
+
+                // WriteOffs
+                $qWo = DB::table('od_claim_procs')
+                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(WriteOff) as val")
+                    ->whereBetween('ProcDate', [$startRange, $endRange]);
+                if ($clinics) {
+                    $qWo->whereIn('ClinicNum', $clinics);
+                }
+                foreach ($qWo->groupBy('ClinicNum', DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $row) {
+                    $addToBucket((int) $row->ClinicNum, $row->month, -abs($row->val));
                 }
             }
 
@@ -2119,28 +2150,57 @@ class OperationsAnalyticsService
         }
 
         if ($metric === 'visits') {
-            $query = DB::table('od_procedure_logs')
+            $qTab = DB::table('od_procedure_logs')
                 ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, " . MetricDefinitions::patientVisits('val'))
                 ->where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$start, $end]);
+            if ($clinics) {
+                $qTab->whereIn('ClinicNum', $clinics);
+            }
+            foreach ($qTab->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $res) {
+                if (isset($buckets[$res->month])) {
+                    $buckets[$res->month] += (float) $res->val;
+                }
+            }
         } else {
-            // production / collection
-            // In a real jarvis app, collection comes from od_claimproc or od_paysplit. For prototyping consistency, production uses ProcFee.
-            $query = DB::table('od_procedure_logs')
-                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, " . MetricDefinitions::grossProduction('val'))
+            // Gross
+            $qGross = DB::table('od_procedure_logs')
+                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(ProcFee) as val")
                 ->where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$start, $end]);
-        }
+            if ($clinics) {
+                $qGross->whereIn('ClinicNum', $clinics);
+            }
+            foreach ($qGross->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $res) {
+                if (isset($buckets[$res->month])) {
+                    $buckets[$res->month] += (float) $res->val;
+                }
+            }
 
-        if ($clinics) {
-            $query->whereIn('ClinicNum', $clinics);
-        }
+            // Adjustments
+            $qAdj = DB::table('od_adjustments')
+                ->selectRaw("DATE_FORMAT(AdjDate, '%Y-%m') as month, SUM(AdjAmt) as val")
+                ->whereBetween('AdjDate', [$start, $end]);
+            if ($clinics) {
+                $qAdj->whereIn('ClinicNum', $clinics);
+            }
+            foreach ($qAdj->groupBy(DB::raw("DATE_FORMAT(AdjDate, '%Y-%m')"))->get() as $res) {
+                if (isset($buckets[$res->month])) {
+                    $buckets[$res->month] -= abs((float) $res->val);
+                }
+            }
 
-        $results = $query->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get();
-
-        foreach ($results as $res) {
-            if (isset($buckets[$res->month])) {
-                $buckets[$res->month] = (float) $res->val;
+            // WriteOffs
+            $qWo = DB::table('od_claim_procs')
+                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(WriteOff) as val")
+                ->whereBetween('ProcDate', [$start, $end]);
+            if ($clinics) {
+                $qWo->whereIn('ClinicNum', $clinics);
+            }
+            foreach ($qWo->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $res) {
+                if (isset($buckets[$res->month])) {
+                    $buckets[$res->month] -= abs((float) $res->val);
+                }
             }
         }
 
