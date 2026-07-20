@@ -481,6 +481,7 @@ class PatientController extends Controller
         // Fetch Live completed transactions for the sub-log
         $patientProcedures = OdProcedureLog::where('PatNum', $patientId)->where('ProcStatus', 'C')->get();
         $provMap = OdProvider::all()->pluck('LName', 'ProvNum')->toArray();
+        $codeMap = OdProcedure::all()->keyBy('CodeNum');
 
         $arTransactions = [];
         foreach ($patientProcedures as $proc) {
@@ -490,11 +491,16 @@ class PatientController extends Controller
             $provNum = $proc->ProvNum ?? null;
             $provName = $provNum && isset($provMap[$provNum]) ? $provMap[$provNum] : '—';
 
+            $codeRecord = isset($proc->CodeNum) ? $codeMap->get($proc->CodeNum) : null;
+            $codeStr = $codeRecord->ProcCode ?? ($proc->OldCode ?? ($proc->ProcCode ?? '—'));
+            $descStr = $codeRecord->Descript ?? ($proc->Descript ?? 'Procedure');
+
             $arTransactions[] = [
-                'description' => $proc->Descript ?? 'Procedure',
-                'code' => $proc->ProcCode ?? ($proc->OldCode ?? '—'),
+                'description' => $descStr,
+                'code' => $codeStr,
                 'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
                 'provider' => $provName,
+                'provider_id' => $provNum,
                 'date' => isset($proc->ProcDate) ? date('M d, Y', strtotime($proc->ProcDate)) : '—',
             ];
         }
