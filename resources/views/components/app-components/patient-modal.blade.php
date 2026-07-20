@@ -515,25 +515,28 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
                 var ledger = p.ledger || [];
                 if (ledger.length) {
                     var rows = '';
-                    ledger.forEach(function (itm) {
-                        rows += '<tr class="border-t border-slate-100 hover:bg-slate-50/50">'
-                            + '<td class="p-3 font-medium">' + (itm.code || '—') + '</td>'
-                            + '<td class="p-3 text-slate-500">' + (itm.description || '—') + '</td>'
-                            + '<td class="p-3 text-center">' + (itm.tooth || '—') + '</td>'
-                            + '<td class="p-3 text-center">' + (itm.surface || '—') + '</td>'
-                            + '<td class="p-3 font-semibold ' + (itm.amount && itm.amount.startsWith('-') ? 'text-emerald-600' : 'text-slate-700') + '">' + (itm.amount || '—') + '</td>'
-                            + '<td class="p-3">' + (itm.provider || '—') + '</td>'
-                            + '<td class="p-3 text-slate-500">' + (itm.date || '—') + '</td>'
-                            + '</tr>';
-                    });
-                    $('#pm-ledger-body').html(rows);
-                } else {
-                    $('#pm-ledger-body').html('<tr><td colspan="7" class="p-4 text-center text-slate-400">No Data</td></tr>');
-                }
+                    var providerHtml = itm.provider_id
+                        ? '<div class="flex items-center gap-2"><svg onclick="openProviderModal(' + itm.provider_id + ')" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-500 hover:text-emerald-700 cursor-pointer shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" title="Provider Information"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg><span>' + (itm.provider || '—') + '</span></div>'
+                        : (itm.provider || '—');
 
-                $('#pm-patient-notes').text(p.notes || 'No activities or notes available.');
+                    rows += '<tr class="border-t border-slate-100 hover:bg-slate-50/50">'
+                        + '<td class="p-3 font-medium">' + (itm.code || '—') + '</td>'
+                        + '<td class="p-3 text-slate-500">' + (itm.description || '—') + '</td>'
+                        + '<td class="p-3 text-center">' + (itm.tooth || '—') + '</td>'
+                        + '<td class="p-3 text-center">' + (itm.surface || '—') + '</td>'
+                        + '<td class="p-3 font-semibold ' + (itm.amount && itm.amount.startsWith('-') ? 'text-emerald-600' : 'text-slate-700') + '">' + (itm.amount || '—') + '</td>'
+                        + '<td class="p-3">' + providerHtml + '</td>'
+                        + '<td class="p-3 text-slate-500">' + (itm.date || '—') + '</td>'
+                        + '</tr>';
+                });
+        $('#pm-ledger-body').html(rows);
+    } else {
+        $('#pm-ledger-body').html('<tr><td colspan="7" class="p-4 text-center text-slate-400">No Data</td></tr>');
+    }
+
+    $('#pm-patient-notes').text(p.notes || 'No activities or notes available.');
             },
-            error: function () { $('#patientModalName').text('Could not load patient'); }
+    error: function () { $('#patientModalName').text('Could not load patient'); }
         });
     }
 
@@ -591,13 +594,17 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
                             : itm.status === 'Scheduled'
                                 ? '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">Scheduled</span>'
                                 : '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-600 border border-slate-200">Unscheduled</span>';
+                        var providerHtml = itm.provider_id
+                            ? '<div class="flex items-center gap-2"><svg onclick="openProviderModal(' + itm.provider_id + ')" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-500 hover:text-emerald-700 cursor-pointer shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" title="Provider Information"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg><span>' + (itm.provider || '—') + '</span></div>'
+                            : (itm.provider || '—');
+
                         rows += '<tr class="border-t border-slate-100 hover:bg-slate-50/50">'
                             + '<td class="p-3 font-medium">' + (itm.code || '—') + '</td>'
                             + '<td class="p-3 text-slate-500">' + (itm.description || '—') + '</td>'
                             + '<td class="p-3 text-center">' + (itm.tooth || '—') + '</td>'
                             + '<td class="p-3 text-center">' + (itm.surface || '—') + '</td>'
                             + '<td class="p-3 font-semibold">' + (itm.amount || '—') + '</td>'
-                            + '<td class="p-3">' + (itm.provider || '—') + '</td>'
+                            + '<td class="p-3">' + providerHtml + '</td>'
                             + '<td class="p-3">' + badge + '</td>'
                             + '<td class="p-3 text-slate-500">' + (itm.date_planned || '—') + '</td>'
                             + '<td class="p-3 text-slate-500">' + (itm.date_scheduled || '—') + '</td>'
@@ -731,4 +738,92 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
             activatePmTab('pm-reminder');
         });
     });
+
+    /* ── Provider Detail Modal logic ──────────────────────────────── */
+    function openProviderModal(id) {
+        $('#providerModal').removeClass('hidden');
+        $('#providerModalContent').html('<div class="flex justify-center p-6"><div class="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>');
+        $.ajax({
+            url: "{{ url('/dashboard/providers') }}/" + id,
+            type: 'GET',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            success: function (res) {
+                if (!res.provider) {
+                    $('#providerModalContent').html('<div class="text-center text-slate-500 py-4">Provider not found</div>');
+                    return;
+                }
+                var p = res.provider;
+                var s = res.stats;
+                $('#providerModalContent').html(
+                    '<div class="flex items-center gap-4 mb-4">' +
+                    '<div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-lg uppercase">' + (p.Abbr || 'PR') + '</div>' +
+                    '<div>' +
+                    '<h4 class="text-lg font-bold text-slate-800">' + (p.PName || p.LName || 'Unknown') + '</h4>' +
+                    '<p class="text-sm text-slate-500">' + (p.Specialty || 'General') + '</p>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="grid grid-cols-2 gap-3 text-sm">' +
+                    '<div class="bg-slate-50 border border-slate-100 p-3 rounded">' +
+                    '<p class="text-slate-500 text-xs mb-1">Net Production</p>' +
+                    '<p class="font-bold text-slate-800">$' + Number(s.net_production).toLocaleString() + '</p>' +
+                    '</div>' +
+                    '<div class="bg-slate-50 border border-slate-100 p-3 rounded">' +
+                    '<p class="text-slate-500 text-xs mb-1">Avg Production/Day</p>' +
+                    '<p class="font-bold text-slate-800">$' + Number(s.avg_production_per_day).toLocaleString() + '</p>' +
+                    '</div>' +
+                    '<div class="bg-slate-50 border border-slate-100 p-3 rounded">' +
+                    '<p class="text-slate-500 text-xs mb-1">Patient Visits</p>' +
+                    '<p class="font-bold text-slate-800">' + s.patient_visits + ' (' + s.new_patient_visits + ' New)</p>' +
+                    '</div>' +
+                    '<div class="bg-slate-50 border border-slate-100 p-3 rounded">' +
+                    '<p class="text-slate-500 text-xs mb-1">TX Acceptance</p>' +
+                    '<p class="font-bold text-slate-800">' + s.tx_accepted_rate + '%</p>' +
+                    '</div>' +
+                    '</div>'
+                );
+            },
+            error: function () {
+                $('#providerModalContent').html('<div class="text-center text-red-500 py-4">Failed to load provider data.</div>');
+            }
+        });
+    }
+
+    $(function () {
+        $('#providerModal').on('click', function (e) {
+            if (e.target === this) $(this).addClass('hidden');
+        });
+    });
 </script>
+
+{{-- Provider Detail Modal (Stackable) --}}
+<div id="providerModal"
+    class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col transform transition-all">
+        <div class="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100 bg-slate-50">
+            <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-500" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                Provider Information
+            </h3>
+            <button onclick="$('#providerModal').addClass('hidden')"
+                class="text-slate-400 hover:text-slate-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </button>
+        </div>
+        <div class="p-6">
+            <div id="providerModalContent" class="space-y-4">
+                <div class="flex justify-center p-6">
+                    <div class="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
