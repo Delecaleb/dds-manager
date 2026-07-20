@@ -6,6 +6,8 @@ use App\Models\OdProcedureLog;
 
 class ProcedureLogSyncService extends BaseQuerySyncService
 {
+    protected int $batchSize = 500;
+
     protected function table(): string
     {
         return 'procedurelog';
@@ -26,7 +28,7 @@ class ProcedureLogSyncService extends BaseQuerySyncService
      */
     protected function syncColumn(): ?string
     {
-        return 'SecDateEntry';
+        return 'DateTStamp';
     }
 
     /**
