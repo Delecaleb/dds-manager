@@ -169,4 +169,46 @@ class OperationsTest extends TestCase
         // Assert Per Procedure totals
         $this->assertEquals(600.00, $total['pp_production']);
     }
+
+    public function test_offices_tab_includes_completed_procedures_with_procstatus_2(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 10,
+                'PatNum' => 201,
+                'ClinicNum' => 1,
+                'ProcFee' => 750.00,
+                'ProcStatus' => '2',
+                'ProcDate' => '2026-07-08',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            [
+                'ProcNum' => 11,
+                'PatNum' => 202,
+                'ClinicNum' => 1,
+                'ProcFee' => 250.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-07-09',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+        ]);
+
+        $response = $this->get(route('operations.data', [
+            'tab' => 'offices',
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-07-15',
+        ]));
+
+        $response->assertOk();
+        $spec = $response->original->getData()['spec'] ?? null;
+        $this->assertNotNull($spec);
+
+        $total = $spec['total'];
+        $this->assertEquals(1000.00, $total['gross']);
+    }
 }
