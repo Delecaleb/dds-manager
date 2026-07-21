@@ -286,53 +286,123 @@ class OperationsAnalyticsService
     /** @return array<int, array<string, mixed>> */
     private function payorRows(string $start, string $end, array $clinics): array
     {
+        // Map patients to their highest PlanNum from claim_procs
+        $latestClaim = DB::table('od_claim_procs')
+            ->select('PatNum', DB::raw('MAX(PlanNum) as PlanNum'))
+            ->groupBy('PatNum');
+
         $concat = $this->concatPatNumProcDate();
-        $q = DB::table('od_claim_procs')
-            ->selectRaw("PlanNum, ClinicNum,
-                SUM(FeeBilled)                                AS gross,
-                SUM(WriteOff)                                 AS writeoff,
-                SUM(InsPayAmt)                                AS collection,
-                COUNT(DISTINCT {$concat})                     AS pts_visits,
-                COUNT(*)                                      AS procedures,
-                COUNT(DISTINCT ProcDate)                      AS working_days")
+
+        // 1. Gross production, visits, working days, procedures mapped by PlanNum
+        $prodQ = DB::table('od_procedure_logs as pl')
+            ->leftJoinSub($latestClaim, 'cp', 'pl.PatNum', '=', 'cp.PatNum')
+            ->selectRaw("
+                COALESCE(cp.PlanNum, 0) AS PlanNum,
+                pl.ClinicNum,
+                SUM(pl.ProcFee) AS gross,
+                COUNT(*) AS procedures,
+                COUNT(DISTINCT {$concat}) AS pts_visits,
+                COUNT(DISTINCT LEFT(pl.ProcDate, 10)) AS working_days
+            ")
+            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereBetween('pl.ProcDate', [$start, $end]);
+        if ($clinics) {
+            $prodQ->whereIn('pl.ClinicNum', $clinics);
+        }
+        $prod = $prodQ->groupBy('PlanNum', 'pl.ClinicNum')->get();
+
+        // 2. Adjustments mapped by PlanNum
+        $adjQ = DB::table('od_adjustments as a')
+            ->leftJoinSub($latestClaim, 'cp', 'a.PatNum', '=', 'cp.PatNum')
+            ->selectRaw("COALESCE(cp.PlanNum, 0) AS PlanNum, a.ClinicNum, SUM(a.AdjAmt) AS adjustment")
+            ->whereBetween('a.AdjDate', [$start, $end]);
+        if ($clinics) {
+            $adjQ->whereIn('a.ClinicNum', $clinics);
+        }
+        $adj = $adjQ->groupBy('PlanNum', 'a.ClinicNum')->get()->keyBy(function ($x) {
+            return $x->PlanNum . '|' . $x->ClinicNum; });
+
+        // 3. Collections mapped by PlanNum
+        $colQ = DB::table('od_pay_splits as p')
+            ->leftJoinSub($latestClaim, 'cp', 'p.PatNum', '=', 'cp.PatNum')
+            ->selectRaw("COALESCE(cp.PlanNum, 0) AS PlanNum, p.ClinicNum, SUM(p.SplitAmt) AS collection")
+            ->whereBetween('p.DatePay', [$start, $end]);
+        if ($clinics) {
+            $colQ->whereIn('p.ClinicNum', $clinics);
+        }
+        $col = $colQ->groupBy('PlanNum', 'p.ClinicNum')->get()->keyBy(function ($x) {
+            return $x->PlanNum . '|' . $x->ClinicNum; });
+
+        // 4. WriteOffs mapped by PlanNum
+        $woQ = DB::table('od_claim_procs')
+            ->selectRaw("COALESCE(PlanNum, 0) AS PlanNum, ClinicNum, SUM(WriteOff) AS writeoff")
             ->whereBetween('ProcDate', [$start, $end]);
         if ($clinics) {
-            $q->whereIn('ClinicNum', $clinics);
+            $woQ->whereIn('ClinicNum', $clinics);
         }
-        $claims = $q->groupBy('PlanNum', 'ClinicNum')->get();
+        $wo = $woQ->groupBy('PlanNum', 'ClinicNum')->get()->keyBy(function ($x) {
+            return $x->PlanNum . '|' . $x->ClinicNum; });
 
         $npt = $this->newPatientsByPayor($start, $end, $clinics);
 
-        // Total net production drives the "% of TTL" column.
-        $totalNet = 0.0;
+        // Aggregate across combined active payors
+        $activeKeys = array_unique(array_merge(
+            $prod->map(function ($x) {
+                return $x->PlanNum . '|' . $x->ClinicNum; })->toArray(),
+            $adj->keys()->toArray(),
+            $col->keys()->toArray(),
+            $wo->keys()->toArray()
+        ));
+
         $staged = [];
-        foreach ($claims as $c) {
-            $gross = (float) $c->gross;
-            $writeoff = (float) $c->writeoff;
-            $net = $gross - abs($writeoff);
+        $totalNet = 0.0;
+
+        foreach ($activeKeys as $key) {
+            [$planNum, $clinicNum] = explode('|', $key);
+            $p = $prod->first(function ($x) use ($planNum, $clinicNum) {
+                return $x->PlanNum == $planNum && $x->ClinicNum == $clinicNum; });
+
+            $gross = (float) ($p->gross ?? 0);
+            $adjustment = (float) ($adj[$key]->adjustment ?? 0);
+            $writeoff = (float) ($wo[$key]->writeoff ?? 0);
+            $collection = (float) ($col[$key]->collection ?? 0);
+            $net = $gross - abs($adjustment) - abs($writeoff);
+
             $totalNet += $net;
-            $staged[] = [$c, $gross, $writeoff, $net];
+
+            $staged[] = [
+                'PlanNum' => $planNum,
+                'ClinicNum' => $clinicNum,
+                'gross' => $gross,
+                'adjustment' => $adjustment,
+                'writeoff' => $writeoff,
+                'net' => $net,
+                'collection' => $collection,
+                'working_days' => (int) ($p->working_days ?? 0),
+                'pts_visits' => (int) ($p->pts_visits ?? 0),
+                'procedures' => (int) ($p->procedures ?? 0),
+                'npt_visit' => (int) ($npt[$key] ?? 0),
+            ];
         }
 
         $rows = [];
-        foreach ($staged as [$c, $gross, $writeoff, $net]) {
-            $key = $c->PlanNum . '|' . $c->ClinicNum;
-            $workingDays = (int) $c->working_days;
-            $ptsVisits = (int) $c->pts_visits;
-            $procedures = (int) $c->procedures;
-            $collection = (float) $c->collection;
-            $nptVisit = (int) ($npt[$key] ?? 0);
+        foreach ($staged as $stg) {
+            $workingDays = $stg['working_days'];
+            $ptsVisits = $stg['pts_visits'];
+            $procedures = $stg['procedures'];
+            $nptVisit = $stg['npt_visit'];
+            $net = $stg['net'];
 
             $rows[] = [
-                'plan_num' => (int) $c->PlanNum,
-                'clinic_num' => (int) $c->ClinicNum,
-                'payor' => $this->payorLabel($c->PlanNum),
-                'location' => $this->clinicNames[(int) $c->ClinicNum] ?? ('Location ' . $c->ClinicNum),
-                'gross' => round($gross, 2),
+                'plan_num' => (int) $stg['PlanNum'],
+                'clinic_num' => (int) $stg['ClinicNum'],
+                'payor' => $this->payorLabel($stg['PlanNum']),
+                'location' => $this->clinicNames[(int) $stg['ClinicNum']] ?? ('Location ' . $stg['ClinicNum']),
+                'gross' => round($stg['gross'], 2),
                 'net' => round($net, 2),
                 'pct_ttl' => $totalNet != 0 ? round($net / $totalNet * 100, 2) : 0,
-                'adjustment' => round(-abs($writeoff), 2),
-                'collection' => round($collection, 2),
+                'adjustment' => round($stg['adjustment'], 2),
+                'collection' => round($stg['collection'], 2),
                 'pts_visits' => $ptsVisits,
                 'npt_visit' => $nptVisit,
                 'case_acceptance' => null,
@@ -352,24 +422,32 @@ class OperationsAnalyticsService
         return $rows;
     }
 
-    /** New patients (first-ever claim in range) grouped by "PlanNum|ClinicNum". */
+    /** New patients (first-ever procedure) mapped to Payor. */
     private function newPatientsByPayor(string $start, string $end, array $clinics): array
     {
-        $firstClaim = DB::table('od_claim_procs')
-            ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
+        $latestClaim = DB::table('od_claim_procs')
+            ->select('PatNum', DB::raw('MAX(PlanNum) as PlanNum'))
             ->groupBy('PatNum');
 
-        $q = DB::table('od_claim_procs as cp')
-            ->joinSub($firstClaim, 'fc', 'cp.PatNum', '=', 'fc.PatNum')
-            ->selectRaw('cp.PlanNum, cp.ClinicNum, COUNT(DISTINCT cp.PatNum) AS npt')
-            ->whereBetween('cp.ProcDate', [$start, $end])
+        $firstVisit = DB::table('od_procedure_logs')
+            ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
+            ->whereIn('ProcStatus', ['C', '2'])
+            ->groupBy('PatNum');
+
+        $q = DB::table('od_procedure_logs as pl')
+            ->joinSub($firstVisit, 'fc', 'pl.PatNum', '=', 'fc.PatNum')
+            ->leftJoinSub($latestClaim, 'cp', 'pl.PatNum', '=', 'cp.PatNum')
+            ->selectRaw('COALESCE(cp.PlanNum, 0) AS PlanNum, pl.ClinicNum, COUNT(DISTINCT pl.PatNum) AS npt')
+            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereBetween('pl.ProcDate', [$start, $end])
             ->whereBetween('fc.first_date', [$start, $end]);
+
         if ($clinics) {
-            $q->whereIn('cp.ClinicNum', $clinics);
+            $q->whereIn('pl.ClinicNum', $clinics);
         }
 
         $out = [];
-        foreach ($q->groupBy('cp.PlanNum', 'cp.ClinicNum')->get() as $r) {
+        foreach ($q->groupBy('PlanNum', 'pl.ClinicNum')->get() as $r) {
             $out[$r->PlanNum . '|' . $r->ClinicNum] = (int) $r->npt;
         }
 
