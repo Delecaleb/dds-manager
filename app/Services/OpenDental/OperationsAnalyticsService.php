@@ -960,6 +960,10 @@ class OperationsAnalyticsService
             $totalNptVisits = array_sum(array_column($rows, 'npt_visits'));
             $totalWorkingDays = array_sum(array_column($rows, 'working_days'));
             $totalProcedures = array_sum(array_column($rows, 'procedures'));
+
+            $tTotPts = array_sum(array_column($rows, '_t_pts'));
+            $tRetPts = array_sum(array_column($rows, '_r_pts'));
+
             // Filter out nulls for goals
             $goals = array_filter(array_column($rows, 'production_goal'), fn($v) => $v !== null);
             $totalGoal = count($goals) > 0 ? array_sum($goals) : null;
@@ -973,7 +977,7 @@ class OperationsAnalyticsService
                 'npt_visits' => $totalNptVisits,
                 'working_days' => $totalWorkingDays,
                 'procedures' => $totalProcedures,
-                'retention' => null,
+                'retention' => $tTotPts > 0 ? round(($tRetPts / $tTotPts) * 100, 2) : 0,
                 'pwd_production' => $totalWorkingDays > 0 ? round($totalNet / $totalWorkingDays, 2) : 0,
                 'pwd_collection' => $totalWorkingDays > 0 ? round($totalCollection / $totalWorkingDays, 2) : 0,
                 'pwd_pts_visits' => $totalWorkingDays > 0 ? round($totalPtsVisits / $totalWorkingDays, 2) : 0,
@@ -1101,6 +1105,28 @@ class OperationsAnalyticsService
         $npt = $this->newPatientsByClinicProvider($start, $end, $clinics);
         $hours = $this->scheduledHoursByClinicProvider($start, $end, $clinics);
 
+        // 18-month prior logic for retention
+        $prior18m = \Carbon\Carbon::parse($start)->subMonths(18)->startOfDay()->toDateTimeString();
+        $priorEnd = \Carbon\Carbon::parse($start)->subDays(1)->endOfDay()->toDateTimeString();
+
+        $retentionQ = DB::table('od_procedure_logs as pl')
+            ->leftJoin('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
+            ->selectRaw("
+                pl.ClinicNum,
+                pl.ProvNum,
+                COUNT(DISTINCT pl.PatNum) AS total_patients,
+                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D0120','D0140','D0150') THEN pl.PatNum END) AS retained_patients
+            ")
+            ->where('pl.ProcStatus', 'C')
+            ->whereBetween('pl.ProcDate', [$prior18m, $priorEnd]);
+
+        if ($clinics) {
+            $retentionQ->whereIn('pl.ClinicNum', $clinics);
+        }
+        $retentionData = $retentionQ->groupBy('pl.ClinicNum', 'pl.ProvNum')->get()->keyBy(function ($item) {
+            return $item->ClinicNum . '|' . $item->ProvNum;
+        });
+
         $providers = DB::table('od_providers')->get()->keyBy('ProvNum');
 
         $rows = [];
@@ -1127,6 +1153,11 @@ class OperationsAnalyticsService
             $schedHours = (float) ($hours[$key] ?? 0);
             $goal = ($hourlyGoal > 0 && $schedHours > 0) ? round($hourlyGoal * $schedHours, 2) : null;
 
+            $retData = $retentionData->get($key);
+            $tPts = $retData ? $retData->total_patients : 0;
+            $rPts = $retData ? $retData->retained_patients : 0;
+            $retPct = $tPts > 0 ? round(($rPts / $tPts) * 100, 2) : 0;
+
             $rows[] = [
                 'row_key' => $key,
                 'clinic_num' => (int) $p->ClinicNum,
@@ -1141,7 +1172,9 @@ class OperationsAnalyticsService
                 'npt_visits' => $nptVisits,
                 'working_days' => $workingDays,
                 'procedures' => $procedures,
-                'retention' => null, // business rule pending
+                'retention' => $tPts > 0 ? $retPct : 0,
+                '_t_pts' => $tPts,
+                '_r_pts' => $rPts,
                 'pwd_production' => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
                 'pwd_collection' => $workingDays > 0 ? round($collection / $workingDays, 2) : 0,
                 'pwd_pts_visits' => $workingDays > 0 ? round($ptsVisits / $workingDays, 2) : 0,
@@ -1321,19 +1354,19 @@ class OperationsAnalyticsService
         return [
             ['key' => 'location', 'label' => 'Location', 'type' => 'text', 'sticky' => true],
             // By Office
-            ['key' => 'gross', 'label' => 'Gross Prod', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'adjustment', 'label' => 'Adjustment', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'adj_pct', 'label' => 'Adjustment % of Prod', 'type' => 'percent'],
-            ['key' => 'net', 'label' => 'Net Prod', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'collection', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'coll_pct', 'label' => 'Collection %', 'type' => 'percent'],
-            ['key' => 'pts_visit', 'label' => 'Pts Visit', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'unique_pts', 'label' => '# of Unique Pts', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'npt_visit', 'label' => 'Npt Visit', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'new_patient_dollars', 'label' => 'New Patient $', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'act_pts_reservation', 'label' => 'Act Pts w/ Reservation', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'act_pts', 'label' => 'Act Pts', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'retention', 'label' => 'Retention', 'type' => 'percent'],
+            ['key' => 'gross', 'label' => 'Gross Prod', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'gross'],
+            ['key' => 'adjustment', 'label' => 'Adjustment', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'adjustment'],
+            ['key' => 'adj_pct', 'label' => 'Adjustment % of Prod', 'type' => 'percent', 'drilldown_type' => 'adj_production'],
+            ['key' => 'net', 'label' => 'Net Prod', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'net'],
+            ['key' => 'collection', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'collection'],
+            ['key' => 'coll_pct', 'label' => 'Collection %', 'type' => 'percent', 'drilldown_type' => 'coll_pct'],
+            ['key' => 'pts_visit', 'label' => 'Pts Visit', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'pts_visit'],
+            ['key' => 'unique_pts', 'label' => '# of Unique Pts', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'unique_pts'],
+            ['key' => 'npt_visit', 'label' => 'Npt Visit', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'npt_visit'],
+            ['key' => 'new_patient_dollars', 'label' => 'New Patient $', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'new_patient_dollars'],
+            ['key' => 'act_pts', 'label' => 'Active Pts w/Reservation', 'type' => 'percent', 'drilldown_type' => 'act_pts'],
+            ['key' => 'act_pts_count', 'label' => 'Active Pts Count', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'act_pts_count'],
+            ['key' => 'retention', 'label' => 'Retention', 'type' => 'percent', 'drilldown_type' => 'retention'],
             ['key' => 'working_days', 'label' => 'Working Days', 'type' => 'number'],
             // Per Working Day
             ['key' => 'pwd_production', 'label' => 'Production', 'type' => 'money'],
@@ -1362,11 +1395,15 @@ class OperationsAnalyticsService
         $coll = $this->sumByClinic('od_pay_splits', 'SplitAmt', 'DatePay', $start, $end, $clinics);
         $wo = $this->sumByClinic('od_claim_procs', 'WriteOff', 'ProcDate', $start, $end, $clinics);
         $newp = $this->newPatientMetrics($start, $end, $clinics);
+        $activeP = $this->activePatientMetrics($end, $clinics);
+        $retentionMetrics = $this->patientRetentionMetrics($start, $clinics);
 
         $clinicNums = array_values(array_unique(array_merge(
             array_keys($prod),
             array_keys($adj),
-            array_keys($coll)
+            array_keys($coll),
+            array_keys($activeP),
+            array_keys($retentionMetrics)
         )));
         sort($clinicNums);
 
@@ -1397,9 +1434,9 @@ class OperationsAnalyticsService
                 'unique_pts' => (int) ($p->unique_pts ?? 0),
                 'npt_visit' => $npt,
                 'new_patient_dollars' => round($nptDollars, 2),
-                'act_pts_reservation' => null, // business rule pending — see controller notes
-                'act_pts' => null,
-                'retention' => null,
+                'act_pts_count' => (int) ($activeP[$c]['active_pts_count'] ?? 0),
+                'act_pts' => (($activeP[$c]['total_ever_pts'] ?? 0) > 0) ? round(($activeP[$c]['active_pts_count'] ?? 0) / $activeP[$c]['total_ever_pts'] * 100, 2) : 0,
+                'retention' => $retentionMetrics[$c] ?? 0,
                 'procedures' => $procedures,
                 'working_days' => $workingDays,
                 'pwd_production' => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
@@ -1468,6 +1505,75 @@ class OperationsAnalyticsService
         }
 
         return $out;
+    }
+
+    /**
+     * Patient Retention: Shows the percentage of patients seen for an exam ('D0120','D0140', 'D0150')
+     * within the last 18 months prior to the date range selected compared to the total patient count
+     * in percent format.
+     */
+    private function patientRetentionMetrics(string $start, array $clinics): array
+    {
+        $prior18m = date('Y-m-d', strtotime('-18 months', strtotime($start)));
+        $priorEnd = date('Y-m-d', strtotime('-1 day', strtotime($start)));
+
+        $q = DB::table('od_procedure_logs as pl')
+            ->leftJoin('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
+            ->selectRaw("
+                pl.ClinicNum,
+                COUNT(DISTINCT pl.PatNum) AS total_patients,
+                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D0120','D0140','D0150') THEN pl.PatNum END) AS retained_patients
+            ")
+            ->where('pl.ProcStatus', 'C')
+            ->whereBetween('pl.ProcDate', [$prior18m . ' 00:00:00', $priorEnd . ' 23:59:59']);
+
+        if ($clinics) {
+            $q->whereIn('pl.ClinicNum', $clinics);
+        }
+
+        $out = [];
+        foreach ($q->groupBy('pl.ClinicNum')->get() as $row) {
+            $total = (int) $row->total_patients;
+            $retained = (int) $row->retained_patients;
+            $out[$row->ClinicNum] = $total > 0 ? round(($retained / $total) * 100, 2) : 0;
+        }
+
+        return $out;
+    }
+
+    /** Computes Active Patients metrics across clinics based on the end date.
+     * Active Patients = had a completed procedure within the last 24 months.
+     * Total Ever Patients = had any completed procedure up to $end.
+     */
+    private function activePatientMetrics(string $end, array $clinics): array
+    {
+        $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($end)));
+
+        $totalBase = DB::table('od_procedure_logs')
+            ->selectRaw('ClinicNum, COUNT(DISTINCT PatNum) as total_ever_pts')
+            ->where('ProcStatus', 'C')
+            ->where('ProcDate', '<=', $end . ' 23:59:59')
+            ->when($clinics, fn($q) => $q->whereIn('ClinicNum', $clinics))
+            ->groupBy('ClinicNum')
+            ->pluck('total_ever_pts', 'ClinicNum')->all();
+
+        $activeBase = DB::table('od_procedure_logs')
+            ->selectRaw('ClinicNum, COUNT(DISTINCT PatNum) as active_pts_count')
+            ->where('ProcStatus', 'C')
+            ->whereBetween('ProcDate', [$startWindow . ' 00:00:00', $end . ' 23:59:59'])
+            ->when($clinics, fn($q) => $q->whereIn('ClinicNum', $clinics))
+            ->groupBy('ClinicNum')
+            ->pluck('active_pts_count', 'ClinicNum')->all();
+
+        $res = [];
+        $allClinics = array_unique(array_merge(array_keys($totalBase), array_keys($activeBase)));
+        foreach ($allClinics as $c) {
+            $res[$c] = [
+                'total_ever_pts' => $totalBase[$c] ?? 0,
+                'active_pts_count' => $activeBase[$c] ?? 0
+            ];
+        }
+        return $res;
     }
 
     /** SUM(amount) grouped by ClinicNum for a table/date column. Returns [ClinicNum => total]. */

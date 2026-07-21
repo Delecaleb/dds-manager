@@ -86,6 +86,7 @@ Route::middleware('auth')->group(function () {
         return view('huddle.index');
     })->name('huddle.index');
     Route::get('operations', [OperationsController::class, 'index'])->name('operations.index');
+    Route::get('operations/offices/drilldown', [OperationsController::class, 'drilldown'])->name('operations.drilldown');
     Route::get('operations/data/{tab}/{subtab?}', [OperationsController::class, 'data'])->name('operations.data');
     Route::get('operations/{tab}/{subtab?}', [OperationsController::class, 'index'])->name('operations.tab');
     Route::get('snapshot', function () {
@@ -121,4 +122,4 @@ Route::middleware('auth')->group(function () {
     Route::get('hygiene-recall/data', [HygieneRecallController::class, 'data'])->name('hygiene-recall.data');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

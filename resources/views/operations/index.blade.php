@@ -49,7 +49,7 @@
                 @foreach ($tabs as $slug => $label)
                     <a href="{{ route('operations.tab', $slug) }}" data-ops-tab="{{ $slug }}"
                         class="ops-tab pb-2 border-b-2 transition-all duration-150 whitespace-nowrap
-                                      {{ $slug === $activeTab ? 'border-[#00bfa5] text-black font-bold' : 'border-transparent hover:text-slate-600' }}">
+                                              {{ $slug === $activeTab ? 'border-[#00bfa5] text-black font-bold' : 'border-transparent hover:text-slate-600' }}">
                         {{ $label }}
                     </a>
                 @endforeach
@@ -136,8 +136,9 @@
 
                 const params = dateParams();
                 Object.entries(current.extra).forEach(([k, v]) => v && params.set(k, v));
+                params.set('_cb', new Date().getTime()); // cache buster
                 const url = `${CONFIG.dataBase}/${tab}/${current.subtab}?${params.toString()}`;
-                fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Cache-Control': 'no-cache' } })
                     .then(r => r.text())
                     .then(html => {
                         content.innerHTML = html;
@@ -232,4 +233,7 @@
             })();
         })();
     </script>
+
+    <x-app-components.patient-modal />
+
 </x-app-layout>

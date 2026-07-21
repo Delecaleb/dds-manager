@@ -23,7 +23,7 @@ class SyncDefinitionsService extends BaseQuerySyncService
 
     protected function syncColumn(): ?string
     {
-        return 'DateEntry';
+        return null;
     }
 
     protected function module(): string

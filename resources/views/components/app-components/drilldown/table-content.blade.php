@@ -1,0 +1,93 @@
+<x-app-components.drilldown.table-modal :title="$title">
+    <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
+        <thead class="sticky top-0 bg-white shadow-sm ring-1 ring-gray-100">
+            <tr>
+                @foreach ($columns as $col)
+                    <th
+                        class="py-2.5 px-4 font-bold text-gray-900 border-b border-gray-200 capitalize {{ ($col['type'] ?? 'text') === 'money' || ($col['type'] ?? 'text') === 'percent' ? 'text-right' : 'text-left' }}">
+                        {{ $col['label'] }}
+                    </th>
+                @endforeach
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 text-gray-700">
+            @forelse ($rows as $row)
+                <tr class="hover:bg-gray-50 border-b border-gray-50">
+                    @foreach ($columns as $col)
+                        @php
+                            $val = $row[$col['key']] ?? null;
+                            $align = ($col['type'] ?? 'text') === 'money' || ($col['type'] ?? 'text') === 'percent' ? 'text-right' : 'text-left';
+
+                            $isLink = is_array($val) && !empty($val['link']);
+                            $displayStr = $isLink ? $val['label'] : $val;
+
+                            // Format
+                            if ($col['type'] === 'money') {
+                                $displayStr = '$ ' . number_format((float) $displayStr, 2);
+                            } elseif ($col['type'] === 'percent') {
+                                $displayStr = number_format((float) $displayStr, 2) . '%';
+                            }
+                        @endphp
+                        <td class="py-3 px-4 {{ $align }} font-medium">
+                            @if ($isLink && $col['key'] === 'patient')
+                                {!! e($displayStr) !!}
+                                <button type="button"
+                                    class="text-[#00bfa5] ml-1 hover:text-[#009688] focus:outline-none shrink-0 inline-block align-middle"
+                                    onclick="if(typeof openPatient === 'function') openPatient('{{ $row['pat_id'] }}'); else alert('Patient dig-deep must be imported globally.');">
+                                    <svg class="h-3.5 w-3.5 stroke-current cursor-pointer" fill="none" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                            d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                                    </svg>
+                                </button>
+                            @elseif ($isLink && $col['key'] === 'provider')
+                                {!! e($displayStr) !!}
+                                <button type="button"
+                                    class="text-[#00bfa5] ml-1 hover:text-[#009688] focus:outline-none shrink-0 inline-block align-middle"
+                                    onclick="if(typeof openProviderModal === 'function') openProviderModal('{{ $row['prov_id'] }}'); else alert('Provider dig-deep must be imported globally.');">
+                                    <svg class="h-3.5 w-3.5 stroke-current cursor-pointer" fill="none" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                            d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                                    </svg>
+                                </button>
+                            @else
+                                {!! e($displayStr) !!}
+                            @endif
+                        </td>
+                    @endforeach
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="{{ count($columns) }}" class="py-8 text-center text-gray-400 text-sm">
+                        No records found.
+                    </td>
+                </tr>
+            @endforelse
+        </tbody>
+        @if ($totals)
+            <tfoot class="sticky bottom-0 bg-gray-50 border-t border-gray-200">
+                <tr class="font-bold text-gray-900 border-t border-gray-300">
+                    @foreach ($columns as $index => $col)
+                        @php
+                            $align = ($col['type'] ?? 'text') === 'money' || ($col['type'] ?? 'text') === 'percent' ? 'text-right' : 'text-left';
+                        @endphp
+                        @if ($index === 0)
+                            <td class="py-3 px-4">Total:</td>
+                        @elseif (isset($totals[$col['key']]))
+                            @php
+                                $totVal = $totals[$col['key']];
+                                if ($col['type'] === 'money') {
+                                    $totVal = '$ ' . number_format((float) $totVal, 2);
+                                } elseif ($col['type'] === 'percent') {
+                                    $totVal = number_format((float) $totVal, 2) . '%';
+                                }
+                            @endphp
+                            <td class="py-3 px-4 {{ $align }}">{!! e($totVal) !!}</td>
+                        @else
+                            <td class="py-3 px-4"></td>
+                        @endif
+                    @endforeach
+                </tr>
+            </tfoot>
+        @endif
+    </table>
+</x-app-components.drilldown.table-modal>

@@ -153,11 +153,11 @@
                             }
                         }
                     @endphp
-                    <tr class="bg-white">
-                        <th colspan="{{ $leadSpan }}" class="{{ $thBase }} border-r-[6px] border-white"></th>
+                    <tr class="bg-gray-50">
+                        <th colspan="{{ $leadSpan }}" class="{{ $thBase }} bg-gray-200 border-r-[6px] border-white"></th>
                         @foreach ($groups as $group)
                             <th colspan="{{ $group['span'] }}"
-                                class="{{ $thBase }} text-center border-r-[6px] border-white">
+                                class="{{ $thBase }} bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white">
                                 {{ $group['label'] }}
                             </th>
                         @endforeach
@@ -223,7 +223,24 @@
                                 }
                             @endphp
                             <td class="{{ $cellClasses }} {{ ops_heat_class($heat, $col['key'], $row[$col['key']] ?? null) }}">
-                                @if (!empty($col['drilldown']) && (float)($row[$col['key']] ?? 0) > 0)
+                                @if (!empty($col['drilldown_type']) && isset($row['clinic_num']))
+                                    @php
+                                        $ddUrl = route('operations.drilldown', [
+                                            'metric' => $col['drilldown_type'], 
+                                            'clinic_num' => $row['clinic_num'], 
+                                            'start_date' => request('start_date', now()->startOfMonth()->toDateString()), 
+                                            'end_date' => request('end_date', now()->toDateString())
+                                        ]);
+                                    @endphp
+                                    <div class="flex items-center justify-end gap-1.5 {{ $type === 'text' ? 'justify-start' : '' }}">
+                                        {!! $cellContent !!}
+                                        <button type="button" 
+                                                class="text-[#00bfa5] hover:text-[#009688] focus:outline-none shrink-0"
+                                                onclick="openLimitlessModal('{{ $ddUrl }}')">
+                                            <svg class="h-3 w-3 stroke-current" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                                        </button>
+                                    </div>
+                                @elseif (!empty($col['drilldown']) && (float)($row[$col['key']] ?? 0) > 0)
                                     <div class="flex items-center justify-end gap-1.5 {{ $type === 'text' ? 'justify-start' : '' }}">
                                         {!! $cellContent !!}
                                         <button type="button" 
@@ -330,6 +347,17 @@
 </div>
 
 <script>
+    function openLimitlessModal(url) {
+        // Show loading state gracefully if wanted, or just fetch
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.text())
+            .then(html => {
+                document.body.insertAdjacentHTML('beforeend', html);
+            })
+            .catch(e => console.error("Drilldown fetch failed: ", e));
+    }
+
+    // Maintained for backward compatibility for embedded details
     function openOpsDrilldown(title, details) {
         const modal = document.getElementById('ops_drilldown_modal');
         const titleEl = document.getElementById('ops_modal_title');
