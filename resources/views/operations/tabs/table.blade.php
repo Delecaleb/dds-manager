@@ -223,13 +223,18 @@
                                 }
                             @endphp
                             <td class="{{ $cellClasses }} {{ ops_heat_class($heat, $col['key'], $row[$col['key']] ?? null) }}">
-                                @if (!empty($col['drilldown_type']) && isset($row['clinic_num']))
+                                @if (in_array($activeSubtab ?? 'default', ['diff-last-year', 'percent-diff-last-year']))
+                                    <div class="flex items-center gap-1.5 {{ $type === 'text' ? 'justify-start' : 'justify-end' }}">
+                                        {!! $cellContent !!}
+                                    </div>
+                                @elseif (!empty($col['drilldown_type']) && isset($row['clinic_num']))
                                     @php
                                         $ddUrl = route('operations.drilldown', [
                                             'metric' => $col['drilldown_type'], 
                                             'clinic_num' => $row['clinic_num'], 
                                             'start_date' => request('start_date', now()->startOfMonth()->toDateString()), 
-                                            'end_date' => request('end_date', now()->toDateString())
+                                            'end_date' => request('end_date', now()->toDateString()),
+                                            'subtab' => $activeSubtab ?? 'default'
                                         ]);
                                     @endphp
                                     <div class="flex items-center justify-end gap-1.5 {{ $type === 'text' ? 'justify-start' : '' }}">

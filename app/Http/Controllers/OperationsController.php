@@ -228,6 +228,11 @@ class OperationsController extends Controller
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
 
+        if ($request->input('subtab') === 'last-year') {
+            $start = \Illuminate\Support\Carbon::parse($start)->subYear()->toDateString();
+            $end = \Illuminate\Support\Carbon::parse($end)->subYear()->toDateString();
+        }
+
         $title = 'Drilldown';
         $columns = [];
         $rows = [];
