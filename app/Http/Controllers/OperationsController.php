@@ -260,7 +260,7 @@ class OperationsController extends Controller
             $logs = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
                 ->where('ClinicNum', $clinicNum)
-                ->where('ProcStatus', 'C')
+                ->whereIn('ProcStatus', ['C', '2'])
                 ->whereBetween('ProcDate', [$start, $end])
                 ->get();
 
@@ -351,7 +351,7 @@ class OperationsController extends Controller
                     $gross = (float) DB::table('od_procedure_logs')
                         ->where('PatNum', $adj->PatNum)
                         ->where('ProcDate', 'like', substr($adj->AdjDate, 0, 10) . '%')
-                        ->where('ProcStatus', 'C')
+                        ->whereIn('ProcStatus', ['C', '2'])
                         ->sum('ProcFee');
 
                     $totalGrossAll += $gross;
@@ -441,7 +441,7 @@ class OperationsController extends Controller
                 ];
             }
 
-            $logs = DB::table('od_procedure_logs')->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')->where('ClinicNum', $clinicNum)->where('ProcStatus', 'C')->whereBetween('ProcDate', [$start, $end])->get();
+            $logs = DB::table('od_procedure_logs')->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')->where('ClinicNum', $clinicNum)->whereIn('ProcStatus', ['C', '2'])->whereBetween('ProcDate', [$start, $end])->get();
             $adjs = DB::table('od_adjustments')->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt')->where('ClinicNum', $clinicNum)->whereBetween('AdjDate', [$start, $end])->get();
             $wos = DB::table('od_claim_procs')->select('PatNum', 'ProvNum', 'ProcDate', 'WriteOff')->where('ClinicNum', $clinicNum)->whereBetween('ProcDate', [$start, $end])->get();
 
@@ -537,7 +537,7 @@ class OperationsController extends Controller
             $logs = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ProcDate')
                 ->where('ClinicNum', $clinicNum)
-                ->where('ProcStatus', 'C')
+                ->whereIn('ProcStatus', ['C', '2'])
                 ->whereBetween('ProcDate', [$start, $end])
                 ->get();
 
@@ -582,7 +582,7 @@ class OperationsController extends Controller
             $logs = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ProcDate', 'ProvNum')
                 ->where('ClinicNum', $clinicNum)
-                ->where('ProcStatus', 'C')
+                ->whereIn('ProcStatus', ['C', '2'])
                 ->whereBetween('ProcDate', [$start, $end])
                 ->get();
 
@@ -645,7 +645,7 @@ class OperationsController extends Controller
 
             $firstVisitSubQ = DB::table('od_procedure_logs')
                 ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-                ->where('ProcStatus', 'C')
+                ->whereIn('ProcStatus', ['C', '2'])
                 ->groupBy('PatNum');
 
             $nptLogs = DB::table('od_procedure_logs as pl')
@@ -653,7 +653,7 @@ class OperationsController extends Controller
                 ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
                 ->select('pl.PatNum', 'pl.ProcDate', 'pl.ProcFee', 'pc.ProcCode', 'fv.first_date')
                 ->where('pl.ClinicNum', $clinicNum)
-                ->where('pl.ProcStatus', 'C')
+                ->whereIn('pl.ProcStatus', ['C', '2'])
                 ->whereBetween('pl.ProcDate', [$start, $end])
                 ->whereBetween('fv.first_date', [$start, $end])
                 ->get();
@@ -704,7 +704,7 @@ class OperationsController extends Controller
 
             $firstVisitSubQ = DB::table('od_procedure_logs')
                 ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-                ->where('ProcStatus', 'C')
+                ->whereIn('ProcStatus', ['C', '2'])
                 ->groupBy('PatNum');
 
             $nptLogs = DB::table('od_procedure_logs as pl')
@@ -712,7 +712,7 @@ class OperationsController extends Controller
                 ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
                 ->select('pl.PatNum', 'pl.ProvNum', 'pl.ProcDate', 'pl.ProcFee', 'pc.ProcCode', 'fv.first_date')
                 ->where('pl.ClinicNum', $clinicNum)
-                ->where('pl.ProcStatus', 'C')
+                ->whereIn('pl.ProcStatus', ['C', '2'])
                 ->whereBetween('pl.ProcDate', [$start, $end])
                 ->whereBetween('fv.first_date', [$start, $end])
                 ->get();
@@ -768,14 +768,14 @@ class OperationsController extends Controller
 
             $firstVisitSubQ = DB::table('od_procedure_logs')
                 ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-                ->where('ProcStatus', 'C')
+                ->whereIn('ProcStatus', ['C', '2'])
                 ->groupBy('PatNum');
 
             $activePts = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
                 ->select('pl.PatNum', 'fv.first_date')
                 ->where('pl.ClinicNum', $clinicNum)
-                ->where('pl.ProcStatus', 'C')
+                ->whereIn('pl.ProcStatus', ['C', '2'])
                 ->whereBetween('pl.ProcDate', [$startWindow, $end . ' 23:59:59'])
                 ->groupBy('pl.PatNum', 'fv.first_date')
                 ->get();
@@ -792,7 +792,8 @@ class OperationsController extends Controller
                     ->where('AptDateTime', '>=', now()->toDateString())
                     ->groupBy('PatNum')
                     ->pluck('PatNum')->mapWithKeys(function ($item) {
-                        return [$item => true]; })->all();
+                        return [$item => true];
+                    })->all();
             }
 
             foreach ($activePts as $pt) {
@@ -823,7 +824,7 @@ class OperationsController extends Controller
             $logs = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ProvNum', 'ProcDate')
                 ->where('ClinicNum', $clinicNum)
-                ->where('ProcStatus', 'C')
+                ->whereIn('ProcStatus', ['C', '2'])
                 ->whereBetween('ProcDate', [$startWindow, $end . ' 23:59:59'])
                 ->get();
 
@@ -886,7 +887,7 @@ class OperationsController extends Controller
                     MAX(CASE WHEN pc.ProcCode IN ('D0120','D0140','D0150') THEN 1 ELSE 0 END) AS had_exam
                 ")
                 ->where('pl.ClinicNum', $clinicNum)
-                ->where('pl.ProcStatus', 'C')
+                ->whereIn('pl.ProcStatus', ['C', '2'])
                 ->whereBetween('pl.ProcDate', [$prior18m . ' 00:00:00', $priorEnd . ' 23:59:59'])
                 ->groupBy('pl.PatNum')
                 ->get();
