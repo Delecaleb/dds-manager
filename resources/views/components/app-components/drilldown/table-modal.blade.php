@@ -1,5 +1,5 @@
-<div class="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200 ds-limitless-modal"
-    style="z-index: 100;">
+<div
+    class="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200 ds-limitless-modal">
     <div class="bg-white rounded-lg shadow-xl border border-gray-200 w-full max-w-5xl flex flex-col max-h-[85vh]">
         <div class="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/50 rounded-t-lg">
             <h4 class="text-sm font-bold text-gray-900">{{ $title }}</h4>

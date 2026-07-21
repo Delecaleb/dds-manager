@@ -16,7 +16,7 @@
 
 <body class="bg-slate-50 text-slate-800 font-sans antialiased">
 
-    <div id="overlay-menu" class="fixed inset-0 z-50 hidden">
+    <div id="overlay-menu" class="fixed inset-0 z-[200] hidden">
         <div id="menu-backdrop" class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
 
         <aside

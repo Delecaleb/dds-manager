@@ -451,6 +451,11 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
         currentPatientId = id;
         activatePmTab('pm-info');
         $('#patientModal').removeClass('hidden');
+
+        // Dynamically inflate z-index per instance to stack over limitless modals
+        window._limitlessZIndex = (window._limitlessZIndex || 120) + 10;
+        document.getElementById('patientModal').style.zIndex = window._limitlessZIndex;
+
         $('#patientModalName').text('Loading…');
         $('#patientAvatar').text('…');
 
@@ -520,24 +525,24 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
                             ? '<div class="flex items-center gap-2"><svg onclick="openProviderModal(' + itm.provider_id + ')" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-500 hover:text-emerald-700 cursor-pointer shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" title="Provider Information"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg><span>' + (itm.provider || '—') + '</span></div>'
                             : (itm.provider || '—');
 
-                    rows += '<tr class="border-t border-slate-100 hover:bg-slate-50/50">'
-                        + '<td class="p-3 font-medium">' + (itm.code || '—') + '</td>'
-                        + '<td class="p-3 text-slate-500">' + (itm.description || '—') + '</td>'
-                        + '<td class="p-3 text-center">' + (itm.tooth || '—') + '</td>'
-                        + '<td class="p-3 text-center">' + (itm.surface || '—') + '</td>'
-                        + '<td class="p-3 font-semibold ' + (itm.amount && itm.amount.startsWith('-') ? 'text-emerald-600' : 'text-slate-700') + '">' + (itm.amount || '—') + '</td>'
-                        + '<td class="p-3">' + providerHtml + '</td>'
-                        + '<td class="p-3 text-slate-500">' + (itm.date || '—') + '</td>'
-                        + '</tr>';
-                });
-        $('#pm-ledger-body').html(rows);
-    } else {
-        $('#pm-ledger-body').html('<tr><td colspan="7" class="p-4 text-center text-slate-400">No Data</td></tr>');
-    }
+                        rows += '<tr class="border-t border-slate-100 hover:bg-slate-50/50">'
+                            + '<td class="p-3 font-medium">' + (itm.code || '—') + '</td>'
+                            + '<td class="p-3 text-slate-500">' + (itm.description || '—') + '</td>'
+                            + '<td class="p-3 text-center">' + (itm.tooth || '—') + '</td>'
+                            + '<td class="p-3 text-center">' + (itm.surface || '—') + '</td>'
+                            + '<td class="p-3 font-semibold ' + (itm.amount && itm.amount.startsWith('-') ? 'text-emerald-600' : 'text-slate-700') + '">' + (itm.amount || '—') + '</td>'
+                            + '<td class="p-3">' + providerHtml + '</td>'
+                            + '<td class="p-3 text-slate-500">' + (itm.date || '—') + '</td>'
+                            + '</tr>';
+                    });
+                    $('#pm-ledger-body').html(rows);
+                } else {
+                    $('#pm-ledger-body').html('<tr><td colspan="7" class="p-4 text-center text-slate-400">No Data</td></tr>');
+                }
 
-    $('#pm-patient-notes').text(p.notes || 'No activities or notes available.');
+                $('#pm-patient-notes').text(p.notes || 'No activities or notes available.');
             },
-    error: function () { $('#patientModalName').text('Could not load patient'); }
+            error: function () { $('#patientModalName').text('Could not load patient'); }
         });
     }
 
@@ -743,6 +748,11 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
     /* ── Provider Detail Modal logic ──────────────────────────────── */
     function openProviderModal(id) {
         $('#providerModal').removeClass('hidden');
+
+        // Dynamically inflate z-index per instance to stack over limitless modals
+        window._limitlessZIndex = (window._limitlessZIndex || 120) + 10;
+        document.getElementById('providerModal').style.zIndex = window._limitlessZIndex;
+
         $('#providerModalContent').html('<div class="flex justify-center p-6"><div class="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>');
         $.ajax({
             url: "{{ url('/dashboard/providers') }}/" + id,

@@ -347,12 +347,22 @@
 </div>
 
 <script>
+    window._limitlessZIndex = window._limitlessZIndex || 120;
+    
     function openLimitlessModal(url) {
         // Show loading state gracefully if wanted, or just fetch
         fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(r => r.text())
             .then(html => {
                 document.body.insertAdjacentHTML('beforeend', html);
+                
+                // Dynamically inflate z-index per subsequent limitless modal instance
+                window._limitlessZIndex += 10;
+                const modals = document.querySelectorAll('.ds-limitless-modal');
+                const lastModal = modals[modals.length - 1];
+                if (lastModal) {
+                    lastModal.style.zIndex = window._limitlessZIndex;
+                }
             })
             .catch(e => console.error("Drilldown fetch failed: ", e));
     }
