@@ -291,7 +291,7 @@ class OperationsAnalyticsService
             ->select('PatNum', DB::raw('MAX(PlanNum) as PlanNum'))
             ->groupBy('PatNum');
 
-        $concat = $this->concatPatNumProcDate();
+        $concat = $this->concatPatNumProcDate('pl');
 
         // 1. Gross production, visits, working days, procedures mapped by PlanNum
         $prodQ = DB::table('od_procedure_logs as pl')
@@ -320,7 +320,8 @@ class OperationsAnalyticsService
             $adjQ->whereIn('a.ClinicNum', $clinics);
         }
         $adj = $adjQ->groupBy('PlanNum', 'a.ClinicNum')->get()->keyBy(function ($x) {
-            return $x->PlanNum . '|' . $x->ClinicNum; });
+            return $x->PlanNum . '|' . $x->ClinicNum;
+        });
 
         // 3. Collections mapped by PlanNum
         $colQ = DB::table('od_pay_splits as p')
@@ -331,7 +332,8 @@ class OperationsAnalyticsService
             $colQ->whereIn('p.ClinicNum', $clinics);
         }
         $col = $colQ->groupBy('PlanNum', 'p.ClinicNum')->get()->keyBy(function ($x) {
-            return $x->PlanNum . '|' . $x->ClinicNum; });
+            return $x->PlanNum . '|' . $x->ClinicNum;
+        });
 
         // 4. WriteOffs mapped by PlanNum
         $woQ = DB::table('od_claim_procs')
@@ -341,14 +343,16 @@ class OperationsAnalyticsService
             $woQ->whereIn('ClinicNum', $clinics);
         }
         $wo = $woQ->groupBy('PlanNum', 'ClinicNum')->get()->keyBy(function ($x) {
-            return $x->PlanNum . '|' . $x->ClinicNum; });
+            return $x->PlanNum . '|' . $x->ClinicNum;
+        });
 
         $npt = $this->newPatientsByPayor($start, $end, $clinics);
 
         // Aggregate across combined active payors
         $activeKeys = array_unique(array_merge(
             $prod->map(function ($x) {
-                return $x->PlanNum . '|' . $x->ClinicNum; })->toArray(),
+                return $x->PlanNum . '|' . $x->ClinicNum;
+            })->toArray(),
             $adj->keys()->toArray(),
             $col->keys()->toArray(),
             $wo->keys()->toArray()
@@ -360,7 +364,8 @@ class OperationsAnalyticsService
         foreach ($activeKeys as $key) {
             [$planNum, $clinicNum] = explode('|', $key);
             $p = $prod->first(function ($x) use ($planNum, $clinicNum) {
-                return $x->PlanNum == $planNum && $x->ClinicNum == $clinicNum; });
+                return $x->PlanNum == $planNum && $x->ClinicNum == $clinicNum;
+            });
 
             $gross = (float) ($p->gross ?? 0);
             $adjustment = (float) ($adj[$key]->adjustment ?? 0);
@@ -1844,11 +1849,12 @@ class OperationsAnalyticsService
         return $out;
     }
 
-    private function concatPatNumProcDate(): string
+    private function concatPatNumProcDate(string $alias = ''): string
     {
+        $prefix = $alias ? $alias . '.' : '';
         return DB::getDriverName() === 'sqlite'
-            ? "PatNum || '|' || ProcDate"
-            : "CONCAT(PatNum, '|', ProcDate)";
+            ? "{$prefix}PatNum || '|' || {$prefix}ProcDate"
+            : "CONCAT({$prefix}PatNum, '|', {$prefix}ProcDate)";
     }
 
     /**
