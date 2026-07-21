@@ -5,82 +5,81 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 
-return new class extends Migration
-{
+return new class extends Migration {
 
-public function up()
-{
+    public function up()
+    {
 
-Schema::create('carrier', function(Blueprint $table){
+        Schema::create('carrier', function (Blueprint $table) {
 
-$table->integer('CarrierNum');
+            $table->integer('CarrierNum');
 
-$table->string('CarrierName');
+            $table->string('CarrierName');
 
-$table->string('Address');
+            $table->string('Address');
 
-$table->string('Address2');
+            $table->string('Address2');
 
-$table->string('City');
+            $table->string('City');
 
-$table->string('State');
+            $table->string('State');
 
-$table->string('Zip');
+            $table->string('Zip');
 
-$table->string('Phone');
+            $table->string('Phone');
 
-$table->string('ElectID');
+            $table->string('ElectID');
 
-$table->integer('NoSendElect');
+            $table->integer('NoSendElect');
 
-$table->integer('IsCDA');
+            $table->integer('IsCDA');
 
-$table->string('CDAnetVersion');
+            $table->string('CDAnetVersion');
 
-$table->integer('CanadianNetworkNum');
+            $table->integer('CanadianNetworkNum');
 
-$table->integer('IsHidden');
+            $table->integer('IsHidden');
 
-$table->integer('CanadianEncryptionMethod');
+            $table->integer('CanadianEncryptionMethod');
 
-$table->integer('CanadianSupportedTypes');
+            $table->integer('CanadianSupportedTypes');
 
-$table->integer('SecUserNumEntry');
+            $table->integer('SecUserNumEntry');
 
-$table->date('SecDateEntry');
+            $table->date('SecDateEntry');
 
-$table->string('SecDateTEdit');
+            $table->string('SecDateTEdit');
 
-$table->string('TIN');
+            $table->string('TIN');
 
-$table->integer('CarrierGroupName');
+            $table->integer('CarrierGroupName');
 
-$table->integer('ApptTextBackColor');
+            $table->integer('ApptTextBackColor');
 
-$table->integer('IsCoinsuranceInverted');
+            $table->integer('IsCoinsuranceInverted');
 
-$table->integer('TrustedEtransFlags');
+            $table->integer('TrustedEtransFlags');
 
-$table->integer('CobInsPaidBehaviorOverride');
+            $table->integer('CobInsPaidBehaviorOverride');
 
-$table->integer('EraAutomationOverride');
+            $table->integer('EraAutomationOverride');
 
-$table->integer('OrthoInsPayConsolidate');
+            $table->integer('OrthoInsPayConsolidate');
 
-$table->integer('PaySuiteTransSup');
+            $table->integer('PaySuiteTransSup');
 
-$table->text('PreAuthCodes');
-
+            $table->text('PreAuthCodes');
 
 
-});
 
-}
+        });
+
+    }
 
 
-public function down()
-{
-Schema::dropIfExists('carrier');
-}
+    public function down()
+    {
+        Schema::dropIfExists('carrier');
+    }
 
 };

@@ -84,9 +84,9 @@ class OperationsAnalyticsService
                 'unique_pts' => $totalUniquePts,
                 'npt_visit' => $totalNptVisit,
                 'new_patient_dollars' => $totalNewPatientDollars,
-                'act_pts_reservation' => null,
-                'act_pts' => null,
-                'retention' => null,
+                'act_pts_reservation' => count($rows) == 1 ? $rows[0]['act_pts_reservation'] : null,
+                'act_pts' => count($rows) == 1 ? $rows[0]['act_pts'] : null,
+                'retention' => count($rows) == 1 ? $rows[0]['retention'] : null,
                 'working_days' => $totalWorkingDays,
                 'pwd_production' => $pwdProduction,
                 'pwd_collection' => $pwdCollection,
@@ -459,10 +459,43 @@ class OperationsAnalyticsService
         return $out;
     }
 
-    /** Human label for a plan. Carrier names require a carrier sync; number is the fallback. */
+    /** Human label for a plan using cached API map, bridging Jarvis analytics format: "Delta Dental of MI - 1029" */
     private function payorLabel($planNum): string
     {
-        return ((int) $planNum) > 0 ? 'Plan ' . $planNum : 'No Insurance';
+        $planNum = (int) $planNum;
+        if ($planNum === 0)
+            return 'No Insurance - 999999';
+
+        $map = \Illuminate\Support\Facades\Cache::remember('od_carrier_string_map', 86400, function () {
+            try {
+                $client = app(\App\Services\OpenDental\OpenDentalClient::class);
+                $carriers = $client->get('carriers?limit=5000');
+                $cMap = [];
+                foreach ($carriers as $c) {
+                    $name = trim($c['CarrierName'] ?? '');
+                    if ($name !== '') {
+                        $cMap[$c['CarrierNum']] = $name;
+                    }
+                }
+
+                $plans = $client->get('insplans?limit=5000');
+                $pMap = [];
+                foreach ($plans as $p) {
+                    $cNum = $p['CarrierNum'] ?? 0;
+                    if ($cNum > 0) {
+                        $cName = $cMap[$cNum] ?? 'Unknown Carrier';
+                        $pMap[$p['PlanNum']] = $cName . ' - ' . $cNum;
+                    } else {
+                        $pMap[$p['PlanNum']] = ($p['GroupName'] ?? 'Unknown Plan') . ' - Plan ' . $p['PlanNum'];
+                    }
+                }
+                return $pMap;
+            } catch (\Exception $e) {
+                return [];
+            }
+        });
+
+        return $map[$planNum] ?? 'Plan ' . $planNum;
     }
 
     /**
@@ -1521,6 +1554,8 @@ class OperationsAnalyticsService
                 'npt_visit' => $npt,
                 'new_patient_dollars' => round($nptDollars, 2),
                 'act_pts_count' => (int) ($activeP[$c]['active_pts_count'] ?? 0),
+                'act_pts_reservation_count' => (int) ($activeP[$c]['act_pts_reservation'] ?? 0),
+                'act_pts_reservation' => (($activeP[$c]['active_pts_count'] ?? 0) > 0) ? round(($activeP[$c]['act_pts_reservation'] ?? 0) / $activeP[$c]['active_pts_count'] * 100, 2) : 0,
                 'act_pts' => (($activeP[$c]['total_ever_pts'] ?? 0) > 0) ? round(($activeP[$c]['active_pts_count'] ?? 0) / $activeP[$c]['total_ever_pts'] * 100, 2) : 0,
                 'retention' => $retentionMetrics[$c] ?? 0,
                 'procedures' => $procedures,
@@ -1628,12 +1663,12 @@ class OperationsAnalyticsService
     }
 
     /** Computes Active Patients metrics across clinics based on the end date.
-     * Active Patients = had a completed procedure within the last 24 months.
-     * Total Ever Patients = had any completed procedure up to $end.
+     * Active Patients = had a completed procedure within the last 18 months.
+     * Reservations = count of those active patients booked in the future.
      */
     private function activePatientMetrics(string $end, array $clinics): array
     {
-        $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($end)));
+        $startWindow = date('Y-m-d', strtotime('-18 months', strtotime($end)));
 
         $totalBase = DB::table('od_procedure_logs')
             ->selectRaw('ClinicNum, COUNT(DISTINCT PatNum) as total_ever_pts')
@@ -1643,20 +1678,27 @@ class OperationsAnalyticsService
             ->groupBy('ClinicNum')
             ->pluck('total_ever_pts', 'ClinicNum')->all();
 
-        $activeBase = DB::table('od_procedure_logs')
-            ->selectRaw('ClinicNum, COUNT(DISTINCT PatNum) as active_pts_count')
-            ->whereIn('ProcStatus', ['C', '2'])
-            ->whereBetween('ProcDate', [$startWindow . ' 00:00:00', $end . ' 23:59:59'])
-            ->when($clinics, fn($q) => $q->whereIn('ClinicNum', $clinics))
-            ->groupBy('ClinicNum')
-            ->pluck('active_pts_count', 'ClinicNum')->all();
+        $activeBase = DB::table('od_procedure_logs as pl')
+            ->leftJoin('od_appointments as apt', function ($join) use ($end) {
+                $join->on('pl.PatNum', '=', 'apt.PatNum')
+                    ->whereIn('apt.AptStatus', [1, 4])
+                    ->where('apt.AptDateTime', '>', $end . ' 23:59:59');
+            })
+            ->selectRaw('pl.ClinicNum, COUNT(DISTINCT pl.PatNum) as active_pts_count, COUNT(DISTINCT CASE WHEN apt.AptNum IS NOT NULL THEN pl.PatNum END) as act_pts_reservation')
+            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereBetween('pl.ProcDate', [$startWindow . ' 00:00:00', $end . ' 23:59:59'])
+            ->when($clinics, fn($q) => $q->whereIn('pl.ClinicNum', $clinics))
+            ->groupBy('pl.ClinicNum')
+            ->get()->keyBy('ClinicNum')->toArray();
 
         $res = [];
         $allClinics = array_unique(array_merge(array_keys($totalBase), array_keys($activeBase)));
         foreach ($allClinics as $c) {
+            $ab = ((array) ($activeBase[$c] ?? []));
             $res[$c] = [
                 'total_ever_pts' => $totalBase[$c] ?? 0,
-                'active_pts_count' => $activeBase[$c] ?? 0
+                'active_pts_count' => $ab['active_pts_count'] ?? 0,
+                'act_pts_reservation' => $ab['act_pts_reservation'] ?? 0,
             ];
         }
         return $res;

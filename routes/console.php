@@ -50,3 +50,5 @@ Schedule::command('sync:deposit')->cron('12,42 * * * *')->withoutOverlapping()->
 Schedule::command('sync:providers')->dailyAt('01:00')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:procedures')->dailyAt('01:10')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:recall-types')->dailyAt('01:20')->withoutOverlapping()->runInBackground()->onOneServer();
+Schedule::command('sync:carriers')->dailyAt('01:20')->withoutOverlapping()->runInBackground()->onOneServer();
+Schedule::command('sync:insplan')->dailyAt('01:20')->withoutOverlapping()->runInBackground()->onOneServer();

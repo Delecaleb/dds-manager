@@ -1,0 +1,58 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class OdInsplan extends Model
+{
+    protected $fillable = [
+        'PlanNum',
+        'GroupName',
+        'GroupNum',
+        'PlanNote',
+        'FeeSched',
+        'PlanType',
+        'ClaimFormNum',
+        'UseAltCode',
+        'ClaimsUseUCR',
+        'CopayFeeSched',
+        'EmployerNum',
+        'CarrierNum',
+        'AllowedFeeSched',
+        'TrojanID',
+        'DivisionNo',
+        'IsMedical',
+        'FilingCode',
+        'DentaideCardSequence',
+        'ShowBaseUnits',
+        'CodeSubstNone',
+        'IsHidden',
+        'MonthRenew',
+        'FilingCodeSubtype',
+        'CanadianPlanFlag',
+        'CanadianDiagnosticCode',
+        'CanadianInstitutionCode',
+        'RxBIN',
+        'CobRule',
+        'SopCode',
+        'SecUserNumEntry',
+        'SecDateEntry',
+        'SecDateTEdit',
+        'HideFromVerifyList',
+        'OrthoType',
+        'OrthoAutoProcFreq',
+        'OrthoAutoProcCodeNumOverride',
+        'OrthoAutoFeeBilled',
+        'OrthoAutoClaimDaysWait',
+        'BillingType',
+        'HasPpoSubstWriteoffs',
+        'ExclusionFeeRule',
+        'ManualFeeSchedNum',
+        'IsBlueBookEnabled',
+        'InsPlansZeroWriteOffsOnAnnualMaxOverride',
+        'InsPlansZeroWriteOffsOnFreqOrAgingOverride',
+        'PerVisitPatAmount',
+        'PerVisitInsAmount',
+    ];
+}
