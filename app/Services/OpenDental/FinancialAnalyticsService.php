@@ -2,10 +2,15 @@
 
 namespace App\Services\OpenDental;
 
+use App\Domain\Production\ProductionService;
 use Illuminate\Support\Facades\DB;
 
 class FinancialAnalyticsService
 {
+    public function __construct(
+        private readonly ProductionService $production,
+    ) {}
+
     public function filterAnalysis($start, $end)
     {
         $gross = DB::table('od_procedure_logs')
@@ -25,7 +30,9 @@ class FinancialAnalyticsService
             ->whereBetween('ProcDate', [$start, $end])
             ->sum('WriteOff');
 
-        $net = $gross + $adjustments + $writeoffs;
+        // Net = gross + signed adjustments - writeoffs (blueprint D3). Previously this
+        // ADDED writeoffs, which understated reductions; netFrom applies the correct sign.
+        $net = $this->production->netFrom((float) $gross, (float) $adjustments, (float) $writeoffs);
 
         return [
             'gross_production' => round($gross, 2),

@@ -48,6 +48,19 @@ assumes. **This needs a data check** — confirm the sign convention of `AdjAmt`
 only if signs are consistent; C is missing writeoffs entirely and is likely wrong.
 **Decision:** ______  (and: confirm sign convention — signed or absolute?)
 
+> **⚠ DATA CHECK RESULT (run 2026-07-22, current DB) — none of A/B/C is fully correct:**
+> - `od_adjustments.AdjAmt` is stored **SIGNED** — 4,706 negative rows *and* 3,799 positive
+>   rows. So option A (`gross − abs(adj)`) is **wrong**: it forces positive adjustments to
+>   *reduce* production when signed math says they should increase it.
+> - `od_claim_procs.WriteOff` is stored **UNSIGNED** (all ≥ 0; 0 negative rows). So it must
+>   be **subtracted**, which makes option B (`gross + writeoff`) wrong.
+> - **Data-correct formula:** `net = gross + AdjAmt(signed) − WriteOff(positive)`. This is a
+>   new option **D** and is the recommended pick pending your confirmation of the OpenDental
+>   sign convention. (Also note: `AdjAmt` may be stored as a VARCHAR — `MIN/MAX` returned
+>   lexical values — so cast to DECIMAL in aggregates to be safe. Verify at Phase 1.)
+>
+> **Revised recommendation:** **D** (`gross + adj_signed − writeoff`). **Decision:** ______
+
 ## D4. Case Acceptance formula
 | Option | Formula | Note |
 |--------|---------|------|

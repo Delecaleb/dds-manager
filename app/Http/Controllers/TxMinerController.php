@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use App\Models\OdProcedureLog;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class TxMinerController extends Controller
 {
@@ -14,7 +15,7 @@ class TxMinerController extends Controller
         return view('tx-miner.index');
     }
 
-    public function data(Request $request)
+    public function data(Request $request, TreatmentAcceptanceService $txAcceptance)
     {
         $draw = (int) $request->get('draw', 1);
         $start = (int) $request->get('start', 0);
@@ -24,7 +25,7 @@ class TxMinerController extends Controller
         // Group by month YYYY-MM
         // Since we are returning "By Month", we aggregate over ProcDate or DateTP
         // Note: For Treatment Planned procedures, DateTP or ProcDate might be used.
-        // We will group by DATE_FORMAT(ProcDate, '%Y-%m') 
+        // We will group by DATE_FORMAT(ProcDate, '%Y-%m')
 
         $query = OdProcedureLog::query()
             ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month_group")
@@ -49,17 +50,17 @@ class TxMinerController extends Controller
 
         $records = $query->skip($start)->take($length)->get();
 
-        $fmt = fn($v) => '$ ' . number_format((float) ($v ?? 0), 2);
+        $fmt = fn ($v) => '$ '.number_format((float) ($v ?? 0), 2);
 
-        $data = $records->map(function ($r) use ($fmt) {
+        $data = $records->map(function ($r) use ($fmt, $txAcceptance) {
             $totalTx = (float) $r->total_tx_plan;
             $txScheduled = (float) $r->tx_scheduled;
             $unscheduled = $totalTx - $txScheduled;
             $completed = (float) $r->completed_tx;
 
-            $caseAcceptance = $totalTx > 0
-                ? (($completed + $txScheduled) / $totalTx) * 100
-                : 0;
+            // Single source of truth for the case-acceptance formula (blueprint D4-A).
+            // proposed = total TX plan, accepted = TX scheduled, completed = completed TX.
+            $caseAcceptance = $txAcceptance->rateFrom($totalTx, $completed, $txScheduled);
 
             $txPresentedCount = (int) $r->tx_presented_count;
             $avgTxPlan = $txPresentedCount > 0 ? $totalTx / $txPresentedCount : 0;
@@ -67,7 +68,7 @@ class TxMinerController extends Controller
             $patientsSeen = (int) ($r->patients_seen ?? 0);
             $patientsWithTp = (int) ($r->patients_with_tp ?? 0);
             $patientsTxPct = $patientsSeen > 0
-                ? number_format(($patientsWithTp / $patientsSeen) * 100, 1) . '%'
+                ? number_format(($patientsWithTp / $patientsSeen) * 100, 1).'%'
                 : '0.0%';
 
             try {
@@ -82,7 +83,7 @@ class TxMinerController extends Controller
                 'tx_scheduled' => $fmt($txScheduled),
                 'tx_unscheduled' => $fmt($unscheduled),
                 'completed_tx' => $fmt($completed),
-                'case_acceptance' => number_format($caseAcceptance, 2) . '%',
+                'case_acceptance' => number_format($caseAcceptance, 2).'%',
                 'tx_presented' => $txPresentedCount,
                 'avg_tx_plan' => $fmt($avgTxPlan),
                 'patients_with_tx' => $patientsTxPct,

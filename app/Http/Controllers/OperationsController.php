@@ -2,18 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\OdAdjustment;
-use App\Models\OdClaimProc;
+use App\Domain\Production\ProductionService;
 use App\Models\OdPatient;
-use App\Models\OdProcedureLog;
 use App\Models\OdProvider;
-use App\Models\PaySplit;
 use App\Services\OpenDental\OperationsAnalyticsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class OperationsController extends Controller
 {
+    public function __construct(
+        private readonly ProductionService $production,
+    ) {}
+
     /**
      * Main tabs (slug => label), in display order. Mirrors the Jarvis Operations nav.
      */
@@ -103,7 +105,7 @@ class OperationsController extends Controller
      */
     public function index(string $tab = 'offices', ?string $subtab = null)
     {
-        if (!array_key_exists($tab, $this->tabs())) {
+        if (! array_key_exists($tab, $this->tabs())) {
             abort(404);
         }
 
@@ -120,7 +122,7 @@ class OperationsController extends Controller
      */
     public function data(Request $request, OperationsAnalyticsService $service, string $tab, ?string $subtab = null)
     {
-        if (!array_key_exists($tab, $this->tabs())) {
+        if (! array_key_exists($tab, $this->tabs())) {
             abort(404);
         }
 
@@ -229,8 +231,8 @@ class OperationsController extends Controller
         $end = $request->input('end_date', now()->toDateString());
 
         if ($request->input('subtab') === 'last-year') {
-            $start = \Illuminate\Support\Carbon::parse($start)->subYear()->toDateString();
-            $end = \Illuminate\Support\Carbon::parse($end)->subYear()->toDateString();
+            $start = Carbon::parse($start)->subYear()->toDateString();
+            $end = Carbon::parse($end)->subYear()->toDateString();
         }
 
         $title = 'Drilldown';
@@ -240,14 +242,14 @@ class OperationsController extends Controller
 
         // Common Provider mapping
         $provMap = OdProvider::all()->mapWithKeys(function ($p) {
-            return [$p->ProvNum => $p->LName . ($p->PName ? ', ' . $p->PName : '')];
+            return [$p->ProvNum => $p->LName.($p->PName ? ', '.$p->PName : '')];
         })->toArray();
 
         // Common Patient mapping
         // We will fetch only patients included in the queries to save memory
         $mapPatients = function ($patNums) {
             return OdPatient::whereIn('PatNum', $patNums)->get()->mapWithKeys(function ($p) {
-                return [$p->PatNum => $p->LName . ', ' . $p->FName];
+                return [$p->PatNum => $p->LName.', '.$p->FName];
             })->toArray();
         };
 
@@ -274,8 +276,9 @@ class OperationsController extends Controller
             $totalGross = 0;
             foreach ($logs as $log) {
                 $gross = (float) $log->ProcFee;
-                if ($gross == 0)
+                if ($gross == 0) {
                     continue;
+                }
                 $totalGross += $gross;
 
                 $rows[] = [
@@ -328,8 +331,9 @@ class OperationsController extends Controller
 
             foreach ($adjs as $adj) {
                 $amt = (float) $adj->AdjAmt;
-                if ($amt == 0)
+                if ($amt == 0) {
                     continue;
+                }
                 $totalAdj += $amt;
 
                 $row = [
@@ -344,7 +348,7 @@ class OperationsController extends Controller
                         'link' => true,
                     ],
                     'date' => date('M d, Y', strtotime($adj->AdjDate)),
-                    'adj_type' => $defMap[$adj->AdjType] ?? 'Type ' . $adj->AdjType,
+                    'adj_type' => $defMap[$adj->AdjType] ?? 'Type '.$adj->AdjType,
                     'adj_amt' => $amt,
                 ];
 
@@ -355,7 +359,7 @@ class OperationsController extends Controller
                     // Let's pull the patient's gross production on that date
                     $gross = (float) DB::table('od_procedure_logs')
                         ->where('PatNum', $adj->PatNum)
-                        ->where('ProcDate', 'like', substr($adj->AdjDate, 0, 10) . '%')
+                        ->where('ProcDate', 'like', substr($adj->AdjDate, 0, 10).'%')
                         ->whereIn('ProcStatus', ['C', '2'])
                         ->sum('ProcFee');
 
@@ -399,8 +403,9 @@ class OperationsController extends Controller
             $totalCol = 0;
             foreach ($splits as $sp) {
                 $amt = (float) $sp->SplitAmt;
-                if ($amt == 0)
+                if ($amt == 0) {
                     continue;
+                }
                 $totalCol += $amt;
 
                 $rows[] = [
@@ -415,7 +420,7 @@ class OperationsController extends Controller
                         'label' => $provMap[$sp->ProvNum] ?? 'Unknown',
                         'link' => true,
                     ],
-                    'method' => $defMap[$sp->PayType] ?? 'Type ' . $sp->PayType,
+                    'method' => $defMap[$sp->PayType] ?? 'Type '.$sp->PayType,
                     'amount' => $amt,
                 ];
             }
@@ -460,31 +465,36 @@ class OperationsController extends Controller
 
             $buildKey = function ($pat, $prov, $d) use (&$allPats) {
                 $allPats[] = $pat;
-                return $pat . '|' . $prov . '|' . substr($d, 0, 10);
+
+                return $pat.'|'.$prov.'|'.substr($d, 0, 10);
             };
 
             foreach ($logs as $l) {
                 $k = $buildKey($l->PatNum, $l->ProvNum, $l->ProcDate);
-                if (!isset($map[$k]))
+                if (! isset($map[$k])) {
                     $map[$k] = ['pat' => $l->PatNum, 'prov' => $l->ProvNum, 'date' => substr($l->ProcDate, 0, 10), 'gross' => 0, 'adj' => 0, 'wo' => 0, 'coll' => 0];
+                }
                 $map[$k]['gross'] += (float) $l->ProcFee;
             }
             foreach ($adjs as $a) {
                 $k = $buildKey($a->PatNum, $a->ProvNum, $a->AdjDate);
-                if (!isset($map[$k]))
+                if (! isset($map[$k])) {
                     $map[$k] = ['pat' => $a->PatNum, 'prov' => $a->ProvNum, 'date' => substr($a->AdjDate, 0, 10), 'gross' => 0, 'adj' => 0, 'wo' => 0, 'coll' => 0];
+                }
                 $map[$k]['adj'] += (float) $a->AdjAmt;
             }
             foreach ($wos as $w) {
                 $k = $buildKey($w->PatNum, $w->ProvNum, $w->ProcDate);
-                if (!isset($map[$k]))
+                if (! isset($map[$k])) {
                     $map[$k] = ['pat' => $w->PatNum, 'prov' => $w->ProvNum, 'date' => substr($w->ProcDate, 0, 10), 'gross' => 0, 'adj' => 0, 'wo' => 0, 'coll' => 0];
+                }
                 $map[$k]['wo'] += (float) $w->WriteOff;
             }
             foreach ($splits as $s) {
                 $k = $buildKey($s->PatNum, $s->ProvNum, $s->DatePay);
-                if (!isset($map[$k]))
+                if (! isset($map[$k])) {
                     $map[$k] = ['pat' => $s->PatNum, 'prov' => $s->ProvNum, 'date' => substr($s->DatePay, 0, 10), 'gross' => 0, 'adj' => 0, 'wo' => 0, 'coll' => 0];
+                }
                 $map[$k]['coll'] += (float) $s->SplitAmt;
             }
 
@@ -493,13 +503,15 @@ class OperationsController extends Controller
             $totColl = 0;
 
             foreach ($map as $m) {
-                $net = $m['gross'] - abs($m['adj']) - abs($m['wo']);
+                $net = $this->production->netFrom((float) $m['gross'], (float) $m['adj'], (float) $m['wo']);
                 $coll = $m['coll'];
 
-                if (round($net, 2) == 0 && round($coll, 2) == 0 && $metric === 'coll_pct')
+                if (round($net, 2) == 0 && round($coll, 2) == 0 && $metric === 'coll_pct') {
                     continue;
-                if (round($net, 2) == 0 && $metric === 'net')
+                }
+                if (round($net, 2) == 0 && $metric === 'net') {
                     continue;
+                }
 
                 $totNet += $net;
                 $totColl += $coll;
@@ -593,20 +605,20 @@ class OperationsController extends Controller
 
             $patMap = $mapPatients($logs->pluck('PatNum')->unique());
 
-            $clinicName = $clinicNum == 0 ? '8 Mile' : 'Location ' . $clinicNum;
+            $clinicName = $clinicNum == 0 ? '8 Mile' : 'Location '.$clinicNum;
             $patData = [];
 
             foreach ($logs as $log) {
                 $d = substr($log->ProcDate, 0, 10);
-                if (!isset($patData[$log->PatNum])) {
+                if (! isset($patData[$log->PatNum])) {
                     $patData[$log->PatNum] = [
                         'days' => [],
                         'provs' => [],
-                        'services' => 0
+                        'services' => 0,
                     ];
                 }
                 $patData[$log->PatNum]['days'][$d] = true;
-                if (!empty($provMap[$log->ProvNum])) {
+                if (! empty($provMap[$log->ProvNum])) {
                     $patData[$log->PatNum]['provs'][$provMap[$log->ProvNum]] = true;
                 }
                 $patData[$log->PatNum]['services']++;
@@ -636,7 +648,7 @@ class OperationsController extends Controller
             }
             $totals = [
                 'count' => $totalVisits,
-                'services' => $totalServices
+                'services' => $totalServices,
             ];
         } elseif ($metric === 'npt_visit') {
             $title = 'Npt Visit Breakdown';
@@ -667,11 +679,11 @@ class OperationsController extends Controller
 
             $patData = [];
             foreach ($nptLogs as $log) {
-                if (!isset($patData[$log->PatNum])) {
+                if (! isset($patData[$log->PatNum])) {
                     $patData[$log->PatNum] = [
                         'first_date' => $log->first_date,
                         'codes' => [],
-                        'production' => 0
+                        'production' => 0,
                     ];
                 }
                 $patData[$log->PatNum]['codes'][$log->ProcCode] = true;
@@ -689,7 +701,7 @@ class OperationsController extends Controller
                     ],
                     'first_visit' => date('M d, Y', strtotime($data['first_date'])),
                     'service_codes' => implode(', ', array_keys($data['codes'])),
-                    'production' => $data['production']
+                    'production' => $data['production'],
                 ];
             }
 
@@ -726,15 +738,15 @@ class OperationsController extends Controller
 
             $patData = [];
             foreach ($nptLogs as $log) {
-                if (!isset($patData[$log->PatNum])) {
+                if (! isset($patData[$log->PatNum])) {
                     $patData[$log->PatNum] = [
                         'first_date' => $log->first_date,
                         'provs' => [],
                         'codes' => [],
-                        'production' => 0
+                        'production' => 0,
                     ];
                 }
-                if (!empty($provMap[$log->ProvNum])) {
+                if (! empty($provMap[$log->ProvNum])) {
                     $patData[$log->PatNum]['provs'][$provMap[$log->ProvNum]] = true;
                 }
                 $patData[$log->PatNum]['codes'][$log->ProcCode] = true;
@@ -755,7 +767,7 @@ class OperationsController extends Controller
                     'insurance_carrier' => 'N/A',
                     'referral_source' => 'N/A',
                     'service_codes' => implode(', ', array_keys($data['codes'])),
-                    'production' => $data['production']
+                    'production' => $data['production'],
                 ];
             }
             $totals = ['production' => $totalProduction];
@@ -769,7 +781,7 @@ class OperationsController extends Controller
                 ['key' => 'visited', 'label' => 'Visited', 'type' => 'text'],
             ];
 
-            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($end))) . ' 00:00:00';
+            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($end))).' 00:00:00';
 
             $firstVisitSubQ = DB::table('od_procedure_logs')
                 ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
@@ -781,7 +793,7 @@ class OperationsController extends Controller
                 ->select('pl.PatNum', 'fv.first_date')
                 ->where('pl.ClinicNum', $clinicNum)
                 ->whereIn('pl.ProcStatus', ['C', '2'])
-                ->whereBetween('pl.ProcDate', [$startWindow, $end . ' 23:59:59'])
+                ->whereBetween('pl.ProcDate', [$startWindow, $end.' 23:59:59'])
                 ->groupBy('pl.PatNum', 'fv.first_date')
                 ->get();
 
@@ -824,13 +836,13 @@ class OperationsController extends Controller
                 ['key' => 'visits', 'label' => 'Visits', 'type' => 'number', 'agg' => 'sum'],
             ];
 
-            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($end))) . ' 00:00:00';
+            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($end))).' 00:00:00';
 
             $logs = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ProvNum', 'ProcDate')
                 ->where('ClinicNum', $clinicNum)
                 ->whereIn('ProcStatus', ['C', '2'])
-                ->whereBetween('ProcDate', [$startWindow, $end . ' 23:59:59'])
+                ->whereBetween('ProcDate', [$startWindow, $end.' 23:59:59'])
                 ->get();
 
             $patMap = $mapPatients($logs->pluck('PatNum')->unique());
@@ -838,14 +850,14 @@ class OperationsController extends Controller
             $patData = [];
             foreach ($logs as $log) {
                 $d = substr($log->ProcDate, 0, 10);
-                if (!isset($patData[$log->PatNum])) {
+                if (! isset($patData[$log->PatNum])) {
                     $patData[$log->PatNum] = [
                         'days' => [],
-                        'provs' => []
+                        'provs' => [],
                     ];
                 }
                 $patData[$log->PatNum]['days'][$d] = true;
-                if (!empty($provMap[$log->ProvNum])) {
+                if (! empty($provMap[$log->ProvNum])) {
                     $patData[$log->PatNum]['provs'][$log->ProvNum] = true;
                 }
             }
@@ -869,7 +881,7 @@ class OperationsController extends Controller
                     ],
                     'provider_ids' => implode(', ', $provIds),
                     'providers' => implode(', ', array_filter($provNames)),
-                    'visits' => $count
+                    'visits' => $count,
                 ];
             }
             $totals = ['visits' => $totalVisits];
@@ -893,7 +905,7 @@ class OperationsController extends Controller
                 ")
                 ->where('pl.ClinicNum', $clinicNum)
                 ->whereIn('pl.ProcStatus', ['C', '2'])
-                ->whereBetween('pl.ProcDate', [$prior18m . ' 00:00:00', $priorEnd . ' 23:59:59'])
+                ->whereBetween('pl.ProcDate', [$prior18m.' 00:00:00', $priorEnd.' 23:59:59'])
                 ->groupBy('pl.PatNum')
                 ->get();
 

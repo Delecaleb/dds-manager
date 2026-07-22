@@ -2,11 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\MetricFilter;
+use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class KpisController extends Controller
 {
+    public function __construct(
+        private readonly TreatmentAcceptanceService $txAcceptance,
+    ) {}
+
     public function index()
     {
         return view('kpis.index');
@@ -98,17 +104,8 @@ class KpisController extends Controller
         $workDays = (int) $s->work_days;
         $hygVisits = (int) $s->visits;
 
-        // ② Case Acceptance mapping over $ totals
-        $caRates = DB::selectOne("
-            SELECT
-                SUM(CASE WHEN pl.ProcStatus = 'TP' THEN pl.ProcFee ELSE 0 END) AS proposed,
-                SUM(CASE WHEN pl.ProcStatus = 'C' THEN pl.ProcFee ELSE 0 END) AS completed,
-                SUM(CASE WHEN pl.ProcStatus = 'TP' AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' 
-                         THEN pl.ProcFee ELSE 0 END) AS accepted
-            FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcDate BETWEEN ? AND ?
-        ", [$start, $end]);
+        // ② Case Acceptance — single source of truth (blueprint D4-A)
+        $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [], true));
 
         // ③ Reappointment rate — single JOIN, no PHP-side array
         $rapt = DB::selectOne("
@@ -255,7 +252,7 @@ class KpisController extends Controller
             'visits_with_tx_pct' => $hygVisits > 0 ? round($visitsWithTx / $hygVisits * 100, 2) : 0,
             'tx_plans_per_day' => $workDays > 0 ? round($txPlanCount / $workDays, 2) : 0,
             'avg_prod_per_hour' => $totalMins > 0 ? round($hygProd / ($totalMins / 60), 2) : 0,
-            'case_acceptance' => $caRates->proposed > 0 ? round((($caRates->completed + $caRates->accepted) / $caRates->proposed) * 100, 2) : 0,
+            'case_acceptance' => $caRates->rate,
         ];
     }
 
@@ -303,18 +300,8 @@ class KpisController extends Controller
         $avgAptMins = (float) ($apts->avg_mins ?? 0);
         $totalHours = (float) ($apts->total_hours ?? 0);
 
-        // Case Acceptance mapped over $ totals
-        $caRates = DB::selectOne("
-            SELECT
-                COALESCE(SUM(CASE WHEN pl.ProcStatus = 'TP' THEN pl.ProcFee ELSE 0 END), 0) AS proposed,
-                COALESCE(SUM(CASE WHEN pl.ProcStatus = 'C' THEN pl.ProcFee ELSE 0 END), 0) AS completed,
-                COALESCE(SUM(CASE WHEN pl.ProcStatus = 'TP' AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' 
-                         THEN pl.ProcFee ELSE 0 END), 0) AS accepted
-            FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'false' 
-              AND pl.ProcDate BETWEEN ? AND ?
-        ", [$start, $end]);
+        // Case Acceptance — single source of truth (blueprint D4-A)
+        $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [], false));
 
         $docReappt = DB::selectOne("
             SELECT 
@@ -401,7 +388,7 @@ class KpisController extends Controller
 
         return [
             'case_acceptance_same_day' => $sameDayCaPct,
-            'case_acceptance_rate' => $caRates->proposed > 0 ? round((($caRates->completed + $caRates->accepted) / $caRates->proposed) * 100, 2) : 0,
+            'case_acceptance_rate' => $caRates->rate,
             'new_pt_tx_dollars' => $txMatrix->new_pts_with_tp_cnt > 0 ? round($txMatrix->total_new_pt_tp_dollars / $txMatrix->new_pts_with_tp_cnt, 2) : 0,
             'existing_pt_tx_dollars' => round((float) $txMatrix->total_existing_pt_tp_dollars, 2),
             'avg_apt_time_mins' => round($avgAptMins, 2),
@@ -846,16 +833,8 @@ class KpisController extends Controller
             $workDays = (int) $s->work_days;
             $hygVisits = (int) $s->visits;
 
-            // ② Case Acceptance
-            $caRates = DB::selectOne("
-                SELECT
-                    SUM(CASE WHEN pl.ProcStatus = 'TP' THEN pl.ProcFee ELSE 0 END) AS proposed,
-                    SUM(CASE WHEN pl.ProcStatus = 'C' THEN pl.ProcFee ELSE 0 END) AS completed,
-                    SUM(CASE WHEN pl.ProcStatus = 'TP' AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) AS accepted
-                FROM od_procedure_logs pl
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
-            ", [$start, $end, $pId]);
+            // ② Case Acceptance — single source of truth (blueprint D4-A)
+            $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [$pId], true));
 
             // ③ Reappointment
             $rapt = DB::selectOne("
@@ -946,7 +925,7 @@ class KpisController extends Controller
                 'visits_with_tx_pct' => $hygVisits > 0 ? round($visitsWithTx / $hygVisits * 100, 2) : 0,
                 'tx_plans_per_day' => $workDays > 0 ? round($txPlanCount / $workDays, 2) : 0,
                 'avg_prod_per_hour' => $totalMins > 0 ? round($hygProd / ($totalMins / 60), 2) : 0,
-                'case_acceptance' => $caRates->proposed > 0 ? round((($caRates->completed + $caRates->accepted) / $caRates->proposed) * 100, 2) : 0,
+                'case_acceptance' => $caRates->rate,
             ];
         }
 
@@ -1002,15 +981,8 @@ class KpisController extends Controller
             $avgAptMins = (float) $apts->avg_mins;
             $totalHours = (float) $apts->total_hours;
 
-            // Case Acceptance
-            $caRates = DB::selectOne("
-                SELECT
-                    SUM(CASE WHEN pl.ProcStatus = 'TP' THEN pl.ProcFee ELSE 0 END) AS proposed,
-                    SUM(CASE WHEN pl.ProcStatus = 'C' THEN pl.ProcFee ELSE 0 END) AS completed,
-                    SUM(CASE WHEN pl.ProcStatus = 'TP' AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) AS accepted
-                FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pc.IsHygiene = 'false' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
-            ", [$start, $end, $pId]);
+            // Case Acceptance — single source of truth (blueprint D4-A)
+            $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [$pId], false));
 
             // Reappt
             $docReappt = DB::selectOne("
@@ -1069,7 +1041,7 @@ class KpisController extends Controller
                 'location' => $p->Location,
                 'provider' => $p->Abbr.' '.$p->LName,
                 'case_acceptance_same_day' => $docVisits > 0 ? round(($txMatrix->same_day_completions / $docVisits) * 100, 2) : 0,
-                'case_acceptance_rate' => $caRates->proposed > 0 ? round((($caRates->completed + $caRates->accepted) / $caRates->proposed) * 100, 2) : 0,
+                'case_acceptance_rate' => $caRates->rate,
                 'new_pt_tx_dollars' => round((float) $txMatrix->avg_tp_new_pt, 2),
                 'existing_pt_tx_dollars' => round((float) $txMatrix->total_existing_pt_tx, 2),
                 'avg_apt_time_mins' => round($avgAptMins, 2),

@@ -101,7 +101,7 @@ behavior. This is only possible *because* the work isn't a monolithic branch.
 ## Progress tracker
 | Phase | Domain | Status | Snapshot diff notes |
 |-------|--------|--------|---------------------|
-| 0 | Kernel + Case Acceptance | ☐ not started | |
+| 0 | Kernel + Case Acceptance | ✅ **COMPLETE** — all 6 call sites migrated, grep gate clean | TxMiner + KpisController ×4 + Payors tab. 15/15 harness + 160-month + 156 per-provider + 1061-row parity, all 0 mismatches. See PHASE-LOG.md. |
 | 1 | Production | ☐ | |
 | 2 | Patient | ☐ | |
 | 3 | Payor | ☐ | |

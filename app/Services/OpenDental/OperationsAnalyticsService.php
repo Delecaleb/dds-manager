@@ -2,6 +2,9 @@
 
 namespace App\Services\OpenDental;
 
+use App\Domain\Production\ProductionService;
+use App\Domain\Support\ProcStatus;
+use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use App\Helpers\MetricDefinitions;
 use App\Models\OdPatient;
 use App\Models\OdProcedure;
@@ -35,6 +38,11 @@ class OperationsAnalyticsService
     private array $clinicNames = [
         0 => '8 Mile',
     ];
+
+    public function __construct(
+        private readonly TreatmentAcceptanceService $treatmentAcceptance,
+        private readonly ProductionService $production,
+    ) {}
 
     /**
      * Offices tab.
@@ -178,6 +186,7 @@ class OperationsAnalyticsService
             $totalWorkingDays = array_sum(array_column($rows, 'working_days'));
             $totalProcedures = array_sum(array_column($rows, 'procedures'));
             $totalCaProposed = array_sum(array_column($rows, 'ca_proposed'));
+            $totalCaCompleted = array_sum(array_column($rows, 'ca_completed'));
             $totalCaAccepted = array_sum(array_column($rows, 'ca_accepted'));
 
             $pwdProduction = $totalWorkingDays > 0 ? round($totalNet / $totalWorkingDays, 2) : 0;
@@ -197,7 +206,7 @@ class OperationsAnalyticsService
                 'collection' => $totalCollection,
                 'pts_visits' => $totalPtsVisits,
                 'npt_visit' => $totalNptVisit,
-                'case_acceptance' => $totalCaProposed > 0 ? round($totalCaAccepted / $totalCaProposed * 100, 2) : 0,
+                'case_acceptance' => $this->treatmentAcceptance->rateFrom($totalCaProposed, $totalCaCompleted, $totalCaAccepted),
                 'working_days' => $totalWorkingDays,
                 'pwd_production' => $pwdProduction,
                 'pwd_pts_visit' => $pwdPtsVisit,
@@ -349,20 +358,26 @@ class OperationsAnalyticsService
             return $x->PlanNum.'|'.$x->ClinicNum;
         });
 
-        // 5. Case acceptance ($ presented vs $ completed/scheduled) mapped by PlanNum.
-        //    Matches the practice-wide formula used across KPIs: (completed + accepted) / proposed.
-        //    proposed = TP-status fees, completed = C-status fees, accepted = TP fees with an appointment.
+        // 5. Case-acceptance components ($ presented vs $ completed/scheduled) mapped by PlanNum.
+        //    Components are aggregated here (grouped by payor); the RATE itself is computed by
+        //    TreatmentAcceptanceService (single source of truth, blueprint D4-A). Status codes
+        //    come from ProcStatus so "completed"/"treatment-planned" are defined in one place.
+        $tpSum = ProcStatus::sumWhereTreatmentPlanned('pl.ProcFee', 'pl');
+        $completedSum = ProcStatus::sumWhereCompleted('pl.ProcFee', 'pl');
+        $tpList = ProcStatus::inList(ProcStatus::TREATMENT_PLANNED);
+        $caStatuses = array_merge(ProcStatus::TREATMENT_PLANNED, ProcStatus::COMPLETED);
+
         $caQ = DB::table('od_procedure_logs as pl')
             ->leftJoinSub($latestClaim, 'cp', 'pl.PatNum', '=', 'cp.PatNum')
             ->selectRaw("
                 COALESCE(cp.PlanNum, 0) AS PlanNum,
                 pl.ClinicNum,
-                SUM(CASE WHEN pl.ProcStatus IN ('TP', '1') THEN pl.ProcFee ELSE 0 END) AS proposed,
-                SUM(CASE WHEN pl.ProcStatus IN ('C', '2') THEN pl.ProcFee ELSE 0 END) AS completed,
-                SUM(CASE WHEN pl.ProcStatus IN ('TP', '1') AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'
+                {$tpSum} AS proposed,
+                {$completedSum} AS completed,
+                SUM(CASE WHEN pl.ProcStatus IN ({$tpList}) AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'
                          THEN pl.ProcFee ELSE 0 END) AS accepted
             ")
-            ->whereIn('pl.ProcStatus', ['TP', '1', 'C', '2'])
+            ->whereIn('pl.ProcStatus', $caStatuses)
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
             $caQ->whereIn('pl.ClinicNum', $clinics);
@@ -397,12 +412,13 @@ class OperationsAnalyticsService
             $adjustment = (float) ($adj[$key]->adjustment ?? 0);
             $writeoff = (float) ($wo[$key]->writeoff ?? 0);
             $collection = (float) ($col[$key]->collection ?? 0);
-            $net = $gross - abs($adjustment) - abs($writeoff);
+            $net = $this->production->netFrom($gross, $adjustment, $writeoff);
 
             $totalNet += $net;
 
-            $proposed = (float) ($ca[$key]->proposed ?? 0);
-            $accepted = (float) ($ca[$key]->completed ?? 0) + (float) ($ca[$key]->accepted ?? 0);
+            $caProposed = (float) ($ca[$key]->proposed ?? 0);
+            $caCompleted = (float) ($ca[$key]->completed ?? 0);
+            $caAccepted = (float) ($ca[$key]->accepted ?? 0);
 
             $staged[] = [
                 'PlanNum' => $planNum,
@@ -416,9 +432,10 @@ class OperationsAnalyticsService
                 'pts_visits' => (int) ($p->pts_visits ?? 0),
                 'procedures' => (int) ($p->procedures ?? 0),
                 'npt_visit' => (int) ($npt[$key] ?? 0),
-                'ca_proposed' => $proposed,
-                'ca_accepted' => $accepted,
-                'case_acceptance' => $proposed > 0 ? round($accepted / $proposed * 100, 2) : 0,
+                'ca_proposed' => $caProposed,
+                'ca_completed' => $caCompleted,
+                'ca_accepted' => $caAccepted,
+                'case_acceptance' => $this->treatmentAcceptance->rateFrom($caProposed, $caCompleted, $caAccepted),
             ];
         }
 
@@ -443,6 +460,7 @@ class OperationsAnalyticsService
                 'pts_visits' => $ptsVisits,
                 'npt_visit' => $nptVisit,
                 'ca_proposed' => $stg['ca_proposed'],
+                'ca_completed' => $stg['ca_completed'],
                 'ca_accepted' => $stg['ca_accepted'],
                 'case_acceptance' => $stg['case_acceptance'],
                 'working_days' => $workingDays,
@@ -654,7 +672,7 @@ class OperationsAnalyticsService
             $adjustment = (float) ($adj[$key] ?? 0);
             $writeoff = (float) ($wo[$key] ?? 0);
             $collection = (float) ($coll[$key] ?? 0);
-            $net = $gross - abs($adjustment) - abs($writeoff);
+            $net = $this->production->netFrom($gross, $adjustment, $writeoff);
             $ptsVisits = (int) ($p->pts_visits ?? 0);
             $procedures = (int) ($p->procedures ?? 0);
             $workingDays = (int) ($p->working_days ?? 0);
@@ -1291,7 +1309,7 @@ class OperationsAnalyticsService
             $adjustment = (float) ($adj[$key] ?? 0);
             $writeoff = (float) ($wo[$key] ?? 0);
             $collection = (float) ($col[$key] ?? 0);
-            $net = $gross - abs($adjustment) - abs($writeoff);
+            $net = $this->production->netFrom($gross, $adjustment, $writeoff);
             $ptsVisits = (int) $p->pts_visits;
             $procedures = (int) $p->procedures;
             $workingDays = (int) $p->working_days;
@@ -1569,7 +1587,7 @@ class OperationsAnalyticsService
             $adjustment = (float) ($adj[$c] ?? 0);
             $writeoff = (float) ($wo[$c] ?? 0);
             $collection = (float) ($coll[$c] ?? 0);
-            $net = $gross - abs($adjustment) - abs($writeoff);
+            $net = $this->production->netFrom($gross, $adjustment, $writeoff);
             $ptsVisit = (int) ($p->pts_visit ?? 0);
             $procedures = (int) ($p->procedures ?? 0);
             $workingDays = (int) ($p->working_days ?? 0);
