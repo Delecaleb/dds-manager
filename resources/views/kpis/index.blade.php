@@ -150,7 +150,7 @@
 
     <!-- Doctor Section -->
     <div class="kpi-section">
-      <div class="kpi-section-hdr text-indigo-700" style="border-color:#6366f1">
+      <div class="kpi-section-hdr text-indigo-700" style="border-color: rgb(107, 83, 215)">
         <span class="text-base font-extrabold tracking-tight">Doctor</span>
       </div>
       <div class="kpi-grid" id="doctor-grid">
@@ -160,7 +160,7 @@
 
     <!-- Office Section -->
     <div class="kpi-section">
-      <div class="kpi-section-hdr text-teal-700" style="border-color:#14b8a6">
+      <div class="kpi-section-hdr text-teal-700" style="border-color: rgb(0, 194, 255)">
         <span class="text-base font-extrabold tracking-tight">Office</span>
       </div>
       <div class="kpi-grid" id="office-grid">
@@ -337,59 +337,61 @@
 
     /* ── Card definitions ──────────────────────────────────────────────────── */
     var HYGIENE_CARDS = [
-      { k: 'fluoride_per_day', label: '1. # of Fluoride app. per day', fmt: 'dec1', tip: 'Sum of unique patient count who took Fluoride Applications per day divided by the number of production days filtered by service codes D1206 & D1208 and filtered by Hygiene provider.' },
-      { k: 'fmx_per_day', label: '3. Avg. Fmx per day', fmt: 'dec1', tip: 'Sum of unique patient count who took FMX per day divided by the number of production days filtered by service code D0210.' },
-      { k: 'srp_per_day', label: '4. Avg. SRP per day', fmt: 'dec2', tip: 'Sum of total unique patient count who took SRP Applications per day filtered by service codes: 4341, 4342 divided by the total number of production days.' },
-      { k: 'avg_prod_per_day', label: '5. Avg. Prod. per Day', fmt: 'money', tip: 'The total production filtered by Hygienist and divided by the number of working days(any day with production).' },
-      { k: 'sealants', label: '6. Sealants', fmt: 'int', tip: 'Count of all sealants (D1351).' },
-      { k: 'whitening', label: '7. Whitening Procedures', fmt: 'int', tip: 'Count of all whitening procedure (D9972, D9973, D9974, D9975).' },
-      { k: 'antimicrobial', label: '8. Antimicrobial Placement', fmt: 'int', tip: 'Displays the # of PerioChip or Arestin procedures codes charged out within the date range selected. (D4381).' },
-      { k: 'reappt', label: '9. Hygiene Reappointment', fmt: 'pct', tip: 'Displays the percentage of patients who were seen for a hygiene visit, that also have a future hygiene visit scheduled. (1110, 1120, 4341, 4342, 4346, 4355, 4910).' },
-      { k: 'perio_reappt', label: '10. Perio Reappointment', fmt: 'pct', tip: 'Percentage of patients that came in having any of the service codes: D4341, D4342 and D4910, that have their next appointment scheduled with any of the service codes: D4341, D4342 and D4910.' },
-      { k: 'visits_per_day', label: '11. Number of visits per day', fmt: 'dec1', tip: 'Displays the # of hygiene visits per hygiene working day.' },
-      { k: 'adult_retention_12m', label: '12. Adult Hygiene Retention (12 months)', fmt: 'pct', tip: 'Patients seen within the date range that were also seen for a previous appointment within the last 12months. Includes procedure codes D1110 & D4910.' },
-      { k: 'adult_retention_6m', label: '13. Adult Hygiene Retention (6 months)', fmt: 'pct', tip: 'Patients seen within the date range that were also seen for a previous appointment within the last 6 months. Includes procedure codes D1110 & D4910.' },
-      { k: 'child_retention_12m', label: '14. Child Hygiene Retention (12 months)', fmt: 'pct', tip: 'Kid patients that came in today, that have a previous appointments for the past 12 months. Filtered by service codes: D1120.' },
-      { k: 'child_retention_6m', label: '15. Child Hygiene Retention (6 months)', fmt: 'pct', tip: 'Kid patients that came in today, that have a previous appointments for the past 6 months. Filtered by service codes: D1120.' },
-      { k: 'visits_with_tx_pct', label: '16. % of Hygiene Visits with TX Plan', fmt: 'pct', tip: 'The the total number of hygiene visits divided by total number of hygiene visits that included a treatment plan(amount must be greater than $10) multiplied by 100.' },
-      { k: 'prod_per_proc', label: '18. Hyg Production per Procedure', fmt: 'money', tip: 'Displays the average hygiene production per hygiene procedure (\'D1110\', \'D1120\', \'D4341\', \'D4342\', \'D4910\', \'D4346\', \'D4355\').' },
-      { k: 'tx_plans_per_day', label: '20. # of Tx plan per Day', fmt: 'dec1', tip: 'Total number of tx plans divided by total number of working days per provider.' },
-      { k: 'avg_prod_per_prov_day', label: '21. Avg Production per Provider Per Day', fmt: 'money', tip: 'The total production filtered by Hygiene and divided by the number of working days by provider (days with > $0 in Gross Production are considered working days, excludes adjustments and deleted entries).' },
-      { k: 'avg_prod_per_hour', label: '22. Average Hygiene Production per Hour', fmt: 'money', tip: 'The average production per hour by provider filtered by Hygiene Production and Hygiene Providers. Assumptions: Monday - Thursday 8hours, Friday 4 hours and Saturday 4 hours.' },
-      { k: 'case_acceptance', label: '23. Case Acceptance Rate', fmt: 'pct', tip: 'Displays the percentage of treatment plans accepted (scheduled or completed) per day, filtered by Hygienist.' },
+      { k: 'perio_pct', label: '1. Perio %', fmt: 'pct', tip: 'The number of perio appointments (D4341, D4342, D4910, D4346, D4355) divided by the sum of all hygiene appointments (D1110, D1120, D4341, D4342, D4910, D4346, D4355) multiplied by 100.' },
+      { k: 'fluoride_per_day', label: '2. # of Fluoride app. per day', fmt: 'dec1', tip: 'The sum of unique patients that received a Fluoride application (1206, 1208) divided by the number of Hygiene Working Days.' },
+      { k: 'avg_prod_per_day', label: '3. Avg. Prod. per Day', fmt: 'money', tip: 'The total production filtered by Hygienist and divided by the number of working days (any day with production within the date range.)' },
+      { k: 'avg_prod_per_prov_day', label: '4. Avg Production per Provider Per Day', fmt: 'money', tip: 'The total production filtered by Hygiene and divided by the number of working days by provider (days with > $0 in Gross Production are considered working days, excludes adjustments and deleted entries).' },
+      { k: 'prod_per_visit', label: '5. Production per patient visit', fmt: 'money', tip: 'The total production by a Hygiene Provider divided by the total number of Hygiene Patient Visits.' },
+      { k: 'fmx_per_day', label: '6. Avg. Fmx per day', fmt: 'dec1', tip: 'Sum of unique patients that received an FMX (code 0210) Divided by the number of Hygiene Working Days.' },
+      { k: 'srp_per_day', label: '7. Avg. SRP per day', fmt: 'dec2', tip: 'The total of unique patient visits that received an SRP (codes 4341, 4342) Divided by the Total number of Hygiene Working Days.' },
+      { k: 'visits_per_day', label: '8. Number of visits per day', fmt: 'dec1', tip: 'Number of Visits Per Day' },
+      { k: 'reappt', label: '9. Hygiene Reappointment', fmt: 'pct', tip: 'Patients seen by within the date range for a hygiene visit (D1110, D1120, D4341, D4342, D4910, D4346, D4355) that also have a future hygiene appointment scheduled.' },
+      { k: 'perio_reappt', label: '10. Perio Reappointment', fmt: 'pct', tip: 'Patients seen by within the date range for a Perio visit (codes 4341, 4342, 4910) that also have a future Perio appointment scheduled.' },
+      { k: 'adult_retention_12m', label: '11. Adult Hygiene Retention (12 months)', fmt: 'pct', tip: 'Patients seen within the date range that were also seen for a previous appointment within the last 12months. Includes procedure codes D1110 & D4910.' },
+      { k: 'adult_retention_6m', label: '12. Adult Hygiene Retention (6 months)', fmt: 'pct', tip: 'Patients seen within the date range that were also seen for a previous appointment within the last 6 months. Includes procedure codes D1110 & D4910.' },
+      { k: 'child_retention_12m', label: '13. Child Hygiene Retention (12 months)', fmt: 'pct', tip: 'Patients under the age of 18 who were seen within the date range that were also seen for a previous appointment within the last 12 months. Filtered by service codes: D1120.' },
+      { k: 'child_retention_6m', label: '14. Child Hygiene Retention (6 months)', fmt: 'pct', tip: 'Patients under the age of 18 who were seen within the date range that were also seen for a previous appointment within the last 6 months. Filtered by service codes: D1120.' },
+      { k: 'sealants', label: '15. Sealants', fmt: 'int', tip: 'The sum of all sealant procedures within the date range. (D1351)' },
+      { k: 'whitening', label: '16. Whitening Procedures', fmt: 'int', tip: 'The sum of whitening procedures within the date range. (D9972, D9973, D9974, D9975)' },
+      { k: 'antimicrobial', label: '17. Antimicrobial Placement', fmt: 'int', tip: 'The sum of all PerioChip or Arestin procedures within the date range. (D4381)' },
+      { k: 'prod_per_proc', label: '18. Hygiene Production per Procedure', fmt: 'money', tip: 'Total Production of Hygienists in a date range divided by Number of Hygiene codes. \'D1110\', \'D1120\', \'D4341\', \'D4342\', \'D4910\', \'D4346\', \'D4355\'.' },
+      { k: 'visits_with_tx_pct', label: '19. % of Hygiene Visits with TX Plan', fmt: 'pct', tip: 'The total count of all hygiene visits within the date range divided by the number of hygiene visits that received a new or refreshed Tx plan, multiplied by 100.' },
+      { k: 'tx_plans_per_day', label: '20. # of Tx plan per Day', fmt: 'dec1', tip: 'The total count of Tx plans presented within the date range divided by the total number of Hygiene Working Days.' },
+      { k: 'avg_prod_per_hour', label: '21. Average Hygiene Production per Hour', fmt: 'money', tip: 'Displays the average production per hour for hygiene providers' },
+      { k: 'case_acceptance', label: '22. Case Acceptance Rate', fmt: 'pct', tip: 'Displays the average production per hour for hygiene providers based on the office daily schedule setup.' },
     ];
 
     var DOCTOR_CARDS = [
-      { k: 'case_acceptance_same_day', label: '1. Case Acceptance - Same Day', fmt: 'pct', tip: 'Displays the percentage of treatment plans that were completed same day. Filtered by General providers. Excludes codes D0120, D0140, D0150, D0180.' },
-      { k: 'case_acceptance_rate', label: '2. Case Acceptance Rate', fmt: 'pct', tip: 'Displays the percentage of treatment plans accepted (scheduled or completed) per day, filtered by Doctor.' },
-      { k: 'new_pt_tx_dollars', label: '3. $ New Patients Receiving Treatment Plans', fmt: 'money', tip: 'Displays the average amount of treatment plans presented to New Patients.' },
-      { k: 'existing_pt_tx_dollars', label: '4. $ Existing Patients Receiving Treatment Plans', fmt: 'money', tip: 'Displays the total amount of treatment plans created for existing patients within the selected date range.' },
-      { k: 'avg_apt_time_mins', label: '5. Average Time per Doctor Appointment (minutes)', fmt: 'dec2', tip: 'The average time (in minutes) for a doctor appointments.' },
-      { k: 'avg_prod_per_hour', label: '6. Average Doctor Production per Hour', fmt: 'money', tip: 'Displays the average production per hour for general doctor providers based on the office daily schedule setup.' },
-      { k: 'avg_prod_per_apt', label: '7. Average Production per Doctor Appointment', fmt: 'money', tip: 'The average production $ amount for every doctor appointments.' },
-      { k: 'same_day_tx_per_new_pt', label: '8. Same Day Treatment per New Patient', fmt: 'money', tip: 'The sum of new patient production and existing patient production over and above what was booked for divided by the number of new patient (New Patient, first time a code is posted ot the ledger, even if transaction is $0). Filtered by Doctor providers.' },
-      { k: 'avg_prod_per_prov_day', label: '9. Avg. Prod. per Prov. Per Day', fmt: 'money', tip: 'Displays the average production per Provider per Day' },
+      { k: 'case_acceptance_same_day', label: '1. Case Acceptance – Same Day', fmt: 'pct', tip: 'Displays the percentage of treatment plans that were completed same day. Filtered by General providers' },
+      { k: 'case_acceptance_rate', label: '2. Case Acceptance Rate', fmt: 'pct', tip: 'Displays the percentage of treatment that is accepted for the selected date range. Accepted = Completed or Scheduled.' },
+      { k: 'new_pt_tx_dollars', label: '3. $ New Patients Receiving Treatment Plans', fmt: 'money', tip: 'Displays the average $ amount of treatment plans presented to New Patients.' },
+      { k: 'existing_pt_tx_dollars', label: '4. $ Existing Patients Receiving Treatment Plans', fmt: 'money', tip: 'Displays the total $ amount of treatment plans created for existing patients within the selected date range.' },
+      { k: 'avg_apt_time_mins', label: '5. Avg Time per Doctor Appointment (minutes)', fmt: 'dec2', tip: 'Displays the average appointment time (in minutes) for all patients seen by a Doctor within the date range selected.' },
+      { k: 'avg_prod_per_hour', label: '6. Average Doctor Production per Hour', fmt: 'money', tip: 'Displays the average production per hour for doctor providers' },
+      { k: 'avg_prod_per_apt', label: '7. Average Production per Doctor Appointment', fmt: 'money', tip: 'Displays the average scheduled production per doctor appointment.' },
+      { k: 'same_day_tx_per_new_pt', label: '8. Same Day Treatment per New Patient', fmt: 'money', tip: 'Displays the average $ amount of New Patient treatment plans that were completed same day.' },
+      { k: 'avg_prod_per_prov_day', label: '9. Avg Production per Provider Per Day', fmt: 'money', tip: 'Displays the average production $ per Provider per Day.' },
       { k: 'avg_tx_per_existing_pt', label: '10. Avg. Treatment plan ($) per Existing Pts.', fmt: 'money', tip: 'Displays the average treatment plan $ per existing patient.' },
       { k: 'avg_tx_per_new_pt', label: '11. Avg. Treatment plan ($) per New Pts.', fmt: 'money', tip: 'Displays the average treatment plan $ per new patient.' },
-      { k: 'pct_new_pt_with_tx', label: '12. % of new patients w/ treatment plans', fmt: 'pct', tip: 'Percentage of new patients with treatment plans.' },
-      { k: 'pct_existing_pt_with_tx', label: '13. % of existing patients w/ treatment plans', fmt: 'pct', tip: 'Percentage of existing patients with treatment plans.' },
+      { k: 'pct_new_pt_with_tx', label: '12. % of new patients w/ treatment plans', fmt: 'pct', tip: 'Displays the percentage of New Patients that received a treatment plan within the date range.' },
+      { k: 'pct_existing_pt_with_tx', label: '13. % of existing patients w/ treatment plans', fmt: 'pct', tip: 'Displays the percentage of existing patient that received a new or refreshed treatment plan.' },
       { k: 'reappt', label: '14. Doctor Reappoint', fmt: 'pct', tip: 'Displays the percentage of patients that were seen by a General Doctor and also have a future appointment.' },
-      { k: 'prod_per_exam', label: '15. Dr. Production per Exam', fmt: 'money', tip: 'Total Production of Doctors in a date range divided by Number of exam codes. \'D0120\',\'D0140\', \'D0150\'.' },
-      { k: 'total_production', label: '22. Total Doctor Production', fmt: 'money', tip: 'Total production of doctor providers.' },
+      { k: 'prod_per_exam', label: '15. Doctor Production per Exam', fmt: 'money', tip: 'Displays the average production $ per exam for General Doctors.' },
+      { k: 'total_production', label: '16. Total Doctor Production', fmt: 'money', tip: 'Total production of doctor providers.' },
     ];
 
     var OFFICE_CARDS = [
-      { k: 'patient_retention', label: 'Patient Retention', fmt: 'pct', tip: 'Displays the percentage of patients who were seen for an exam within the last 18 months compared to the active patient base. Active Patient = completed procedure code within last 36 months.' },
-      { k: 'tx_plans_per_day', label: '# of Treatment Plans per Day', fmt: 'dec1', tip: 'The number of treatment plans presented (must be greater than $10) divided by the number of working days.' },
-      { k: 'co_pay_collection', label: 'Co-Pay Collection', fmt: 'pct', tip: 'The Total amount collected from a patient divided by what was expected to be collected from a patient (based on the insurance estimate), multiplied by 100.' },
-      { k: 'unscheduled_tx', label: 'Unscheduled Tx $', fmt: 'money', tip: 'Displays the total $ amount of unscheduled treatment during the selected date range' },
-      { k: 'new_pt_fmx_pct', label: 'New Patients Fmx %', fmt: 'pct', tip: 'Displays the percentage of new patients receiving a full mouth series x ray' },
-      { k: 'no_show_rate', label: 'No Show Rate', fmt: 'pct', tip: 'Displays the percentage of patients that missed their appointment or cancelled their appointment within 24 hours.' },
-      { k: 'reactivation_list', label: 'Patient Reactivation List', fmt: 'comma', tip: 'Displays the number of patients that have not been seen 12 months prior to the date range selected' },
-      { k: 'patient_attrition', label: 'Patient Attrition', fmt: 'comma', tip: 'The # of patients that became inactive during the selected timeframe.' },
-      { k: 'patient_growth', label: 'Patient Growth', fmt: 'signed', tip: 'The number of new patient visits minus the number of patients deactivated.' },
-      { k: 'active_patients', label: '# of Active Patients', fmt: 'comma', tip: 'Displays the # of any patient that had a completed procedure within the last 18 months and has an active patient status. Excludes broken appointment codes (D9986 & D9987).' },
-      { k: 'active_in_recare_pct', label: '% of Active Patients in Hygiene Recare', fmt: 'pct', tip: 'Displays the percentage of active patients that are in hygiene recare. Any patient seen within the last 12 months prior to the selected date range and had one of the following procedure codes completed: D4910, D1110, D1120.' },
+      { k: 'patient_retention', label: '1. Patient Retention', fmt: 'pct', tip: 'Displays the percentage of patients who were seen for an exam within the last 18 months compared to the active patient base. Active Patient = completed procedure code within last 36 months.' },
+      { k: 'tx_plans_per_day', label: '2. # of Treatment Plans per Day', fmt: 'dec1', tip: 'The number of treatment plans presented (must be greater than $10) divided by the number of working days.' },
+      { k: 'co_pay_collection', label: '3. Co-Pay Collection', fmt: 'pct', tip: 'The Total amount collected from a patient divided by what was expected to be collected from a patient (based on the insurance estimate), multiplied by 100.' },
+      { k: 'unscheduled_tx', label: '4. Unscheduled Tx $', fmt: 'money', tip: 'Displays the total $ amount of unscheduled treatment during the selected date range' },
+      { k: 'new_pt_fmx_pct', label: '5. New Patients Fmx %', fmt: 'pct', tip: 'Displays the percentage of new patients receiving a full mouth series x ray' },
+      { k: 'no_show_rate', label: '6. No Show Rate', fmt: 'pct', tip: 'Displays the percentage of patients that missed their appointment or cancelled their appointment within 24 hours.' },
+      { k: 'reactivation_list', label: '7. Patient Reactivation List', fmt: 'comma', tip: 'Displays the number of patients that have not been seen 12 months prior to the date range selected' },
+      { k: 'patient_attrition', label: '8. Patient Attrition', fmt: 'comma', tip: 'The # of patients that became inactive during the selected timeframe.' },
+      { k: 'patient_growth', label: '9. Patient Growth', fmt: 'signed', tip: 'The number of new patient visits minus the number of patients deactivated.' },
+      { k: 'active_patients', label: '10. # of Active Patients', fmt: 'comma', tip: 'Displays the # of any patient that had a completed procedure within the last 18 months and has an active patient status. Excludes broken appointment codes (D9986 & D9987).' },
+      { k: 'active_in_recare_pct', label: '11. % of Active Patients in Hygiene Recare', fmt: 'pct', tip: 'Displays the percentage of active patients that are in hygiene recare. Any patient seen within the last 12 months prior to the selected date range and had one of the following procedure codes completed: D4910, D1110, D1120.' },
     ];
 
     var ENDO_CARDS = [
