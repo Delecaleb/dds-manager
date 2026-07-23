@@ -413,3 +413,24 @@ the grouping/labeling layer. Validated: payors location '8 Mile', net unchanged 
 Remaining cosmetic single-labels (Aging/Deposit/Calendar/HygieneRecall report headers) still
 print a fixed office string; harmless today, wire to ClinicRegistry when those reports gain
 per-clinic rows.
+
+## Phase 5.0 — Domain services build-out (Scheduling / Recall / Financial / Payor / Provider)   (2026-07-23)
+
+Built the remaining blueprint domain services (additive; all multi-office & per-provider aware
+via MetricFilter clinics[]/providers[]):
+
+- **SchedulingService** (+Summary): appointmentCount, completed/broken, brokenRate,
+  reappointmentRate, scheduledProduction. Uses AppointmentStatus enum. Validated 2025:
+  2938 appts / 1512 completed / 47.79% broken. NOTE: NextAptNum is unpopulated in the sync,
+  so reappointmentRate is 0 everywhere (data gap, also affects existing KPIs).
+- **RecallService** (+Summary): due/overdue/scheduled/byType. Clinic scope via patient join
+  (od_recalls has no ClinicNum). Validated: due 807, overdue 13886, scheduled 457.
+- **FinancialService** (+Summary): collections, adjustmentsBreakdown, accountsReceivable —
+  WRAPS AgingCalculationService + ProductionService (no duplication). Validated: AR 861,304.35.
+- **PayorService**: owns the patient->plan map (planForPatientSubquery, D10) + payorLabel +
+  productionByPayor — the primitives previously duplicated 5x in OperationsAnalyticsService.
+  Validated: 87 payors, top gross 503,079.34.
+- **ProviderService**: scorecard() composer — owns NO formulas, iterates providers calling the
+  shared services with withProviders([id]). Validated: 7 providers, per-provider net/CA/newPts.
+
+All lint clean, DI resolves, validated against live data.
