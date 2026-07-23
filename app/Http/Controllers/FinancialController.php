@@ -14,10 +14,15 @@ use Illuminate\Support\Facades\DB;
 
 class FinancialController extends Controller
 {
+    /** Pre-rendered completed-status IN-list for raw-SQL heredoc interpolation (DRY). */
+    private readonly string $completedIn;
+
     public function __construct(
         protected FinancialAnalyticsService $financialAnalytics,
         protected PatientAnalyticsService $patientAnalytics
-    ) {}
+    ) {
+        $this->completedIn = ProcStatus::inList(ProcStatus::completed());
+    }
 
     public function index()
     {
@@ -54,7 +59,7 @@ class FinancialController extends Controller
                     SUM(pl.ProcFee) AS production
                 FROM od_procedure_logs pl
                 JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-                WHERE pl.ProcStatus = 'C'
+                WHERE pl.ProcStatus IN ({$this->completedIn})
                   AND pr.IsHidden IN ('false', '0', 0)
                   AND pl.ProcDate BETWEEN ? AND ?
                 GROUP BY pr.ProvNum, pr.LName, pr.PName
@@ -90,7 +95,7 @@ class FinancialController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
                 JOIN od_definitions d ON pc.ProcCat = d.DefNum
-                WHERE pl.ProcStatus = 'C'
+                WHERE pl.ProcStatus IN ({$this->completedIn})
                   AND pl.ProcDate BETWEEN ? AND ?
                 GROUP BY d.DefNum, d.ItemName
                 ORDER BY SUM(pl.ProcFee) DESC
@@ -152,7 +157,7 @@ class FinancialController extends Controller
 
         // Daily Patient Statistics
         if (in_array($section, ['all', 'daily-patient-chart'])) {
-            $dailyVisits = OdProcedureLog::where('ProcStatus', 'C')
+            $dailyVisits = OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
                 ->selectRaw('DATE(ProcDate) as date, '.MetricDefinitions::patientVisits('cnt'))
                 ->groupByRaw('DATE(ProcDate)')
@@ -186,7 +191,7 @@ class FinancialController extends Controller
 
             $dailyCancelled = DB::table('od_procedure_logs as pl')
                 ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
-                ->where('pl.ProcStatus', 'C')
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereIn('pc.ProcCode', ['D9986', 'D9987'])
                 ->whereBetween('pl.ProcDate', [$start, $end])
                 ->selectRaw('DATE(pl.ProcDate) as date, COUNT(*) as cnt')
@@ -257,7 +262,7 @@ class FinancialController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             JOIN od_providers  pr ON pl.ProvNum  = pr.ProvNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               {$provFilter}
             GROUP BY pr.ProvNum, pr.LName, pr.PName, pc.CodeNum, pc.ProcCode, pc.Descript
@@ -694,7 +699,7 @@ class FinancialController extends Controller
                 SUM(pl.ProcFee)                  AS amount
             FROM od_procedure_logs pl
             JOIN od_patients p ON pl.PatNum = p.PatNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY p.PatNum, p.LName, p.FName
             ORDER BY p.LName
@@ -720,7 +725,7 @@ class FinancialController extends Controller
             FROM od_procedure_logs pl
             JOIN od_patients   p  ON pl.PatNum  = p.PatNum
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pc.ProcCode IN ('D9986', 'D9987')
               AND pl.ProcDate BETWEEN ? AND ?
             ORDER BY dates, p.LName

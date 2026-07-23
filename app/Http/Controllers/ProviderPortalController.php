@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ProcStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -19,6 +20,14 @@ class ProviderPortalController extends Controller
         8 => 'Hygienist',
         268 => 'Invisalign',
     ];
+
+    /** Pre-rendered completed-status IN-list for raw-SQL heredoc interpolation (DRY). */
+    private readonly string $completedIn;
+
+    public function __construct()
+    {
+        $this->completedIn = ProcStatus::inList(ProcStatus::completed());
+    }
 
     public function index()
     {
@@ -72,7 +81,7 @@ class ProviderPortalController extends Controller
                    COALESCE(SUM(pl.ProcFee), 0) AS production
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               {$provFilter}
               {$typeFilter}
@@ -132,7 +141,7 @@ class ProviderPortalController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             JOIN od_providers p   ON pl.ProvNum  = p.ProvNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND p.IsHidden IN ('false', '0', 0)
               {$provFilter}

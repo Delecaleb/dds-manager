@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use App\Models\OdProcedureLog;
 use Carbon\Carbon;
@@ -21,6 +22,9 @@ class TxMinerController extends Controller
         $start = (int) $request->get('start', 0);
         $length = (int) $request->get('length', 20);
 
+        $completed = ProcStatus::inList(ProcStatus::completed());
+        $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
+
         // Typically month filter or overall
         // Group by month YYYY-MM
         // Since we are returning "By Month", we aggregate over ProcDate or DateTP
@@ -30,17 +34,17 @@ class TxMinerController extends Controller
         $query = OdProcedureLog::query()
             ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month_group")
             // Total TX Plan: procedures with status 'TP' (Treatment Planned)
-            ->selectRaw("SUM(CASE WHEN ProcStatus = 'TP' THEN ProcFee ELSE 0 END) as total_tx_plan")
+            ->selectRaw("SUM(CASE WHEN ProcStatus IN ({$tp}) THEN ProcFee ELSE 0 END) as total_tx_plan")
             // Tx Scheduled: TP procedures that have been linked to an appointment (AptNum != 0)
-            ->selectRaw("SUM(CASE WHEN ProcStatus = 'TP' AND AptNum != 0 THEN ProcFee ELSE 0 END) as tx_scheduled")
+            ->selectRaw("SUM(CASE WHEN ProcStatus IN ({$tp}) AND AptNum != 0 THEN ProcFee ELSE 0 END) as tx_scheduled")
             // Completed: procedures with status 'C' (Complete)
-            ->selectRaw("SUM(CASE WHEN ProcStatus = 'C' THEN ProcFee ELSE 0 END) as completed_tx")
+            ->selectRaw("SUM(CASE WHEN ProcStatus IN ({$completed}) THEN ProcFee ELSE 0 END) as completed_tx")
             // # TX Plans Presented: count of TP procedures
-            ->selectRaw("COUNT(CASE WHEN ProcStatus = 'TP' THEN 1 END) as tx_presented_count")
-            // Distinct patients seen (ProcStatus = 'C') — used for 'Patients with Tx Plan %'
-            ->selectRaw("COUNT(DISTINCT CASE WHEN ProcStatus = 'C' THEN PatNum END) as patients_seen")
+            ->selectRaw("COUNT(CASE WHEN ProcStatus IN ({$tp}) THEN 1 END) as tx_presented_count")
+            // Distinct patients seen (completed) — used for 'Patients with Tx Plan %'
+            ->selectRaw("COUNT(DISTINCT CASE WHEN ProcStatus IN ({$completed}) THEN PatNum END) as patients_seen")
             // Distinct patients with a TP in this month
-            ->selectRaw("COUNT(DISTINCT CASE WHEN ProcStatus = 'TP' THEN PatNum END) as patients_with_tp")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN ProcStatus IN ({$tp}) THEN PatNum END) as patients_with_tp")
             ->whereNotNull('ProcDate')
             ->whereYear('ProcDate', '>=', 2000)
             ->groupBy('month_group')

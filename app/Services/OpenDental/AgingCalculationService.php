@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenDental;
 
+use App\Domain\Support\ProcStatus;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -324,6 +325,7 @@ class AgingCalculationService
     {
         $creditsFilter = $includeCredits ? '' : 'AND SUM(items.remaining) > 0';
         $groupExpr = $groupBy === 'patient' ? 'p.PatNum' : 'COALESCE(g.PatNum, p.PatNum)';
+        $completed = ProcStatus::inList(ProcStatus::completed());
 
         return "
             SELECT
@@ -360,7 +362,7 @@ class AgingCalculationService
                     SELECT ProcNum, SUM(CAST(AdjAmt AS DECIMAL(12,2))) amt
                     FROM od_adjustments WHERE ProcNum <> 0 GROUP BY ProcNum
                 ) adj ON adj.ProcNum = pl.ProcNum
-                WHERE pl.ProcStatus = 'C'
+                WHERE pl.ProcStatus IN ({$completed})
 
                 UNION ALL
 

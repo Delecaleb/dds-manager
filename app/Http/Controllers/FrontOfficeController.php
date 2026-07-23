@@ -7,6 +7,7 @@ use App\Models\OdPatient;
 use App\Models\OdProcedureLog;
 use App\Models\OdRecall;
 use Carbon\Carbon;
+use App\Domain\Support\ProcStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\Facades\DataTables;
@@ -40,14 +41,14 @@ class FrontOfficeController extends Controller
         $startOfMonth = $targetDate->copy()->startOfMonth()->format('Y-m-d');
         $endOfMonth = $targetDate->copy()->endOfMonth()->format('Y-m-d');
 
-        $monthlyProduction = OdProcedureLog::where('ProcStatus', 'C') // Completed
+        $monthlyProduction = OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed()) // Completed
             ->whereBetween('ProcDate', [$startOfMonth, $endOfMonth])
             ->sum('ProcFee');
 
         // Prior Year
         $lastYearStart = $targetDate->copy()->subYear()->startOfMonth()->format('Y-m-d');
         $lastYearEnd = $targetDate->copy()->subYear()->endOfMonth()->format('Y-m-d');
-        $priorYearProduction = OdProcedureLog::where('ProcStatus', 'C')
+        $priorYearProduction = OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$lastYearStart, $lastYearEnd])
             ->sum('ProcFee');
 
@@ -72,7 +73,7 @@ class FrontOfficeController extends Controller
 
         for ($i = 0; $i < 5; $i++) {
             $day = $startOfWeek->copy()->addDays($i)->format('Y-m-d');
-            $dailyActuals[] = (float) OdProcedureLog::where('ProcStatus', 'C')->whereDate('ProcDate', $day)->sum('ProcFee');
+            $dailyActuals[] = (float) OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())->whereDate('ProcDate', $day)->sum('ProcFee');
             $dailyGoals[] = $monthlyGoal / 20; // Avg 20 working days
         }
 
@@ -180,7 +181,7 @@ class FrontOfficeController extends Controller
         }
 
         // 4. Unscheduled TX
-        $tpProcs = OdProcedureLog::where('ProcStatus', 1) // Treatment Planned
+        $tpProcs = OdProcedureLog::whereIn('ProcStatus', ProcStatus::treatmentPlanned()) // Treatment Planned
             ->where('ProvNum', '>', 0)
             ->whereNotNull('DateTP')
             ->where('DateTP', '<=', $endOfMonth)
@@ -430,7 +431,7 @@ class FrontOfficeController extends Controller
         )->first();
 
         // Ins/Pts Collect
-        $pts_collection = OdProcedureLog::query()->where('ProcStatus', 2)->sum('ProcFee');
+        $pts_collection = OdProcedureLog::query()->whereIn('ProcStatus', ProcStatus::completed())->sum('ProcFee');
         $ins_collection = OdPatient::query()->sum(DB::raw('CAST(InsEst AS DECIMAL(10,2))'));
 
         return response()->json([
@@ -481,12 +482,12 @@ class FrontOfficeController extends Controller
         $data = [];
 
         // Dynamic Calculations bound to the date filter
-        $dbTxPlansInRange = OdProcedureLog::where('ProcStatus', 1)->whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
+        $dbTxPlansInRange = OdProcedureLog::whereIn('ProcStatus', ProcStatus::treatmentPlanned())->whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
         $dbNoShowCount = OdAppointment::where('AptStatus', 5)->whereBetween('AptDateTime', [$startOfMonth, $endOfMonth])->count();
         $dbTotalAptsInRange = OdAppointment::whereBetween('AptDateTime', [$startOfMonth, $endOfMonth])->count();
         $noShowRate = $dbTotalAptsInRange > 0 ? round(($dbNoShowCount / $dbTotalAptsInRange) * 100, 1) : 0;
 
-        $docProduction = OdProcedureLog::where('ProcStatus', 2)->whereBetween('ProcDate', [$startOfMonth, $endOfMonth])->sum('ProcFee');
+        $docProduction = OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$startOfMonth, $endOfMonth])->sum('ProcFee');
 
         // Dynamic Data Mappings per section.
         // Note: For KPI fields where OpenDental core DB does not natively store analytical time-series logs

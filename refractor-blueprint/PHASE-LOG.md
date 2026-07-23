@@ -4,6 +4,30 @@ Chronological record of what was actually built and validated. Newest first.
 
 ---
 
+## Phase 3.3 — Raw-SQL status retrofit across remaining files + FrontOffice bug fix   (2026-07-23)
+
+### Changed (DRY status single-sourcing)
+- `TxMinerController`, `ProviderPortalController`, `FinancialController`,
+  `AgingCalculationService`, `FrontOfficeController` — all raw-SQL/query-builder completed &
+  TP status filters now route through `ProcStatus` (heredocs via a constructor-initialized
+  `{$this->completedIn}` / local `{$completed}` IN-list; query builders via
+  `whereIn(ProcStatus::completed()/treatmentPlanned())`).
+- Bespoke IN-combos (`'C','TP'`, `'C','S'`, `'T','C'`) left as-is (intentional sets).
+- App-wide sweep: **0** raw completed/TP status literals remain outside intentional combos.
+
+### Bug fixed (surfaced by the retrofit)
+`FrontOfficeController` filtered by **integer** `ProcStatus = 1` (TP) and `= 2` (completed),
+but the synced data encodes TP as `'TP'` and completed mostly as `'C'`. Those filters matched
+almost nothing, so four metrics silently read **0/$0**:
+- `$tpProcs` 0 → **5975**, `$dbTxPlansInRange` 0 → real, `$pts_collection`/`$docProduction`
+  $0 → real (all-time completed production $1,322,655.99).
+Now correct via `ProcStatus::completed()/treatmentPlanned()`.
+
+### Validation
+- Lint clean; both parity harnesses PASS; TxMiner/Financial/Dashboard endpoints run.
+
+---
+
 ## Phase 3.1 — First-visit cohort single-sourced in KpisController (raw SQL)   (2026-07-23)
 
 ### Changed
