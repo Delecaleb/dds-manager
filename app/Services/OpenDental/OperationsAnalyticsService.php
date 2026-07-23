@@ -316,7 +316,7 @@ class OperationsAnalyticsService
                 COUNT(DISTINCT {$concat}) AS pts_visits,
                 COUNT(DISTINCT LEFT(pl.ProcDate, 10)) AS working_days
             ")
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
             $prodQ->whereIn('pl.ClinicNum', $clinics);
@@ -488,14 +488,14 @@ class OperationsAnalyticsService
 
         $firstVisit = DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->groupBy('PatNum');
 
         $q = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisit, 'fc', 'pl.PatNum', '=', 'fc.PatNum')
             ->leftJoinSub($latestClaim, 'cp', 'pl.PatNum', '=', 'cp.PatNum')
             ->selectRaw('COALESCE(cp.PlanNum, 0) AS PlanNum, pl.ClinicNum, COUNT(DISTINCT pl.PatNum) AS npt')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end])
             ->whereBetween('fc.first_date', [$start, $end]);
 
@@ -729,7 +729,7 @@ class OperationsAnalyticsService
                 COUNT(*)                                      AS procedures,
                 COUNT(DISTINCT {$concat}) AS pts_visits,
                 COUNT(DISTINCT ProcDate)                      AS working_days")
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end]);
 
         $groupCols = ['ClinicNum'];
@@ -786,13 +786,13 @@ class OperationsAnalyticsService
     {
         $firstVisit = DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->groupBy('PatNum');
 
         $q = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
             ->selectRaw('pl.ClinicNum, COUNT(DISTINCT pl.PatNum) AS npt')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end])
             ->whereBetween('fv.first_date', [$start, $end]);
 
@@ -887,7 +887,7 @@ class OperationsAnalyticsService
         // --- ACTUAL METRICS ---
         $actualProdQuery = DB::table('od_procedure_logs')
             ->selectRaw('ProcDate as d, SUM(ProcFee) as gross, COUNT(DISTINCT PatNum) as pts_visits')
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end]);
         if ($clinics) {
             $actualProdQuery->whereIn('ClinicNum', $clinics);
@@ -904,12 +904,12 @@ class OperationsAnalyticsService
 
         $firstVisit = DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) as first_date'))
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->groupBy('PatNum');
         $nptQuery = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
             ->selectRaw('pl.ProcDate as d, COUNT(DISTINCT pl.PatNum) as npt')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereColumn('pl.ProcDate', 'fv.first_date')
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
@@ -970,7 +970,7 @@ class OperationsAnalyticsService
 
         $provCountQuery = DB::table('od_procedure_logs')
             ->selectRaw('ProcDate as d, COUNT(DISTINCT ProvNum) as providers')
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end]);
         if ($clinics) {
             $provCountQuery->whereIn('ClinicNum', $clinics);
@@ -1265,7 +1265,7 @@ class OperationsAnalyticsService
                 COUNT(*)                                      AS procedures,
                 COUNT(DISTINCT {$concat}) AS pts_visits,
                 COUNT(DISTINCT ProcDate)                      AS working_days")
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end]);
         if ($clinics) {
             $prodQ->whereIn('ClinicNum', $clinics);
@@ -1290,7 +1290,7 @@ class OperationsAnalyticsService
                 COUNT(DISTINCT pl.PatNum) AS total_patients,
                 COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D0120','D0140','D0150') THEN pl.PatNum END) AS retained_patients
             ")
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$prior18m, $priorEnd]);
 
         if ($clinics) {
@@ -1415,13 +1415,13 @@ class OperationsAnalyticsService
     {
         $firstVisit = DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->groupBy('PatNum');
 
         $q = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
             ->selectRaw('pl.ClinicNum, pl.ProvNum, COUNT(DISTINCT pl.PatNum) AS npt')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end])
             ->whereBetween('fv.first_date', [$start, $end]);
         if ($clinics) {
@@ -1640,7 +1640,7 @@ class OperationsAnalyticsService
                 COUNT(DISTINCT PatNum)                        AS unique_pts,
                 COUNT(DISTINCT {$concat}) AS pts_visit,
                 COUNT(DISTINCT ProcDate)                      AS working_days")
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end]);
 
         if ($clinics) {
@@ -1655,7 +1655,7 @@ class OperationsAnalyticsService
     {
         $firstVisit = DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->groupBy('PatNum');
 
         $q = DB::table('od_procedure_logs as pl')
@@ -1663,7 +1663,7 @@ class OperationsAnalyticsService
             ->selectRaw('pl.ClinicNum,
                 COUNT(DISTINCT pl.PatNum) AS npt_visit,
                 SUM(pl.ProcFee)           AS new_patient_dollars')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end])
             ->whereBetween('fv.first_date', [$start, $end]);
 
@@ -1699,7 +1699,7 @@ class OperationsAnalyticsService
                 COUNT(DISTINCT pl.PatNum) AS total_patients,
                 COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D0120','D0140','D0150') THEN pl.PatNum END) AS retained_patients
             ")
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$prior18m.' 00:00:00', $priorEnd.' 23:59:59']);
 
         if ($clinics) {
@@ -1726,7 +1726,7 @@ class OperationsAnalyticsService
 
         $totalBase = DB::table('od_procedure_logs')
             ->selectRaw('ClinicNum, COUNT(DISTINCT PatNum) as total_ever_pts')
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->where('ProcDate', '<=', $end.' 23:59:59')
             ->when($clinics, fn ($q) => $q->whereIn('ClinicNum', $clinics))
             ->groupBy('ClinicNum')
@@ -1739,7 +1739,7 @@ class OperationsAnalyticsService
                     ->where('apt.AptDateTime', '>', $end.' 23:59:59');
             })
             ->selectRaw('pl.ClinicNum, COUNT(DISTINCT pl.PatNum) as active_pts_count, COUNT(DISTINCT CASE WHEN apt.AptNum IS NOT NULL THEN pl.PatNum END) as act_pts_reservation')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$startWindow.' 00:00:00', $end.' 23:59:59'])
             ->when($clinics, fn ($q) => $q->whereIn('pl.ClinicNum', $clinics))
             ->groupBy('pl.ClinicNum')
@@ -1964,7 +1964,7 @@ class OperationsAnalyticsService
         $qSrv = DB::table('od_procedure_logs as pl')
             ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
             ->selectRaw('pc.ProcCode, pc.Descript, COUNT(*) as cnt')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
             $qSrv->whereIn('pl.ClinicNum', $clinics);
@@ -1991,13 +1991,13 @@ class OperationsAnalyticsService
 
         $firstVisits = DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) as first_date'))
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->groupBy('PatNum');
 
         $qNpt = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisits, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
             ->selectRaw('COUNT(DISTINCT pl.PatNum) as npt')
-            ->whereIn('pl.ProcStatus', ['C', '2']);
+            ->whereIn('pl.ProcStatus', ProcStatus::completed());
 
         // Because of the complexity of filtering, we can just do two basic scalar queries.
         $metrics = $this->newPatientMetrics($start, $end, $clinics); // This gives NPT visits in the active selected range.
@@ -2014,7 +2014,7 @@ class OperationsAnalyticsService
         $qAct = DB::table('od_patients as pt')
             ->join('od_procedure_logs as pl', 'pt.PatNum', '=', 'pl.PatNum')
             ->select('pt.PatNum', 'pt.Birthdate')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end])
             ->where('pt.PatStatus', '0'); // 0 = Patient (Active)
 
@@ -2131,7 +2131,7 @@ class OperationsAnalyticsService
         $q = DB::table('od_procedure_logs as pl')
             ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
             ->selectRaw('pl.ClinicNum, pl.ProvNum, pc.ProcCode, pc.Descript, pc.ProcCat, COUNT(*) as cnt, SUM(pl.ProcFee) as fee')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
             $q->whereIn('pl.ClinicNum', $clinics);
@@ -2253,7 +2253,7 @@ class OperationsAnalyticsService
             if ($metric === 'visits') {
                 $qTab = DB::table('od_procedure_logs')
                     ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, ".MetricDefinitions::patientVisits('val'))
-                    ->whereIn('ProcStatus', ['C', '2'])
+                    ->whereIn('ProcStatus', ProcStatus::completed())
                     ->whereBetween('ProcDate', [$startRange, $endRange]);
                 if ($clinics) {
                     $qTab->whereIn('ClinicNum', $clinics);
@@ -2265,7 +2265,7 @@ class OperationsAnalyticsService
                 // Gross Production
                 $qGross = DB::table('od_procedure_logs')
                     ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(ProcFee) as val")
-                    ->whereIn('ProcStatus', ['C', '2'])
+                    ->whereIn('ProcStatus', ProcStatus::completed())
                     ->whereBetween('ProcDate', [$startRange, $endRange]);
                 if ($clinics) {
                     $qGross->whereIn('ClinicNum', $clinics);
@@ -2443,7 +2443,7 @@ class OperationsAnalyticsService
         if ($metric === 'visits') {
             $qTab = DB::table('od_procedure_logs')
                 ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, ".MetricDefinitions::patientVisits('val'))
-                ->whereIn('ProcStatus', ['C', '2'])
+                ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end]);
             if ($clinics) {
                 $qTab->whereIn('ClinicNum', $clinics);
@@ -2457,7 +2457,7 @@ class OperationsAnalyticsService
             // Gross
             $qGross = DB::table('od_procedure_logs')
                 ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(ProcFee) as val")
-                ->whereIn('ProcStatus', ['C', '2'])
+                ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end]);
             if ($clinics) {
                 $qGross->whereIn('ClinicNum', $clinics);
@@ -2518,7 +2518,7 @@ class OperationsAnalyticsService
 
         $qTab = DB::table('od_procedure_logs')
             ->selectRaw('ClinicNum, DAY(ProcDate) as d_day, COUNT(*) as c')
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$monthStart, $monthEnd]);
 
         if ($clinics) {
@@ -2753,7 +2753,7 @@ class OperationsAnalyticsService
                 SUM(CASE WHEN pc.ProcCode IN ("D3220", "D3221", "D3222") THEN 1 ELSE 0 END) as c_pulp,
                 SUM(CASE WHEN pc.ProcCode BETWEEN "D3310" AND "D3330" THEN 1 ELSE 0 END) as c_root
             ')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end]);
 
         if ($clinics) {
@@ -2767,7 +2767,7 @@ class OperationsAnalyticsService
         $drillQ = DB::table("$logTable as pl")
             ->join("$patTable as p", 'pl.PatNum', '=', 'p.PatNum')
             ->selectRaw('pl.ProvNum, pl.PatNum, p.FName, p.LName, MIN(pl.ProcDate) as first_date, MAX(pl.ProcDate) as last_date, SUM(pl.ProcFee) as total_prod')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
             $drillQ->whereIn('pl.ClinicNum', $clinics);
@@ -2794,7 +2794,7 @@ class OperationsAnalyticsService
         $visitsQ = DB::table("$logTable as pl")
             ->join("$patTable as p", 'pl.PatNum', '=', 'p.PatNum')
             ->selectRaw('pl.ProvNum, pl.PatNum, p.FName, p.LName, COUNT(DISTINCT pl.ProcDate) as visit_count, GROUP_CONCAT(DISTINCT pl.ProcDate ORDER BY pl.ProcDate SEPARATOR ", ") as visit_days')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
             $visitsQ->whereIn('pl.ClinicNum', $clinics);
@@ -2821,7 +2821,7 @@ class OperationsAnalyticsService
         // Active Working Days distinct calculation
         $daysQ = DB::table("$logTable as pl")
             ->selectRaw('pl.ProvNum, COUNT(DISTINCT pl.ProcDate) as days_worked')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
             $daysQ->whereIn('pl.ClinicNum', $clinics);
@@ -2915,13 +2915,13 @@ class OperationsAnalyticsService
         // 1) Find New Patients within the date range
         $firstVisit = DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->groupBy('PatNum');
 
         $newPatsQuery = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
             ->select('pl.PatNum', 'fv.first_date')
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('fv.first_date', [$start, $end]);
 
         if (! empty($clinics)) {
@@ -2945,7 +2945,7 @@ class OperationsAnalyticsService
                 'p.Zip',
                 'cp.PlanNum'
             )
-            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end]);
 
         if (! empty($clinics)) {
@@ -2995,13 +2995,13 @@ class OperationsAnalyticsService
             // 1. Gender
             $firstVisit = DB::table('od_procedure_logs')
                 ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-                ->whereIn('ProcStatus', ['C', '2'])
+                ->whereIn('ProcStatus', ProcStatus::completed())
                 ->groupBy('PatNum');
 
             $gQuery = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
                 ->join('od_patients as p', 'p.PatNum', '=', 'pl.PatNum')
-                ->whereIn('pl.ProcStatus', ['C', '2'])
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereBetween('pl.ProcDate', [$start, $end])
                 ->whereBetween('fv.first_date', [$start, $end]);
             $baseFilter($gQuery);
@@ -3023,7 +3023,7 @@ class OperationsAnalyticsService
 
             $ageQuery = DB::table('od_procedure_logs as pl')
                 ->join('od_patients as p', 'p.PatNum', '=', 'pl.PatNum')
-                ->whereIn('pl.ProcStatus', ['C', '2'])
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->where('pl.ProcDate', '>=', $start24)
                 ->where('pl.ProcDate', '<=', $end);
             $baseFilter($ageQuery);
@@ -3073,7 +3073,7 @@ class OperationsAnalyticsService
             $goalQuery = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
                 ->join('od_patients as p', 'p.PatNum', '=', 'pl.PatNum')
-                ->whereIn('pl.ProcStatus', ['C', '2'])
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->where('pl.ProcDate', '>=', $ytdStart)
                 ->where('pl.ProcDate', '<=', $end)
                 ->where('fv.first_date', '>=', $ytdStart)
@@ -3104,7 +3104,7 @@ class OperationsAnalyticsService
             $volQuery = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
                 ->join('od_patients as p', 'p.PatNum', '=', 'pl.PatNum')
-                ->whereIn('pl.ProcStatus', ['C', '2'])
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->where('pl.ProcDate', '>=', $volStart)
                 ->where('pl.ProcDate', '<=', $end)
                 ->where('fv.first_date', '>=', $volStart)
@@ -3207,7 +3207,7 @@ class OperationsAnalyticsService
             $lifetimeData = DB::table('od_procedure_logs')
                 ->select('PatNum', DB::raw('SUM(ProcFee) as total_fee'), DB::raw('COUNT(DISTINCT ProcDate) as visit_count'))
                 ->whereIn('PatNum', $flatPatIds)
-                ->whereIn('ProcStatus', ['C', '2'])
+                ->whereIn('ProcStatus', ProcStatus::completed())
                 ->groupBy('PatNum')
                 ->get()
                 ->keyBy('PatNum');

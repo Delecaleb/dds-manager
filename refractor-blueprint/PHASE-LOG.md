@@ -4,6 +4,29 @@ Chronological record of what was actually built and validated. Newest first.
 
 ---
 
+## Phase 1.3 — Grouped gross: completed-status single-sourced in OperationsAnalyticsService   (2026-07-23)
+
+### Changed
+- Replaced all **43** inline `['C', '2']` completed-status filters in
+  `OperationsAnalyticsService` with `ProcStatus::completed()`. This file already used the
+  canonical `['C','2']` set, so the change is **parity-perfect** (identical array value) —
+  it centralizes the "completed" definition that underlies grouped gross and every
+  completed-based metric in the largest analytics file.
+
+### Validation
+- Lint clean; zero `['C','2']` literals remain in code (doc comment retained).
+- Payors 2025: 123 rows, total net **672,627.85**, total gross **592,001.70** — unchanged.
+- Offices tab runs.
+
+### Note on scope
+Other files (Kpis, Financial, ProviderPortal, FrontOffice, Dashboard) filter completed as
+`'C'` only. Switching those to `ProcStatus::completed()` is fee-safe for gross but would
+change COUNT columns over 2010–2012 (the fee-zero `'2'` rows), so each needs per-query
+review — not a blanket replace. Deferred; OperationsAnalyticsService was uniquely safe
+because it already used `['C','2']`.
+
+---
+
 ## Phase 1.2 — Last net copy removed + FinancialAnalyticsService reuse   (2026-07-23)
 
 ### Changed
