@@ -4,6 +4,7 @@ namespace App\Services\OpenDental;
 
 use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
+use App\Domain\Insurance\PayorService;
 use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
@@ -12,7 +13,6 @@ use App\Models\OdPatient;
 use App\Models\OdProcedure;
 use App\Models\OdProcedureLog;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -44,6 +44,7 @@ class OperationsAnalyticsService
         private readonly ProductionService $production,
         private readonly PatientService $patients,
         private readonly ClinicRegistry $clinics,
+        private readonly PayorService $payors,
     ) {
         $this->clinicNames = $this->clinics->all();
     }
@@ -303,9 +304,7 @@ class OperationsAnalyticsService
     private function payorRows(string $start, string $end, array $clinics): array
     {
         // Map patients to their highest PlanNum from claim_procs
-        $latestClaim = DB::table('od_claim_procs')
-            ->select('PatNum', DB::raw('MAX(PlanNum) as PlanNum'))
-            ->groupBy('PatNum');
+        $latestClaim = $this->payors->planForPatientSubquery();
 
         $concat = $this->concatPatNumProcDate('pl');
 
@@ -486,9 +485,7 @@ class OperationsAnalyticsService
     /** New patients (first-ever procedure) mapped to Payor. */
     private function newPatientsByPayor(string $start, string $end, array $clinics): array
     {
-        $latestClaim = DB::table('od_claim_procs')
-            ->select('PatNum', DB::raw('MAX(PlanNum) as PlanNum'))
-            ->groupBy('PatNum');
+        $latestClaim = $this->payors->planForPatientSubquery();
 
         $firstVisit = $this->patients->firstVisitCohort();
 
@@ -513,44 +510,10 @@ class OperationsAnalyticsService
     }
 
     /** Human label for a plan using cached API map, bridging Jarvis analytics format: "Delta Dental of MI - 1029" */
+    /** Delegates to the single source of payor identity (PayorService, D10). */
     private function payorLabel($planNum): string
     {
-        $planNum = (int) $planNum;
-        if ($planNum === 0) {
-            return 'No Insurance - 999999';
-        }
-
-        $map = Cache::remember('od_carrier_string_map', 86400, function () {
-            try {
-                $client = app(OpenDentalClient::class);
-                $carriers = $client->get('carriers?limit=5000');
-                $cMap = [];
-                foreach ($carriers as $c) {
-                    $name = trim($c['CarrierName'] ?? '');
-                    if ($name !== '') {
-                        $cMap[$c['CarrierNum']] = $name;
-                    }
-                }
-
-                $plans = $client->get('insplans?limit=5000');
-                $pMap = [];
-                foreach ($plans as $p) {
-                    $cNum = $p['CarrierNum'] ?? 0;
-                    if ($cNum > 0) {
-                        $cName = $cMap[$cNum] ?? 'Unknown Carrier';
-                        $pMap[$p['PlanNum']] = $cName.' - '.$cNum;
-                    } else {
-                        $pMap[$p['PlanNum']] = ($p['GroupName'] ?? 'Unknown Plan').' - Plan '.$p['PlanNum'];
-                    }
-                }
-
-                return $pMap;
-            } catch (\Exception $e) {
-                return [];
-            }
-        });
-
-        return $map[$planNum] ?? 'Plan '.$planNum;
+        return $this->payors->payorLabel($planNum);
     }
 
     /**
