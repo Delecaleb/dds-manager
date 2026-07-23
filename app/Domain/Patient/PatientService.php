@@ -34,6 +34,21 @@ class PatientService
             ->groupBy('PatNum');
     }
 
+    /**
+     * The first-visit cohort as a raw SQL string, for interpolation into heredoc queries
+     * that can't take a query builder (e.g. KpisController's bundled single-scan KPIs).
+     * Same definition as firstVisitCohort(); keeps the cohort single-sourced everywhere.
+     *
+     * @param string $dateAlias column alias for the first-visit date (default 'first_date')
+     */
+    public function firstVisitCohortSql(string $dateAlias = 'first_date'): string
+    {
+        $completed = ProcStatus::inList(ProcStatus::completed());
+
+        return "SELECT PatNum, MIN(ProcDate) AS {$dateAlias} "
+            . "FROM od_procedure_logs WHERE ProcStatus IN ({$completed}) GROUP BY PatNum";
+    }
+
     /** Patients seen (any completed procedure) in the period. */
     public function count(MetricFilter $filter): int
     {

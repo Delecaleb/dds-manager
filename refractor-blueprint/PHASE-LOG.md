@@ -4,6 +4,27 @@ Chronological record of what was actually built and validated. Newest first.
 
 ---
 
+## Phase 3.1 — First-visit cohort single-sourced in KpisController (raw SQL)   (2026-07-23)
+
+### Changed
+- Added `PatientService::firstVisitCohortSql(alias)` — the cohort as a raw SQL string for
+  heredoc interpolation (same definition as `firstVisitCohort()`; keeps DRY where a query
+  builder can't be used).
+- `KpisController` — injected `PatientService`; replaced the 2 inline
+  `SELECT PatNum, MIN(ProcDate) ...` cohort subqueries in the bundled tx-matrix queries with
+  `{$cohortSql}`. Now `['C','2']` (D8), consistent with everywhere else.
+
+### Design note (DRY vs scalability)
+KpisController's bundled single-scan queries (one query → many KPIs) are kept intentionally —
+splitting them into per-metric service calls would mean N queries per page and hurt scale.
+The DRY win here is single-sourcing the *cohort definition* inside them, not restructuring.
+
+### Validation
+- Lint clean; 0 inline cohort subqueries remain in Kpis; DI resolves.
+- Helper-based new-patient count == `PatientService::newPatientCount` == **549** (2025).
+
+---
+
 ## Phase 3.0 — Completed-status single-sourced (query-builder filters)   (2026-07-23)
 
 ### Changed

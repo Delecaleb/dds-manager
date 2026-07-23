@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Patient\PatientService;
 use App\Domain\Support\MetricFilter;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use Illuminate\Http\Request;
@@ -11,6 +12,7 @@ class KpisController extends Controller
 {
     public function __construct(
         private readonly TreatmentAcceptanceService $txAcceptance,
+        private readonly PatientService $patients,
     ) {}
 
     public function index()
@@ -324,6 +326,7 @@ class KpisController extends Controller
         ", [$start, $end])->exam_cnt;
 
         // Advanced New/Existing & SameDay aggregation matrix
+        $cohortSql = $this->patients->firstVisitCohortSql('first_visit');
         $txMatrix = DB::selectOne("
             SELECT
                 COUNT(DISTINCT CASE WHEN pl.ProcStatus = 'TP' AND tp_same.same_day_completed = 1 THEN {$patDate} END) AS same_day_tp_accepted_cnt,
@@ -344,10 +347,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             JOIN (
-                SELECT PatNum, MIN(ProcDate) AS first_visit 
-                FROM od_procedure_logs 
-                WHERE ProcStatus = 'C' 
-                GROUP BY PatNum
+                {$cohortSql}
             ) pt_hist ON pl.PatNum = pt_hist.PatNum
             LEFT JOIN (
                 SELECT DISTINCT c.PatNum, c.ProcDate, 1 AS same_day_completed
@@ -995,6 +995,7 @@ class KpisController extends Controller
                 ->whereIn('pc.ProcCode', ['D0120', 'D0140', 'D0150', 'D0160', 'D0170', 'D0180'])->where('pl.ProcStatus', 'C')->whereBetween('pl.ProcDate', [$start, $end])->where('pl.ProvNum', $pId)->count();
 
             // TX Matrix
+            $cohortSql = $this->patients->firstVisitCohortSql('first_visit');
             $txMatrix = DB::selectOne("
                 SELECT
                     COUNT(DISTINCT CASE WHEN DATEDIFF(pl.ProcDate, tp.DateTP) = 0 THEN CONCAT(pl.PatNum,'-',pl.ProcDate) END) AS same_day_completions,
@@ -1010,8 +1011,7 @@ class KpisController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
                 JOIN (
-                    SELECT PatNum, MIN(ProcDate) AS first_visit 
-                    FROM od_procedure_logs WHERE ProcStatus = 'C' GROUP BY PatNum
+                    {$cohortSql}
                 ) pt_hist ON pl.PatNum = pt_hist.PatNum
                 LEFT JOIN od_procedure_logs tp ON tp.PatNum = pl.PatNum AND tp.ProcStatus = 'TP' AND tp.DateTP IS NOT NULL AND tp.DateTP BETWEEN ? AND ?
                 WHERE pc.IsHygiene = 'false' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
