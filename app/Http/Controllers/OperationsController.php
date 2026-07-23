@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ProcStatus;
 use App\Models\OdPatient;
@@ -15,6 +16,7 @@ class OperationsController extends Controller
 {
     public function __construct(
         private readonly ProductionService $production,
+        private readonly PatientService $patients,
     ) {}
 
     /**
@@ -661,10 +663,7 @@ class OperationsController extends Controller
                 ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
             ];
 
-            $firstVisitSubQ = DB::table('od_procedure_logs')
-                ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->groupBy('PatNum');
+            $firstVisitSubQ = $this->patients->firstVisitCohort();
 
             $nptLogs = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
@@ -720,10 +719,7 @@ class OperationsController extends Controller
                 ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
             ];
 
-            $firstVisitSubQ = DB::table('od_procedure_logs')
-                ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->groupBy('PatNum');
+            $firstVisitSubQ = $this->patients->firstVisitCohort();
 
             $nptLogs = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
@@ -784,10 +780,7 @@ class OperationsController extends Controller
 
             $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($end))).' 00:00:00';
 
-            $firstVisitSubQ = DB::table('od_procedure_logs')
-                ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->groupBy('PatNum');
+            $firstVisitSubQ = $this->patients->firstVisitCohort();
 
             $activePts = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')

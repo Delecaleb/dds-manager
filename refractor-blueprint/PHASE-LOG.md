@@ -15,6 +15,8 @@ Chronological record of what was actually built and validated. Newest first.
 - `OperationsAnalyticsService` — injected `PatientService`; replaced all **8** inline
   first-visit cohort subqueries (`MIN(ProcDate) … GROUP BY PatNum`) with
   `$this->patients->firstVisitCohort()`. Parity-perfect (identical query).
+- `OperationsController` — injected `PatientService`; replaced **3** more identical
+  practice-wide cohort subqueries. Parity-perfect. (11 copies eliminated total.)
 
 ### Validation
 - Lint clean; zero inline cohort copies remain in the service.
@@ -23,10 +25,11 @@ Chronological record of what was actually built and validated. Newest first.
 - DI resolves (OperationsAnalyticsService now has 3 domain deps).
 
 ### Remaining Patient work
-~9 more first-visit copies live in DashboardController, OperationsController,
-FinancialController, KpisController, PatientAnalyticsService, OdProcedureLog. Kpis/Financial
-are concurrency-hot; the rest can follow incrementally. Also pending: reconcile the
-competing `IsNewPatient` flag path (D8) where it's used instead of the cohort.
+`DashboardController` has 3 cohort copies that are genuinely DIFFERENT variants
+(provider-scoped, clinic-grouped, `'C'`-only, some raw SQL) — NOT the practice-wide cohort,
+so they need per-case review (possibly a bug: "new to provider" vs "new patient"). Also
+copies in FinancialController, KpisController (concurrency-hot), PatientAnalyticsService,
+OdProcedureLog. Pending: reconcile the competing `IsNewPatient` flag path (D8).
 
 ---
 
