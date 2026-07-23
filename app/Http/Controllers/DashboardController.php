@@ -259,7 +259,6 @@ class DashboardController extends Controller
                 DB::raw('COALESCE(a.adjustments, 0) AS adjustments'),
                 DB::raw('COALESCE(w.writeoffs, 0) AS writeoffs'),
                 DB::raw('COALESCE(c.collections, 0) AS collections'),
-                DB::raw('COALESCE(g.gross, 0) - ABS(COALESCE(a.adjustments, 0)) - ABS(COALESCE(w.writeoffs, 0)) AS net_production'),
                 DB::raw('COALESCE(apt.appointment_count, 0) AS appointment_count')
             )
             ->leftJoinSub($grossSub, 'g', 'p.ProvNum', '=', 'g.ProvNum')
@@ -287,6 +286,12 @@ class DashboardController extends Controller
         $mappedProviders = $providers->map(function ($p) {
             $p->specialty = $this->specialtyMap[(int) $p->Specialty] ?? 'General Dentistry';
             $p->location = '8 Mile';
+            // Net via the single source of truth (blueprint D3, signed adjustments).
+            $p->net_production = $this->production->netFrom(
+                (float) $p->gross_production,
+                (float) $p->adjustments,
+                (float) $p->writeoffs
+            );
 
             return $p;
         });

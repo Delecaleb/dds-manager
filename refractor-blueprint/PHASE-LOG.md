@@ -4,6 +4,28 @@ Chronological record of what was actually built and validated. Newest first.
 
 ---
 
+## Phase 1.2 — Last net copy removed + FinancialAnalyticsService reuse   (2026-07-23)
+
+### Changed
+- `DashboardController::providerPerformance` — the net_production was computed in **SQL with
+  `ABS()`** (missed by the earlier PHP-only grep gate). Removed that SQL expression; net is
+  now computed per row via `ProductionService::netFrom()`. This was the **last** net copy.
+- `FinancialAnalyticsService::filterAnalysis` — now sources gross/net/adjustments/writeoffs/
+  collections from `ProductionService::summary()` (one call). Gross-based rates preserved.
+
+### Validation
+- Lint clean; grep gate: **zero net formulas remain** outside `ProductionService`.
+- `filterAnalysis` 2025: gross 592,001.70, net 672,627.85, net == gross+adj−wo ✓, all 7
+  output keys intact (parity with committed behavior).
+- `providerPerformance` 2025: 6/6 providers net signed-correct.
+
+### Status
+Net production is now **fully single-sourced** across PHP and SQL. Remaining Production work
+(all parity-safe reuse, no number changes): route the many grouped GROSS/collection/visits/
+working-day queries through `ProductionService` fragments where cleanly separable.
+
+---
+
 ## Phase 1.1 — Net-production call sites migrated   (2026-07-22)
 
 ### Changed
