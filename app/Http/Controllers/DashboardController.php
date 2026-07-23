@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Production\ProductionService;
+use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
 use App\Models\ClaimProcs;
 use App\Models\OdAdjustment;
@@ -65,7 +66,7 @@ class DashboardController extends Controller
                 MetricDefinitions::grossProduction('total_production').', '.
                 MetricDefinitions::patientVisits('patient_count')
             )
-            ->where('ProcStatus', 'C')
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])
             ->groupBy('ClinicNum')
             ->orderByDesc('total_production')
@@ -103,7 +104,7 @@ class DashboardController extends Controller
 
         /* ── Aggregate stats ─────────────────────────── */
         $gross = DB::table('od_procedure_logs')
-            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])->sum('ProcFee');
 
         $adjustments = DB::table('od_adjustments')
@@ -115,7 +116,7 @@ class DashboardController extends Controller
         $net = $this->production->netFrom((float) $gross, (float) $adjustments, (float) $writeoffs);
 
         $patientVisits = DB::table('od_procedure_logs')
-            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])
             ->selectRaw('PatNum, DATE(ProcDate)')
             ->distinct()
@@ -124,14 +125,14 @@ class DashboardController extends Controller
 
         $newPatientVisits = DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) as first_visit'))
-            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
             ->groupBy('PatNum')
             ->havingBetween('first_visit', [$start, $end])
             ->count();
 
         // Avg per work-day (days this provider had completed procedures)
         $workDays = DB::table('od_procedure_logs')
-            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])
             ->distinct('ProcDate')->count('ProcDate');
 
@@ -142,7 +143,7 @@ class DashboardController extends Controller
         $txTotal = DB::table('od_procedure_logs')
             ->where('ProvNum', $id)->whereBetween('ProcDate', [$start, $end])->count();
         $txCompleted = DB::table('od_procedure_logs')
-            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])->count();
         $txRate = $txTotal > 0 ? round($txCompleted / $txTotal * 100, 2) : 0;
 
@@ -153,7 +154,7 @@ class DashboardController extends Controller
                 MetricDefinitions::grossProduction('production').', '.
                 MetricDefinitions::patientVisits('patient_count')
             )
-            ->where('ProvNum', $id)->where('ProcStatus', 'C')
+            ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])
             ->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m-%d')"))
             ->orderBy('date')->get()
@@ -226,7 +227,7 @@ class DashboardController extends Controller
         $search = trim($request->input('search', ''));
 
         $grossSub = OdProcedureLog::select('ProvNum', DB::raw('SUM(ProcFee) AS gross'))
-            ->where('ProcStatus', 'C')
+            ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])
             ->groupBy('ProvNum');
 
@@ -310,7 +311,7 @@ class DashboardController extends Controller
         $buildLocationStats = function ($s, $e) {
             $gross = DB::table('od_procedure_logs')
                 ->selectRaw('ClinicNum, '.MetricDefinitions::grossProduction('val'))
-                ->where('ProcStatus', 'C')->whereBetween('ProcDate', [$s, $e])
+                ->whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
             $adj = DB::table('od_adjustments')
@@ -388,7 +389,7 @@ class DashboardController extends Controller
 
         $buildVisitStats = function ($s, $e) {
             $patientVisits = DB::table('od_procedure_logs')
-                ->where('ProcStatus', 'C')
+                ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$s, $e])
                 ->selectRaw('ClinicNum, '.MetricDefinitions::patientVisits('val'))
                 ->groupBy('ClinicNum')
@@ -397,7 +398,7 @@ class DashboardController extends Controller
             // Find new patient visits per clinic (patient's first completed procedure at this clinic falls in date range)
             $newPatientVisits = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ClinicNum', DB::raw('MIN(ProcDate) as first_visit'))
-                ->where('ProcStatus', 'C')
+                ->whereIn('ProcStatus', ProcStatus::completed())
                 ->groupBy('PatNum', 'ClinicNum')
                 ->havingBetween('first_visit', [$s, $e])
                 ->get()

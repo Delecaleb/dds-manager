@@ -4,6 +4,30 @@ Chronological record of what was actually built and validated. Newest first.
 
 ---
 
+## Phase 3.0 — Completed-status single-sourced (query-builder filters)   (2026-07-23)
+
+### Changed
+- Replaced all **15** query-builder `->where('ProcStatus', 'C')` filters with
+  `->whereIn('ProcStatus', ProcStatus::completed())` across DashboardController (11),
+  FinancialController (2), PatientController (2). Added `ProcStatus` imports.
+
+### Validation
+- Lint clean; 0 query-builder `'C'` filters remain in controllers.
+- Parity (2025): Dashboard providerPerformance total gross **592,001.70**, locationStats
+  **592,001.70** — unchanged (recent ranges identical; `'2'` rows are only fee-zero 2010-2012).
+
+### Deliberately NOT done (honest scope)
+- **~70 raw-SQL `ProcStatus = 'C'` literals** inside `DB::select(...)` heredocs remain
+  (KpisController alone has **58**). These produce **identical numbers for all current
+  data** — `'2'`-status rows exist only in 2010-2012 and are fee-zero. Interpolating
+  `ProcStatus::inList()` into 70 heredocs is high-churn for **zero current impact**, so it's
+  left until (if ever) a proper query restructure. Encoding-robustness there is preventive
+  only.
+- KpisController / FinancialController deeper single-sourcing (their inline production/visit/
+  cohort logic) is a larger restructure, not part of this swift finish.
+
+---
+
 ## Phase 2.2 — Single-source patient_visits + avg production (Dashboard/Financials)   (2026-07-23)
 
 ### Changed

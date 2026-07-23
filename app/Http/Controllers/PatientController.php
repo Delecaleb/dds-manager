@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ProcStatus;
 use App\Models\OdAppointment;
 use App\Models\OdPatient;
 use App\Models\OdPatientBalance;
@@ -172,7 +173,7 @@ class PatientController extends Controller
         $codeMap = OdProcedure::all()->keyBy('CodeNum');
 
         $ledgerItems = [];
-        foreach ($patientProcedures->where('ProcStatus', 'C') as $proc) {
+        foreach ($patientProcedures->whereIn('ProcStatus', ProcStatus::completed()) as $proc) {
             $provNum = $proc->ProvNum ?? null;
             $provName = $provNum && isset($provMap[$provNum]) ? $provMap[$provNum] : '—';
 
@@ -479,7 +480,7 @@ class PatientController extends Controller
         $ar = $this->ar->aging($patientId);
 
         // Fetch Live completed transactions for the sub-log
-        $patientProcedures = OdProcedureLog::where('PatNum', $patientId)->where('ProcStatus', 'C')->get();
+        $patientProcedures = OdProcedureLog::where('PatNum', $patientId)->whereIn('ProcStatus', ProcStatus::completed())->get();
         $provMap = OdProvider::all()->pluck('LName', 'ProvNum')->toArray();
         $codeMap = OdProcedure::all()->keyBy('CodeNum');
 

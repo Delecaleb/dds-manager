@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
 use App\Models\OdAppointment;
 use App\Models\OdProcedureLog;
@@ -102,7 +103,7 @@ class FinancialController extends Controller
         // Daily Revenue Data
         if (in_array($section, ['all', 'daily-revenue-chart'])) {
             $dailyGross = DB::table('od_procedure_logs')
-                ->where('ProcStatus', 'C')
+                ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
                 ->selectRaw('DATE(ProcDate) as date, '.MetricDefinitions::grossProduction('amount'))
                 ->groupByRaw('DATE(ProcDate)')
@@ -172,7 +173,7 @@ class FinancialController extends Controller
 
             $dailyNewVisits = DB::table(function ($query) {
                 $query->from('od_procedure_logs')
-                    ->where('ProcStatus', 'C')
+                    ->whereIn('ProcStatus', ProcStatus::completed())
                     ->select('PatNum')
                     ->selectRaw('MIN(DATE(ProcDate)) as first_visit')
                     ->groupBy('PatNum');
