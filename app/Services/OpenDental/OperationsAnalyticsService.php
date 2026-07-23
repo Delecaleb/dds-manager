@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenDental;
 
+use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
@@ -42,6 +43,7 @@ class OperationsAnalyticsService
     public function __construct(
         private readonly TreatmentAcceptanceService $treatmentAcceptance,
         private readonly ProductionService $production,
+        private readonly PatientService $patients,
     ) {}
 
     /**
@@ -486,10 +488,7 @@ class OperationsAnalyticsService
             ->select('PatNum', DB::raw('MAX(PlanNum) as PlanNum'))
             ->groupBy('PatNum');
 
-        $firstVisit = DB::table('od_procedure_logs')
-            ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-            ->whereIn('ProcStatus', ProcStatus::completed())
-            ->groupBy('PatNum');
+        $firstVisit = $this->patients->firstVisitCohort();
 
         $q = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisit, 'fc', 'pl.PatNum', '=', 'fc.PatNum')
@@ -784,10 +783,7 @@ class OperationsAnalyticsService
     /** New-patient visits grouped by the active dimensions. Keyed by composite. */
     private function pdGroupedNewPatients(string $start, string $end, array $dims, array $clinics): array
     {
-        $firstVisit = DB::table('od_procedure_logs')
-            ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-            ->whereIn('ProcStatus', ProcStatus::completed())
-            ->groupBy('PatNum');
+        $firstVisit = $this->patients->firstVisitCohort();
 
         $q = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
@@ -902,10 +898,7 @@ class OperationsAnalyticsService
         }
         $actualCol = $colQuery->groupBy('DatePay')->pluck('total', 'd');
 
-        $firstVisit = DB::table('od_procedure_logs')
-            ->select('PatNum', DB::raw('MIN(ProcDate) as first_date'))
-            ->whereIn('ProcStatus', ProcStatus::completed())
-            ->groupBy('PatNum');
+        $firstVisit = $this->patients->firstVisitCohort();
         $nptQuery = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
             ->selectRaw('pl.ProcDate as d, COUNT(DISTINCT pl.PatNum) as npt')
@@ -1413,10 +1406,7 @@ class OperationsAnalyticsService
     /** New-patient visit counts grouped by "ClinicNum|ProvNum". */
     private function newPatientsByClinicProvider(string $start, string $end, array $clinics): array
     {
-        $firstVisit = DB::table('od_procedure_logs')
-            ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-            ->whereIn('ProcStatus', ProcStatus::completed())
-            ->groupBy('PatNum');
+        $firstVisit = $this->patients->firstVisitCohort();
 
         $q = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
@@ -1653,10 +1643,7 @@ class OperationsAnalyticsService
     /** New patients = first-ever completed procedure falls in range; dollars = their production in range. */
     private function newPatientMetrics(string $start, string $end, array $clinics): array
     {
-        $firstVisit = DB::table('od_procedure_logs')
-            ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-            ->whereIn('ProcStatus', ProcStatus::completed())
-            ->groupBy('PatNum');
+        $firstVisit = $this->patients->firstVisitCohort();
 
         $q = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
@@ -1989,10 +1976,7 @@ class OperationsAnalyticsService
         $ytdStart = substr($end, 0, 4).'-01-01'; // yyyy-01-01
         $mtdStart = substr($end, 0, 7).'-01';    // yyyy-mm-01
 
-        $firstVisits = DB::table('od_procedure_logs')
-            ->select('PatNum', DB::raw('MIN(ProcDate) as first_date'))
-            ->whereIn('ProcStatus', ProcStatus::completed())
-            ->groupBy('PatNum');
+        $firstVisits = $this->patients->firstVisitCohort();
 
         $qNpt = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisits, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
@@ -2913,10 +2897,7 @@ class OperationsAnalyticsService
             ->toArray();
 
         // 1) Find New Patients within the date range
-        $firstVisit = DB::table('od_procedure_logs')
-            ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-            ->whereIn('ProcStatus', ProcStatus::completed())
-            ->groupBy('PatNum');
+        $firstVisit = $this->patients->firstVisitCohort();
 
         $newPatsQuery = DB::table('od_procedure_logs as pl')
             ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
@@ -2993,10 +2974,7 @@ class OperationsAnalyticsService
         if ($subtab === 'patient-analysis') {
 
             // 1. Gender
-            $firstVisit = DB::table('od_procedure_logs')
-                ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->groupBy('PatNum');
+            $firstVisit = $this->patients->firstVisitCohort();
 
             $gQuery = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')

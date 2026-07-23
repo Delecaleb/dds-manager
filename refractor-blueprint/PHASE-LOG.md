@@ -4,6 +4,32 @@ Chronological record of what was actually built and validated. Newest first.
 
 ---
 
+## Phase 2.0 — PatientService + first-visit cohort single-sourced   (2026-07-23)
+
+### Built (additive)
+- `app/Domain/Patient/PatientService.php` — `firstVisitCohort()` (first-ever COMPLETED
+  procedure per patient, the one cohort definition), plus `count()`, `newPatientCount()`,
+  `existingPatientCount()`. Blueprint D8 = first completed procedure in period.
+
+### Changed
+- `OperationsAnalyticsService` — injected `PatientService`; replaced all **8** inline
+  first-visit cohort subqueries (`MIN(ProcDate) … GROUP BY PatNum`) with
+  `$this->patients->firstVisitCohort()`. Parity-perfect (identical query).
+
+### Validation
+- Lint clean; zero inline cohort copies remain in the service.
+- `PatientService::newPatientCount` == raw inline cohort: 2025 = **549**, 2024 = **318**.
+- Cross-check: Payors 2025 total npt_visit (**549**) == PatientService newPatientCount (**549**).
+- DI resolves (OperationsAnalyticsService now has 3 domain deps).
+
+### Remaining Patient work
+~9 more first-visit copies live in DashboardController, OperationsController,
+FinancialController, KpisController, PatientAnalyticsService, OdProcedureLog. Kpis/Financial
+are concurrency-hot; the rest can follow incrementally. Also pending: reconcile the
+competing `IsNewPatient` flag path (D8) where it's used instead of the cohort.
+
+---
+
 ## Phase 1.3 — Grouped gross: completed-status single-sourced in OperationsAnalyticsService   (2026-07-23)
 
 ### Changed
