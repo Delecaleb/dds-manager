@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
@@ -20,6 +21,7 @@ class DashboardController extends Controller
 {
     public function __construct(
         private readonly ProductionService $production,
+        private readonly PatientService $patients,
     ) {}
 
     private array $clinicNames = [
@@ -165,6 +167,8 @@ class DashboardController extends Controller
             ]);
 
         /* ── Daily visits (with new-patient detection) ── */
+        $cohortSql = $this->patients->firstVisitCohortSql('first_date');
+        $completed = ProcStatus::inList(ProcStatus::completed());
         $dailyVisits = DB::select("
             SELECT
                 DATE_FORMAT(pl.ProcDate, '%Y-%m-%d') AS date,
@@ -172,12 +176,9 @@ class DashboardController extends Controller
                 COUNT(DISTINCT CASE WHEN pl.ProcDate = fv.first_date THEN pl.PatNum END) AS new_patient_visits
             FROM od_procedure_logs pl
             LEFT JOIN (
-                SELECT PatNum, MIN(ProcDate) AS first_date
-                FROM od_procedure_logs
-                WHERE ProcStatus = 'C'
-                GROUP BY PatNum
+                {$cohortSql}
             ) fv ON pl.PatNum = fv.PatNum
-            WHERE pl.ProvNum = ? AND pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ?
+            WHERE pl.ProvNum = ? AND pl.ProcStatus IN ({$completed}) AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY DATE_FORMAT(pl.ProcDate, '%Y-%m-%d')
             ORDER BY date
         ", [$id, $start, $end]);
@@ -186,7 +187,7 @@ class DashboardController extends Controller
         $dailyTx = DB::table('od_procedure_logs')
             ->select(
                 DB::raw("DATE_FORMAT(ProcDate, '%Y-%m-%d') AS date"),
-                DB::raw("SUM(CASE WHEN ProcStatus = 'C' THEN 1 ELSE 0 END) AS completed"),
+                DB::raw("SUM(CASE WHEN ProcStatus IN ({$completed}) THEN 1 ELSE 0 END) AS completed"),
                 DB::raw('COUNT(*) AS total')
             )
             ->where('ProvNum', $id)
