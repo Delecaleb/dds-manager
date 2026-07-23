@@ -25,6 +25,9 @@
         <button id="exportCsvBtn" disabled class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-slate-400 rounded-xl cursor-not-allowed transition shadow-sm focus:outline-none disabled:opacity-60">
           <i data-lucide="download" class="w-4 h-4"></i> Export CSV
         </button>
+        <button id="syncToLocalBtn" disabled class="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-slate-400 rounded-xl cursor-not-allowed transition shadow-sm focus:outline-none disabled:opacity-60" title="Sync fetched OpenDental records into local database table">
+          <i data-lucide="cloud-download" class="w-4 h-4"></i> Sync to Local DB
+        </button>
         <button id="runQueryBtn" class="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-md shadow-emerald-500/20 transition focus:outline-none">
           <i data-lucide="play" class="w-4 h-4 fill-current"></i> Fetch Realtime Data
         </button>
@@ -285,6 +288,7 @@
       var runQueryBtn = document.getElementById('runQueryBtn');
       var resetBtn = document.getElementById('resetBtn');
       var exportCsvBtn = document.getElementById('exportCsvBtn');
+      var syncToLocalBtn = document.getElementById('syncToLocalBtn');
       var loadingSpinner = document.getElementById('loadingSpinner');
       var quickFilterInput = document.getElementById('quickFilterInput');
       var srcLiveBtn = document.getElementById('srcLiveBtn');
@@ -556,12 +560,18 @@
         document.getElementById('sqlDrawer').textContent = formattedSql;
 
         exportCsvBtn.disabled = _queryResultData.count === 0;
+        syncToLocalBtn.disabled = _queryResultData.count === 0;
+
         if (_queryResultData.count > 0) {
           exportCsvBtn.classList.remove('bg-slate-400', 'cursor-not-allowed');
           exportCsvBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-md', 'shadow-emerald-500/20');
+          syncToLocalBtn.classList.remove('bg-slate-400', 'cursor-not-allowed');
+          syncToLocalBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700', 'shadow-md', 'shadow-indigo-500/20');
         } else {
           exportCsvBtn.classList.add('bg-slate-400', 'cursor-not-allowed');
           exportCsvBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+          syncToLocalBtn.classList.add('bg-slate-400', 'cursor-not-allowed');
+          syncToLocalBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
         }
 
         document.getElementById('tableTitle').textContent = 'Results: ' + _queryResultData.table + ' (' + _queryResultData.count + ' rows)';
@@ -634,6 +644,46 @@
         document.body.removeChild(link);
       });
 
+      syncToLocalBtn.addEventListener('click', function () {
+        if (!_queryResultData || !_queryResultData.rows || !_queryResultData.rows.length) return;
+
+        syncToLocalBtn.disabled = true;
+        syncToLocalBtn.innerHTML = '<svg class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Syncing to Local DB...';
+
+        fetch('{{ url("/open-dental-explorer/sync-to-local") }}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+          },
+          body: JSON.stringify({
+            table: _queryResultData.table,
+            rows: _queryResultData.rows
+          })
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
+            syncToLocalBtn.disabled = false;
+            syncToLocalBtn.innerHTML = '<i data-lucide="cloud-download" class="w-4 h-4"></i> Sync to Local DB';
+            lucide.createIcons();
+
+            if (res.error) {
+              alert('Error syncing to local database: ' + res.error);
+              return;
+            }
+
+            noticeText.textContent = '✅ ' + (res.message || ('Successfully synced ' + res.synced_count + ' record(s) into local table.'));
+            noticeBanner.className = 'p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs flex items-center gap-2 shadow-sm font-medium';
+            noticeBanner.classList.remove('hidden');
+          })
+          .catch(function (err) {
+            syncToLocalBtn.disabled = false;
+            syncToLocalBtn.innerHTML = '<i data-lucide="cloud-download" class="w-4 h-4"></i> Sync to Local DB';
+            lucide.createIcons();
+            alert('Failed to sync data: ' + err.message);
+          });
+      });
+
       resetBtn.addEventListener('click', function () {
         tableSelect.value = '';
         columnsContainer.innerHTML = '<p class="text-slate-400 italic">Select a table first to inspect available columns.</p>';
@@ -651,6 +701,9 @@
         exportCsvBtn.disabled = true;
         exportCsvBtn.classList.add('bg-slate-400', 'cursor-not-allowed');
         exportCsvBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+        syncToLocalBtn.disabled = true;
+        syncToLocalBtn.classList.add('bg-slate-400', 'cursor-not-allowed');
+        syncToLocalBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
         noticeBanner.classList.add('hidden');
         _queryResultData = null;
         lucide.createIcons();

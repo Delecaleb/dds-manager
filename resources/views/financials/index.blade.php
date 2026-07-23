@@ -46,22 +46,22 @@
 
     /* ── Breakdown modal table ── */
     #bkTable th {
-      background: #f9fafb;
-      font-size: .7rem;
+      background: #e5e7eb;
+      font-size: .75rem;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .05em;
-      color: #6b7280;
-      border-bottom: 1px solid #e5e7eb;
-      padding: .625rem 1rem;
+      color: #111827;
+      border-bottom: 1px solid #d1d5db;
+      border-right: 1px solid #d1d5db;
+      padding: .75rem 1rem;
       white-space: nowrap;
     }
 
     #bkTable td {
       font-size: .8rem;
       color: #374151;
-      padding: .5rem 1rem;
+      padding: .625rem 1rem;
       border-bottom: 1px solid #f3f4f6;
+      border-right: 1px solid #f3f4f6;
       white-space: nowrap;
     }
 
@@ -707,23 +707,23 @@
     <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col" style="max-height:90vh">
 
       <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200 shrink-0">
-        <h2 id="bkTitle" class="text-xl font-bold text-gray-900">Financial Breakdown</h2>
+        <h2 id="bkTitle" class="text-2xl font-bold text-slate-900 tracking-tight">Financial Breakdown</h2>
         <button onclick="closeBkModal()"
-          class="text-gray-400 hover:text-gray-600 text-2xl leading-none font-light transition-colors">&times;</button>
+          class="text-slate-900 hover:text-slate-600 text-3xl font-bold font-sans transition-colors cursor-pointer leading-none">&times;</button>
       </div>
 
-      <div class="flex items-center justify-end gap-3 px-6 py-3 border-b border-gray-100 shrink-0">
+      <div class="flex items-center justify-end gap-3 px-6 py-3.5 border-b border-gray-100 shrink-0">
         <div class="relative">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none"
+          <input id="bkSearch" type="text" placeholder="Search"
+            class="pl-3 pr-8 py-1.5 text-sm border border-slate-400 rounded focus:outline-none focus:border-emerald-500 w-52 shadow-xs">
+          <svg class="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none"
             fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <input id="bkSearch" type="text" placeholder="Search"
-            class="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-emerald-400 w-48">
         </div>
         <button id="bkExportBtn"
-          class="text-sm font-semibold border border-emerald-500 text-emerald-600 hover:bg-emerald-50 px-4 py-1.5 rounded transition-colors">
+          class="text-xs font-bold border border-emerald-500 text-emerald-600 hover:bg-emerald-50 px-4 py-2 rounded transition-colors shadow-xs">
           Export CSV
         </button>
       </div>
@@ -1538,7 +1538,45 @@
     }
 
     /* ── Breakdown Modal ──────────────────────────────────────────────────────── */
-    var _bk = { allData: [], filtered: [], type: '', page: 1, pageSize: 10 };
+    var _bk = { allData: [], filtered: [], type: '', page: 1, pageSize: 10, sortKey: null, sortAsc: true };
+
+    function bkBuildHeader(cols) {
+      return '<tr class="bg-slate-200 border-b border-slate-300">' + cols.map(function (c) {
+        var isSorted = _bk.sortKey === c.key;
+        var arrow = isSorted ? (_bk.sortAsc ? '▲' : '▼') : '↕';
+        var arrowClass = isSorted ? 'text-emerald-700 font-bold' : 'text-slate-500 opacity-60';
+        return '<th onclick="bkSortBy(\'' + c.key + '\')" class="cursor-pointer select-none text-xs font-bold text-slate-900 px-4 py-3 border-r border-slate-300 hover:bg-slate-300 transition-colors whitespace-nowrap">' +
+          '<span class="inline-flex items-center gap-1.5">' +
+          '<span class="' + arrowClass + ' text-[11px]">' + arrow + '</span>' +
+          '<span>' + c.title + '</span>' +
+          '</span>' +
+          '</th>';
+      }).join('') + '</tr>';
+    }
+
+    function bkSortBy(key) {
+      if (_bk.sortKey === key) {
+        _bk.sortAsc = !_bk.sortAsc;
+      } else {
+        _bk.sortKey = key;
+        _bk.sortAsc = true;
+      }
+
+      _bk.filtered.sort(function (a, b) {
+        var valA = a[key];
+        var valB = b[key];
+        if (valA === valB) return 0;
+        if (valA === null || valA === undefined) return 1;
+        if (valB === null || valB === undefined) return -1;
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return _bk.sortAsc ? valA - valB : valB - valA;
+        }
+        return _bk.sortAsc ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
+      });
+
+      _bk.page = 1;
+      bkRenderPage();
+    }
 
     var BK_COLS = {
       gross_production: [
@@ -1748,6 +1786,8 @@
       _bk.allData = [];
       _bk.filtered = [];
       _bk.page = 1;
+      _bk.sortKey = null;
+      _bk.sortAsc = true;
       _bk.pageSize = parseInt(document.getElementById('bkPageSize').value, 10);
 
       document.getElementById('bkTitle').textContent = 'Financial Breakdown - ' + title;

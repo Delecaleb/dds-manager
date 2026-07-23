@@ -128,4 +128,34 @@ class OpenDentalExplorerTest extends TestCase
         $response->assertStatus(400);
         $response->assertJson(['error' => 'Invalid or unauthorized table selected.']);
     }
+
+    public function test_od_explorer_sync_to_local_upserts_records_into_local_database(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->postJson('/open-dental-explorer/sync-to-local', [
+            'table' => 'patient',
+            'rows' => [
+                [
+                    'PatNum' => 99999,
+                    'LName' => 'Doe',
+                    'FName' => 'Jane',
+                    'PatStatus' => 0,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'table' => 'od_patients',
+            'synced_count' => 1,
+        ]);
+
+        $this->assertDatabaseHas('od_patients', [
+            'PatNum' => 99999,
+            'LName' => 'Doe',
+            'FName' => 'Jane',
+        ]);
+    }
 }

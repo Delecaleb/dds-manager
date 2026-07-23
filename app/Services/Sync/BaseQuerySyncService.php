@@ -73,10 +73,7 @@ abstract class BaseQuerySyncService
         return array_values(array_filter([
             'created_at',
             'updated_at',
-            'row_hash',
             $this->syncColumn(),
-            'DateTStamp',
-            'SecDateTEdit',
         ]));
     }
 
@@ -297,21 +294,18 @@ abstract class BaseQuerySyncService
             foreach ($rows as $row) {
 
                 $data = $this->transformRow($row);
-                $hash = $this->computeRowHash($data);
 
                 $existing = $modelClass::where($pk, $row[$pk])->first();
 
-                if ($existing === null || $existing->row_hash !== $hash) {
+                if ($existing === null) {
 
                     $model = $existing ?? new $modelClass;
                     $model->fill($data);
                     $model->{$pk} = $row[$pk];
-                    $model->row_hash = $hash;
                     $model->save();
 
                     $log->increment('total_processed');
                 }
-                // else: content identical — re-scanned boundary row, skip.
 
                 $lastId = (int) $row[$pk];
 

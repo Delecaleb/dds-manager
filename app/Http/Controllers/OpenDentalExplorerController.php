@@ -330,4 +330,116 @@ class OpenDentalExplorerController extends Controller
 
         return $sql;
     }
+
+    public function syncToLocal(Request $request): JsonResponse
+    {
+        $startTime = microtime(true);
+        $table = (string) $request->input('table');
+        $rows = $request->input('rows', []);
+
+        if (empty($rows) || ! is_array($rows)) {
+            return response()->json(['error' => 'No records provided to sync.'], 400);
+        }
+
+        $resolvedTable = $this->resolveTableName($table);
+        if (! $resolvedTable) {
+            return response()->json(['error' => 'Invalid or unauthorized target table.'], 400);
+        }
+
+        $tableColumns = DB::getSchemaBuilder()->getColumnListing($resolvedTable);
+        if (empty($tableColumns)) {
+            return response()->json(['error' => "Target local table '{$resolvedTable}' does not exist or has no columns."], 400);
+        }
+
+        $primaryKey = $this->getPrimaryKeyForTable($resolvedTable, $tableColumns);
+        $syncedCount = 0;
+
+        $validRecords = [];
+        foreach ($rows as $row) {
+            $rowArr = (array) $row;
+            $cleanRow = [];
+            foreach ($tableColumns as $col) {
+                if (array_key_exists($col, $rowArr)) {
+                    $cleanRow[$col] = $rowArr[$col];
+                }
+            }
+
+            if (! empty($cleanRow)) {
+                $validRecords[] = $cleanRow;
+            }
+        }
+
+        if (empty($validRecords)) {
+            return response()->json(['error' => 'No matching valid columns to sync into local database.'], 400);
+        }
+
+        DB::transaction(function () use ($resolvedTable, $validRecords, $primaryKey, &$syncedCount) {
+            $updateColumns = array_values(array_diff(array_keys($validRecords[0]), [$primaryKey]));
+
+            if ($primaryKey && isset($validRecords[0][$primaryKey])) {
+                foreach (array_chunk($validRecords, 500) as $chunk) {
+                    DB::table($resolvedTable)->upsert(
+                        $chunk,
+                        [$primaryKey],
+                        $updateColumns
+                    );
+                    $syncedCount += count($chunk);
+                }
+            } else {
+                foreach (array_chunk($validRecords, 500) as $chunk) {
+                    DB::table($resolvedTable)->insertOrIgnore($chunk);
+                    $syncedCount += count($chunk);
+                }
+            }
+        });
+
+        $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+
+        return response()->json([
+            'success' => true,
+            'table' => $resolvedTable,
+            'synced_count' => $syncedCount,
+            'execution_time_ms' => $executionTimeMs,
+            'message' => "Successfully synced {$syncedCount} record(s) from OpenDental into local table '{$resolvedTable}'.",
+        ]);
+    }
+
+    private function getPrimaryKeyForTable(string $table, array $columns): string
+    {
+        $primaryKeyMap = [
+            'od_patients' => 'PatNum',
+            'od_procedure_logs' => 'ProcNum',
+            'od_procedures' => 'CodeNum',
+            'od_appointments' => 'AptNum',
+            'od_providers' => 'ProvNum',
+            'od_pay_splits' => 'SplitNum',
+            'treatment_plans' => 'TreatPlanNum',
+            'od_claims' => 'ClaimNum',
+            'od_claim_procs' => 'ClaimProcNum',
+            'od_adjustments' => 'AdjNum',
+            'od_pay_plans' => 'PayPlanNum',
+            'od_payments' => 'PayNum',
+            'od_recalls' => 'RecallNum',
+            'od_ins_plans' => 'PlanNum',
+            'od_clinics' => 'ClinicNum',
+            'od_operatories' => 'OperatoryNum',
+            'od_user_ods' => 'UserNum',
+        ];
+
+        if (isset($primaryKeyMap[$table])) {
+            return $primaryKeyMap[$table];
+        }
+
+        if (in_array('id', $columns, true)) {
+            return 'id';
+        }
+
+        foreach ($columns as $col) {
+            if (str_ends_with($col, 'Num') || str_ends_with($col, '_id')) {
+                return $col;
+            }
+        }
+
+        return $columns[0] ?? 'id';
+    }
 }

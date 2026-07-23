@@ -126,6 +126,7 @@ Route::middleware('auth')->group(function () {
     Route::get('open-dental-explorer/tables', [OpenDentalExplorerController::class, 'tables'])->name('od-explorer.tables');
     Route::get('open-dental-explorer/columns', [OpenDentalExplorerController::class, 'columns'])->name('od-explorer.columns');
     Route::post('open-dental-explorer/query', [OpenDentalExplorerController::class, 'query'])->name('od-explorer.query');
+    Route::post('open-dental-explorer/sync-to-local', [OpenDentalExplorerController::class, 'syncToLocal'])->name('od-explorer.sync');
 });
 
 require __DIR__.'/auth.php';
