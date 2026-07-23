@@ -4,6 +4,21 @@ Chronological record of what was actually built and validated. Newest first.
 
 ---
 
+## Phase 3.4 — Net-production drill-down reconciled + status single-sourced   (2026-07-23)
+
+### Changed
+- `FinancialController::bkNetProduction` (financials drill-down ledger) now includes
+  **writeoff line items** (stored positive → shown negative), so the ledger total equals
+  Net = gross + adjustments − writeoffs (D3). Previously it summed procedures + adjustments
+  only and did not reconcile with the net-production KPI card.
+- Status literals in all `bk*` ledgers now single-sourced via `{$this->completedIn}`.
+
+### Validation
+- Lint clean. 2025: `ProductionService::netProduction` == `bkNetProduction` ledger total
+  == **672,627.85** (2665 rows) — **RECONCILES** exactly.
+
+---
+
 ## Phase 3.3 — Raw-SQL status retrofit across remaining files + FrontOffice bug fix   (2026-07-23)
 
 ### Changed (DRY status single-sourcing)

@@ -456,7 +456,7 @@ class FinancialController extends Controller
             FROM od_procedure_logs pl
             JOIN od_patients  p  ON pl.PatNum  = p.PatNum
             JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            WHERE pl.ProcStatus IN ('C', '2')
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY p.PatNum, p.LName, p.FName,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
@@ -490,7 +490,7 @@ class FinancialController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_patients  p  ON pl.PatNum  = p.PatNum
                 JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-                WHERE pl.ProcStatus IN ('C', '2')
+                WHERE pl.ProcStatus IN ({$this->completedIn})
                   AND pl.ProcDate BETWEEN ? AND ?
                 GROUP BY p.PatNum, p.LName, p.FName,
                          pr.ProvNum, pr.Abbr, pr.LName, pr.PName, pl.ProcDate
@@ -508,9 +508,28 @@ class FinancialController extends Controller
                 JOIN od_patients  p  ON a.PatNum  = p.PatNum
                 LEFT JOIN od_providers pr ON a.ProvNum = pr.ProvNum
                 WHERE a.AdjDate BETWEEN ? AND ?
+
+                UNION ALL
+
+                -- Writeoffs reduce net (stored positive → shown negative) so the ledger
+                -- total reconciles with Net = gross + adjustments − writeoffs (D3).
+                SELECT
+                    p.PatNum                                          AS patient_id,
+                    CONCAT(p.LName, ', ', p.FName)                   AS patient_name,
+                    COALESCE(CONCAT(pr.ProvNum, ' - ', pr.Abbr), '') AS provider_ids,
+                    COALESCE(CONCAT(pr.LName, ', ', pr.PName), '')   AS providers,
+                    cp.ProcDate                                       AS dates,
+                    -SUM(cp.WriteOff)                                 AS amount
+                FROM od_claim_procs cp
+                JOIN od_patients  p  ON cp.PatNum  = p.PatNum
+                LEFT JOIN od_providers pr ON cp.ProvNum = pr.ProvNum
+                WHERE cp.ProcDate BETWEEN ? AND ?
+                  AND cp.WriteOff <> 0
+                GROUP BY p.PatNum, p.LName, p.FName,
+                         pr.ProvNum, pr.Abbr, pr.LName, pr.PName, cp.ProcDate
             ) combined
             ORDER BY dates, patient_name
-        ", [$start, $end, $start, $end]);
+        ", [$start, $end, $start, $end, $start, $end]);
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
@@ -595,7 +614,7 @@ class FinancialController extends Controller
                 COUNT(DISTINCT DATE(pl.ProcDate)) AS count
             FROM od_procedure_logs pl
             JOIN od_patients p ON pl.PatNum = p.PatNum
-            WHERE pl.ProcStatus IN ('C', '2')
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY p.PatNum, p.LName, p.FName
             ORDER BY count DESC, p.LName
@@ -622,7 +641,7 @@ class FinancialController extends Controller
             FROM od_procedure_logs pl
             JOIN od_patients   p  ON pl.PatNum  = p.PatNum
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus IN ('C', '2')
+            WHERE pl.ProcStatus IN ({$this->completedIn})
             GROUP BY p.PatNum, p.LName, p.FName
             HAVING MIN(pl.ProcDate) BETWEEN ? AND ?
             ORDER BY dates, p.LName
