@@ -101,16 +101,6 @@ class OdProcedureLog extends Model
             ->count();
     }
 
-    public function newPatientVisits($start, $end)
-    {
-        return OdProcedureLog::select('PatNum')
-            ->selectRaw('MIN(ProcDate) first_visit')
-            ->where('ProcStatus', 'C')
-            ->groupBy('PatNum')
-            ->havingBetween('first_visit', [$start, $end])
-            ->count();
-    }
-
     public function avgProductionPerPatient($start, $end)
     {
         $production = OdProcedureLog::where('ProcStatus', 'C')

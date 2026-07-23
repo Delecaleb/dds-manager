@@ -4,6 +4,28 @@ Chronological record of what was actually built and validated. Newest first.
 
 ---
 
+## Phase 2.1 — Consolidate new-patient count (fixes a miscount)   (2026-07-23)
+
+### Decision — D8 status set = ['C','2'] (confirmed by product owner)
+The 2010-2012 `'2'`-status rows are REAL procedures (comprehensive exams D0150, extractions
+D7140, X-rays, composites) — fees just weren't imported for that era. So those patients
+genuinely visited then and are NOT new later. First-visit cohort must include them.
+
+### Changed
+- `PatientAnalyticsService::getPatientAnalytics` — now uses
+  `PatientService::newPatientCount()` (injected) instead of the model's `'C'`-only method.
+- Removed `OdProcedureLog::newPatientVisits()` (dead + wrong definition; no other consumers,
+  no test refs).
+
+### Validation
+- new_patient_visit 2025: **550 → 549** (the returning-since-2011 patient no longer
+  miscounted as new). Confirmed correct fix, product-owner approved.
+- patient_visits unchanged at 1465 (visit-events: one per patient per day — a patient can
+  visit multiple times; product-owner definition, blueprint D7).
+- Lint clean; DI resolves.
+
+---
+
 ## Phase 2.0 — PatientService + first-visit cohort single-sourced   (2026-07-23)
 
 ### Built (additive)
