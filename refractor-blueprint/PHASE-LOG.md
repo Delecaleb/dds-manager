@@ -4,6 +4,29 @@ Chronological record of what was actually built and validated. Newest first.
 
 ---
 
+## Phase 2.2 — Single-source patient_visits + avg production (Dashboard/Financials)   (2026-07-23)
+
+### Changed
+- `PatientAnalyticsService` — injected `ProductionService`; `patient_visits` now comes from
+  `ProductionService::patientVisits()` (visit-events, D7) and `patient_avg_production` from
+  `grossProduction() / visits`. Both previously used `OdProcedureLog`'s `'C'`-only methods.
+- Removed `OdProcedureLog::patientVisits()` and `avgProductionPerPatient()` (dead; only
+  consumer was PatientAnalyticsService; no test refs).
+
+### Why
+The Dashboard/Financials `patient_visits` KPI filtered `ProcStatus = 'C'` (letter only).
+Routing through the domain service uses `['C','2']`, so the metric no longer depends on the
+status encoding. Grouped `MetricDefinitions::patientVisits` fragment sites (Operations,
+per-clinic) are separate and untouched.
+
+### Validation
+- Parity: visits 2025=1465 / 2024=706; avg 404.10 / 240.19 — identical to the old methods.
+- End-to-end via `getPatientAnalytics`: 2025 visits=1465, avg=404.10, new=549. Empty current
+  month = 0 (expected).
+- Lint clean; DI resolves.
+
+---
+
 ## Phase 2.1 — Consolidate new-patient count (fixes a miscount)   (2026-07-23)
 
 ### Decision — D8 status set = ['C','2'] (confirmed by product owner)

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Support\ProcStatus;
 use Illuminate\Database\Eloquent\Model;
 
 class OdProcedureLog extends Model
@@ -83,7 +84,7 @@ class OdProcedureLog extends Model
 
     public function scopeCompleted($query)
     {
-        return $query->where('ProcStatus', 'C');
+        return $query->whereIn('ProcStatus', ProcStatus::completed());
     }
 
     public function scopeInDateRange($query, $start, $end)
@@ -91,26 +92,4 @@ class OdProcedureLog extends Model
         return $query->whereBetween('ProcDate', [$start, $end]);
     }
 
-    public function patientVisits($start, $end)
-    {
-        return $this->inDateRange($start, $end)
-            ->completed()
-            ->selectRaw('DATE(ProcDate), PatNum')
-            ->distinct()
-            ->get()
-            ->count();
-    }
-
-    public function avgProductionPerPatient($start, $end)
-    {
-        $production = OdProcedureLog::where('ProcStatus', 'C')
-            ->whereBetween('ProcDate', [$start, $end])
-            ->sum('ProcFee');
-
-        $visits = $this->patientVisits($start, $end);
-
-        return $visits
-            ? round($production / $visits, 2)
-            : 0;
-    }
 }
