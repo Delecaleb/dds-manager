@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
+use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
 use App\Models\ClaimProcs;
@@ -125,12 +126,11 @@ class DashboardController extends Controller
             ->get()
             ->count();
 
-        $newPatientVisits = DB::table('od_procedure_logs')
-            ->select('PatNum', DB::raw('MIN(ProcDate) as first_visit'))
-            ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
-            ->groupBy('PatNum')
-            ->havingBetween('first_visit', [$start, $end])
-            ->count();
+        // New patients = new to the PRACTICE (D8), seen by this provider in the period —
+        // not "new to this provider". Single-sourced via PatientService.
+        $newPatientVisits = $this->patients->newPatientCount(
+            new MetricFilter($start, $end, [], [$id])
+        );
 
         // Avg per work-day (days this provider had completed procedures)
         $workDays = DB::table('od_procedure_logs')
