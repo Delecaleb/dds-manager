@@ -18,7 +18,7 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
 --}}
 
 <div id="patientModal"
-    class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-start justify-center pt-10 pb-10 overflow-y-auto">
+    class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-start justify-center pt-10 pb-10 overflow-y-auto">
     <div class="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-4xl mx-4 flex flex-col">
 
         {{-- Header --}}

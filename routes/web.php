@@ -8,6 +8,7 @@ use App\Http\Controllers\FinancialController;
 use App\Http\Controllers\FrontOfficeController;
 use App\Http\Controllers\HygieneRecallController;
 use App\Http\Controllers\KpisController;
+use App\Http\Controllers\OpenDentalExplorerController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\ProfileController;
@@ -120,6 +121,11 @@ Route::middleware('auth')->group(function () {
 
     Route::get('hygiene-recall', [HygieneRecallController::class, 'index'])->name('hygiene-recall.index');
     Route::get('hygiene-recall/data', [HygieneRecallController::class, 'data'])->name('hygiene-recall.data');
+
+    Route::get('open-dental-explorer', [OpenDentalExplorerController::class, 'index'])->name('od-explorer.index');
+    Route::get('open-dental-explorer/tables', [OpenDentalExplorerController::class, 'tables'])->name('od-explorer.tables');
+    Route::get('open-dental-explorer/columns', [OpenDentalExplorerController::class, 'columns'])->name('od-explorer.columns');
+    Route::post('open-dental-explorer/query', [OpenDentalExplorerController::class, 'query'])->name('od-explorer.query');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

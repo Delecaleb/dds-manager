@@ -13,12 +13,18 @@ abstract class BaseQuerySyncService
 
     protected int $maxRetries = 5;
 
-    protected bool $throttle = false;
-
     protected int $sleepSeconds = 1;
 
-    /** Rows processed during the current sync() invocation (for reporting). */
-    protected int $processedThisRun = 0;
+    /**
+     * How far (seconds) to rewind last_synced_at at the start of every
+     * incremental run. This closes the classic boundary hole: a run killed
+     * at time T records last_synced_at = T, but a remote row committed AT
+     * exactly T (or slightly earlier, due to clock skew / long remote
+     * transactions) was never persisted. The old strict ">" comparison
+     * would skip that row forever. Rewinding re-scans the window; the
+     * content hash below makes the re-scan free of duplicate writes.
+     */
+    protected int $overlapSeconds = 300;
 
     public function __construct(
         protected QueryService $queryService
@@ -40,27 +46,84 @@ abstract class BaseQuerySyncService
         return $this->table();
     }
 
+    /**
+     * Hook to massage a raw OpenDental API row before it is persisted
+     * locally. Base implementation is a pass-through; subclasses override
+     * to normalize values (e.g. datetimes) so they land cleanly in typed
+     * local columns.
+     */
     protected function transformRow(array $row): array
     {
         return $row;
     }
 
+    /**
+     * Columns that must NOT participate in the row fingerprint.
+     *
+     * Bookkeeping timestamps change without the real data changing — e.g.
+     * an admin touching DateTStamp on the remote side purely to force a
+     * re-sync. If those columns were hashed, every touched row would look
+     * "changed" and be rewritten; excluded, a touched-but-identical row is
+     * recognized as already synced and skipped entirely.
+     *
+     * Subclasses can extend this list for table-specific volatile columns.
+     */
+    protected function hashExcludedColumns(): array
+    {
+        return array_values(array_filter([
+            'created_at',
+            'updated_at',
+            'row_hash',
+            $this->syncColumn(),
+            'DateTStamp',
+            'SecDateTEdit',
+        ]));
+    }
+
+    /**
+     * Deterministic fingerprint of a row's substantive content.
+     * Key-sorted so column order from the API can never affect the hash.
+     */
+    protected function computeRowHash(array $data): string
+    {
+        foreach ($this->hashExcludedColumns() as $column) {
+            unset($data[$column]);
+        }
+
+        ksort($data);
+
+        return hash('sha256', json_encode($data));
+    }
+
+    /**
+     * Convert an OpenDental datetime string into a MySQL-storable
+     * "Y-m-d H:i:s" value, or null when the source is blank/sentinel/
+     * out-of-range. OpenDental emits ISO-8601 with a 'T' separator and uses
+     * placeholder dates (e.g. 0001-01-01) for "no value"; both must be
+     * normalized before they reach a real DATETIME column.
+     */
     protected function normalizeDateTime($value): ?string
     {
-        if (! $value) {
+        if ($value === null) {
             return null;
         }
 
-        $value = str_replace('T', ' ', trim($value));
+        $value = str_replace('T', ' ', trim((string) $value));
 
-        if (
-            $value < '1000-01-01 00:00:00' ||
-            $value > '9999-12-31 23:59:59'
-        ) {
+        if ($value === '') {
             return null;
         }
 
-        return date('Y-m-d H:i:s', strtotime($value));
+        // Reject OpenDental sentinels and anything outside MySQL's DATETIME
+        // range (1000-01-01 .. 9999-12-31) — lexical compare is valid for
+        // zero-padded ISO strings.
+        if ($value < '1000-01-01 00:00:00' || $value > '9999-12-31 23:59:59') {
+            return null;
+        }
+
+        $timestamp = strtotime($value);
+
+        return $timestamp !== false ? date('Y-m-d H:i:s', $timestamp) : null;
     }
 
     public function sync(): void
@@ -76,19 +139,31 @@ abstract class BaseQuerySyncService
         $log->update([
             'status' => 'running',
             'started_at' => now(),
-            'finished_at' => null,
             'last_error' => null,
         ]);
 
-        $incremental = $log->last_primary_key !== null && $this->syncColumn() !== null;
-        echo "[{$this->module()}] ".($incremental ? 'incremental' : 'initial')." sync started...\n";
-
         try {
 
-            if ($this->syncColumn()) {
-                $this->incrementalSync($log);
+            // Initial mode until a full pass has completed at least once
+            // (last_synced_at is only stamped on initial completion), or
+            // always when the table has no incremental sync column.
+            if ($this->syncColumn() === null || $log->last_synced_at === null) {
+
+                $runStartedAt = now()->format('Y-m-d H:i:s');
+
+                $this->runInitialSync($log);
+
+                // Watermark for the first incremental run. Anything that
+                // changed remotely while the initial sync was running is
+                // covered by overlapSeconds + the hash-skip on re-scan.
+                if ($this->syncColumn() !== null) {
+                    $log->update(['last_synced_at' => $runStartedAt]);
+                }
+
             } else {
-                $this->initialSync($log);
+
+                $this->runIncrementalSync($log);
+
             }
 
             $log->update([
@@ -96,11 +171,6 @@ abstract class BaseQuerySyncService
                 'finished_at' => now(),
                 'retry_count' => 0,
             ]);
-
-            $summary = $this->processedThisRun === 0
-                ? 'already up to date (0 new rows)'
-                : "{$this->processedThisRun} row(s) processed";
-            echo "[{$this->module()}] sync complete — {$summary}\n";
 
         } catch (Exception $e) {
 
@@ -111,126 +181,148 @@ abstract class BaseQuerySyncService
                 'last_error' => $e->getMessage(),
             ]);
 
-            echo "[{$this->module()}] sync FAILED after {$this->processedThisRun} row(s): {$e->getMessage()}\n";
-
             throw $e;
         }
     }
 
-    protected function initialSync(SyncLog $log): void
+    protected function runInitialSync(SyncLog $log): void
     {
-        $lastId = $log->last_primary_key ?? 0;
+        $pk = $this->primaryKey();
+        $lastId = (int) ($log->last_primary_key ?? 0);
 
         while (true) {
 
-            $rows = $this->executeWithRetry("
+            $sql = "
                 SELECT *
                 FROM {$this->table()}
-                WHERE {$this->primaryKey()} > {$lastId}
-                ORDER BY {$this->primaryKey()}
+                WHERE {$pk} > {$lastId}
+                ORDER BY {$pk}
                 LIMIT {$this->batchSize}
-            ");
+            ";
+
+            $rows = $this->executeWithRetry($sql);
 
             if (empty($rows)) {
                 break;
             }
 
-            $this->bulkUpsert($rows);
-
-            $lastId = end($rows)[$this->primaryKey()];
+            [, $lastId] = $this->persistBatch($rows, $log);
 
             $log->update([
                 'last_primary_key' => $lastId,
             ]);
 
-            $log->increment('total_processed', count($rows));
+            echo "Synced through ID {$lastId}\n";
 
-            echo "Synced {$log->total_processed} rows (Last ID {$lastId})\n";
-
-            if ($this->throttle) {
-                sleep($this->sleepSeconds);
-            }
+            sleep($this->sleepSeconds);
         }
     }
 
-    protected function incrementalSync(SyncLog $log): void
+    protected function runIncrementalSync(SyncLog $log): void
     {
-        $lastDate = $log->last_synced_at ?? '1900-01-01 00:00:00';
-        $lastId = $log->last_primary_key ?? 0;
+        $pk = $this->primaryKey();
+        $col = $this->syncColumn();
+
+        // Rewind the cursor to re-scan the boundary window. Rows already
+        // stored identically are skipped by hash, so this costs reads only.
+        $lastSync = date(
+            'Y-m-d H:i:s',
+            strtotime((string) $log->last_synced_at) - $this->overlapSeconds
+        );
+
+        $lastId = 0;
 
         while (true) {
 
-            $rows = $this->executeWithRetry("
-            SELECT *
-            FROM {$this->table()}
-            WHERE
-                {$this->syncColumn()} > '{$lastDate}'
-            OR (
-                {$this->syncColumn()} = '{$lastDate}'
-                AND {$this->primaryKey()} > {$lastId}
-            )
-            ORDER BY
-                {$this->syncColumn()},
-                {$this->primaryKey()}
-            LIMIT {$this->batchSize}
-        ");
+            $safeSync = addslashes($lastSync);
+
+            // Keyset pagination on the (syncColumn, primaryKey) tuple.
+            // A bare "syncColumn > X" cursor either skips rows that share a
+            // timestamp across a batch boundary (with ">") or loops forever
+            // when more than batchSize rows share one timestamp (with ">=").
+            // The tuple cursor always advances and never skips.
+            $sql = "
+                SELECT *
+                FROM {$this->table()}
+                WHERE ({$col} > '{$safeSync}')
+                   OR ({$col} = '{$safeSync}' AND {$pk} > {$lastId})
+                ORDER BY {$col}, {$pk}
+                LIMIT {$this->batchSize}
+            ";
+
+            $rows = $this->executeWithRetry($sql);
 
             if (empty($rows)) {
                 break;
             }
 
-            $this->bulkUpsert($rows);
+            [$lastSync, $lastId] = $this->persistBatch($rows, $log, $lastSync, $lastId);
 
-            $lastRow = end($rows);
-
-            $lastDate = $lastRow[$this->syncColumn()];
-            $lastId = $lastRow[$this->primaryKey()];
-
+            // Persist both halves of the cursor so a kill mid-run resumes
+            // exactly where it left off (minus the overlap window).
             $log->update([
-                'last_synced_at' => $lastDate,
+                'last_synced_at' => $lastSync,
                 'last_primary_key' => $lastId,
             ]);
 
-            $log->increment('total_processed', count($rows));
+            echo "Synced through {$lastSync} (ID {$lastId})\n";
 
-            echo sprintf(
-                "Processed %d rows | Checkpoint: %s | PK: %s\n",
-                count($rows),
-                $lastDate,
-                $lastId
-            );
-
-            if ($this->throttle) {
-                sleep($this->sleepSeconds);
-            }
+            sleep($this->sleepSeconds);
         }
     }
 
-    protected function bulkUpsert(array $rows): void
+    /**
+     * Upsert a batch idempotently and advance the cursor.
+     *
+     * Identity is ALWAYS the OpenDental primary key — a row can never be
+     * inserted twice, no matter how many times it is re-fetched. The
+     * content hash then decides whether an existing row actually changed:
+     * created_at / updated_at / DateTStamp are excluded, so an admin
+     * touching DateTStamp to force a re-sync causes a write only if the
+     * substantive data really differs from what we hold locally.
+     *
+     * Rows synced before the row_hash column existed have a null hash;
+     * they are rewritten once and backfilled automatically.
+     *
+     * @return array{0: ?string, 1: int} [$lastSync, $lastId]
+     */
+    protected function persistBatch(array $rows, SyncLog $log, ?string $lastSync = null, int $lastId = 0): array
     {
-        if (empty($rows)) {
-            return;
-        }
+        $modelClass = $this->model();
+        $pk = $this->primaryKey();
+        $col = $this->syncColumn();
 
-        $model = $this->model();
+        DB::transaction(function () use ($rows, $log, $modelClass, $pk, $col, &$lastSync, &$lastId) {
 
-        $records = array_map(
-            fn ($row) => $this->transformRow($row),
-            $rows
-        );
+            foreach ($rows as $row) {
 
-        $updateColumns = array_values(array_diff(
-            array_keys($records[0]),
-            [$this->primaryKey()]
-        ));
+                $data = $this->transformRow($row);
+                $hash = $this->computeRowHash($data);
 
-        DB::transaction(function () use ($model, $records, $updateColumns) {
-            $model::upsert(
-                $records,
-                [$this->primaryKey()],
-                $updateColumns
-            );
-        }, 3);
+                $existing = $modelClass::where($pk, $row[$pk])->first();
+
+                if ($existing === null || $existing->row_hash !== $hash) {
+
+                    $model = $existing ?? new $modelClass;
+                    $model->fill($data);
+                    $model->{$pk} = $row[$pk];
+                    $model->row_hash = $hash;
+                    $model->save();
+
+                    $log->increment('total_processed');
+                }
+                // else: content identical — re-scanned boundary row, skip.
+
+                $lastId = (int) $row[$pk];
+
+                if ($col !== null && isset($row[$col])) {
+                    $lastSync = $this->normalizeDateTime($row[$col]) ?? $lastSync;
+                }
+            }
+
+        });
+
+        return [$lastSync, $lastId];
     }
 
     protected function executeWithRetry(string $sql): array
@@ -245,28 +337,22 @@ abstract class BaseQuerySyncService
 
             } catch (Exception $e) {
 
-                if (
-                    ! str_contains($e->getMessage(), 'Deadlock')
-                    &&
-                    ! str_contains($e->getMessage(), 'Lock wait timeout')
-                    &&
-                    ! str_contains($e->getMessage(), 'server has gone away')
-                ) {
-                    throw $e;
-                }
-
                 if ($attempt >= $this->maxRetries) {
+
                     throw $e;
                 }
 
-                $wait = 2 ** $attempt;
+                $wait = pow(2, $attempt);
 
-                echo "Retry {$attempt} after {$wait}s\n";
+                echo "Retry {$attempt} after {$wait} seconds...\n";
 
                 sleep($wait);
 
                 $attempt++;
+
             }
+
         }
+
     }
 }

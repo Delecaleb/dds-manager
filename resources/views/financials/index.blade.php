@@ -1611,6 +1611,17 @@
       var v = row[col.key];
       if (v === null || v === undefined) return '—';
       if (col.fmt === 'money') return fmtMoney(v);
+      if (col.key === 'patient_name' && row.patient_id) {
+        return '<div class="flex items-center justify-between gap-2">' +
+          '<span class="font-bold text-slate-800">' + v + '</span>' +
+          '<button type="button" onclick="openPatient(' + row.patient_id + ')" class="inline-flex items-center text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 p-1 rounded transition-colors ml-1" title="View Patient Details">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
+          '</button>' +
+          '</div>';
+      }
+      if (col.key === 'patient_id' && v) {
+        return '<button type="button" onclick="openPatient(' + v + ')" class="text-emerald-600 hover:text-emerald-800 font-semibold hover:underline cursor-pointer" title="View Patient Details">' + v + '</button>';
+      }
       return String(v);
     }
 
@@ -1764,6 +1775,35 @@
         });
     }
 
+    function buildPatientIdColumn(title) {
+      return {
+        data: 'patient_id',
+        title: title || 'Patient ID',
+        render: function (data) {
+          if (!data) return '—';
+          return '<button type="button" onclick="openPatient(' + data + ')" class="text-emerald-600 hover:text-emerald-800 font-semibold hover:underline cursor-pointer" title="View Patient Details">' + data + '</button>';
+        }
+      };
+    }
+
+    function buildPatientNameColumn(title) {
+      return {
+        data: 'patient_name',
+        title: title || 'Patient Name',
+        render: function (data, type, row) {
+          if (type !== 'display') return data;
+          var patId = row.patient_id || row.id;
+          if (!patId) return data || '—';
+          return '<div class="flex items-center justify-between gap-2">' +
+            '<span class="font-bold text-slate-800">' + (data || '—') + '</span>' +
+            '<button type="button" onclick="openPatient(' + patId + ')" class="inline-flex items-center text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 p-1 rounded transition-colors" title="View Patient Details">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
+            '</button>' +
+            '</div>';
+        }
+      };
+    }
+
     function openPatientVisitsBreakdown(title) {
       var modalId = 'breakdown-modal';
       setDataTableModalLoading(modalId, 'Financial Breakdown - ' + title);
@@ -1775,8 +1815,8 @@
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var columns = [
-            { data: 'patient_id', title: 'Patient Id' },
-            { data: 'patient_name', title: 'Patient Name' },
+            buildPatientIdColumn('Patient ID'),
+            buildPatientNameColumn('Patient Name'),
             { data: 'dates', title: 'Visit Date' },
             { data: 'count', title: 'Number of visits' }
           ];
@@ -1799,8 +1839,8 @@
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var columns = [
-            { data: 'patient_id', title: 'Patient Id' },
-            { data: 'patient_name', title: 'Patient Name' },
+            buildPatientIdColumn('Patient ID'),
+            buildPatientNameColumn('Patient Name'),
             { data: 'dates', title: 'First Visit Date' },
             { data: 'service_codes', title: 'Service Code' },
             {
@@ -1828,8 +1868,8 @@
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var columns = [
-            { data: 'patient_id', title: 'Patient Id' },
-            { data: 'patient_name', title: 'Patient Name' },
+            buildPatientIdColumn('Patient ID'),
+            buildPatientNameColumn('Patient Name'),
             { data: 'dates', title: 'Procedure Date' },
             { data: 'type', title: 'Type' }
           ];
@@ -1852,8 +1892,8 @@
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var columns = [
-            { data: 'patient_id', title: 'Patient Id' },
-            { data: 'patient_name', title: 'Patient Name' },
+            buildPatientIdColumn('Patient ID'),
+            buildPatientNameColumn('Patient Name'),
             { data: 'dates', title: 'Appointment Date(s)' },
             { data: 'count', title: 'Number of visits' }
           ];
@@ -1876,8 +1916,8 @@
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var columns = [
-            { data: 'patient_id', title: 'Patient Id' },
-            { data: 'patient_name', title: 'Patient Name' },
+            buildPatientIdColumn('Patient ID'),
+            buildPatientNameColumn('Patient Name'),
             { data: 'dates', title: 'Appointment Date(s)' },
             { data: 'count', title: 'Number of visits' }
           ];
@@ -1900,5 +1940,6 @@
   </script>
 
   <x-app-components.datatable-modal id="breakdown-modal" />
+  <x-app-components.patient-modal />
 
 </x-app-layout>
