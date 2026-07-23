@@ -8,10 +8,10 @@ Chronological record of what was actually built and validated. Newest first.
 
 ### Changed
 - Replaced all **43** inline `['C', '2']` completed-status filters in
-  `OperationsAnalyticsService` with `ProcStatus::completed()`. This file already used the
-  canonical `['C','2']` set, so the change is **parity-perfect** (identical array value) —
-  it centralizes the "completed" definition that underlies grouped gross and every
-  completed-based metric in the largest analytics file.
+  `OperationsAnalyticsService` (+ **17** more in `OperationsController`) with
+  `ProcStatus::completed()`. Both already used the canonical `['C','2']` set, so the change
+  is **parity-perfect** (identical array value) — it centralizes the "completed" definition
+  that underlies grouped gross and every completed-based metric in the Operations layer.
 
 ### Validation
 - Lint clean; zero `['C','2']` literals remain in code (doc comment retained).
