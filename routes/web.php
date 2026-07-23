@@ -127,6 +127,8 @@ Route::middleware('auth')->group(function () {
     Route::get('open-dental-explorer/columns', [OpenDentalExplorerController::class, 'columns'])->name('od-explorer.columns');
     Route::post('open-dental-explorer/query', [OpenDentalExplorerController::class, 'query'])->name('od-explorer.query');
     Route::post('open-dental-explorer/sync-to-local', [OpenDentalExplorerController::class, 'syncToLocal'])->name('od-explorer.sync');
+    Route::get('open-dental-explorer/sync-checkpoints', [OpenDentalExplorerController::class, 'syncCheckpoints'])->name('od-explorer.checkpoints');
+    Route::post('open-dental-explorer/reset-sync-checkpoint', [OpenDentalExplorerController::class, 'resetSyncCheckpoint'])->name('od-explorer.reset-checkpoint');
 });
 
 require __DIR__.'/auth.php';

@@ -158,4 +158,31 @@ class OpenDentalExplorerTest extends TestCase
             'FName' => 'Jane',
         ]);
     }
+
+    public function test_od_explorer_can_get_and_reset_sync_checkpoints(): void
+    {
+        $user = User::factory()->create();
+
+        $getRes = $this->actingAs($user)->getJson('/open-dental-explorer/sync-checkpoints');
+        $getRes->assertStatus(200);
+        $getRes->assertJsonStructure(['logs']);
+
+        $resetRes = $this->actingAs($user)->postJson('/open-dental-explorer/reset-sync-checkpoint', [
+            'module' => 'od_patients',
+            'last_synced_at' => '2026-01-01 00:00:00',
+            'last_primary_key' => 0,
+        ]);
+
+        $resetRes->assertStatus(200);
+        $resetRes->assertJson([
+            'success' => true,
+            'module' => 'od_patients',
+        ]);
+
+        $this->assertDatabaseHas('sync_logs', [
+            'module' => 'od_patients',
+            'last_synced_at' => '2026-01-01 00:00:00',
+            'last_primary_key' => 0,
+        ]);
+    }
 }

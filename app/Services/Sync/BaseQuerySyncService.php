@@ -58,41 +58,6 @@ abstract class BaseQuerySyncService
     }
 
     /**
-     * Columns that must NOT participate in the row fingerprint.
-     *
-     * Bookkeeping timestamps change without the real data changing — e.g.
-     * an admin touching DateTStamp on the remote side purely to force a
-     * re-sync. If those columns were hashed, every touched row would look
-     * "changed" and be rewritten; excluded, a touched-but-identical row is
-     * recognized as already synced and skipped entirely.
-     *
-     * Subclasses can extend this list for table-specific volatile columns.
-     */
-    protected function hashExcludedColumns(): array
-    {
-        return array_values(array_filter([
-            'created_at',
-            'updated_at',
-            $this->syncColumn(),
-        ]));
-    }
-
-    /**
-     * Deterministic fingerprint of a row's substantive content.
-     * Key-sorted so column order from the API can never affect the hash.
-     */
-    protected function computeRowHash(array $data): string
-    {
-        foreach ($this->hashExcludedColumns() as $column) {
-            unset($data[$column]);
-        }
-
-        ksort($data);
-
-        return hash('sha256', json_encode($data));
-    }
-
-    /**
      * Convert an OpenDental datetime string into a MySQL-storable
      * "Y-m-d H:i:s" value, or null when the source is blank/sentinel/
      * out-of-range. OpenDental emits ISO-8601 with a 'T' separator and uses
@@ -269,17 +234,14 @@ abstract class BaseQuerySyncService
     }
 
     /**
-     * Upsert a batch idempotently and advance the cursor.
+     * Persist a batch of rows idempotently and advance the cursor.
      *
      * Identity is ALWAYS the OpenDental primary key — a row can never be
-     * inserted twice, no matter how many times it is re-fetched. The
-     * content hash then decides whether an existing row actually changed:
-     * created_at / updated_at / DateTStamp are excluded, so an admin
-     * touching DateTStamp to force a re-sync causes a write only if the
-     * substantive data really differs from what we hold locally.
+     * inserted twice, no matter how many times it is re-synced.
      *
-     * Rows synced before the row_hash column existed have a null hash;
-     * they are rewritten once and backfilled automatically.
+     * - New records (not in local DB) are inserted.
+     * - Existing records are updated if any substantive columns have changed.
+     * - Local auto-generated columns (id, created_at, updated_at) are ignored.
      *
      * @return array{0: ?string, 1: int} [$lastSync, $lastId]
      */
@@ -295,16 +257,27 @@ abstract class BaseQuerySyncService
 
                 $data = $this->transformRow($row);
 
+                // Ignore local-only auto-generated columns
+                unset($data['id'], $data['created_at'], $data['updated_at'], $data['row_hash']);
+
                 $existing = $modelClass::where($pk, $row[$pk])->first();
 
                 if ($existing === null) {
 
-                    $model = $existing ?? new $modelClass;
+                    $model = new $modelClass;
                     $model->fill($data);
                     $model->{$pk} = $row[$pk];
                     $model->save();
 
                     $log->increment('total_processed');
+                } else {
+
+                    $existing->fill($data);
+
+                    if ($existing->isDirty()) {
+                        $existing->save();
+                        $log->increment('total_processed');
+                    }
                 }
 
                 $lastId = (int) $row[$pk];

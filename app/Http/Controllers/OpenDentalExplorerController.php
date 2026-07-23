@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -441,5 +442,65 @@ class OpenDentalExplorerController extends Controller
         }
 
         return $columns[0] ?? 'id';
+    }
+
+    public function syncCheckpoints(): JsonResponse
+    {
+        $logs = SyncLog::orderBy('module')->get();
+
+        return response()->json([
+            'logs' => $logs,
+        ]);
+    }
+
+    public function resetSyncCheckpoint(Request $request): JsonResponse
+    {
+        $module = (string) $request->input('module');
+        $lastSyncedAt = $request->input('last_synced_at');
+        $lastPrimaryKey = (int) $request->input('last_primary_key', 0);
+
+        if (empty($module)) {
+            return response()->json(['error' => 'Module is required.'], 400);
+        }
+
+        $formattedDate = null;
+        if (! empty($lastSyncedAt)) {
+            $ts = strtotime((string) $lastSyncedAt);
+            if ($ts !== false) {
+                $formattedDate = date('Y-m-d H:i:s', $ts);
+            }
+        }
+
+        if ($module === 'all') {
+            SyncLog::query()->update([
+                'last_synced_at' => $formattedDate,
+                'last_primary_key' => $lastPrimaryKey,
+                'status' => 'idle',
+                'last_error' => null,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Successfully reset sync checkpoints for ALL modules.',
+            ]);
+        }
+
+        $log = SyncLog::firstOrCreate(
+            ['module' => $module],
+            ['status' => 'idle', 'total_processed' => 0]
+        );
+
+        $log->update([
+            'last_synced_at' => $formattedDate,
+            'last_primary_key' => $lastPrimaryKey,
+            'status' => 'idle',
+            'last_error' => null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'module' => $module,
+            'message' => "Successfully reset sync checkpoint for module '{$module}'.",
+        ]);
     }
 }

@@ -34,8 +34,19 @@
       </div>
     </div>
 
-    <!-- Main Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Navigation Tabs -->
+    <div class="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 rounded-xl shadow-xs">
+      <button id="tabQueryBuilderBtn" onclick="switchOdTab('queryBuilder')" class="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 transition">
+        <i data-lucide="sliders" class="w-4 h-4"></i> Realtime Query Builder
+      </button>
+      <button id="tabSyncCheckpointsBtn" onclick="switchOdTab('syncCheckpoints')" class="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition">
+        <i data-lucide="history" class="w-4 h-4"></i> Sync Checkpoints & Reset Start Date
+      </button>
+    </div>
+
+    <!-- Query Builder View (Tab 1) -->
+    <div id="tabQueryBuilderView">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       
       <!-- Query Builder Sidebar (Left Column) -->
       <div class="lg:col-span-4 space-y-5">
@@ -267,6 +278,51 @@
         </div>
       </div>
 
+    </div>
+    <!-- End Query Builder View (Tab 1) -->
+
+    <!-- Sync Checkpoints Management View (Tab 2) -->
+    <div id="tabSyncCheckpointsView" class="hidden space-y-6">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="refresh-cw" class="w-5 h-5 text-indigo-600"></i> OpenDental Sync Checkpoints & Start Date Reset
+            </h2>
+            <p class="text-xs text-slate-500 mt-1">
+              Reset or alter the sync start date (`last_synced_at`) and primary key watermark (`last_primary_key`) for any OpenDental sync module. When sync next executes, existing records will be updated and non-existent records will be inserted without duplicate rows being created.
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <button onclick="loadSyncCheckpoints()" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition">
+              <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> Refresh List
+            </button>
+            <button onclick="resetAllCheckpoints()" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition">
+              <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Reset All Checkpoints to Start
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto border border-slate-200 rounded-xl">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <th class="px-4 py-3">Module / Table</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3">Last Synced Date (`last_synced_at`)</th>
+                <th class="px-4 py-3">Last Primary Key (`last_primary_key`)</th>
+                <th class="px-4 py-3">Total Records Synced</th>
+                <th class="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="checkpointsTbody">
+              <tr>
+                <td colspan="6" class="p-8 text-center text-slate-400 text-sm">Loading sync checkpoints...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -713,5 +769,133 @@
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
       }
     });
+
+    function switchOdTab(tab) {
+      var queryView = document.getElementById('tabQueryBuilderView');
+      var checkView = document.getElementById('tabSyncCheckpointsView');
+      var qBtn = document.getElementById('tabQueryBuilderBtn');
+      var cBtn = document.getElementById('tabSyncCheckpointsBtn');
+
+      if (tab === 'syncCheckpoints') {
+        queryView.classList.add('hidden');
+        checkView.classList.remove('hidden');
+        qBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition';
+        cBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 transition';
+        loadSyncCheckpoints();
+      } else {
+        checkView.classList.add('hidden');
+        queryView.classList.remove('hidden');
+        qBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 transition';
+        cBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition';
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function loadSyncCheckpoints() {
+      var tbody = document.getElementById('checkpointsTbody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 text-sm">Loading sync checkpoints...</td></tr>';
+
+      fetch('{{ url("/open-dental-explorer/sync-checkpoints") }}')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var logs = data.logs || [];
+          if (!logs.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 text-sm">No sync logs recorded in sync_logs table yet.</td></tr>';
+            return;
+          }
+          var html = '';
+          logs.forEach(function (log) {
+            var statusBadge = '<span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full uppercase bg-slate-100 text-slate-700 border border-slate-200">' + escHtml(log.status) + '</span>';
+            if (log.status === 'completed') statusBadge = '<span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">Completed</span>';
+            if (log.status === 'running') statusBadge = '<span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full uppercase bg-blue-100 text-blue-800 border border-blue-200 animate-pulse">Running</span>';
+            if (log.status === 'failed') statusBadge = '<span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full uppercase bg-rose-100 text-rose-800 border border-rose-200">Failed</span>';
+
+            var escMod = escHtml(log.module);
+            var dateVal = log.last_synced_at ? String(log.last_synced_at).replace(' ', 'T').slice(0, 16) : '';
+
+            html += '<tr class="border-b border-slate-100 hover:bg-slate-50/70 transition text-xs" data-module="' + escMod + '">';
+            html += '<td class="px-4 py-3 font-bold text-slate-900">' + escMod + '</td>';
+            html += '<td class="px-4 py-3">' + statusBadge + '</td>';
+            html += '<td class="px-4 py-3"><input type="datetime-local" class="cp-date bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:ring-indigo-500 shadow-2xs" value="' + dateVal + '"></td>';
+            html += '<td class="px-4 py-3"><input type="number" class="cp-pk w-28 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:ring-indigo-500 shadow-2xs" value="' + (log.last_primary_key || 0) + '"></td>';
+            html += '<td class="px-4 py-3 font-mono font-semibold text-slate-700">' + Number(log.total_processed || 0).toLocaleString() + '</td>';
+            html += '<td class="px-4 py-3 text-right"><button onclick="saveCheckpointRow(\'' + escMod + '\', this)" class="px-3.5 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition shadow-xs">Save / Reset Date</button></td>';
+            html += '</tr>';
+          });
+          tbody.innerHTML = html;
+          if (window.lucide) lucide.createIcons();
+        })
+        .catch(function (err) {
+          tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-rose-500 text-sm">Failed to load sync checkpoints: ' + escHtml(err.message) + '</td></tr>';
+        });
+    }
+
+    function saveCheckpointRow(module, btn) {
+      var tr = btn.closest('tr');
+      var dateVal = tr.querySelector('.cp-date').value;
+      var pkVal = tr.querySelector('.cp-pk').value;
+
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      fetch('{{ url("/open-dental-explorer/reset-sync-checkpoint") }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+          module: module,
+          last_synced_at: dateVal ? dateVal.replace('T', ' ') : null,
+          last_primary_key: parseInt(pkVal, 10) || 0
+        })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          btn.disabled = false;
+          btn.textContent = 'Save / Reset Date';
+          if (res.error) {
+            alert('Error: ' + res.error);
+            return;
+          }
+          alert(res.message || 'Successfully updated sync checkpoint.');
+          loadSyncCheckpoints();
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          btn.textContent = 'Save / Reset Date';
+          alert('Failed to save checkpoint: ' + err.message);
+        });
+    }
+
+    function resetAllCheckpoints() {
+      if (!confirm('Are you sure you want to reset ALL sync checkpoints? This will cause all modules to restart sync from the beginning on their next execution, updating existing rows and inserting new ones without duplicates.')) return;
+
+      fetch('{{ url("/open-dental-explorer/reset-sync-checkpoint") }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+          module: 'all',
+          last_synced_at: null,
+          last_primary_key: 0
+        })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.error) {
+            alert('Error: ' + res.error);
+            return;
+          }
+          alert(res.message || 'Successfully reset all sync checkpoints.');
+          loadSyncCheckpoints();
+        })
+        .catch(function (err) {
+          alert('Failed to reset all checkpoints: ' + err.message);
+        });
+    }
   </script>
 </x-app-layout>
