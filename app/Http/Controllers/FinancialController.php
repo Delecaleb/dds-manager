@@ -16,8 +16,7 @@ class FinancialController extends Controller
     public function __construct(
         protected FinancialAnalyticsService $financialAnalytics,
         protected PatientAnalyticsService $patientAnalytics
-    ) {
-    }
+    ) {}
 
     public function index()
     {
@@ -105,25 +104,25 @@ class FinancialController extends Controller
             $dailyGross = DB::table('od_procedure_logs')
                 ->where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$start, $end])
-                ->selectRaw('DATE(ProcDate) as date, ' . MetricDefinitions::grossProduction('amount'))
+                ->selectRaw('DATE(ProcDate) as date, '.MetricDefinitions::grossProduction('amount'))
                 ->groupByRaw('DATE(ProcDate)')
                 ->pluck('amount', 'date');
 
             $dailyAdj = DB::table('od_adjustments')
                 ->whereBetween('AdjDate', [$start, $end])
-                ->selectRaw('DATE(AdjDate) as date, ' . MetricDefinitions::adjustments('amount'))
+                ->selectRaw('DATE(AdjDate) as date, '.MetricDefinitions::adjustments('amount'))
                 ->groupByRaw('DATE(AdjDate)')
                 ->pluck('amount', 'date');
 
             $dailyWriteOffs = DB::table('od_claim_procs')
                 ->whereBetween('ProcDate', [$start, $end])
-                ->selectRaw('DATE(ProcDate) as date, ' . MetricDefinitions::writeOffs('amount'))
+                ->selectRaw('DATE(ProcDate) as date, '.MetricDefinitions::writeOffs('amount'))
                 ->groupByRaw('DATE(ProcDate)')
                 ->pluck('amount', 'date');
 
             $dailyColl = DB::table('od_pay_splits')
                 ->whereBetween('DatePay', [$start, $end])
-                ->selectRaw('DATE(DatePay) as date, ' . MetricDefinitions::collections('amount'))
+                ->selectRaw('DATE(DatePay) as date, '.MetricDefinitions::collections('amount'))
                 ->groupByRaw('DATE(DatePay)')
                 ->pluck('amount', 'date');
 
@@ -154,20 +153,20 @@ class FinancialController extends Controller
         if (in_array($section, ['all', 'daily-patient-chart'])) {
             $dailyVisits = OdProcedureLog::where('ProcStatus', 'C')
                 ->whereBetween('ProcDate', [$start, $end])
-                ->selectRaw('DATE(ProcDate) as date, ' . MetricDefinitions::patientVisits('cnt'))
+                ->selectRaw('DATE(ProcDate) as date, '.MetricDefinitions::patientVisits('cnt'))
                 ->groupByRaw('DATE(ProcDate)')
                 ->pluck('cnt', 'date');
 
             $dailyScheduled = OdAppointment::whereBetween('AptDateTime', [$start, $end])
                 ->scheduled()
-                ->selectRaw('DATE(AptDateTime) as date, ' . MetricDefinitions::scheduledPatients('cnt'))
+                ->selectRaw('DATE(AptDateTime) as date, '.MetricDefinitions::scheduledPatients('cnt'))
                 ->groupByRaw('DATE(AptDateTime)')
                 ->pluck('cnt', 'date');
 
             $dailyNewScheduled = OdAppointment::whereBetween('AptDateTime', [$start, $end])
                 ->scheduled()
                 ->where('IsNewPatient', 'true')
-                ->selectRaw('DATE(AptDateTime) as date, ' . MetricDefinitions::scheduledPatients('cnt'))
+                ->selectRaw('DATE(AptDateTime) as date, '.MetricDefinitions::scheduledPatients('cnt'))
                 ->groupByRaw('DATE(AptDateTime)')
                 ->pluck('cnt', 'date');
 
@@ -276,13 +275,13 @@ class FinancialController extends Controller
             };
         }
 
-        $totalCount = (int) array_sum(array_map(fn($r) => $r->cnt, $rows));
-        $totalProd = (float) array_sum(array_map(fn($r) => $r->total_production, $rows));
-        $uniquePriced = count(array_filter($rows, fn($r) => (float) $r->service_fee > 0));
+        $totalCount = (int) array_sum(array_map(fn ($r) => $r->cnt, $rows));
+        $totalProd = (float) array_sum(array_map(fn ($r) => $r->total_production, $rows));
+        $uniquePriced = count(array_filter($rows, fn ($r) => (float) $r->service_fee > 0));
 
         // Top-5 for charts
         $byCount = $rows;
-        usort($byCount, fn($a, $b) => $b->cnt <=> $a->cnt);
+        usort($byCount, fn ($a, $b) => $b->cnt <=> $a->cnt);
 
         $providers = DB::table('od_providers')
             ->whereIn('IsHidden', ['false', '0', 0, false])
@@ -295,15 +294,15 @@ class FinancialController extends Controller
                 'unique_by_pricing' => $uniquePriced,
                 'total_production' => round($totalProd, 2),
             ],
-            'chart_counts' => array_slice(array_map(fn($r) => [
+            'chart_counts' => array_slice(array_map(fn ($r) => [
                 'label' => $r->service,
                 'value' => (int) $r->cnt,
             ], $byCount), 0, 5),
-            'chart_services' => array_slice(array_map(fn($r) => [
+            'chart_services' => array_slice(array_map(fn ($r) => [
                 'label' => $r->service,
                 'value' => round((float) $r->total_production, 2),
             ], $rows), 0, 5),
-            'rows' => array_map(fn($r) => [
+            'rows' => array_map(fn ($r) => [
                 'provider' => $r->provider ?? 'Unknown',
                 'service' => $r->service,
                 'service_code' => $r->service_code,
@@ -312,7 +311,7 @@ class FinancialController extends Controller
                 'total_production' => round((float) $r->total_production, 2),
                 'tier' => $r->tier,
             ], $rows),
-            'providers' => $providers->map(fn($p) => [
+            'providers' => $providers->map(fn ($p) => [
                 'id' => $p->ProvNum,
                 'name' => $p->PName ? "{$p->LName}, {$p->PName}" : $p->LName,
             ])->values(),
@@ -361,7 +360,7 @@ class FinancialController extends Controller
         }
 
         $totalCount = count($rows);
-        $totalPay = (float) array_sum(array_map(fn($r) => $r->total_payments, $rows));
+        $totalPay = (float) array_sum(array_map(fn ($r) => $r->total_payments, $rows));
 
         $providers = DB::table('od_providers')
             ->whereIn('IsHidden', ['false', '0', 0, false])
@@ -382,22 +381,22 @@ class FinancialController extends Controller
         ', [$start, $end]);
 
         $byCount = $topPayments;
-        usort($byCount, fn($a, $b) => $b->CountValue <=> $a->CountValue);
+        usort($byCount, fn ($a, $b) => $b->CountValue <=> $a->CountValue);
 
         return [
             'kpis' => [
                 'total_count' => $totalCount,
                 'total_payments' => round($totalPay, 2),
             ],
-            'chart_counts' => array_map(fn($r) => [
+            'chart_counts' => array_map(fn ($r) => [
                 'label' => $r->PaymentType ?? 'Unknown',
                 'value' => (int) $r->CountValue,
             ], array_slice($byCount, 0, 6)),
-            'chart_payments' => array_map(fn($r) => [
+            'chart_payments' => array_map(fn ($r) => [
                 'label' => $r->PaymentType ?? 'Unknown',
                 'value' => round((float) $r->AmountValue, 2),
             ], array_slice($topPayments, 0, 6)),
-            'rows' => array_map(fn($r) => [
+            'rows' => array_map(fn ($r) => [
                 'provider' => $r->provider ?? 'Unknown',
                 'payment_date' => $r->payment_date,
                 'description' => $r->description,
@@ -407,7 +406,7 @@ class FinancialController extends Controller
                 'total_payments' => round((float) $r->total_payments, 2),
                 'tier' => $r->tier,
             ], $rows),
-            'providers' => $providers->map(fn($p) => [
+            'providers' => $providers->map(fn ($p) => [
                 'id' => $p->ProvNum,
                 'name' => $p->PName ? "{$p->LName}, {$p->PName}" : $p->LName,
             ])->values(),
@@ -451,7 +450,7 @@ class FinancialController extends Controller
             FROM od_procedure_logs pl
             JOIN od_patients  p  ON pl.PatNum  = p.PatNum
             JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ('C', '2')
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY p.PatNum, p.LName, p.FName,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
@@ -459,7 +458,7 @@ class FinancialController extends Controller
             ORDER BY pl.ProcDate, p.LName
         ", [$start, $end]);
 
-        return array_map(fn($r) => [
+        return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
@@ -485,7 +484,7 @@ class FinancialController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_patients  p  ON pl.PatNum  = p.PatNum
                 JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-                WHERE pl.ProcStatus = 'C'
+                WHERE pl.ProcStatus IN ('C', '2')
                   AND pl.ProcDate BETWEEN ? AND ?
                 GROUP BY p.PatNum, p.LName, p.FName,
                          pr.ProvNum, pr.Abbr, pr.LName, pr.PName, pl.ProcDate
@@ -507,7 +506,7 @@ class FinancialController extends Controller
             ORDER BY dates, patient_name
         ", [$start, $end, $start, $end]);
 
-        return array_map(fn($r) => [
+        return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
@@ -537,14 +536,14 @@ class FinancialController extends Controller
             ORDER BY a.AdjDate, p.LName
         ", [$start, $end]);
 
-        return array_map(fn($r) => [
+        return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
             'providers' => $r->providers,
             'dates' => $r->dates,
             'amount' => round((float) $r->amount, 2),
-            'adj_type' => ((float) $r->amount >= 0 ? '+' : '-') . ' Adjustment (Type #' . $r->adj_type_id . ')',
+            'adj_type' => ((float) $r->amount >= 0 ? '+' : '-').' Adjustment (Type #'.$r->adj_type_id.')',
         ], $rows);
     }
 
@@ -569,7 +568,7 @@ class FinancialController extends Controller
             ORDER BY ps.DatePay, p.LName
         ", [$start, $end]);
 
-        return array_map(fn($r) => [
+        return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
@@ -590,13 +589,13 @@ class FinancialController extends Controller
                 COUNT(DISTINCT DATE(pl.ProcDate)) AS count
             FROM od_procedure_logs pl
             JOIN od_patients p ON pl.PatNum = p.PatNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ('C', '2')
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY p.PatNum, p.LName, p.FName
             ORDER BY count DESC, p.LName
         ", [$start, $end]);
 
-        return array_map(fn($r) => [
+        return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'dates' => $r->dates,
@@ -617,13 +616,13 @@ class FinancialController extends Controller
             FROM od_procedure_logs pl
             JOIN od_patients   p  ON pl.PatNum  = p.PatNum
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ('C', '2')
             GROUP BY p.PatNum, p.LName, p.FName
             HAVING MIN(pl.ProcDate) BETWEEN ? AND ?
             ORDER BY dates, p.LName
         ", [$start, $end]);
 
-        return array_map(fn($r) => [
+        return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'dates' => $r->dates,
@@ -649,7 +648,7 @@ class FinancialController extends Controller
             ORDER BY count DESC, p.LName
         ", [$start, $end]);
 
-        return array_map(fn($r) => [
+        return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'dates' => $r->dates,
@@ -675,7 +674,7 @@ class FinancialController extends Controller
             ORDER BY count DESC, p.LName
         ", [$start, $end]);
 
-        return array_map(fn($r) => [
+        return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'dates' => $r->dates,
@@ -700,7 +699,7 @@ class FinancialController extends Controller
             ORDER BY p.LName
         ", [$start, $end]);
 
-        return array_map(fn($r) => [
+        return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'count' => (int) $r->count,
@@ -726,7 +725,7 @@ class FinancialController extends Controller
             ORDER BY dates, p.LName
         ", [$start, $end]);
 
-        return array_map(fn($r) => [
+        return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'dates' => $r->dates,
