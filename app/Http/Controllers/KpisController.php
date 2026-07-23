@@ -4,16 +4,25 @@ namespace App\Http\Controllers;
 
 use App\Domain\Patient\PatientService;
 use App\Domain\Support\MetricFilter;
+use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class KpisController extends Controller
 {
+    /** Pre-rendered status IN-lists for interpolation into raw-SQL heredocs (DRY). */
+    private readonly string $completedIn;
+
+    private readonly string $tpIn;
+
     public function __construct(
         private readonly TreatmentAcceptanceService $txAcceptance,
         private readonly PatientService $patients,
-    ) {}
+    ) {
+        $this->completedIn = ProcStatus::inList(ProcStatus::completed());
+        $this->tpIn = ProcStatus::inList(ProcStatus::treatmentPlanned());
+    }
 
     public function index()
     {
@@ -97,7 +106,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             WHERE pc.IsHygiene = 'true'
-              AND pl.ProcStatus = 'C'
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
         ", [$start, $end]);
 
@@ -119,7 +128,7 @@ class KpisController extends Controller
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             JOIN od_appointments a ON pl.AptNum = a.AptNum
             WHERE pc.IsHygiene = 'true'
-              AND pl.ProcStatus = 'C'
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'
         ", [$start, $end]);
@@ -135,7 +144,7 @@ class KpisController extends Controller
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             JOIN od_appointments a ON pl.AptNum = a.AptNum
             WHERE pc.ProcCode IN ('D4341','D4342','D4910','4341','4342','4910')
-              AND pl.ProcStatus = 'C'
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'
         ", [$start, $end]);
@@ -161,7 +170,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             JOIN od_patients pt   ON pl.PatNum  = pt.PatNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C'
+            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
               AND pt.PatStatus = 'Patient'
               AND pl.ProcDate >= {$sub12}
         ");
@@ -174,7 +183,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             JOIN od_patients pt   ON pl.PatNum  = pt.PatNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C'
+            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
               AND pt.PatStatus = 'Patient'
               AND pl.ProcDate >= {$sub6}
         ");
@@ -187,9 +196,9 @@ class KpisController extends Controller
             JOIN (
                 SELECT DISTINCT PatNum
                 FROM od_procedure_logs
-                WHERE ProcStatus = 'TP' AND ProcDate BETWEEN ? AND ?
+                WHERE ProcStatus IN ({$this->tpIn}) AND ProcDate BETWEEN ? AND ?
             ) tp ON pl.PatNum = tp.PatNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C'
+            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
         ", [$start, $end, $start, $end])->cnt;
 
@@ -197,7 +206,7 @@ class KpisController extends Controller
         $txPlanCount = (int) DB::selectOne("
             SELECT COUNT(DISTINCT {$patTpDate}) AS cnt
             FROM od_procedure_logs
-            WHERE ProcStatus = 'TP'
+            WHERE ProcStatus IN ({$this->tpIn})
               AND DateTP IS NOT NULL
               AND DateTP BETWEEN ? AND ?
         ", [$start, $end])->cnt;
@@ -209,7 +218,7 @@ class KpisController extends Controller
                    COUNT(DISTINCT pl.ProcDate) AS days
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C'
+            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY pl.ProvNum
         ", [$start, $end]);
@@ -226,7 +235,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc    ON pl.CodeNum = pc.CodeNum
             JOIN od_appointments a   ON pl.AptNum  = a.AptNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C'
+            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'
               AND a.Pattern IS NOT NULL AND a.Pattern != ''
@@ -274,7 +283,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             WHERE pc.IsHygiene = 'false'
-              AND pl.ProcStatus = 'C'
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
         ", [$start, $end]);
 
@@ -293,7 +302,7 @@ class KpisController extends Controller
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             WHERE a.AptStatus = 2
               AND pc.IsHygiene = 'false'
-              AND pl.ProcStatus = 'C'
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND a.Pattern IS NOT NULL AND a.Pattern != ''
               AND DATE(a.AptDateTime) BETWEEN ? AND ?
         ", [$start, $end]);
@@ -319,7 +328,7 @@ class KpisController extends Controller
             SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus = 'C' 
+            WHERE pl.ProcStatus IN ({$this->completedIn}) 
               AND pc.IsHygiene = 'false'
               AND pl.ProcDate BETWEEN ? AND ?
               AND pc.ProcCode IN ('D0120', 'D0140', 'D0150', 'D0160', 'D0170', 'D0180')
@@ -329,21 +338,21 @@ class KpisController extends Controller
         $cohortSql = $this->patients->firstVisitCohortSql('first_visit');
         $txMatrix = DB::selectOne("
             SELECT
-                COUNT(DISTINCT CASE WHEN pl.ProcStatus = 'TP' AND tp_same.same_day_completed = 1 THEN {$patDate} END) AS same_day_tp_accepted_cnt,
-                COUNT(DISTINCT CASE WHEN pl.ProcStatus = 'TP' THEN {$patDate} END) AS total_tp_presented_cnt,
+                COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$this->tpIn}) AND tp_same.same_day_completed = 1 THEN {$patDate} END) AS same_day_tp_accepted_cnt,
+                COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$this->tpIn}) THEN {$patDate} END) AS total_tp_presented_cnt,
 
-                COALESCE(SUM(CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus = 'TP' THEN pl.ProcFee ELSE 0 END), 0) AS total_new_pt_tp_dollars,
-                COUNT(DISTINCT CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus = 'TP' THEN pl.PatNum END) AS new_pts_with_tp_cnt,
+                COALESCE(SUM(CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus IN ({$this->tpIn}) THEN pl.ProcFee ELSE 0 END), 0) AS total_new_pt_tp_dollars,
+                COUNT(DISTINCT CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus IN ({$this->tpIn}) THEN pl.PatNum END) AS new_pts_with_tp_cnt,
 
-                COALESCE(SUM(CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus = 'TP' THEN pl.ProcFee ELSE 0 END), 0) AS total_existing_pt_tp_dollars,
+                COALESCE(SUM(CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus IN ({$this->tpIn}) THEN pl.ProcFee ELSE 0 END), 0) AS total_existing_pt_tp_dollars,
 
-                COALESCE(SUM(CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus = 'C' AND tp_same.same_day_completed = 1 THEN pl.ProcFee ELSE 0 END), 0) AS sameday_new_pt_tx_dollars,
-                COUNT(DISTINCT CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus = 'C' AND tp_same.same_day_completed = 1 THEN pl.PatNum END) AS sameday_new_pt_cnt,
+                COALESCE(SUM(CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus IN ({$this->completedIn}) AND tp_same.same_day_completed = 1 THEN pl.ProcFee ELSE 0 END), 0) AS sameday_new_pt_tx_dollars,
+                COUNT(DISTINCT CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus IN ({$this->completedIn}) AND tp_same.same_day_completed = 1 THEN pl.PatNum END) AS sameday_new_pt_cnt,
 
-                COUNT(DISTINCT CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus = 'TP' THEN pl.PatNum END) AS existing_pts_with_tp_cnt,
+                COUNT(DISTINCT CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus IN ({$this->tpIn}) THEN pl.PatNum END) AS existing_pts_with_tp_cnt,
 
-                COUNT(DISTINCT CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus = 'C' THEN pt_hist.PatNum END) AS new_pts_seen_cnt,
-                COUNT(DISTINCT CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus = 'C' THEN pt_hist.PatNum END) AS existing_pts_seen_cnt
+                COUNT(DISTINCT CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus IN ({$this->completedIn}) THEN pt_hist.PatNum END) AS new_pts_seen_cnt,
+                COUNT(DISTINCT CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus IN ({$this->completedIn}) THEN pt_hist.PatNum END) AS existing_pts_seen_cnt
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             JOIN (
@@ -353,7 +362,7 @@ class KpisController extends Controller
                 SELECT DISTINCT c.PatNum, c.ProcDate, 1 AS same_day_completed
                 FROM od_procedure_logs c
                 JOIN od_procedure_logs tp ON c.PatNum = tp.PatNum AND c.ProcDate = tp.DateTP
-                WHERE c.ProcStatus = 'C' AND tp.ProcStatus = 'TP'
+                WHERE c.ProcStatus IN ({$this->completedIn}) AND tp.ProcStatus IN ({$this->tpIn})
             ) tp_same ON pl.PatNum = tp_same.PatNum AND pl.ProcDate = tp_same.ProcDate
             WHERE pc.IsHygiene = 'false'
               AND pl.ProcDate BETWEEN ? AND ?
@@ -374,7 +383,7 @@ class KpisController extends Controller
             SELECT pl.ProvNum, SUM(pl.ProcFee) as prod, COUNT(DISTINCT pl.ProcDate) as days
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'false' AND pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ?
+            WHERE pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY pl.ProvNum
         ", [$start, $end]);
         if (count($docProviders) > 0) {
@@ -427,7 +436,7 @@ class KpisController extends Controller
                 COUNT(DISTINCT CASE WHEN pl.ProcDate >= ? AND pc.ProcCode IN ('D0120','D0140','D0150','D0160','D0170','D0180') THEN pl.PatNum END) AS exam_in_18m
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
         ", [$cutoff36m, $cutoff18m, $cutoff18m]);
 
         $activePatients = (int) ($retentionData->active_18m ?? 0);
@@ -437,8 +446,8 @@ class KpisController extends Controller
         // 2. Treatment Plans per Day
         $tpDays = DB::selectOne("
             SELECT
-                (SELECT COUNT(DISTINCT {$patTpDate}) FROM od_procedure_logs WHERE ProcStatus = 'TP' AND DateTP BETWEEN ? AND ? AND ProcFee > 10) AS tp_count,
-                (SELECT COUNT(DISTINCT pl2.ProcDate) FROM od_procedure_logs pl2 WHERE pl2.ProcStatus = 'C' AND pl2.ProcDate BETWEEN ? AND ?) AS work_days
+                (SELECT COUNT(DISTINCT {$patTpDate}) FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ? AND ProcFee > 10) AS tp_count,
+                (SELECT COUNT(DISTINCT pl2.ProcDate) FROM od_procedure_logs pl2 WHERE pl2.ProcStatus IN ({$this->completedIn}) AND pl2.ProcDate BETWEEN ? AND ?) AS work_days
         ", [$start, $end, $start, $end]);
         $txPlansPerDay = ($tpDays->work_days ?? 0) > 0 ? round(($tpDays->tp_count ?? 0) / $tpDays->work_days, 2) : 0;
 
@@ -449,7 +458,7 @@ class KpisController extends Controller
                 COALESCE(SUM(pl.ProcFee * 0.2), 0) AS expected
             FROM od_procedure_logs pl
             JOIN od_pay_splits ps ON pl.ProcNum = ps.ProcNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND ps.SplitAmt > 0
         ", [$start, $end]);
@@ -458,7 +467,7 @@ class KpisController extends Controller
         // 4. Unscheduled Tx
         $unscheduled = (float) (DB::selectOne("
             SELECT COALESCE(SUM(ProcFee), 0) AS val FROM od_procedure_logs
-            WHERE ProcStatus = 'TP'
+            WHERE ProcStatus IN ({$this->tpIn})
               AND ProcDate BETWEEN ? AND ?
               AND (AptNum IS NULL OR AptNum = 0 OR AptNum = '0')
               AND ProcFee > 0
@@ -479,7 +488,7 @@ class KpisController extends Controller
                     MAX(CASE WHEN pl.ProcDate BETWEEN ? AND ? AND pc.ProcCode IN ('D0210','0210') THEN 1 ELSE 0 END) AS has_fmx
                 FROM od_procedure_logs pl
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcStatus = 'C'
+                WHERE pl.ProcStatus IN ({$this->completedIn})
                 GROUP BY pl.PatNum
             ) x
         ", [
@@ -499,7 +508,7 @@ class KpisController extends Controller
         $reactivationList = (int) (DB::selectOne("
             SELECT COUNT(DISTINCT pl.PatNum) AS cnt
             FROM od_procedure_logs pl
-            WHERE pl.ProcStatus = 'C' AND pl.ProcDate < ?
+            WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate < ?
             GROUP BY pl.PatNum
             HAVING MAX(pl.ProcDate) < ?
         ", [$start, $prior12m])->cnt ?? 0);
@@ -520,7 +529,7 @@ class KpisController extends Controller
             SELECT COUNT(DISTINCT pl.PatNum) AS cnt
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate >= ?
               AND pc.ProcCode IN ('D4910','D1110','D1120')
               AND pl.PatNum IN (
@@ -578,12 +587,12 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = 8
+            WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = 8
               AND pc.ProcCode BETWEEN 'D4000' AND 'D4999'
         ", [$start, $end])->sm, 2);
 
         // Treatment plan per exam
-        $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus = 'TP' AND DateTP BETWEEN ? AND ?", [$start, $end])->sm ?? 0;
+        $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ?", [$start, $end])->sm ?? 0;
 
         $exams = DB::selectOne("
             SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
@@ -592,7 +601,7 @@ class KpisController extends Controller
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             WHERE pl.ProcDate BETWEEN ? AND ?
               AND pc.ProcCode IN ('D0120', 'D0140', 'D0145', 'D0150', 'D0160', 'D0170', 'D0180')
-              AND pl.ProcStatus = 'C' AND pr.Specialty = 8
+              AND pl.ProcStatus IN ({$this->completedIn}) AND pr.Specialty = 8
         ", [$start, $end])->exam_cnt ?? 0;
 
         $data['treatment_plan_per_exam'] = $exams > 0 ? round($txFee / $exams, 2) : 0;
@@ -645,7 +654,7 @@ class KpisController extends Controller
             'extractions_dollars' => ['D7140', 'D7210', 'D7220', 'D7230', 'D7240', 'D7241', 'D7250'],
         ]);
 
-        $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus = 'TP' AND DateTP BETWEEN ? AND ?", [$start, $end])->sm ?? 0;
+        $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ?", [$start, $end])->sm ?? 0;
 
         $exams = DB::selectOne("
             SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
@@ -654,7 +663,7 @@ class KpisController extends Controller
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             WHERE pl.ProcDate BETWEEN ? AND ?
               AND pc.ProcCode IN ('D0120', 'D0140', 'D0145', 'D0150', 'D0160', 'D0170', 'D0180')
-              AND pl.ProcStatus = 'C' AND pr.Specialty = 5
+              AND pl.ProcStatus IN ({$this->completedIn}) AND pr.Specialty = 5
         ", [$start, $end])->exam_cnt ?? 0;
 
         $data['treatment_plan_per_exam'] = $exams > 0 ? round($txFee / $exams, 2) : 0;
@@ -726,7 +735,7 @@ class KpisController extends Controller
                 CAST(COUNT(DISTINCT pl.PatNum) AS SIGNED) AS patient_visits
             FROM od_procedure_logs pl
             JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND pr.Specialty = ?
         ", [$start, $end, $specId]);
@@ -746,7 +755,7 @@ class KpisController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
+                WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
                   AND pc.ProcCode IN ($inStr)
             ", [$start, $end, $specId])->cnt;
         }
@@ -758,7 +767,7 @@ class KpisController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
+                WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
                   AND pc.ProcCode IN ($inStr)
             ", [$start, $end, $specId])->sm, 2);
         }
@@ -770,7 +779,7 @@ class KpisController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
+                WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
                   AND pc.ProcCode IN ($inStr)
             ", [$start, $end, $specId])->cnt;
         }
@@ -797,7 +806,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ?
+            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
         ", [$start, $end]);
 
         $providersList = [];
@@ -825,7 +834,7 @@ class KpisController extends Controller
                     SUM(CASE WHEN pc.ProcCode IN ('D4381') THEN 1 ELSE 0 END) AS antimicrobial
                 FROM od_procedure_logs pl
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [$start, $end, $pId]);
 
             $hygProd = (float) $s->total_prod;
@@ -840,7 +849,7 @@ class KpisController extends Controller
             $rapt = DB::selectOne("
                 SELECT COUNT(DISTINCT a.AptNum) AS total, COUNT(DISTINCT CASE WHEN a.NextAptNum IS NOT NULL AND a.NextAptNum != '0' THEN a.AptNum END) AS with_next
                 FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_appointments a ON pl.AptNum = a.AptNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.ProvNum = ?
+                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.ProvNum = ?
             ", [$start, $end, $pId]);
             $reapptRate = $rapt->total > 0 ? round($rapt->with_next / $rapt->total * 100, 2) : 0;
 
@@ -848,7 +857,7 @@ class KpisController extends Controller
             $prapt = DB::selectOne("
                 SELECT COUNT(DISTINCT a.AptNum) AS total, COUNT(DISTINCT CASE WHEN a.NextAptNum IS NOT NULL AND a.NextAptNum != '0' THEN a.AptNum END) AS with_next
                 FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_appointments a ON pl.AptNum = a.AptNum
-                WHERE pc.ProcCode IN ('D4341','D4342','D4910','4341','4342','4910') AND pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.ProvNum = ?
+                WHERE pc.ProcCode IN ('D4341','D4342','D4910','4341','4342','4910') AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.ProvNum = ?
             ", [$start, $end, $pId]);
             $perioReapptRate = $prapt->total > 0 ? round($prapt->with_next / $prapt->total * 100, 2) : 0;
 
@@ -858,14 +867,14 @@ class KpisController extends Controller
                     COUNT(DISTINCT CASE WHEN {$agePt} >= 18 THEN pl.PatNum END) AS adult,
                     COUNT(DISTINCT CASE WHEN {$agePt} <  18 THEN pl.PatNum END) AS child
                 FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_patients pt ON pl.PatNum = pt.PatNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C' AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN DATE_SUB(?, INTERVAL 12 MONTH) AND ? AND pl.ProvNum = ?
+                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN DATE_SUB(?, INTERVAL 12 MONTH) AND ? AND pl.ProvNum = ?
             ", [$end, $end, $pId]);
             $ret6 = DB::selectOne("
                 SELECT
                     COUNT(DISTINCT CASE WHEN {$agePt} >= 18 THEN pl.PatNum END) AS adult,
                     COUNT(DISTINCT CASE WHEN {$agePt} <  18 THEN pl.PatNum END) AS child
                 FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_patients pt ON pl.PatNum = pt.PatNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C' AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN DATE_SUB(?, INTERVAL 6 MONTH) AND ? AND pl.ProvNum = ?
+                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN DATE_SUB(?, INTERVAL 6 MONTH) AND ? AND pl.ProvNum = ?
             ", [$end, $end, $pId]);
 
             // We need a proper denominator for retention "Patients seen within date range".
@@ -874,7 +883,7 @@ class KpisController extends Controller
                     COUNT(DISTINCT CASE WHEN {$agePt} >= 18 THEN pl.PatNum END) AS adult,
                     COUNT(DISTINCT CASE WHEN {$agePt} <  18 THEN pl.PatNum END) AS child
                 FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_patients pt ON pl.PatNum = pt.PatNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C' AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [$start, $end, $pId]);
 
             // Visits with Tx Plan
@@ -883,22 +892,22 @@ class KpisController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
                 JOIN (
-                    SELECT DISTINCT PatNum FROM od_procedure_logs WHERE ProcStatus = 'TP' AND ProcDate BETWEEN ? AND ?
+                    SELECT DISTINCT PatNum FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND ProcDate BETWEEN ? AND ?
                 ) tp ON pl.PatNum = tp.PatNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [$start, $end, $start, $end, $pId])->cnt;
 
             // Tx plans per day
             $txPlanCount = (int) DB::selectOne("
                 SELECT COUNT(DISTINCT CONCAT(PatNum,'-',DateTP)) AS cnt
-                FROM od_procedure_logs WHERE ProcStatus = 'TP' AND DateTP BETWEEN ? AND ? AND ProvNum = ?
+                FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ? AND ProvNum = ?
             ", [$start, $end, $pId])->cnt;
 
             // Avg prod per hour
             $totalMins = (float) (DB::selectOne("
                 SELECT COALESCE(SUM(LENGTH(a.Pattern) * 5), 0) AS mins
                 FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_appointments a ON pl.AptNum = a.AptNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND a.Pattern IS NOT NULL AND a.Pattern != '' AND pl.ProvNum = ?
+                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND a.Pattern IS NOT NULL AND a.Pattern != '' AND pl.ProvNum = ?
             ", [$start, $end, $pId])->mins ?? 0);
 
             $providersList[] = [
@@ -949,7 +958,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'false' AND pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ?
+            WHERE pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
         ", [$start, $end]);
 
         $providersList = [];
@@ -965,7 +974,7 @@ class KpisController extends Controller
                     COUNT(DISTINCT pl.ProcDate) AS work_days,
                     COUNT(DISTINCT CONCAT(pl.PatNum, '-', pl.ProcDate)) AS visits
                 FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pc.IsHygiene = 'false' AND pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                WHERE pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [$start, $end, $pId]);
             $docProd = (float) $doc->total_prod;
             $workDays = (int) $doc->work_days;
@@ -975,7 +984,7 @@ class KpisController extends Controller
             $apts = DB::selectOne("
                 SELECT COUNT(DISTINCT a.AptNum) AS total_apts, AVG(LENGTH(a.Pattern) * 5) AS avg_mins, SUM(LENGTH(a.Pattern) * 5) / 60 AS total_hours
                 FROM od_appointments a JOIN od_procedure_logs pl ON a.AptNum = pl.AptNum JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE a.AptStatus = 2 AND pc.IsHygiene = 'false' AND pl.ProcStatus = 'C' AND a.Pattern IS NOT NULL AND a.Pattern != '' AND DATE(a.AptDateTime) BETWEEN ? AND ? AND pl.ProvNum = ?
+                WHERE a.AptStatus = 2 AND pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND a.Pattern IS NOT NULL AND a.Pattern != '' AND DATE(a.AptDateTime) BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [$start, $end, $pId]);
             $docAptCount = (int) $apts->total_apts;
             $avgAptMins = (float) $apts->avg_mins;
@@ -992,7 +1001,7 @@ class KpisController extends Controller
 
             // Exam count
             $examCount = DB::table('od_procedure_logs as pl')->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
-                ->whereIn('pc.ProcCode', ['D0120', 'D0140', 'D0150', 'D0160', 'D0170', 'D0180'])->where('pl.ProcStatus', 'C')->whereBetween('pl.ProcDate', [$start, $end])->where('pl.ProvNum', $pId)->count();
+                ->whereIn('pc.ProcCode', ['D0120', 'D0140', 'D0150', 'D0160', 'D0170', 'D0180'])->whereIn('pl.ProcStatus', ProcStatus::completed())->whereBetween('pl.ProcDate', [$start, $end])->where('pl.ProvNum', $pId)->count();
 
             // TX Matrix
             $cohortSql = $this->patients->firstVisitCohortSql('first_visit');
@@ -1001,19 +1010,19 @@ class KpisController extends Controller
                     COUNT(DISTINCT CASE WHEN DATEDIFF(pl.ProcDate, tp.DateTP) = 0 THEN CONCAT(pl.PatNum,'-',pl.ProcDate) END) AS same_day_completions,
                     COALESCE(AVG(CASE WHEN pt_hist.first_visit BETWEEN ? AND ? THEN pl.ProcFee END), 0) AS avg_new_pt_tx,
                     COALESCE(SUM(CASE WHEN pt_hist.first_visit < ? THEN pl.ProcFee END), 0) AS total_existing_pt_tx,
-                    COALESCE(AVG(CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus = 'TP' THEN pl.ProcFee END), 0) AS avg_tp_existing_pt,
-                    COALESCE(AVG(CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus = 'TP' THEN pl.ProcFee END), 0) AS avg_tp_new_pt,
+                    COALESCE(AVG(CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus IN ({$this->tpIn}) THEN pl.ProcFee END), 0) AS avg_tp_existing_pt,
+                    COALESCE(AVG(CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus IN ({$this->tpIn}) THEN pl.ProcFee END), 0) AS avg_tp_new_pt,
                     COUNT(DISTINCT CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus IN ('C','TP') THEN pl.PatNum END) AS new_pts_with_tx,
                     COUNT(DISTINCT CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus IN ('C','TP') THEN pl.PatNum END) AS existing_pts_with_tx,
                     COUNT(DISTINCT CASE WHEN pt_hist.first_visit BETWEEN ? AND ? THEN pt_hist.PatNum END) AS new_pts_total,
-                    COUNT(DISTINCT CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus = 'C' THEN pt_hist.PatNum END) AS existing_pts_total,
-                    COALESCE(AVG(CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND DATEDIFF(pl.ProcDate, tp.DateTP) = 0 AND pl.ProcStatus = 'C' THEN pl.ProcFee END), 0) AS avg_sameday_new_pt
+                    COUNT(DISTINCT CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus IN ({$this->completedIn}) THEN pt_hist.PatNum END) AS existing_pts_total,
+                    COALESCE(AVG(CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND DATEDIFF(pl.ProcDate, tp.DateTP) = 0 AND pl.ProcStatus IN ({$this->completedIn}) THEN pl.ProcFee END), 0) AS avg_sameday_new_pt
                 FROM od_procedure_logs pl
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
                 JOIN (
                     {$cohortSql}
                 ) pt_hist ON pl.PatNum = pt_hist.PatNum
-                LEFT JOIN od_procedure_logs tp ON tp.PatNum = pl.PatNum AND tp.ProcStatus = 'TP' AND tp.DateTP IS NOT NULL AND tp.DateTP BETWEEN ? AND ?
+                LEFT JOIN od_procedure_logs tp ON tp.PatNum = pl.PatNum AND tp.ProcStatus IN ({$this->tpIn}) AND tp.DateTP IS NOT NULL AND tp.DateTP BETWEEN ? AND ?
                 WHERE pc.IsHygiene = 'false' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [
                 $start,
@@ -1072,7 +1081,7 @@ class KpisController extends Controller
         return DB::table('od_procedure_logs as pl')
             ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
             ->whereIn('pc.ProcCode', $codes)
-            ->where('pl.ProcStatus', 'C')
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end])
             ->count();
     }
@@ -1088,7 +1097,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
+            WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
         ", [$start, $end, $specId]);
 
         $providersList = [];
@@ -1112,7 +1121,7 @@ class KpisController extends Controller
                     CAST(COUNT(DISTINCT CASE WHEN pl.ProcFee > 0 THEN DATE(pl.ProcDate) END) AS SIGNED) AS work_days,
                     CAST(COUNT(DISTINCT pl.PatNum) AS SIGNED) AS patient_visits
                 FROM od_procedure_logs pl
-                WHERE pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [$start, $end, $provNum]);
 
             $workDays = max(1, (int) $base->work_days);
@@ -1127,7 +1136,7 @@ class KpisController extends Controller
                     SELECT COUNT(DISTINCT pl.ProcNum) AS cnt
                     FROM od_procedure_logs pl
                     JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                    WHERE pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                    WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                       AND pc.ProcCode IN ($inStr)
                 ", [$start, $end, $provNum])->cnt;
             }
@@ -1138,7 +1147,7 @@ class KpisController extends Controller
                     SELECT SUM(pl.ProcFee) AS sm
                     FROM od_procedure_logs pl
                     JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                    WHERE pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                    WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                       AND pc.ProcCode IN ($inStr)
                 ", [$start, $end, $provNum])->sm, 2);
             }
@@ -1149,7 +1158,7 @@ class KpisController extends Controller
                     SELECT COUNT(DISTINCT pl.PatNum) AS cnt
                     FROM od_procedure_logs pl
                     JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                    WHERE pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                    WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                       AND pc.ProcCode IN ($inStr)
                 ", [$start, $end, $provNum])->cnt;
             }
@@ -1228,19 +1237,19 @@ class KpisController extends Controller
                 SELECT SUM(pl.ProcFee) AS sm
                 FROM od_procedure_logs pl
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcStatus = 'C' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                   AND pc.ProcCode BETWEEN 'D4000' AND 'D4999'
             ", [$start, $end, $provNum])->sm, 2);
 
             // Treatment plan per exam
-            $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus = 'TP' AND DateTP BETWEEN ? AND ? AND ProvNum = ?", [$start, $end, $provNum])->sm ?? 0;
+            $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ? AND ProvNum = ?", [$start, $end, $provNum])->sm ?? 0;
             $exams = DB::selectOne("
                 SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
                 FROM od_procedure_logs pl
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
                 WHERE pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                   AND pc.ProcCode IN ('D0120', 'D0140', 'D0145', 'D0150', 'D0160', 'D0170', 'D0180')
-                  AND pl.ProcStatus = 'C'
+                  AND pl.ProcStatus IN ({$this->completedIn})
             ", [$start, $end, $provNum])->exam_cnt ?? 0;
             $row['treatment_plan_per_exam'] = $exams > 0 ? round($txFee / $exams, 2) : 0;
 
@@ -1292,14 +1301,14 @@ class KpisController extends Controller
             'sedations_dollars' => ['D9222', 'D9223', 'D9239', 'D9243', 'D9248'],
             'extractions_dollars' => ['D7140', 'D7210', 'D7220', 'D7230', 'D7240', 'D7241', 'D7250'],
         ], [], function ($row, $start, $end, $provNum) {
-            $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus = 'TP' AND DateTP BETWEEN ? AND ? AND ProvNum = ?", [$start, $end, $provNum])->sm ?? 0;
+            $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ? AND ProvNum = ?", [$start, $end, $provNum])->sm ?? 0;
             $exams = DB::selectOne("
                 SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
                 FROM od_procedure_logs pl
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
                 WHERE pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                   AND pc.ProcCode IN ('D0120', 'D0140', 'D0145', 'D0150', 'D0160', 'D0170', 'D0180')
-                  AND pl.ProcStatus = 'C'
+                  AND pl.ProcStatus IN ({$this->completedIn})
             ", [$start, $end, $provNum])->exam_cnt ?? 0;
             $row['treatment_plan_per_exam'] = $exams > 0 ? round($txFee / $exams, 2) : 0;
 
@@ -1338,14 +1347,14 @@ class KpisController extends Controller
             $txDayZero = DB::selectOne("
                 SELECT COUNT(DISTINCT a.PatNum) AS tx_pts
                 FROM od_procedure_logs a
-                WHERE a.ProcStatus = 'TP' AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
+                WHERE a.ProcStatus IN ({$this->tpIn}) AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
             ", [$start, $end, $provNum])->tx_pts ?? 0;
 
             $accSameDay = DB::selectOne("
                 SELECT COUNT(DISTINCT a.PatNum) AS acc_pts
                 FROM od_procedure_logs a
                 JOIN od_procedure_logs b ON a.PatNum = b.PatNum AND a.CodeNum = b.CodeNum
-                WHERE a.ProcStatus = 'TP' AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
+                WHERE a.ProcStatus IN ({$this->tpIn}) AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
                   AND b.ProcStatus IN ('C','S') AND DATE(b.ProcDate) = DATE(a.DateTP)
             ", [$start, $end, $provNum])->acc_pts ?? 0;
 
@@ -1353,7 +1362,7 @@ class KpisController extends Controller
                 SELECT COUNT(DISTINCT a.PatNum) AS acc_pts
                 FROM od_procedure_logs a
                 JOIN od_procedure_logs b ON a.PatNum = b.PatNum AND a.CodeNum = b.CodeNum
-                WHERE a.ProcStatus = 'TP' AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
+                WHERE a.ProcStatus IN ({$this->tpIn}) AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
                   AND b.ProcStatus IN ('C','S') AND b.ProcDate >= a.DateTP AND DATEDIFF(b.ProcDate, a.DateTP) <= 90
             ", [$start, $end, $provNum])->acc_pts ?? 0;
 
