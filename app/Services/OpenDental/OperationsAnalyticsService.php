@@ -4,6 +4,7 @@ namespace App\Services\OpenDental;
 
 use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
+use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use App\Helpers\MetricDefinitions;
@@ -35,16 +36,17 @@ use Illuminate\Support\Facades\DB;
  */
 class OperationsAnalyticsService
 {
-    /** ClinicNum => display name. Single clinic today; extend as locations are added. */
-    private array $clinicNames = [
-        0 => '8 Mile',
-    ];
+    /** ClinicNum => display name, sourced from the multi-office ClinicRegistry. */
+    private array $clinicNames = [];
 
     public function __construct(
         private readonly TreatmentAcceptanceService $treatmentAcceptance,
         private readonly ProductionService $production,
         private readonly PatientService $patients,
-    ) {}
+        private readonly ClinicRegistry $clinics,
+    ) {
+        $this->clinicNames = $this->clinics->all();
+    }
 
     /**
      * Offices tab.

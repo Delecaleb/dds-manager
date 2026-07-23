@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
+use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
@@ -23,11 +24,13 @@ class DashboardController extends Controller
     public function __construct(
         private readonly ProductionService $production,
         private readonly PatientService $patients,
-    ) {}
+        private readonly ClinicRegistry $clinics,
+    ) {
+        $this->clinicNames = $this->clinics->all();
+    }
 
-    private array $clinicNames = [
-        0 => '8 Mile',
-    ];
+    /** ClinicNum => display name, sourced from the multi-office ClinicRegistry. */
+    private array $clinicNames = [];
 
     private array $specialtyMap = [
         0 => 'General',
@@ -287,7 +290,7 @@ class DashboardController extends Controller
 
         $mappedProviders = $providers->map(function ($p) {
             $p->specialty = $this->specialtyMap[(int) $p->Specialty] ?? 'General Dentistry';
-            $p->location = '8 Mile';
+            $p->location = $this->clinics->name((int) ($p->ClinicNum ?? 0));
             // Net via the single source of truth (blueprint D3, signed adjustments).
             $p->net_production = $this->production->netFrom(
                 (float) $p->gross_production,

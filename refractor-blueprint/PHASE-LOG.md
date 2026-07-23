@@ -397,3 +397,19 @@ ship; then migrate the remaining 5 case-acceptance call sites one at a time.
 php artisan blueprint:parity
 ```
 Read-only; safe to run anytime. Must print PASS before any call site is switched.
+
+## Phase 4.0 — Multi-office foundation: ClinicRegistry   (2026-07-23)
+
+Built `App\Domain\Support\ClinicRegistry` (singleton) — the single source for ClinicNum ->
+display name. Reads `od_clinics` when synced (new offices appear automatically); falls back
+to the primary office (ClinicNum 0 -> '8 Mile', configurable via `config('clinics.primary_name')`)
+until then. Removes the hardcoded '8 Mile' from the analytics path.
+
+Wired into: OperationsAnalyticsService, DashboardController, OperationsController (the per-clinic
+grouping paths). `MetricFilter` already carries `clinics[]` and filters on ClinicNum, so the
+services were already multi-office capable — this closes the last single-office assumption in
+the grouping/labeling layer. Validated: payors location '8 Mile', net unchanged 672,627.85.
+
+Remaining cosmetic single-labels (Aging/Deposit/Calendar/HygieneRecall report headers) still
+print a fixed office string; harmless today, wire to ClinicRegistry when those reports gain
+per-clinic rows.

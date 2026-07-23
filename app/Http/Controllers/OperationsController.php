@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
+use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
 use App\Models\OdPatient;
 use App\Models\OdProvider;
@@ -17,6 +18,7 @@ class OperationsController extends Controller
     public function __construct(
         private readonly ProductionService $production,
         private readonly PatientService $patients,
+        private readonly ClinicRegistry $clinics,
     ) {}
 
     /**
@@ -608,7 +610,7 @@ class OperationsController extends Controller
 
             $patMap = $mapPatients($logs->pluck('PatNum')->unique());
 
-            $clinicName = $clinicNum == 0 ? '8 Mile' : 'Location '.$clinicNum;
+            $clinicName = $this->clinics->name((int) $clinicNum);
             $patData = [];
 
             foreach ($logs as $log) {
