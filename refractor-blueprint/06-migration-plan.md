@@ -99,14 +99,20 @@ Each phase is one mergeable unit → `git revert` of that merge cleanly restores
 behavior. This is only possible *because* the work isn't a monolithic branch.
 
 ## Progress tracker
-| Phase | Domain | Status | Snapshot diff notes |
+| Phase | Domain | Status | Notes |
 |-------|--------|--------|---------------------|
-| 0 | Kernel + Case Acceptance | ✅ **COMPLETE** — all 6 call sites migrated, grep gate clean | TxMiner + KpisController ×4 + Payors tab. 15/15 harness + 160-month + 156 per-provider + 1061-row parity, all 0 mismatches. See PHASE-LOG.md. |
-| 1 | Production | ☐ | |
-| 2 | Patient | ☐ | |
-| 3 | Payor | ☐ | |
-| 4a | Scheduling | ☐ | |
-| 4b | Financial | ☐ | |
-| 4c | Recall | ☐ | |
-| 5 | Provider composer | ☐ | |
-| 6 | Frontend | ☐ | |
+| 0 | Kernel + Case Acceptance | ✅ **COMPLETE** | ProcStatus/MetricFilter/DateRange + TreatmentAcceptanceService; all 6 call sites migrated. |
+| 1 | Production | ✅ **COMPLETE** | ProductionService + summary; net corrected to gross+AdjAmt−WriteOff (D3); consumers migrated. |
+| 2 | Patient | ✅ **COMPLETE** | PatientService + firstVisitCohort (killed ~19 copies); new-patient miscount fixed (D8). |
+| 3 | Payor | ✅ **COMPLETE** | PayorService owns plan map (D10) + payorLabel; Operations delegates. |
+| 4a | Scheduling | ✅ **COMPLETE** | SchedulingService + Summary. Flags NextAptNum sync gap. |
+| 4b | Financial | ✅ **COMPLETE** | FinancialService wraps AgingCalculationService + ProductionService. |
+| 4c | Recall | ✅ **COMPLETE** | RecallService + Summary. |
+| 5 | Provider composer | ✅ **COMPLETE** | ProviderService::scorecard — owns no formulas. |
+| — | Multi-office | ✅ **COMPLETE** | ClinicRegistry (single clinic-identity source); all hardcoded '8 Mile' wired; MetricFilter filters clinics[]. |
+| — | Raw-SQL retrofit | ✅ **COMPLETE** | 0 raw completed/TP status literals app-wide; FrontOffice integer-status bug fixed. |
+| 6 | Frontend | ☐ **NOT STARTED** | See 05-frontend-consolidation.md (3 drill-down modals, #providerModal dupe, fmtMoney ×4). |
+
+**Backend: complete.** Every metric resolves to one definition; the full domain-service layer
+exists; multi-office is structurally supported (ClinicRegistry + clinic-filtered services).
+Remaining work is frontend consolidation only (Phase 6).
