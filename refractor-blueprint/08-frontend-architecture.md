@@ -49,12 +49,18 @@ undefined no-ops and are being replaced).
 3. ✅ **`DDS.modal`** — canonical stacking opener (handles `.ds-limitless-modal` + `.dds-modal`);
    removed the duplicate `openLimitlessModal`. *(Still TODO: retire `openMarketingDrilldown`
    and the embedded `openOpsDrilldown`; fix the duplicate `#providerModal` id.)*
-4. ⏳ **`DDS.tabs`** — Operations already URL-driven. TODO: convert Aging/Financials/etc.
-   show-hide tabs to URL-driven (add `?tab=` sync + deep-link).
+4. ✅ **`DDS.tabs`** — URL-driven + deep-linkable. Operations (AJAX); `DDS.tabs.deeplink`
+   added for pre-rendered/show-hide pages → applied to **Aging, KPIs, Tx Miner** (`?tab=`
+   sync + deep-link + back/forward). Dashboard/patient-modal tabs are modal-internal (left
+   page-URL-agnostic by design). Calendar's detail/capacity are panels, not tabs.
 5. ✅ **Date picker** — URL-persisted range + `daterange:changed` event; `DDS.onDateRange`
    retires the glue. Consumers migrate opportunistically (back-compat kept).
 6. ✅ **Formatters** — the 4 `fmtMoney` copies now delegate to `DDS.fmt.money`.
+7. ✅ **Modals** — `DDS.modal.details` (one stackable embedded-details modal) retired both
+   `openOpsDrilldown` and `openMarketingDrilldown`.
 
-**Runtime verification still owed** (CSS/JS behavior can't be checked server-side): sticky
-columns actually freezing, modal stacking, tab AJAX/pushState. Verify in a browser before the
-remaining per-page tab migration (step 4) is propagated.
+### Remaining (minor)
+- Duplicate `#providerModal` id (dashboard + patient-modal component) — latent id collision.
+- Horizontal-scroll fix shipped (`.dds-table-scroll` pinned to parent width).
+
+**Runtime verification owed** for the per-page tab conversions and modal stacking (browser).
