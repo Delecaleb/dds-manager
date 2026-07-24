@@ -1019,8 +1019,8 @@
       });
 
       /* Provider modal: close */
-      $(document).on('click', '#closeProviderModal, #providerModalBackdrop', function () {
-        $('#providerModal').addClass('hidden');
+      $(document).on('click', '#closeDashProviderModal, #dashProviderModalBackdrop', function () {
+        $('#dashProviderModal').addClass('hidden');
       });
 
       /* Initial load */
@@ -1093,7 +1093,7 @@
       $('#ptab-info').removeClass('hidden');
 
       /* Show modal */
-      $('#providerModal').removeClass('hidden');
+      $('#dashProviderModal').removeClass('hidden');
 
       /* Destroy old charts */
       if (_provProductionChart) { _provProductionChart.destroy(); _provProductionChart = null; }
@@ -1198,15 +1198,15 @@
   </script>
 
   <!-- ── PROVIDER MODAL ──────────────────────────────── -->
-  <div id="providerModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
-    <div id="providerModalBackdrop" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+  <div id="dashProviderModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div id="dashProviderModalBackdrop" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
 
     <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
 
       <!-- Modal header -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
         <h3 class="text-base font-bold text-slate-900">Provider Information</h3>
-        <button id="closeProviderModal" class="text-slate-400 hover:text-slate-700 transition-colors">
+        <button id="closeDashProviderModal" class="text-slate-400 hover:text-slate-700 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18" />
