@@ -8,7 +8,8 @@ use Illuminate\Http\Request;
 class AgingController extends Controller
 {
     public function __construct(
-        protected AgingCalculationService $agingCalculationService
+        protected AgingCalculationService $agingCalculationService,
+        protected \App\Domain\Support\ClinicRegistry $clinics
     ) {}
 
     public function index()
@@ -141,7 +142,7 @@ class AgingController extends Controller
             'data' => [
                 [
                     'id' => 1,
-                    'office' => '8 Mile',
+                    'office' => $this->clinics->name(0),
                     'bal_current' => $fmtCell($totals['current_total']),
                     'bal_30' => $fmtCell($totals['thirty_total']),
                     'bal_60' => $fmtCell($totals['sixty_total']),

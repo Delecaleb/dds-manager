@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ClinicRegistry;
 use App\Models\OdAppointment;
 use App\Models\OdProcedureLog;
 use App\Models\OdProvider;
@@ -12,6 +13,10 @@ use Yajra\DataTables\Facades\DataTables;
 
 class HygieneRecallController extends Controller
 {
+    public function __construct(
+        private readonly ClinicRegistry $clinics,
+    ) {}
+
     public function index()
     {
         return view('hygiene-recall.index');
@@ -60,7 +65,7 @@ class HygieneRecallController extends Controller
             return [
                 'provider_name' => trim(($prov->LName ?? '') . ', ' . ($prov->FName ?? '')),
                 'provider_id' => $prov->ProvNum . ' - ' . substr($prov->Abbr ?? 'PRV', 0, 4),
-                'office' => '8 Mile',
+                'office' => $this->clinics->name(0),
                 'missed_recall' => $missedRecallCount,
                 'patient_recalled' => $patientRecalledCount,
                 'future_appointments' => $futureAptCount,
@@ -79,7 +84,7 @@ class HygieneRecallController extends Controller
             $filteredData->prepend([
                 'provider_name' => 'Poole, Donna',
                 'provider_id' => '41 - POOL',
-                'office' => '8 Mile',
+                'office' => $this->clinics->name(0),
                 'missed_recall' => 126,
                 'patient_recalled' => 18,
                 'future_appointments' => 0,
@@ -89,7 +94,7 @@ class HygieneRecallController extends Controller
             $filteredData->prepend([
                 'provider_name' => 'Heller, Landi',
                 'provider_id' => '76 - HELL',
-                'office' => '8 Mile',
+                'office' => $this->clinics->name(0),
                 'missed_recall' => 4,
                 'patient_recalled' => 1,
                 'future_appointments' => 1,

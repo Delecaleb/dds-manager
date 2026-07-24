@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\OdAdjustment;
 use App\Models\OdAppointment;
 use App\Models\OdProcedureLog;
+use App\Domain\Support\ClinicRegistry;
 use App\Services\OpenDental\CalendarService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -13,6 +14,10 @@ use Yajra\DataTables\Facades\DataTables;
 
 class CalendarController extends Controller
 {
+    public function __construct(
+        private readonly ClinicRegistry $clinics,
+    ) {}
+
     public function index()
     {
         return view('calendar.index');
@@ -146,7 +151,7 @@ class CalendarController extends Controller
             ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
 
         return DataTables::of($query)
-            ->addColumn('location', fn ($row) => '8 Mile')
+            ->addColumn('location', fn ($row) => $this->clinics->name((int) ($row->ClinicNum ?? 0)))
             ->addColumn('patient_name', fn ($row) => trim(($row->patient?->FName ?? '').' '.($row->patient?->LName ?? '')))
             ->addColumn('appointment_date', fn ($row) => (new Carbon($row->AptDateTime))->format('M d, Y'))
             ->addColumn('appointment_time', fn ($row) => (new Carbon($row->AptDateTime))->format('h:i A'))
@@ -234,7 +239,7 @@ class CalendarController extends Controller
         // Mock tiers heavily matching the requested UI visually
         $data = [
             [
-                'location' => '8 Mile',
+                'location' => $this->clinics->name(0),
                 'scheduled_appointments' => $scheduledApts,
                 'provider_count' => $providerCount,
                 'booked_hours' => number_format($bookedMinutes / 60, 2),

@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ClinicRegistry;
 use Illuminate\Http\Request;
 
 class DepositSlipController extends Controller
 {
+    public function __construct(
+        private readonly ClinicRegistry $clinics,
+    ) {}
+
     /**
      * Display a listing of the resource.
      */
@@ -81,7 +86,7 @@ class DepositSlipController extends Controller
         $results = [];
         $totalAmount = 0;
         foreach ($payments as $p) {
-            $loc = '8 Mile'; // Hardcoded as per user request: only available clinic is 8 Mile
+            $loc = $this->clinics->name((int) ($p->ClinicNum ?? 0));
             $type = $p->type ?: 'Uncategorized Payment';
             $amt = (float) $p->amount;
             $totalAmount += $amt;
@@ -104,7 +109,7 @@ class DepositSlipController extends Controller
             $totalAmount += $amt;
 
             $results[] = [
-                'location' => '8 Mile',
+                'location' => $this->clinics->name((int) ($cp->ClinicNum ?? 0)),
                 'type' => 'Insurance Co Pmt',
                 'amount' => $amt
             ];
@@ -137,7 +142,7 @@ class DepositSlipController extends Controller
 
         foreach ($paymentsForDetails as $p) {
             $details[] = [
-                'office' => '8 Mile',
+                'office' => $this->clinics->name((int) ($p->ClinicNum ?? 0)),
                 'patient_name' => ($p->LName || $p->FName) ? trim($p->LName . ', ' . $p->FName, ', ') : '',
                 'patient_id' => $p->PatNum,
                 'provider' => '',

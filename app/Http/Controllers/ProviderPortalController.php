@@ -24,8 +24,9 @@ class ProviderPortalController extends Controller
     /** Pre-rendered completed-status IN-list for raw-SQL heredoc interpolation (DRY). */
     private readonly string $completedIn;
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly \App\Domain\Support\ClinicRegistry $clinics,
+    ) {
         $this->completedIn = ProcStatus::inList(ProcStatus::completed());
     }
 
@@ -163,7 +164,7 @@ class ProviderPortalController extends Controller
 
             return [
                 'provider' => $r->provider_name,
-                'office' => '8 Mile',
+                'office' => $this->clinics->name(0),
                 'provider_type' => $this->specialtyMap[(int) $r->Specialty] ?? 'General',
                 'date' => $r->period,
                 'avg_rev_hyg' => $avgHygDay,

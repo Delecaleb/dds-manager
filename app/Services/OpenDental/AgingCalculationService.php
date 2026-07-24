@@ -32,7 +32,9 @@ use Illuminate\Support\Facades\DB;
  */
 class AgingCalculationService
 {
-    private const OFFICE_NAME = '8 Mile';
+    public function __construct(
+        private readonly \App\Domain\Support\ClinicRegistry $clinics,
+    ) {}
 
     /**
      * Allowlist mapping a DataTables column data-key to the outer-query
@@ -169,7 +171,7 @@ class AgingCalculationService
             $rows = collect(DB::select($sql, $bindings));
 
             return $rows->map(function ($row) {
-                $row->office = self::OFFICE_NAME;
+                $row->office = $this->clinics->name(0);
 
                 return $row;
             });
@@ -291,7 +293,7 @@ class AgingCalculationService
             $family = $families->get((int) $row->guarantor_id);
             $row->family_names = $family->family_names ?? null;
             $row->family_ids = $family->family_ids ?? null;
-            $row->office = self::OFFICE_NAME;
+            $row->office = $this->clinics->name(0);
 
             return $row;
         });
