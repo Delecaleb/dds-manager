@@ -139,8 +139,9 @@
     var _totalAmount = 0;
     var _currentTab = 'summary';
 
+    // Canonical formatter (single source: DDS.fmt.money in ui.js).
     function fmtMoney(v) {
-      return '$ ' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return DDS.fmt.money(v);
     }
 
     function renderSummary(data, total) {

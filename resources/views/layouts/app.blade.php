@@ -15,6 +15,10 @@
     {{-- Shared UI: single source of truth for component CSS (design tokens, sticky
          columns/header, heatmap, modals, tabs). Loaded after Tailwind so it can override. --}}
     <link rel="stylesheet" href="{{ asset('css/ui.css') }}">
+    {{-- Shared UI behavior (window.DDS): formatters, stacking modals, URL-driven tabs,
+         date-range helpers. Loaded in <head> after jQuery so DDS is available to every
+         page script (incl. those that render at parse time). --}}
+    <script src="{{ asset('js/ui.js') }}"></script>
 </head>
 
 <body class="bg-slate-50 text-slate-800 font-sans antialiased">
@@ -178,9 +182,6 @@
     </script>
     <script src="https://cdn.datatables.net/2.0.8/js/dataTables.js"></script>
     <script src="https://cdn.datatables.net/2.0.8/js/dataTables.tailwind.js"></script>
-    {{-- Shared UI behavior: DDS.fmt (formatters), DDS.modal (stacking drill-downs),
-         DDS.tabs (URL-driven, no reload), DDS.getRange/onDateRange. One place to edit. --}}
-    <script src="{{ asset('js/ui.js') }}"></script>
 </body>
 
 </html>

@@ -496,14 +496,9 @@
     var _locUtilizationChartInstance = null;
 
     /* ── Helpers ──────────────────────────────────────── */
+    // Canonical formatter (single source: DDS.fmt.money in ui.js).
     function fmtMoney(v) {
-      var n = Number(v ?? 0);
-      if (n < 0) {
-        return '($' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')';
-      }
-      return '$' + n.toLocaleString('en-US', {
-        minimumFractionDigits: 2, maximumFractionDigits: 2
-      });
+      return DDS.fmt.money(v);
     }
 
     function fmtMoneyCompact(v) {

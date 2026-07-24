@@ -770,12 +770,9 @@
   <script>
     const baseUrl = "{{ url('') }}";
 
+    // Canonical formatter (single source: DDS.fmt.money in ui.js). Also fixes null -> "$NaN".
     function fmtMoney(v) {
-      var num = Number(v);
-      if (num < 0) {
-        return '($' + Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')';
-      }
-      return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return DDS.fmt.money(v);
     }
 
     /* ── Main tab switching ──────────────────────────────────────────────────── */
