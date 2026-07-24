@@ -317,34 +317,28 @@
             const tabBtns = document.querySelectorAll('.tab-btn');
             const tabPanes = document.querySelectorAll('.tab-pane');
 
-            tabBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const targetSelect = btn.getAttribute('data-target');
-
-                    // Reset buttons
-                    tabBtns.forEach(b => {
-                        b.classList.remove('active', 'border-emerald-500', 'text-emerald-600');
-                        b.classList.add('border-transparent', 'text-slate-500');
-                    });
-
-                    // Activate clicked button
+            // URL-driven + deep-linkable (DDS.tabs.deeplink). Tab key = the id after "#tab-".
+            function activateTxTab(tab) {
+                var targetSelect = '#tab-' + tab;
+                tabBtns.forEach(b => {
+                    b.classList.remove('active', 'border-emerald-500', 'text-emerald-600');
+                    b.classList.add('border-transparent', 'text-slate-500');
+                });
+                var btn = document.querySelector('.tab-btn[data-target="' + targetSelect + '"]');
+                if (btn) {
                     btn.classList.add('active', 'border-emerald-500', 'text-emerald-600');
                     btn.classList.remove('border-transparent', 'text-slate-500');
-
-                    // Reset panes
-                    tabPanes.forEach(pane => {
-                        pane.classList.add('hidden');
-                        pane.classList.remove('active');
-                    });
-
-                    // Activate target pane
-                    const target = document.querySelector(targetSelect);
-                    if (target) {
-                        target.classList.remove('hidden');
-                        target.classList.add('active');
-                    }
-                });
+                }
+                tabPanes.forEach(pane => { pane.classList.add('hidden'); pane.classList.remove('active'); });
+                var target = document.querySelector(targetSelect);
+                if (target) { target.classList.remove('hidden'); target.classList.add('active'); }
+            }
+            var txTabs = DDS.tabs.deeplink('tab', activateTxTab);
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => { txTabs.go(btn.getAttribute('data-target').replace('#tab-', '')); });
             });
+            // Deep-link: honor ?tab= on load, else the default 'month' tab.
+            activateTxTab(txTabs.initial || 'month');
         });
     </script>
 </x-app-layout>

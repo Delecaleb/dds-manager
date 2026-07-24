@@ -816,24 +816,25 @@
 
     /* ── Init ──────────────────────────────────────────────────────────────── */
     document.addEventListener('DOMContentLoaded', function () {
-      // Tab switching
-      document.querySelectorAll('.kpi-tab-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          document.querySelectorAll('.kpi-tab-btn').forEach(function (b) {
-            b.classList.remove('border-emerald-500', 'text-emerald-600', 'font-bold');
-            b.classList.add('border-transparent');
-          });
-          btn.classList.add('border-emerald-500', 'text-emerald-600', 'font-bold');
-          btn.classList.remove('border-transparent');
-          document.querySelectorAll('.kpi-tab-content').forEach(function (t) { t.classList.add('hidden'); });
-          var tab = document.getElementById('tab-' + btn.dataset.tab);
-          if (tab) tab.classList.remove('hidden');
-
-          if (btn.dataset.tab === 'providers') {
-            renderProvidersTable();
-          }
+      // Tab switching — URL-driven + deep-linkable (DDS.tabs.deeplink).
+      function activateKpiTab(tab) {
+        document.querySelectorAll('.kpi-tab-btn').forEach(function (b) {
+          b.classList.remove('border-emerald-500', 'text-emerald-600', 'font-bold');
+          b.classList.add('border-transparent');
         });
+        var btn = document.querySelector('.kpi-tab-btn[data-tab="' + tab + '"]');
+        if (btn) { btn.classList.add('border-emerald-500', 'text-emerald-600', 'font-bold'); btn.classList.remove('border-transparent'); }
+        document.querySelectorAll('.kpi-tab-content').forEach(function (t) { t.classList.add('hidden'); });
+        var panel = document.getElementById('tab-' + tab);
+        if (panel) panel.classList.remove('hidden');
+        if (tab === 'providers') renderProvidersTable();
+      }
+      var kpiTabs = DDS.tabs.deeplink('tab', activateKpiTab);
+      document.querySelectorAll('.kpi-tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { kpiTabs.go(btn.dataset.tab); });
       });
+      // Deep-link: honor ?tab= on load, else the default 'main' tab.
+      activateKpiTab(kpiTabs.initial || 'main');
 
       // Providers Sub-tabs
       document.querySelectorAll('.kpi-subtab-btn').forEach(function (btn) {
