@@ -1,0 +1,89 @@
+/* ============================================================================
+   DDS Manager — shared UI stylesheet (single source of truth for component CSS)
+   Loaded once in layouts/app.blade.php. No build step (served statically).
+   Canonical look = the Operations analytics table (teal accent, heatmap, sticky).
+   ============================================================================ */
+
+:root {
+    --dds-accent: #00bfa5;
+    --dds-accent-dark: #009688;
+    --dds-heat-top: #c8f7dc;      /* top 20%  */
+    --dds-heat-mid: #fef3c7;      /* mid tier */
+    --dds-heat-bottom: #fecdd3;   /* bottom 20% */
+    --dds-border: #e5e7eb;
+    --dds-head-bg: #f9fafb;
+    --dds-sticky-col-w: 12rem;    /* width reserved for the first sticky column */
+    --dds-modal-base-z: 120;      /* stacking modals increment from here */
+}
+
+/* ── Canonical table shell ────────────────────────────────────────────────── */
+.dds-table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+.dds-table-scroll { overflow-x: auto; }                 /* body scrolls, page never does */
+
+/* Fixed (sticky) header — works everywhere, unlike the old no-op tb:sm:* classes */
+.dds-table thead.dds-head-sticky th { position: sticky; top: 0; z-index: 20; }
+.dds-table tfoot.dds-foot-sticky td { position: sticky; bottom: 0; z-index: 20; }
+
+/* ── Sticky columns (REAL implementation — replaces undefined tb:sm:stick-*) ──
+   Apply .dds-stick to the 1st frozen column cell (th+td), .dds-stick-2 to a 2nd.
+   Header/footer sticky cells sit above body sticky cells via z-index. */
+.dds-stick,
+.dds-stick-2 {
+    position: sticky;
+    background: inherit;
+    z-index: 15;
+}
+.dds-stick   { left: 0; }
+.dds-stick-2 { left: var(--dds-sticky-col-w); }
+.dds-stick-shadow { box-shadow: 6px 0 6px -4px rgba(0, 0, 0, 0.12); }
+
+.dds-table thead .dds-stick,
+.dds-table thead .dds-stick-2 { z-index: 30; background: var(--dds-head-bg); }
+.dds-table tfoot .dds-stick,
+.dds-table tfoot .dds-stick-2 { z-index: 25; background: var(--dds-head-bg); }
+.dds-table tbody tr { background: #fff; }
+.dds-table tbody tr:hover { background: #f8fafc; }
+.dds-table tbody tr:hover .dds-stick,
+.dds-table tbody tr:hover .dds-stick-2 { background: #f8fafc; }
+
+/* Legacy alias so existing `.dt-col-sticky` markup keeps working during migration */
+.dt-col-sticky { position: sticky !important; left: 0; background: inherit;
+    box-shadow: 2px 0 5px -2px rgba(0,0,0,.10); border-right: 1px solid var(--dds-border) !important; z-index: 15; }
+.dt-col-sticky { }
+
+/* ── Heatmap cell backgrounds ─────────────────────────────────────────────── */
+.dds-heat-top    { background-color: var(--dds-heat-top); }
+.dds-heat-mid    { background-color: var(--dds-heat-mid); }
+.dds-heat-bottom { background-color: var(--dds-heat-bottom); }
+
+/* ── Accent helpers ───────────────────────────────────────────────────────── */
+.dds-accent { color: var(--dds-accent); }
+.dds-accent-bg { background-color: var(--dds-accent); }
+.dds-btn-accent { border: 1px solid var(--dds-accent); color: var(--dds-accent); background: #fff;
+    transition: background-color .15s, color .15s; }
+.dds-btn-accent:hover { background: var(--dds-accent); color: #fff; }
+
+/* ── Tabs (URL-driven; JS in ui.js) ───────────────────────────────────────── */
+.dds-tab { cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; }
+.dds-tab[aria-selected="true"] { color: #000; border-bottom-color: var(--dds-accent); font-weight: 600; }
+.dds-tab[aria-selected="false"] { color: #94a3b8; }
+.dds-tab[aria-selected="false"]:hover { color: #475569; }
+
+/* ── Stacking modals (JS in ui.js: DDS.modal) ─────────────────────────────── */
+.dds-modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: 1rem; background: rgba(0,0,0,.40); backdrop-filter: blur(2px); }
+.dds-modal-panel { background: #fff; border-radius: .5rem; box-shadow: 0 20px 50px rgba(0,0,0,.25);
+    max-height: 85vh; width: 100%; max-width: 56rem; display: flex; flex-direction: column;
+    overflow: hidden; }
+
+/* ── Loading skeleton ─────────────────────────────────────────────────────── */
+.dds-skeleton { position: relative; overflow: hidden; background: #eef2f6; border-radius: .375rem; }
+.dds-skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
+    animation: dds-shimmer 1.3s infinite; }
+@keyframes dds-shimmer { 100% { transform: translateX(100%); } }
+
+/* Respect reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    .dds-skeleton::after { animation: none; }
+}
