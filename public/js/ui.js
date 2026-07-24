@@ -69,14 +69,14 @@
         if (!drp) return null;
         return { start: drp.startDate.format('YYYY-MM-DD'), end: drp.endDate.format('YYYY-MM-DD') };
     };
-    // Wire a picker's "apply" to a callback receiving {start,end}. Also syncs the URL.
+    // Listen for a picker's apply (the x-daterange-picker dispatches 'daterange:changed').
+    // Syncs the range into the URL, then invokes cb({start,end}). Pass id=null for any picker.
     DDS.onDateRange = function (id, cb) {
-        window['__dds_drp_' + id] = function (start, end) {
-            history.replaceState(history.state, '', DDS.url.merge({ start_date: start, end_date: end }));
-            cb({ start: start, end: end });
-        };
-        // The x-daterange-picker calls window[onApply](start,end); point onApply at us.
-        return '__dds_drp_' + id;
+        document.addEventListener('daterange:changed', function (e) {
+            if (id && e.detail.id !== id) return;
+            history.replaceState(history.state, '', DDS.url.merge({ start_date: e.detail.start, end_date: e.detail.end }));
+            cb({ start: e.detail.start, end: e.detail.end });
+        });
     };
 
     /* ── Stacking modal system (canonical home for openLimitlessModal) ──────────

@@ -60,11 +60,16 @@
   var _id = '{{ $id }}';
   var _cb = @if($onApply) '{{ $onApply }}' @else null @endif;
 
+  // Restore the range from the URL (?start_date&end_date) so deep-links/reloads persist it.
+  var _params = new URLSearchParams(window.location.search);
+  var _startParam = _params.get('start_date');
+  var _endParam = _params.get('end_date');
+
   function _init() {
     if (typeof $ === 'undefined' || !$.fn.daterangepicker) { setTimeout(_init, 30); return; }
     $('#' + _id).daterangepicker({
-      startDate: moment().startOf('month'),
-      endDate:   moment(),
+      startDate: _startParam ? moment(_startParam, 'YYYY-MM-DD') : moment().startOf('month'),
+      endDate:   _endParam ? moment(_endParam, 'YYYY-MM-DD') : moment(),
       ranges: {
         'Today':        [moment(),                                        moment()],
         'Yesterday':    [moment().subtract(1,'days'),                    moment().subtract(1,'days')],
@@ -82,9 +87,11 @@
       showDropdowns: true,
       linkedCalendars: false,
     }, function(start, end) {
-      if (_cb && typeof window[_cb] === 'function') {
-        window[_cb](start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD'));
-      }
+      var s = start.format('YYYY-MM-DD'), e = end.format('YYYY-MM-DD');
+      // Canonical: dispatch an event any consumer can listen to via DDS.onDateRange(id, cb).
+      document.dispatchEvent(new CustomEvent('daterange:changed', { detail: { id: _id, start: s, end: e } }));
+      // Back-compat: still call a named global if on-apply was provided.
+      if (_cb && typeof window[_cb] === 'function') window[_cb](s, e);
     });
   }
 
