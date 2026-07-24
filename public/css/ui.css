@@ -18,7 +18,16 @@
 
 /* ── Canonical table shell ────────────────────────────────────────────────── */
 .dds-table { width: 100%; border-collapse: collapse; white-space: nowrap; }
-.dds-table-scroll { overflow-x: auto; }                 /* body scrolls, page never does */
+/* Scroll container: width:100% + min-width:0 pin it to the parent's width so a wide
+   table is clipped and scrolls HERE, instead of forcing ancestors wide and scrolling
+   the whole page. (Matches the working x-data-table wrapper's w-full + overflow-x-auto.) */
+.dds-table-scroll {
+    overflow-x: auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    -webkit-overflow-scrolling: touch;
+}
 
 /* Fixed (sticky) header — works everywhere, unlike the old no-op tb:sm:* classes */
 .dds-table thead.dds-head-sticky th { position: sticky; top: 0; z-index: 20; }
