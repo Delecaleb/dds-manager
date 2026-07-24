@@ -79,74 +79,72 @@
         return '__dds_drp_' + id;
     };
 
-    /* ── Stacking modal system (standardizes openLimitlessModal) ────────────── */
+    /* ── Stacking modal system (canonical home for openLimitlessModal) ──────────
+       Supports BOTH the existing server markup (`.ds-limitless-modal`, which ships its own
+       close button) and new inline panels (`.dds-modal`). Stacking via a shared z counter;
+       ESC closes the topmost of either kind. --------------------------------------------- */
+    var MODAL_SEL = '.dds-modal, .ds-limitless-modal';
     DDS.modal = (function () {
-        var z = 0; // running offset above --dds-modal-base-z
+        window._limitlessZIndex = window._limitlessZIndex || baseZ();
         function baseZ() {
             var v = getComputedStyle(document.documentElement).getPropertyValue('--dds-modal-base-z');
             return parseInt(v, 10) || 120;
         }
-        function mount(node) {
-            z += 10;
-            node.style.zIndex = baseZ() + z;
-            node.classList.add('dds-modal');
-            node.setAttribute('role', 'dialog');
-            node.setAttribute('aria-modal', 'true');
-            // Backdrop click closes THIS modal only (topmost UX).
-            node.addEventListener('mousedown', function (e) { if (e.target === node) close(node); });
-            document.body.appendChild(node);
-            document.body.style.overflow = 'hidden';
-            return node;
-        }
-        function close(node) {
-            if (!node) node = topModal();
-            if (!node) return;
-            node.remove();
-            z = Math.max(0, z - 10);
-            if (!document.querySelector('.dds-modal')) document.body.style.overflow = '';
+        function bumpZ(node) {
+            window._limitlessZIndex += 10;
+            node.style.zIndex = window._limitlessZIndex;
         }
         function topModal() {
-            var all = document.querySelectorAll('.dds-modal');
+            var all = document.querySelectorAll(MODAL_SEL);
             return all.length ? all[all.length - 1] : null;
         }
+        function close(node) {
+            node = node || topModal();
+            if (!node) return;
+            node.remove();
+            window._limitlessZIndex = Math.max(baseZ(), window._limitlessZIndex - 10);
+            if (!document.querySelector(MODAL_SEL)) document.body.style.overflow = '';
+        }
+        // Append already-built modal HTML (server-rendered .ds-limitless-modal or .dds-modal).
         function openHtml(html) {
             var wrap = document.createElement('div');
-            wrap.innerHTML = html.trim();
-            // Accept either a full .dds-modal node or bare panel content.
-            var node = wrap.firstElementChild && wrap.firstElementChild.classList.contains('dds-modal')
-                ? wrap.firstElementChild
-                : wrapPanel(html);
-            mount(node);
-            DDS.swapHtml(node, node.innerHTML); // activate any injected scripts/icons
+            wrap.innerHTML = String(html).trim();
+            var node = wrap.firstElementChild;
+            if (!node) return null;
+            if (!node.classList.contains('ds-limitless-modal') && !node.classList.contains('dds-modal')) {
+                // Bare content → wrap in a standard dds-modal panel with a close button.
+                var shell = document.createElement('div');
+                shell.className = 'dds-modal';
+                shell.setAttribute('role', 'dialog');
+                shell.setAttribute('aria-modal', 'true');
+                shell.innerHTML = '<div class="dds-modal-panel"><button type="button" data-dds-close ' +
+                    'class="self-end m-2 text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>' +
+                    '<div class="overflow-y-auto px-6 pb-6">' + html + '</div></div>';
+                node = shell;
+                node.addEventListener('mousedown', function (e) { if (e.target === node) close(node); });
+            }
+            document.body.appendChild(node);
+            bumpZ(node);
+            document.body.style.overflow = 'hidden';
+            DDS.swapHtml(node, node.innerHTML); // activate injected scripts/icons
             return node;
         }
-        function wrapPanel(inner) {
-            var node = document.createElement('div');
-            node.innerHTML = '<div class="dds-modal-panel"><button type="button" data-dds-close ' +
-                'class="absolute top-3 right-3 text-slate-400 hover:text-slate-600">&times;</button>' +
-                '<div class="overflow-y-auto p-6">' + inner + '</div></div>';
-            return node;
-        }
+        // Fetch a server-rendered modal fragment and stack it (the openLimitlessModal behavior).
         function open(url) {
-            var placeholder = openHtml('<div class="dds-modal-panel"><div class="p-10 text-center text-slate-400">' +
-                '<div class="dds-skeleton h-6 w-40 mx-auto"></div></div></div>');
-            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
                 .then(function (r) { return r.text(); })
-                .then(function (html) { DDS.swapHtml(placeholder.querySelector('.dds-modal-panel').parentNode || placeholder, html); })
-                .catch(function () { placeholder.querySelector('.dds-modal-panel').innerHTML =
-                    '<div class="p-8 text-center text-red-500 text-sm">Failed to load.</div>'; });
-            return placeholder;
+                .then(function (html) { return openHtml(html); })
+                .catch(function (e) { if (window.console) console.error('Drilldown fetch failed:', e); });
         }
-        // Delegated close + ESC (closes topmost).
         document.addEventListener('click', function (e) {
             var btn = e.target.closest('[data-dds-close]');
-            if (btn) { e.preventDefault(); close(btn.closest('.dds-modal')); }
+            if (btn) { e.preventDefault(); close(btn.closest(MODAL_SEL)); }
         });
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(topModal()); });
         return { open: open, openHtml: openHtml, close: close, closeTop: function () { close(topModal()); } };
     })();
-    // Back-compat: existing markup calls openLimitlessModal(url).
-    window.openLimitlessModal = window.openLimitlessModal || DDS.modal.open;
+    // Canonical global (retires the per-partial copies of openLimitlessModal).
+    window.openLimitlessModal = DDS.modal.open;
 
     /* ── URL-driven tabs (generalizes the Operations loadTab pattern) ───────────
        Markup contract:

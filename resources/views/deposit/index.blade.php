@@ -72,7 +72,7 @@
           <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
               <th
-                class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 tb:sm:stick-to-left bg-gray-50 min-w-[120px]">
+                class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 dds-stick bg-gray-50 min-w-[120px]">
                 <input type="checkbox" class="mr-2 rounded border-gray-300 text-[#00c58e]">Office
               </th>
               <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Patient Name</th>
@@ -208,7 +208,7 @@
           </div>`;
 
         var tr = `<tr class="hover:bg-gray-50 transition even:bg-white text-xs text-gray-600">
-          <td class="px-4 py-2 border-r border-gray-100 bg-white tb:sm:stick-to-left flex items-center shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">${locHtml}</td>
+          <td class="px-4 py-2 border-r border-gray-100 bg-white dds-stick flex items-center shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">${locHtml}</td>
           <td class="px-4 py-2 border-r border-gray-100">${patientHtml}</td>
           <td class="px-4 py-2 border-r border-gray-100">${patIdHtml}</td>
           <td class="px-4 py-2 border-r border-gray-100">${provHtml}</td>

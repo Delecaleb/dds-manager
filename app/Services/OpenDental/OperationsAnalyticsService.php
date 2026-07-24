@@ -2529,8 +2529,8 @@ class OperationsAnalyticsService
         ];
 
         $headerGroups = [
-            ['label' => '', 'colspan' => 1, 'class' => 'tb:sm:stick-to-left border-white dark:border-gray-800'],
-            ['label' => '', 'colspan' => 1, 'class' => 'tb:sm:stick-to-left tb:sm:stick-shadow-r border-r-[6px] border-white'],
+            ['label' => '', 'colspan' => 1, 'class' => 'dds-stick border-white dark:border-gray-800'],
+            ['label' => '', 'colspan' => 1, 'class' => 'dds-stick dds-stick-shadow border-r-[6px] border-white'],
             ['label' => 'Provider', 'colspan' => 2, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white'],
             ['label' => 'Per Working Day', 'colspan' => 2, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white'],
             ['label' => 'Per Patient Visit', 'colspan' => 7, 'class' => 'bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white'],
