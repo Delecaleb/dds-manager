@@ -692,7 +692,7 @@
 
     $(document).ready(function () {
 
-      getTable(activeMode);
+      // Initial tab is activated at the end (honors ?tab= deep-link).
 
       // ── Search / filters reload only the currently active tab's table ──
       let searchTimer;
@@ -704,32 +704,32 @@
       $('#refreshBtn').on('click', () => tables[activeMode] && tables[activeMode].ajax.reload());
       $('#creditsFilter').on('change', () => tables[activeMode] && tables[activeMode].ajax.reload());
 
-      // ── Tab switching: show the selected tab's own panel/table, loading
-      //    its data the first time it's selected ─────────────────────────
-      $('.tab-btn').on('click', function () {
+      // ── Tab switching: URL-driven + deep-linkable (DDS.tabs.deeplink) ──
+      //    Panels are pre-rendered; we show/hide + lazily init the tab's DataTable,
+      //    and sync the active tab to ?tab= so it survives reload/back-forward/share.
+      function activateTab(mode) {
+        activeMode = mode;
         $('.tab-btn')
           .removeClass('border-emerald-500 text-emerald-600 font-bold')
           .addClass('border-transparent');
-
-        $(this)
+        $('.tab-btn[data-tab="' + mode + '"]')
           .removeClass('border-transparent')
           .addClass('border-emerald-500 text-emerald-600 font-bold');
-
-        const mode = $(this).data('tab');
-        activeMode = mode;
 
         $('.tab-panel').addClass('hidden');
         $('#tabpanel-' + mode).removeClass('hidden');
 
         const wasAlreadyLoaded = !!tables[mode];
         const table = getTable(mode);
+        if (wasAlreadyLoaded) table.ajax.reload();
+        else table.columns.adjust();
+      }
 
-        if (wasAlreadyLoaded) {
-          table.ajax.reload();
-        } else {
-          table.columns.adjust();
-        }
-      });
+      const agingTabs = DDS.tabs.deeplink('tab', activateTab);
+      $('.tab-btn').on('click', function () { agingTabs.go($(this).data('tab')); });
+
+      // Deep-link: honor ?tab= on load, else the default active tab.
+      activateTab(agingTabs.initial || activeMode);
 
     });
   </script>

@@ -200,6 +200,30 @@
         }
     };
 
+    /* Deep-link helper for pages that PRE-RENDER their tab panels and show/hide them
+       (e.g. Aging/Financials with lazy DataTables). Keeps the page's own show/hide logic;
+       adds URL sync (?<param>=mode), deep-linking on load, and back/forward support.
+         var t = DDS.tabs.deeplink('tab', function (mode) { ...show/hide + lazy init... });
+         // on a tab click:  t.go(mode)
+         // on page load:     activate(t.initial || 'defaultMode')
+    */
+    DDS.tabs.deeplink = function (param, activate) {
+        window.addEventListener('popstate', function (e) {
+            var m = (e.state && e.state['ddsTab_' + param]) || DDS.url.get(param);
+            if (m) activate(m, false);
+        });
+        return {
+            initial: DDS.url.get(param),
+            go: function (mode) {
+                var st = history.state || {};
+                st['ddsTab_' + param] = mode;
+                var patch = {}; patch[param] = mode;
+                history.pushState(st, '', DDS.url.merge(patch));
+                activate(mode, true);
+            }
+        };
+    };
+
     // Auto-init any declarative tab bars on load.
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('[data-dds-tabs]').forEach(function (n) { DDS.tabs.init(n); });
