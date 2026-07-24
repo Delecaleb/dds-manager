@@ -121,6 +121,9 @@
                     'class="self-end m-2 text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>' +
                     '<div class="overflow-y-auto px-6 pb-6">' + html + '</div></div>';
                 node = shell;
+            }
+            // Backdrop click closes THIS modal (dds-modal only; ds-limitless ships its own).
+            if (node.classList.contains('dds-modal')) {
                 node.addEventListener('mousedown', function (e) { if (e.target === node) close(node); });
             }
             document.body.appendChild(node);
@@ -145,6 +148,44 @@
     })();
     // Canonical global (retires the per-partial copies of openLimitlessModal).
     window.openLimitlessModal = DDS.modal.open;
+
+    // Embedded-details drilldown from a rows[] array — the ONE implementation, replacing the
+    // duplicated openOpsDrilldown / openMarketingDrilldown. Stackable; money/count auto-format.
+    DDS.modal.details = function (title, rows) {
+        rows = rows || [];
+        var body;
+        if (!rows.length) {
+            body = '<div class="py-8 text-center text-gray-400 text-sm">No records found.</div>';
+        } else {
+            var keys = Object.keys(rows[0]);
+            var money = /production|amount|fee|total|collection|\$/i;
+            var count = /visits|count|#|patients|procedures/i;
+            var head = '<tr>' + keys.map(function (k) {
+                var r = (money.test(k) || count.test(k)) ? ' text-right' : '';
+                return '<th class="py-2.5 px-4 font-bold text-gray-900 border-b border-gray-200 capitalize' + r + '">' + k + '</th>';
+            }).join('') + '</tr>';
+            var rowsHtml = rows.map(function (item) {
+                return '<tr class="hover:bg-gray-50 border-b border-gray-50">' + keys.map(function (k) {
+                    var v = item[k];
+                    if (money.test(k) && typeof v === 'number') return '<td class="py-3 px-4 text-right font-medium text-gray-900">' + DDS.fmt.money(v) + '</td>';
+                    if (count.test(k) && typeof v === 'number') return '<td class="py-3 px-4 text-right font-medium text-gray-900">' + DDS.fmt.number(v) + '</td>';
+                    return '<td class="py-3 px-4 text-gray-700 font-semibold">' + (v == null || v === '' ? '—' : v) + '</td>';
+                }).join('') + '</tr>';
+            }).join('');
+            body = '<table class="w-full text-left border-collapse text-xs whitespace-nowrap">' +
+                '<thead class="sticky top-0 bg-white shadow-sm ring-1 ring-gray-100">' + head + '</thead>' +
+                '<tbody class="divide-y divide-gray-100 text-gray-700">' + rowsHtml + '</tbody></table>';
+        }
+        var html = '<div class="dds-modal"><div class="dds-modal-panel">' +
+            '<div class="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/50">' +
+            '<h4 class="text-sm font-bold text-gray-900">Breakdown | ' + (title || 'Details') + '</h4>' +
+            '<button type="button" data-dds-close class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button></div>' +
+            '<div class="flex-1 overflow-y-auto p-6">' + body + '</div></div></div>';
+        return DDS.modal.openHtml(html);
+    };
+    // Back-compat aliases so existing markup keeps working while callers migrate.
+    window.openOpsDrilldown = function (t, d) { return DDS.modal.details(t, d); };
+    window.openMarketingDrilldown = function (t, d) { return DDS.modal.details(t, d); };
 
     /* ── URL-driven tabs (generalizes the Operations loadTab pattern) ───────────
        Markup contract:

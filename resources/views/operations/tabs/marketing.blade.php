@@ -400,40 +400,6 @@
                 </div>
             </div>
 
-            <!-- Patient List Drill-down Modal overlay -->
-            <div id="marketing_drilldown_modal"
-                class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                <div
-                    class="bg-white rounded-lg shadow-xl border border-gray-200 w-full max-w-4xl flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-200">
-                    <div class="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/50 rounded-t-lg">
-                        <h4 class="text-sm font-bold text-gray-900" id="marketing_modal_title">Patient List</h4>
-                        <button onclick="closeMarketingDrilldown()"
-                            class="text-gray-400 hover:text-gray-600 transition-colors p-1 focus:outline-none">
-                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
-                                </path>
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="flex-1 overflow-y-auto p-6">
-                        <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
-                            <thead class="sticky top-0 bg-white shadow-sm ring-1 ring-gray-100">
-                                <tr>
-                                    <th class="py-2.5 px-4 font-bold text-gray-900 border-b border-gray-200">PatNum</th>
-                                    <th class="py-2.5 px-4 font-bold text-gray-900 border-b border-gray-200">Patient Name</th>
-                                    <th class="py-2.5 px-4 font-bold text-gray-900 border-b border-gray-200">Phone</th>
-                                    <th class="py-2.5 px-4 font-bold text-gray-900 border-b border-gray-200">Email</th>
-                                    <th class="py-2.5 px-4 font-bold text-right text-gray-900 border-b border-gray-200">Range
-                                        Production</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100 text-gray-700" id="marketing_modal_rows">
-                                <!-- Filled by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
 
             <!-- Table Client-Side JavaScript Logic -->
             <script>
@@ -546,46 +512,9 @@
                     updatePagination();
                 });
 
-                function openMarketingDrilldown(entityName, details) {
-                    const modal = document.getElementById('marketing_drilldown_modal');
-                    const title = document.getElementById('marketing_modal_title');
-                    const container = document.getElementById('marketing_modal_rows');
-
-                    title.textContent = `Patient Details | ${entityName}`;
-                    container.innerHTML = '';
-
-                    if (details.length === 0) {
-                        container.innerHTML = `
-                                    <tr>
-                                        <td colspan="5" class="py-8 text-center text-gray-400 text-sm">
-                                            No patients records connected.
-                                        </td>
-                                    </tr>
-                                `;
-                    } else {
-                        details.forEach(item => {
-                            const tr = document.createElement('tr');
-                            tr.className = 'hover:bg-gray-50 border-b border-gray-50';
-
-                            const currencyStr = '$ ' + item.production.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-                            tr.innerHTML = `
-                                        <td class="py-3 px-4 text-gray-800 font-bold">${item.pat_num}</td>
-                                        <td class="py-3 px-4 text-gray-900 font-semibold">${item.name}</td>
-                                        <td class="py-3 px-4 text-gray-700">${item.phone || '—'}</td>
-                                        <td class="py-3 px-4 text-gray-500">${item.email || '—'}</td>
-                                        <td class="py-3 px-4 text-right font-medium text-gray-900">${currencyStr}</td>
-                                    `;
-                            container.appendChild(tr);
-                        });
-                    }
-                    modal.classList.remove('hidden');
-                }
-
-                function closeMarketingDrilldown() {
-                    const modal = document.getElementById('marketing_drilldown_modal');
-                    modal.classList.add('hidden');
-                }
+                // Drilldown now uses the shared, stackable DDS.modal.details (ui.js) — the
+                // window.openMarketingDrilldown alias renders these rows (production auto-
+                // formats as money). The local #marketing_drilldown_modal copy is retired.
             </script>
         @endif
 
