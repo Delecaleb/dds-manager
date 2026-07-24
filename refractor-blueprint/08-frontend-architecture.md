@@ -43,12 +43,18 @@ Sticky columns use `.dds-stick` / `.dds-stick-2` (**real** CSS — the old `tb:s
 undefined no-ops and are being replaced).
 
 ## Migration order
-1. ✅ Foundation — `ui.css`, `ui.js`, layout wiring.
-2. `<x-data-table>` canonical component (+ fix sticky columns); repoint `operations/tabs/table` and
-   the drilldown table-content at it.
-3. `DDS.modal` — retire `openOpsDrilldown` / `openMarketingDrilldown`; fix duplicate `#providerModal`.
-4. `DDS.tabs` — convert Aging/Financials/etc. show-hide tabs to URL-driven; keep Operations behavior.
-5. Date picker — repoint consumers at `DDS.onDateRange`/`getRange`; drop the ~8 glue copies.
-6. Per-page cleanup: replace inline formatters with `DDS.fmt`.
+1. ✅ **Foundation** — `ui.css`, `ui.js` (in `<head>`), layout wiring.
+2. ✅ **`<x-analytics-table>`** canonical component (+ real sticky columns); Operations table
+   is now a thin wrapper around it; migrated stray `tb:sm:stick-*` usages.
+3. ✅ **`DDS.modal`** — canonical stacking opener (handles `.ds-limitless-modal` + `.dds-modal`);
+   removed the duplicate `openLimitlessModal`. *(Still TODO: retire `openMarketingDrilldown`
+   and the embedded `openOpsDrilldown`; fix the duplicate `#providerModal` id.)*
+4. ⏳ **`DDS.tabs`** — Operations already URL-driven. TODO: convert Aging/Financials/etc.
+   show-hide tabs to URL-driven (add `?tab=` sync + deep-link).
+5. ✅ **Date picker** — URL-persisted range + `daterange:changed` event; `DDS.onDateRange`
+   retires the glue. Consumers migrate opportunistically (back-compat kept).
+6. ✅ **Formatters** — the 4 `fmtMoney` copies now delegate to `DDS.fmt.money`.
 
-Each step ships independently and is validated (page renders, no console errors).
+**Runtime verification still owed** (CSS/JS behavior can't be checked server-side): sticky
+columns actually freezing, modal stacking, tab AJAX/pushState. Verify in a browser before the
+remaining per-page tab migration (step 4) is propagated.
