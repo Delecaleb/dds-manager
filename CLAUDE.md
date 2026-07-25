@@ -1,5 +1,38 @@
 # Jarvis Analytics Clone - AI Development Instructions
 
+---
+
+## ⚠️ ARCHITECTURE RULES — READ BEFORE CHANGING ANY CODE (non-negotiable)
+
+This app has been restructured to a **single source of truth** for every metric, table,
+modal, tab, and format. New code that bypasses these sources re-introduces the duplication
+the restructure removed. **Full rules: [refractor-blueprint/09-architecture-rules.md](refractor-blueprint/09-architecture-rules.md) — read it before editing metrics or UI.**
+
+The core rule: **if a thing already has a home, use its home** — never re-implement it inline.
+
+**Backend**
+- Metric numbers come from a **domain service** in `app/Domain/…` (Production, Patient,
+  TreatmentAcceptance, Insurance, Scheduling, Financial, Recall, Provider). Never write metric
+  SQL/formulas in controllers or views.
+- Pass **`MetricFilter`** (period + `clinics[]` + `providers[]`), never positional `($start,$end,…)`.
+- Status codes: **`ProcStatus`** (`completed()`/`treatmentPlanned()`), never literal `'C'/'TP'/1/2`.
+- Office names: **`ClinicRegistry`**, never `'8 Mile'`.
+- A definition change = one edit in the service + a parity check (`php artisan blueprint:parity` / `blueprint:production`).
+
+**Frontend** (Play-CDN Tailwind + jQuery + DataTables 2; shared code in `public/css/ui.css` and `public/js/ui.js` = `window.DDS`; assets referenced with the `public/` prefix)
+- **Two table types only:** `<x-analytics-table>` (static spec) and `<x-data-table>` +
+  **`DDS.dataTable()`** (interactive/sortable). Never write a bare data `<table>` or call
+  `$('#x').DataTable(...)` directly.
+- Table **look** → edit `ui.css` (all tables carry `.dds-table`). Table **behavior** → edit `DDS.dataTable`.
+- Drill-downs/modals → **`DDS.modal`** (stackable). Tabs → **`DDS.tabs`** (URL-driven, deep-linkable).
+- Dates → **`<x-daterange-picker>`** + `DDS.onDateRange`. Formatting → **`DDS.fmt`** (JS) / **`ops_fmt`** (PHP).
+- Never fork these into a new modal/tab/picker/formatter/table system — extend the single source instead.
+
+When a real need doesn't fit a single source, **extend the single source** (add a method /
+option / token); do not fork it. See the PR checklist in the rules doc before merging.
+
+---
+
 ## Your Role
 
 You are the Lead Software Architect, Senior Laravel Engineer, Senior Data Engineer, UI/UX Engineer, and Code Reviewer for this project.
