@@ -130,6 +130,7 @@
             bumpZ(node);
             document.body.style.overflow = 'hidden';
             DDS.swapHtml(node, node.innerHTML); // activate injected scripts/icons
+            if (DDS.dataTableAll) DDS.dataTableAll(node); // sortable drilldown tables
             return node;
         }
         // Fetch a server-rendered modal fragment and stack it (the openLimitlessModal behavior).
@@ -149,11 +150,36 @@
     // Canonical global (retires the per-partial copies of openLimitlessModal).
     window.openLimitlessModal = DDS.modal.open;
 
+    // ── Canonical DataTable initializer ───────────────────────────────────────
+    // The ONE config for every sortable table (drill-downs included). Numeric columns sort by
+    // their cell's data-order value (raw number), not the formatted display text.
+    DDS.dataTable = function (el, opts) {
+        if (!el || !window.jQuery || !jQuery.fn || !jQuery.fn.DataTable) return null;
+        var $el = jQuery(el);
+        if (jQuery.fn.DataTable.isDataTable($el)) return $el.DataTable();
+        return $el.DataTable(Object.assign({
+            paging: true,
+            pageLength: 10,
+            lengthChange: false,
+            searching: true,
+            ordering: true,          // every column sortable
+            info: true,
+            autoWidth: false,
+            order: [],
+            language: { search: '', searchPlaceholder: 'Search…', emptyTable: 'No records found.' }
+        }, opts || {}));
+    };
+    // Init every not-yet-initialised .dds-datatable within a root (called after a modal opens).
+    DDS.dataTableAll = function (root) {
+        (root || document).querySelectorAll('table.dds-datatable').forEach(function (t) { DDS.dataTable(t); });
+    };
+
     // Embedded-details drilldown from a rows[] array — the ONE implementation, replacing the
-    // duplicated openOpsDrilldown / openMarketingDrilldown. Stackable; money/count auto-format.
+    // duplicated openOpsDrilldown / openMarketingDrilldown. Renders the shared, SORTABLE
+    // DataTable (DDS.dataTable). Stackable; money/count auto-format + sort numerically.
     DDS.modal.details = function (title, rows) {
         rows = rows || [];
-        var body;
+        var body, tableId = 'dds-dt-' + (DDS._dtSeq = (DDS._dtSeq || 0) + 1);
         if (!rows.length) {
             body = '<div class="py-8 text-center text-gray-400 text-sm">No records found.</div>';
         } else {
@@ -162,26 +188,27 @@
             var count = /visits|count|#|patients|procedures/i;
             var head = '<tr>' + keys.map(function (k) {
                 var r = (money.test(k) || count.test(k)) ? ' text-right' : '';
-                return '<th class="py-2.5 px-4 font-bold text-gray-900 border-b border-gray-200 capitalize' + r + '">' + k + '</th>';
+                return '<th class="py-2.5 px-4 font-bold text-gray-900 capitalize' + r + '">' + k + '</th>';
             }).join('') + '</tr>';
             var rowsHtml = rows.map(function (item) {
-                return '<tr class="hover:bg-gray-50 border-b border-gray-50">' + keys.map(function (k) {
+                return '<tr>' + keys.map(function (k) {
                     var v = item[k];
-                    if (money.test(k) && typeof v === 'number') return '<td class="py-3 px-4 text-right font-medium text-gray-900">' + DDS.fmt.money(v) + '</td>';
-                    if (count.test(k) && typeof v === 'number') return '<td class="py-3 px-4 text-right font-medium text-gray-900">' + DDS.fmt.number(v) + '</td>';
+                    if (money.test(k) && typeof v === 'number') return '<td data-order="' + v + '" class="py-3 px-4 text-right font-medium text-gray-900">' + DDS.fmt.money(v) + '</td>';
+                    if (count.test(k) && typeof v === 'number') return '<td data-order="' + v + '" class="py-3 px-4 text-right font-medium text-gray-900">' + DDS.fmt.number(v) + '</td>';
                     return '<td class="py-3 px-4 text-gray-700 font-semibold">' + (v == null || v === '' ? '—' : v) + '</td>';
                 }).join('') + '</tr>';
             }).join('');
-            body = '<table class="w-full text-left border-collapse text-xs whitespace-nowrap">' +
-                '<thead class="sticky top-0 bg-white shadow-sm ring-1 ring-gray-100">' + head + '</thead>' +
-                '<tbody class="divide-y divide-gray-100 text-gray-700">' + rowsHtml + '</tbody></table>';
+            body = '<table id="' + tableId + '" class="dds-table dds-datatable w-full text-left text-xs whitespace-nowrap">' +
+                '<thead>' + head + '</thead><tbody>' + rowsHtml + '</tbody></table>';
         }
         var html = '<div class="dds-modal"><div class="dds-modal-panel">' +
             '<div class="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/50">' +
             '<h4 class="text-sm font-bold text-gray-900">Breakdown | ' + (title || 'Details') + '</h4>' +
             '<button type="button" data-dds-close class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button></div>' +
             '<div class="flex-1 overflow-y-auto p-6">' + body + '</div></div></div>';
-        return DDS.modal.openHtml(html);
+        var modal = DDS.modal.openHtml(html);
+        if (rows.length) DDS.dataTable(document.getElementById(tableId)); // sortable columns
+        return modal;
     };
     // Back-compat aliases so existing markup keeps working while callers migrate.
     window.openOpsDrilldown = function (t, d) { return DDS.modal.details(t, d); };

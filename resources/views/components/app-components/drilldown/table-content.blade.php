@@ -1,6 +1,8 @@
 <x-app-components.drilldown.table-modal :title="$title">
-    <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
-        <thead class="sticky top-0 bg-white shadow-sm ring-1 ring-gray-100">
+    {{-- dds-datatable → auto-initialised as the shared, sortable DataTable when the modal
+         opens (DDS.dataTableAll). No fixed id, so stacked drilldowns never collide. --}}
+    <table class="dds-table {{ count($rows) ? 'dds-datatable' : '' }} w-full text-left text-xs whitespace-nowrap">
+        <thead>
             <tr>
                 @foreach ($columns as $col)
                     <th
@@ -21,14 +23,18 @@
                             $isLink = is_array($val) && !empty($val['link']);
                             $displayStr = $isLink ? $val['label'] : $val;
 
-                            // Format
+                            // Numeric columns carry data-order so the DataTable sorts by the raw
+                            // value, not the formatted "$ 1,234.56" / "12.34%" text.
+                            $orderAttr = '';
                             if ($col['type'] === 'money') {
+                                $orderAttr = 'data-order="' . (float) $displayStr . '"';
                                 $displayStr = '$ ' . number_format((float) $displayStr, 2);
                             } elseif ($col['type'] === 'percent') {
+                                $orderAttr = 'data-order="' . (float) $displayStr . '"';
                                 $displayStr = number_format((float) $displayStr, 2) . '%';
                             }
                         @endphp
-                        <td class="py-3 px-4 {{ $align }} font-medium">
+                        <td {!! $orderAttr !!} class="py-3 px-4 {{ $align }} font-medium">
                             @if ($isLink && $col['key'] === 'patient')
                                 {!! e($displayStr) !!}
                                 <button type="button"
