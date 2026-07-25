@@ -108,7 +108,7 @@
         <div class="text-3xl font-extrabold text-slate-900 mb-2 tabular-nums" id="kpi-gross">
           <span class="skel h-9 w-36 rounded-lg"></span>
         </div>
-        <p class="text-xs text-slate-400">Completed procedures in period</p>
+        <p class="text-xs text-slate-400"></p>
       </div>
 
       <!-- 2 · Net Production -->
@@ -249,7 +249,7 @@
         <div class="text-3xl font-extrabold text-slate-900 mb-2 tabular-nums" id="kpi-visits">
           <span class="skel h-9 w-20 rounded-lg"></span>
         </div>
-        <p class="text-xs text-slate-400">Distinct patients with completed procedures</p>
+        <p class="text-xs text-slate-400"></p>
       </div>
 
     </div>{{-- /kpi grid --}}

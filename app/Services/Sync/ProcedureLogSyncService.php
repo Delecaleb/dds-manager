@@ -6,7 +6,7 @@ use App\Models\OdProcedureLog;
 
 class ProcedureLogSyncService extends BaseQuerySyncService
 {
-    protected int $batchSize = 500;
+    protected int $batchSize = 1000;
 
     protected function table(): string
     {
