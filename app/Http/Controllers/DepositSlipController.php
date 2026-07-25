@@ -121,10 +121,12 @@ class DepositSlipController extends Controller
 
         // ── DETAILS TAB DATA ──
         $details = [];
-        $providers = \App\Models\OdProvider::pluck('Abbr', 'ProvNum', 'LName', 'PName');
-
+        $providers = \App\Models\OdProvider::pluck('Abbr', 'ProvNum');
+        $providerTable = (new \App\Models\OdProvider)->getTable();
+        
         $paymentsForDetails = \App\Models\OdPayment::leftJoin($defTable, "{$paymentTable}.PayType", '=', "{$defTable}.DefNum")
             ->leftJoin($patientTable, "{$paymentTable}.PatNum", '=', "{$patientTable}.PatNum")
+            ->leftJoin($providerTable, "{$paymentTable}.ProvNum",'=',"{$providerTable}.ProvNum")
             ->whereBetween("{$paymentTable}.PayDate", [$start, $end])
             ->select(
                 "{$paymentTable}.ClinicNum",
@@ -134,7 +136,11 @@ class DepositSlipController extends Controller
                 "{$paymentTable}.PatNum",
                 "{$patientTable}.FName",
                 "{$patientTable}.LName",
-                "{$paymentTable}.CheckNum"
+                "{$paymentTable}.CheckNum",
+                "{$providerTable}.Abbr",
+                 "{$paymentTable}.ProvNum",
+                "{$providerTable}.LName as ProviderLName",
+                "{$providerTable}.FName as ProviderFName",
             )
             ->orderBy("{$paymentTable}.PayDate", 'desc')
             ->limit(100)
@@ -145,8 +151,8 @@ class DepositSlipController extends Controller
                 'office' => $this->clinics->name((int) ($p->ClinicNum ?? 0)),
                 'patient_name' => ($p->LName || $p->FName) ? trim($p->LName . ', ' . $p->FName, ', ') : '',
                 'patient_id' => $p->PatNum,
-                'provider' => $providers[$p->Abbr].' '.$providers[$p->LNane] ?? '' ?? '',
-                'provider_id' => $providers[$p->ProvNum] ?? '',
+                'provider' => $p->Abbr.' '.$p->ProviderLName.' '.$p->ProviderFName ?? " ",
+                'provider_id' => $p->ProvNum,
                 'date' => $p->date,
                 'payment_type' => $p->type,
                 'type' => 'Patient Payment',
