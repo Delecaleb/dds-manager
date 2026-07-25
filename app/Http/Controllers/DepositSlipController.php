@@ -141,13 +141,12 @@ class DepositSlipController extends Controller
             ->get();
 
         foreach ($paymentsForDetails as $p) {
-            $providersDetails = $providers[$p->ProvNum] ?? '';
             $details[] = [
                 'office' => $this->clinics->name((int) ($p->ClinicNum ?? 0)),
                 'patient_name' => ($p->LName || $p->FName) ? trim($p->LName . ', ' . $p->FName, ', ') : '',
                 'patient_id' => $p->PatNum,
-                'provider' => $providersDetails['Abbr'].' '.$providersDetails['LName'] ?? '',
-                'provider_id' => $providersDetails['ProvNum'] ?? '',
+                'provider' => $providers[$p->Abbr].' '.$providers[$p->LNane] ?? '' ?? '',
+                'provider_id' => $providers[$p->ProvNum] ?? '',
                 'date' => $p->date,
                 'payment_type' => $p->type,
                 'type' => 'Patient Payment',
