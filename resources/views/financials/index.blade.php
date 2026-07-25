@@ -775,15 +775,19 @@
       return DDS.fmt.money(v);
     }
 
-    /* ── Main tab switching ──────────────────────────────────────────────────── */
-    function switchMainTab(tab) {
-      var isSummary = tab === 'summary';
+    /* ── Main tab switching (URL-driven + deep-linkable via DDS.tabs.deeplink) ─── */
+    function activateMainTab(tab) {
+      var isSummary = tab !== 'score-cards';
       document.getElementById('summaryPanel').classList.toggle('hidden', !isSummary);
       document.getElementById('scoreCardsPanel').classList.toggle('hidden', isSummary);
       document.getElementById('tabSummary').classList.toggle('active', isSummary);
       document.getElementById('tabScoreCards').classList.toggle('active', !isSummary);
       if (!isSummary && !_sc.data) loadScoreCards();
     }
+
+    var finTabs = DDS.tabs.deeplink('tab', activateMainTab);
+    // Public entry kept for the existing onclick="switchMainTab(...)" handlers.
+    function switchMainTab(tab) { finTabs.go(tab); }
 
     /* ── Summary KPI fetching ────────────────────────────────────────────────── */
     function showSkeletons() {
@@ -1233,6 +1237,8 @@
 
     $(document).ready(function () {
       fetchAnalytics(_currentStartDate, _currentEndDate);
+      // Deep-link: honor ?tab= on load (Summary by default).
+      activateMainTab(finTabs.initial || 'summary');
     });
 
     /* ── Score Cards ─────────────────────────────────────────────────────────── */
