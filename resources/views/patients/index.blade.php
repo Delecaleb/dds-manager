@@ -96,7 +96,7 @@
 
                 <div class="overflow-x-auto custom-table-scrollbar relative">
                     <x-table-skeleton />
-                    <table id="patientsTable" class="w-full text-left border-collapse table-auto">
+                    <table id="patientsTable" class="dds-table w-full text-left border-collapse table-auto">
                         <thead>
                             <tr class="bg-slate-50 text-slate-700 font-bold text-xs border-b border-slate-200">
                                 <th

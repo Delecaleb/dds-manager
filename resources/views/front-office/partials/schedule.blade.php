@@ -296,7 +296,7 @@
         </div>
 
         <div class="overflow-x-auto p-4 custom-table-scrollbar">
-            <table id="brokenAppointmentsTable" class="w-full text-left border-collapse table-auto min-w-[1200px]">
+            <table id="brokenAppointmentsTable" class="dds-table w-full text-left border-collapse table-auto min-w-[1200px]">
                 <thead>
                     <tr
                         class="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">

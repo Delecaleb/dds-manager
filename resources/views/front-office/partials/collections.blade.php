@@ -139,7 +139,7 @@
 
             <!-- Table -->
             <div class="overflow-x-auto custom-table-scrollbar">
-                <table id="collectionsTable" class="w-full text-left border-collapse table-auto min-w-[1000px]">
+                <table id="collectionsTable" class="dds-table w-full text-left border-collapse table-auto min-w-[1000px]">
                     <thead>
                         <tr class="bg-white border-y border-gray-200">
                             <th class="text-[11px] font-bold py-3 px-4 border-r border-gray-200 text-gray-800">

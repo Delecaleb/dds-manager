@@ -53,7 +53,7 @@
 
             <!-- Table Content -->
             <div class="overflow-x-auto custom-table-scrollbar p-0">
-                <table id="remindersTable" class="w-full text-left border-collapse table-auto">
+                <table id="remindersTable" class="dds-table w-full text-left border-collapse table-auto">
                     <thead>
                         <tr class="bg-white border-y border-gray-200">
                             <th class="text-[11px] font-bold py-3 px-4 border-r border-gray-200 text-gray-800"><i
@@ -118,7 +118,7 @@
 
             <!-- Table Content -->
             <div class="overflow-x-auto custom-table-scrollbar p-0">
-                <table id="nonRemindersTable" class="w-full text-left border-collapse table-auto">
+                <table id="nonRemindersTable" class="dds-table w-full text-left border-collapse table-auto">
                     <thead>
                         <tr class="bg-white border-y border-gray-200">
                             <th class="text-[11px] font-bold py-3 px-4 border-r border-gray-200 text-gray-800"><i
@@ -178,7 +178,7 @@
 
             <!-- Table Content -->
             <div class="overflow-x-auto custom-table-scrollbar p-0">
-                <table id="totalsTable" class="w-full text-left border-collapse table-auto">
+                <table id="totalsTable" class="dds-table w-full text-left border-collapse table-auto">
                     <thead>
                         <tr class="bg-white border-y border-gray-200">
                             <th class="text-[11px] font-bold py-3 px-4 border-r border-gray-200 text-gray-800"><i

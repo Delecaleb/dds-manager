@@ -33,7 +33,7 @@ Call from JS via: openDataTableModal('modalId', 'Title', columnsConfig, dataArra
         <div class="p-6 overflow-y-auto">
             <div id="{{ $id }}Loading" class="text-center py-10 text-slate-400 hidden">Loading...</div>
             <div id="{{ $id }}TableContainer">
-                <table id="{{ $id }}Table" class="w-full text-sm text-left text-slate-700 stripe hover row-border"
+                <table id="{{ $id }}Table" class="dds-table w-full text-sm text-left text-slate-700 stripe hover row-border"
                     style="width:100%">
                     <thead class="text-xs uppercase bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
                     </thead>

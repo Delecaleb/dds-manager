@@ -165,7 +165,7 @@
         </div>
 
         <div class="overflow-x-auto p-4 pt-1 custom-table-scrollbar bg-white">
-            <table id="tasksTable" class="w-full text-left border-collapse table-auto min-w-[1400px]">
+            <table id="tasksTable" class="dds-table w-full text-left border-collapse table-auto min-w-[1400px]">
                 <thead>
                     <tr class="bg-white border-b border-gray-200">
                         <th aria-sort="" class="text-[11px] font-bold py-3 pl-4 pr-3 text-gray-700"
