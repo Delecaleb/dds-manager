@@ -121,7 +121,7 @@ class DepositSlipController extends Controller
 
         // ── DETAILS TAB DATA ──
         $details = [];
-        $providers = \App\Models\OdProvider::pluck('Abbr', 'ProvNum');
+        $providers = \App\Models\OdProvider::pluck('Abbr', 'ProvNum', 'LName', 'PName');
 
         $paymentsForDetails = \App\Models\OdPayment::leftJoin($defTable, "{$paymentTable}.PayType", '=', "{$defTable}.DefNum")
             ->leftJoin($patientTable, "{$paymentTable}.PatNum", '=', "{$patientTable}.PatNum")
@@ -141,12 +141,13 @@ class DepositSlipController extends Controller
             ->get();
 
         foreach ($paymentsForDetails as $p) {
+            $providersDetails = $providers[$p->ProvNum] ?? '';
             $details[] = [
                 'office' => $this->clinics->name((int) ($p->ClinicNum ?? 0)),
                 'patient_name' => ($p->LName || $p->FName) ? trim($p->LName . ', ' . $p->FName, ', ') : '',
                 'patient_id' => $p->PatNum,
-                'provider' => '',
-                'provider_id' => '',
+                'provider' => $providersDetails['Abbr'].' '.$providersDetails['LName'] ?? '',
+                'provider_id' => $providersDetails['ProvNum'] ?? '',
                 'date' => $p->date,
                 'payment_type' => $p->type,
                 'type' => 'Patient Payment',
