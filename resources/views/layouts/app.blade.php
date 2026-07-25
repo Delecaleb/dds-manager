@@ -14,11 +14,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     {{-- Shared UI: single source of truth for component CSS (design tokens, sticky
          columns/header, heatmap, modals, tabs). Loaded after Tailwind so it can override. --}}
-    <link rel="stylesheet" href="{{ asset('css/ui.css') }}">
+    <link rel="stylesheet" href="{{ asset('public/css/ui.css') }}">
     {{-- Shared UI behavior (window.DDS): formatters, stacking modals, URL-driven tabs,
          date-range helpers. Loaded in <head> after jQuery so DDS is available to every
          page script (incl. those that render at parse time). --}}
-    <script src="{{ asset('js/ui.js') }}"></script>
+    <script src="{{ asset('public/js/ui.js') }}"></script>
 </head>
 
 <body class="bg-slate-50 text-slate-800 font-sans antialiased">
