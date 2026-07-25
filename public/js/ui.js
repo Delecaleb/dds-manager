@@ -156,7 +156,10 @@
     DDS.dataTable = function (el, opts) {
         if (!el || !window.jQuery || !jQuery.fn || !jQuery.fn.DataTable) return null;
         var $el = jQuery(el);
-        if (jQuery.fn.DataTable.isDataTable($el)) return $el.DataTable();
+        opts = opts || {};
+        // Already initialised → reuse it, UNLESS the caller wants a rebuild (destroy:true,
+        // e.g. a modal table re-opened with fresh data).
+        if (jQuery.fn.DataTable.isDataTable($el) && !opts.destroy) return $el.DataTable();
         return $el.DataTable(Object.assign({
             paging: true,
             pageLength: 10,

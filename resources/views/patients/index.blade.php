@@ -259,14 +259,10 @@
         let table;
 
         $(document).ready(function () {
-            table = $('#patientsTable').DataTable({
+            table = DDS.dataTable(document.getElementById('patientsTable'), {
                 processing: true,
                 serverSide: true,
-                paging: true,
-                pageLength: 10,
-                lengthChange: false,
                 pagingType: 'simple_numbers',
-                searching: true,
                 info: false,
                 layout: { topStart: null, topEnd: null, bottomStart: null, bottomEnd: 'paging' },
                 ajax: {

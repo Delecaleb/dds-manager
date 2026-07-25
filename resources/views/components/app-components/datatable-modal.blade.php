@@ -86,7 +86,7 @@ Call from JS via: openDataTableModal('modalId', 'Title', columnsConfig, dataArra
         tfoot.html(footerRowHtml);
 
         // Initialize DataTable
-        $(tableId).DataTable({
+        DDS.dataTable(tableId, {
             data: data,
             columns: columns,
             paging: false,           // Show all data

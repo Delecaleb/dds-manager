@@ -1214,7 +1214,7 @@
         function initAptDetailsTable() {
             if (aptDetailsTable) return;
 
-            aptDetailsTable = $('#appointmentDetailsTable').DataTable({
+            aptDetailsTable = DDS.dataTable(document.getElementById('appointmentDetailsTable'), {
                 processing: true,
                 serverSide: true,
                 ajax: {
@@ -1347,7 +1347,7 @@
         function initAptCapacityTable() {
             if (aptCapacityTable) return;
 
-            aptCapacityTable = $('#appointmentCapacityTable').DataTable({
+            aptCapacityTable = DDS.dataTable(document.getElementById('appointmentCapacityTable'), {
                 processing: true,
                 serverSide: true,
                 ajax: {

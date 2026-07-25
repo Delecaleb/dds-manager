@@ -234,7 +234,7 @@
         };
 
         // Init Reminders
-        let remTable = $('#remindersTable').DataTable({
+        let remTable = DDS.dataTable(document.getElementById('remindersTable'), {
             ...dtConfig,
             ajax: {
                 url: "{{ route('front-office.performance-reminders-data') }}",
@@ -253,7 +253,7 @@
         });
 
         // Init Non-Reminders
-        let nonRemTable = $('#nonRemindersTable').DataTable({
+        let nonRemTable = DDS.dataTable(document.getElementById('nonRemindersTable'), {
             ...dtConfig,
             ajax: {
                 url: "{{ route('front-office.performance-non-reminders-data') }}",
@@ -270,7 +270,7 @@
         });
 
         // Init Totals
-        let totTable = $('#totalsTable').DataTable({
+        let totTable = DDS.dataTable(document.getElementById('totalsTable'), {
             ...dtConfig,
             ajax: {
                 url: "{{ route('front-office.performance-totals-data') }}",

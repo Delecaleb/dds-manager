@@ -654,14 +654,13 @@
         return tables[mode];
       }
 
-      tables[mode] = $('#agingTable-' + mode).DataTable({
+      tables[mode] = DDS.dataTable(document.getElementById('agingTable-' + mode), {
         processing: true,
         serverSide: true,
-        paging: true,
         searching: false,
-        ordering: true,
         order: [[15, 'desc']], // Total, descending — matches the previous fixed sort
         pageLength: 20,
+        lengthChange: true, // this table shows a length selector
         lengthMenu: [10, 20, 50, 100],
         ajax: {
           url: baseUrl + '/aging/data',

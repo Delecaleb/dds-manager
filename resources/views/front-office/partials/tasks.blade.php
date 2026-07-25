@@ -346,7 +346,7 @@
             $('#tasksTable tbody').html(skeletonRows);
         });
 
-        let tasksTable = $('#tasksTable').DataTable({
+        let tasksTable = DDS.dataTable(document.getElementById('tasksTable'), {
             processing: false, // Disabled default processing popup to let skeleton loader present cleanly
             serverSide: true,
             pageLength: 20,

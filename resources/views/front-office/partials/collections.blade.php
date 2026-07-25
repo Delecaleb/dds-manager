@@ -281,7 +281,7 @@
 
 
         // DataTable Init
-        let colTable = $('#collectionsTable').DataTable({
+        let colTable = DDS.dataTable(document.getElementById('collectionsTable'), {
             processing: true,
             serverSide: true,
             pageLength: 20,

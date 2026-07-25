@@ -282,12 +282,11 @@
         // Wait for jQuery
         $(document).ready(function () {
             // Initialize DataTable
-            $('#tableByMonth').DataTable({
+            DDS.dataTable(document.getElementById('tableByMonth'), {
                 processing: true,
                 serverSide: true,
-                paging: true,
                 searching: false,
-                ordering: false,
+                ordering: false, // serverSide monthly rollup — sorting handled server-side
                 ajax: {
                     url: baseUrl + '/tx-miner/data',
                     type: 'GET'

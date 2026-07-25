@@ -422,7 +422,7 @@
                     return;
                 }
 
-                _table = $('#portalTable').DataTable({
+                _table = DDS.dataTable(document.getElementById('portalTable'), {
                     data: data,
                     dom: 'tip',
                     pageLength: 25,

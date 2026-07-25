@@ -156,7 +156,7 @@
         var _currentEndDate = moment().format('YYYY-MM-DD');
 
         $(document).ready(function () {
-            let table = $('#hygieneRecallTable').DataTable({
+            let table = DDS.dataTable(document.getElementById('hygieneRecallTable'), {
                 processing: true,
                 serverSide: true,
                 ajax: {

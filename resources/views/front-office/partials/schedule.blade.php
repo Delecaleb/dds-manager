@@ -484,7 +484,7 @@
         }
 
         // 4. Broken Appointments DataTables Bind
-        brokenTable = $('#brokenAppointmentsTable').DataTable({
+        brokenTable = DDS.dataTable(document.getElementById('brokenAppointmentsTable'), {
             processing: true,
             serverSide: true,
             pageLength: 10,
