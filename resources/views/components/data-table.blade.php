@@ -46,7 +46,7 @@
 >
     <table
         id="{{ $id }}"
-        class="w-full text-left border-collapse"
+        class="dds-table w-full text-left border-collapse"
         style="min-width: {{ $minWidth }}"
     >
         @if($head->isNotEmpty())
