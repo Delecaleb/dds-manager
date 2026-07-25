@@ -549,7 +549,7 @@ class FinancialController extends Controller
                 p.PatNum                                          AS patient_id,
                 CONCAT(p.LName, ', ', p.FName)                   AS patient_name,
                 COALESCE(CONCAT(pr.ProvNum, ' - ', pr.Abbr), '') AS provider_ids,
-                COALESCE(CONCAT(pr.LName, ', ', pr.PName), '')   AS provider_name,
+                CONCAT(pr.LName, ', ', pr.PName)   AS provider_name,
                 a.AdjDate                                         AS dates,
                 a.AdjAmt                                          AS amount,
                 a.AdjType                                         AS adj_type_id,
