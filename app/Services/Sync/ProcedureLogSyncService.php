@@ -32,6 +32,16 @@ class ProcedureLogSyncService extends BaseQuerySyncService
     }
 
     /**
+     * Business date a windowed sync (sync:procedurelogs-range) filters on.
+     * ProcDate is what every production metric buckets by, so it is the only
+     * correct bound for a "from 2025 till date" backfill.
+     */
+    protected function dateColumn(): ?string
+    {
+        return 'ProcDate';
+    }
+
+    /**
      * Order records by the primary key during the initial sync.
      */
     protected function orderBy(): string

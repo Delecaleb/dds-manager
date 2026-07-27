@@ -2,18 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Production\ProductionService;
+use App\Domain\Support\MetricFilter;
+use App\Domain\Support\ProcStatus;
 use App\Models\OdAppointment;
 use App\Models\OdPatient;
 use App\Models\OdProcedureLog;
 use App\Models\OdRecall;
 use Carbon\Carbon;
-use App\Domain\Support\ProcStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\Facades\DataTables;
 
 class FrontOfficeController extends Controller
 {
+    public function __construct(
+        private readonly ProductionService $production,
+    ) {}
+
     public function index(Request $request)
     {
         if ($request->ajax()) {
@@ -38,26 +44,35 @@ class FrontOfficeController extends Controller
         $targetDate = Carbon::createFromFormat('Y-m', $monthYear);
 
         // Monthly Production calculation
-        $startOfMonth = $targetDate->copy()->startOfMonth()->format('Y-m-d');
-        $endOfMonth = $targetDate->copy()->endOfMonth()->format('Y-m-d');
+        $monthStart = $targetDate->copy()->startOfMonth();
+        $monthEnd = $targetDate->copy()->endOfMonth();
+        $startOfMonth = $monthStart->format('Y-m-d');
+        $endOfMonth = $monthEnd->format('Y-m-d');
 
-        $monthlyProduction = OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed()) // Completed
-            ->whereBetween('ProcDate', [$startOfMonth, $endOfMonth])
-            ->sum('ProcFee');
+        // The production period is MONTH-TO-DATE while the month is still in
+        // progress, and the full month once it has closed. This is what makes
+        // the prior-year comparison below like-for-like: on 1/22/21 we measure
+        // 1/1/21-1/22/21 against 1/1/20-1/22/20, never against all of Jan 2020.
+        $today = Carbon::today();
+        $periodEnd = $today->between($monthStart, $monthEnd) ? $today : $monthEnd;
 
-        // Prior Year
-        $lastYearStart = $targetDate->copy()->subYear()->startOfMonth()->format('Y-m-d');
-        $lastYearEnd = $targetDate->copy()->subYear()->endOfMonth()->format('Y-m-d');
-        $priorYearProduction = OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())
-            ->whereBetween('ProcDate', [$lastYearStart, $lastYearEnd])
-            ->sum('ProcFee');
+        $productionFilter = new MetricFilter($startOfMonth, $periodEnd->format('Y-m-d'));
+        $priorYearFilter = $productionFilter->lastYear();
+
+        $monthlyProduction = $this->production->grossProduction($productionFilter);
+
+        // Prior Year: the SAME span, shifted back exactly one year.
+        $priorYearProduction = $this->production->grossProduction($priorYearFilter);
 
         // Note: For now, $100k is used as simple monthly goal for UI ratio mapping till Goals system added.
         $monthlyGoal = 109286.00;
         $pctGoal = $monthlyGoal > 0 ? round(($monthlyProduction / $monthlyGoal) * 100, 2) : 0;
 
-        $productionDiff = $monthlyProduction - $monthlyGoal;
-        $yearDiff = $monthlyProduction - $priorYearProduction;
+        $productionDiff = round($monthlyProduction - $monthlyGoal, 2);
+
+        // Variance in dollars: current-year actual vs prior-year actual over
+        // the same span. Positive = up on last year, negative = down.
+        $yearDiff = round($monthlyProduction - $priorYearProduction, 2);
 
         // Daily Production
         $dailyActuals = [];
@@ -213,11 +228,21 @@ class FrontOfficeController extends Controller
         return response()->json([
             'monthly' => [
                 'goal' => $monthlyGoal,
-                'actual' => floatval($monthlyProduction),
+                'actual' => $monthlyProduction,
                 'percent_goal' => $pctGoal,
-                'prior_year' => floatval($priorYearProduction),
+                'prior_year' => $priorYearProduction,
                 'diff_goal' => $productionDiff,
                 'diff_year' => $yearDiff,
+                // The two spans actually compared, so the card can label them
+                // instead of the user having to infer the month-to-date cut-off.
+                'period' => [
+                    'start' => $productionFilter->start,
+                    'end' => $productionFilter->end,
+                ],
+                'prior_period' => [
+                    'start' => $priorYearFilter->start,
+                    'end' => $priorYearFilter->end,
+                ],
             ],
             'daily' => [
                 'actuals' => $dailyActuals,

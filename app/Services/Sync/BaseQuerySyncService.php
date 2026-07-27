@@ -26,6 +26,15 @@ abstract class BaseQuerySyncService
      */
     protected int $overlapSeconds = 300;
 
+    /**
+     * Inclusive bounds of the optional date window (see withDateWindow()).
+     * Null on both sides — the default — means "whole table", so every
+     * existing sync service behaves exactly as before.
+     */
+    protected ?string $windowStart = null;
+
+    protected ?string $windowEnd = null;
+
     public function __construct(
         protected QueryService $queryService
     ) {}
@@ -41,9 +50,89 @@ abstract class BaseQuerySyncService
         return null;
     }
 
+    /**
+     * Business-date column the optional sync window filters on (e.g.
+     * procedurelog.ProcDate). Null — the default — means the table cannot be
+     * windowed and withDateWindow() will be rejected.
+     *
+     * This is deliberately NOT syncColumn(): syncColumn() is the *change*
+     * timestamp driving incremental runs, while this is the *business* date
+     * that decides whether a row belongs to the period we care about.
+     */
+    protected function dateColumn(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Restrict this sync to rows whose dateColumn() falls inside the window.
+     *
+     * Both bounds are inclusive and either may be null (open-ended). A windowed
+     * sync gets its OWN sync_logs row (see module()), so a backfill can never
+     * overwrite the cursor or watermark of the full-table sync.
+     *
+     * @param  string|null  $start  'Y-m-d'
+     * @param  string|null  $end  'Y-m-d'
+     */
+    public function withDateWindow(?string $start, ?string $end = null): static
+    {
+        if ($this->dateColumn() === null) {
+            throw new Exception(static::class.' does not support a date window (no dateColumn() defined).');
+        }
+
+        if ($start !== null && $end !== null && $start > $end) {
+            throw new Exception("Invalid sync window: start ({$start}) is after end ({$end}).");
+        }
+
+        $this->windowStart = $start;
+        $this->windowEnd = $end;
+
+        return $this;
+    }
+
     protected function module(): string
     {
-        return $this->table();
+        return $this->table().$this->windowSuffix();
+    }
+
+    /**
+     * Suffix that keeps a windowed run's cursor separate from the full sync's.
+     *
+     * Derived from the window bounds only, so re-running the same backfill
+     * resumes the same sync_logs row instead of restarting from scratch.
+     */
+    protected function windowSuffix(): string
+    {
+        if ($this->windowStart === null && $this->windowEnd === null) {
+            return '';
+        }
+
+        return ':'.($this->windowStart ?? 'min').'..'.($this->windowEnd ?? 'max');
+    }
+
+    /**
+     * SQL fragment (leading " AND ...") bounding a query to the window.
+     * Empty string when no window is set.
+     */
+    protected function windowClause(): string
+    {
+        $col = $this->dateColumn();
+
+        if ($col === null) {
+            return '';
+        }
+
+        $clause = '';
+
+        if ($this->windowStart !== null) {
+            $clause .= " AND {$col} >= '".addslashes($this->windowStart)."'";
+        }
+
+        if ($this->windowEnd !== null) {
+            $clause .= " AND {$col} <= '".addslashes($this->windowEnd)."'";
+        }
+
+        return $clause;
     }
 
     /**
@@ -151,13 +240,14 @@ abstract class BaseQuerySyncService
     {
         $pk = $this->primaryKey();
         $lastId = (int) ($log->last_primary_key ?? 0);
+        $window = $this->windowClause();
 
         while (true) {
 
             $sql = "
                 SELECT *
                 FROM {$this->table()}
-                WHERE {$pk} > {$lastId}
+                WHERE {$pk} > {$lastId}{$window}
                 ORDER BY {$pk}
                 LIMIT {$this->batchSize}
             ";
@@ -193,6 +283,7 @@ abstract class BaseQuerySyncService
         );
 
         $lastId = 0;
+        $window = $this->windowClause();
 
         while (true) {
 
@@ -203,11 +294,16 @@ abstract class BaseQuerySyncService
             // timestamp across a batch boundary (with ">") or loops forever
             // when more than batchSize rows share one timestamp (with ">=").
             // The tuple cursor always advances and never skips.
+            // The keyset OR-group is wrapped in its own parentheses so an
+            // appended window clause ANDs against the whole cursor, not just
+            // the second branch of the OR.
             $sql = "
                 SELECT *
                 FROM {$this->table()}
-                WHERE ({$col} > '{$safeSync}')
-                   OR ({$col} = '{$safeSync}' AND {$pk} > {$lastId})
+                WHERE (
+                          ({$col} > '{$safeSync}')
+                       OR ({$col} = '{$safeSync}' AND {$pk} > {$lastId})
+                      ){$window}
                 ORDER BY {$col}, {$pk}
                 LIMIT {$this->batchSize}
             ";
