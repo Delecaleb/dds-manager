@@ -668,7 +668,7 @@ class FinancialController extends Controller
             FROM od_appointments a
             JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
-              AND (a.AptStatus = 1 OR a.AptStatus = 2)
+              AND a.AptStatus = 1
             GROUP BY p.PatNum, p.LName, p.FName
             ORDER BY count DESC, p.LName
         ", [$start, $end]);
