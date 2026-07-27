@@ -55,14 +55,18 @@ class FinancialController extends Controller
         if (in_array($section, ['all', 'utilization-chart'])) {
             $utilizationData = DB::select("
                 SELECT
-                    CONCAT(pr.LName, ', ', pr.PName) AS provider,
+                    COALESCE(
+                        NULLIF(CONCAT_WS(', ', NULLIF(pr.LName, ''), NULLIF(COALESCE(NULLIF(pr.PName, ''), pr.FName), '')), ''),
+                        NULLIF(pr.Abbr, ''),
+                        CONCAT('Provider #', pr.ProvNum)
+                    ) AS provider,
                     SUM(pl.ProcFee) AS production
                 FROM od_procedure_logs pl
                 JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
                 WHERE pl.ProcStatus IN ({$this->completedIn})
                   AND pr.IsHidden IN ('false', '0', 0)
                   AND pl.ProcDate BETWEEN ? AND ?
-                GROUP BY pr.ProvNum, pr.LName, pr.PName
+                GROUP BY pr.ProvNum, pr.LName, pr.PName, pr.FName, pr.Abbr
                 HAVING SUM(pl.ProcFee) > 0
                 ORDER BY production DESC
             ", [$start, $end]);

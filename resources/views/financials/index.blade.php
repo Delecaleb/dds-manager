@@ -842,7 +842,7 @@
     var utilizationChartInstance = null;
     function renderUtilizationChart(utilData) {
       var ctx = document.getElementById('utilizationChart').getContext('2d');
-      var labels = utilData.map(function (item) { return item.provider; });
+      var labels = utilData.map(function (item) { return item.provider || 'Unknown Provider'; });
       var values = utilData.map(function (item) { return parseFloat(item.production); });
 
       if (utilizationChartInstance) {

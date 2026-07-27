@@ -536,7 +536,6 @@
         });
 
         $('#frontOfficeMonth').on('change', function () {
-            alert('hello');
             hydrateDashboard();
         });
     });
