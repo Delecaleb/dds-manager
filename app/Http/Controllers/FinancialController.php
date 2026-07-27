@@ -55,18 +55,14 @@ class FinancialController extends Controller
         if (in_array($section, ['all', 'utilization-chart'])) {
             $utilizationData = DB::select("
                 SELECT
-                    COALESCE(
-                        NULLIF(CONCAT_WS(', ', NULLIF(pr.LName, ''), NULLIF(COALESCE(NULLIF(pr.PName, ''), pr.FName), '')), ''),
-                        NULLIF(pr.Abbr, ''),
-                        CONCAT('Provider #', pr.ProvNum)
-                    ) AS provider,
+                    COALESCE(NULLIF(pr.Abbr, ''), pr.LName, CAST(pr.ProvNum AS CHAR)) AS provider,
                     SUM(pl.ProcFee) AS production
                 FROM od_procedure_logs pl
                 JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
                 WHERE pl.ProcStatus IN ({$this->completedIn})
                   AND pr.IsHidden IN ('false', '0', 0)
                   AND pl.ProcDate BETWEEN ? AND ?
-                GROUP BY pr.ProvNum, pr.LName, pr.PName, pr.FName, pr.Abbr
+                GROUP BY pr.ProvNum, pr.Abbr, pr.LName
                 HAVING SUM(pl.ProcFee) > 0
                 ORDER BY production DESC
             ", [$start, $end]);
@@ -240,7 +236,7 @@ class FinancialController extends Controller
 
     private function providerExpr(string $alias): string
     {
-        return "IF({$alias}.PName IS NULL OR {$alias}.PName = '', {$alias}.LName, CONCAT({$alias}.LName, ', ', {$alias}.PName))";
+        return "COALESCE(NULLIF({$alias}.Abbr, ''), {$alias}.LName, CAST({$alias}.ProvNum AS CHAR))";
     }
 
     private function scoreCardsProduction(string $start, string $end, string $provNum): array
@@ -296,7 +292,7 @@ class FinancialController extends Controller
         $providers = DB::table('od_providers')
             ->whereIn('IsHidden', ['false', '0', 0, false])
             ->orderBy('LName')
-            ->get(['ProvNum', 'LName', 'PName']);
+            ->get(['ProvNum', 'Abbr', 'LName']);
 
         return [
             'kpis' => [
@@ -323,7 +319,7 @@ class FinancialController extends Controller
             ], $rows),
             'providers' => $providers->map(fn ($p) => [
                 'id' => $p->ProvNum,
-                'name' => $p->PName ? "{$p->LName}, {$p->PName}" : $p->LName,
+                'name' => $p->Abbr ?: $p->LName,
             ])->values(),
         ];
     }
@@ -375,7 +371,7 @@ class FinancialController extends Controller
         $providers = DB::table('od_providers')
             ->whereIn('IsHidden', ['false', '0', 0, false])
             ->orderBy('LName')
-            ->get(['ProvNum', 'LName', 'PName']);
+            ->get(['ProvNum', 'Abbr', 'LName']);
 
         // Collection Scorecard - Top Counts and Top Payments Charts
         $topPayments = DB::select('
@@ -418,7 +414,7 @@ class FinancialController extends Controller
             ], $rows),
             'providers' => $providers->map(fn ($p) => [
                 'id' => $p->ProvNum,
-                'name' => $p->PName ? "{$p->LName}, {$p->PName}" : $p->LName,
+                'name' => $p->Abbr ?: $p->LName,
             ])->values(),
         ];
     }
