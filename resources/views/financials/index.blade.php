@@ -381,7 +381,7 @@
     </section>
 
     <div class="font-bold border-b p-3 text-sm text-gray-700">Patients</div>
-    <section class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
+    <section class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
 
       {{-- Patient Visits --}}
       <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-xs flex flex-col justify-between">
@@ -472,7 +472,7 @@
       </div>
 
       {{-- Broken / Cancelled --}}
-      <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-xs flex flex-col justify-between">
+      <!-- <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-xs flex flex-col justify-between">
         <div class="flex justify-between items-start">
           <div class="flex-1">
             <div class="flex items-center gap-1.5">
@@ -492,7 +492,7 @@
         <div class="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
           D9986 / D9987 procedures
         </div>
-      </div>
+      </div> -->
 
       {{-- Avg Production Per Patient --}}
       <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-xs flex flex-col justify-between">
