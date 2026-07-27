@@ -13,6 +13,9 @@
 @props([
     'spec',
     'activeSubtab' => 'default',
+    // Column sorting is on by default (DDS.sortable picks up .dds-sortable). Pass
+    // :sortable="false" for a table whose row order carries meaning on its own.
+    'sortable' => true,
 ])
 
 @php
@@ -96,8 +99,14 @@
     $isDiffMode = in_array($activeSubtab ?? 'default', ['diff-last-year', 'percent-diff-last-year']);
 @endphp
 
+@php
+    // Sort only a table that actually has rows — DataTables needs one cell per column,
+    // and the empty state is a single colspan cell.
+    $isSortable = $sortable && count($rows) > 0;
+@endphp
+
 <div class="dds-table-scroll border-t border-slate-200 max-h-[70vh]">
-    <table class="dds-table" style="min-width: max-content;">
+    <table class="dds-table {{ $isSortable ? 'dds-sortable' : '' }}" style="min-width: max-content;">
         <thead class="dds-head-sticky z-50 shadow-sm bg-white ring-1 ring-gray-200">
             @if (!empty($groups))
                 @php
@@ -152,6 +161,20 @@
                     @foreach ($columns as $i => $col)
                         @php
                             $type = $col['type'] ?? 'text';
+                            $rawValue = $row[$col['key']] ?? null;
+
+                            // Sort key for numeric columns: the raw number. Without this
+                            // DataTables sorts the DISPLAY text, and "$ 1,200.00" / "$ (900.00)"
+                            // / "12.34%" sort alphabetically — 900 would beat 1,200 and negatives
+                            // would land at the top. Missing values get an empty key so they sort
+                            // together at one end instead of scattering.
+                            $orderAttr = '';
+                            if (in_array($type, ['money', 'percent', 'number'], true)) {
+                                $orderAttr = ($rawValue === null || $rawValue === '--')
+                                    ? ' data-order=""'
+                                    : ' data-order="' . (float) $rawValue . '"';
+                            }
+
                             $cellClasses = 'px-4 py-3 border-r border-gray-200 text-gray-700 text-xs';
                             $cellClasses .= ' ' . $stickyClass($i);
                             if ($type === 'yn_badge') {
@@ -166,7 +189,7 @@
                             }
                             if (isset($col['class'])) $cellClasses .= ' ' . $col['class'];
                         @endphp
-                        <td class="{{ $cellClasses }} {{ ops_heat_class($heat, $col['key'], $row[$col['key']] ?? null) }}">
+                        <td class="{{ $cellClasses }} {{ ops_heat_class($heat, $col['key'], $rawValue) }}" {!! $orderAttr !!}>
                             @if ($isDiffMode)
                                 <div class="flex items-center gap-1.5 {{ $type === 'text' ? 'justify-start' : 'justify-end' }}">{!! $cellContent !!}</div>
                             @elseif (!empty($col['drilldown_type']) && isset($row['clinic_num']))

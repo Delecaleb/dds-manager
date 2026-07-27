@@ -45,6 +45,53 @@
     z-index: 20;
 }
 
+/* ── Sort indicators ──────────────────────────────────────────────────────────
+   The app loads DataTables' JS but not its stylesheet, so the sort affordance has
+   to live here (table LOOK belongs in ui.css). DataTables 2 tags each header cell
+   with .dt-orderable-* (this column can sort) and .dt-ordering-* (this column IS
+   the sort), and injects <span class="dt-column-order"> for the arrow.
+
+   Idle columns show a dimmed double chevron on hover, the active column a solid
+   single chevron — otherwise a sortable table looks identical to a static one and
+   nobody discovers the sorting. */
+.dds-table thead th.dt-orderable-asc,
+.dds-table thead th.dt-orderable-desc {
+    cursor: pointer;
+    position: relative;
+    padding-right: 1.35rem !important;
+    user-select: none;
+}
+.dds-table thead th.dt-orderable-asc:hover,
+.dds-table thead th.dt-orderable-desc:hover {
+    background-color: #f1f5f9;
+}
+.dds-table thead th span.dt-column-order {
+    position: absolute;
+    right: 0.45rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.6rem;
+    line-height: 1;
+    color: #94a3b8;
+}
+.dds-table thead th.dt-orderable-asc span.dt-column-order::before {
+    content: '\2195'; /* ↕ — sortable, not currently sorted */
+    opacity: 0.45;
+}
+.dds-table thead th.dt-ordering-asc span.dt-column-order::before {
+    content: '\25B2'; /* ▲ */
+    opacity: 1;
+    color: var(--dds-accent, #009688);
+}
+.dds-table thead th.dt-ordering-desc span.dt-column-order::before {
+    content: '\25BC'; /* ▼ */
+    opacity: 1;
+    color: var(--dds-accent, #009688);
+}
+.dds-table thead th.dt-orderable-asc:hover span.dt-column-order {
+    opacity: 1;
+}
+
 /* ── Sticky columns (REAL implementation — replaces undefined tb:sm:stick-*) ──
    Apply .dds-stick to the 1st frozen column cell (th+td), .dds-stick-2 to a 2nd.
    Header/footer sticky cells sit above body sticky cells via z-index. */

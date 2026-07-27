@@ -48,6 +48,9 @@
             old.remove();
         });
         if (window.lucide) window.lucide.createIcons();
+        // Swapped-in markup (tab panels, drilldowns) gets its sortable tables wired
+        // here, so no call site has to remember to do it.
+        if (DDS.sortableAll) DDS.sortableAll(el);
     };
 
     /* ── URL-as-state helpers ───────────────────────────────────────────────── */
@@ -177,6 +180,45 @@
         (root || document).querySelectorAll('table.dds-datatable').forEach(function (t) { DDS.dataTable(t); });
     };
 
+    /* ── Sorting-only preset ───────────────────────────────────────────────────
+       Same DataTable, ORDER behavior only: no pager, no search box, no info line.
+       This is what server-rendered analytics tables need — every row is already on
+       the page under a sticky header with sticky footer totals, so paging/search
+       would fight the design, but the columns must still be click-sortable.
+
+       Numeric columns sort on each cell's data-order (the raw number), never on
+       the formatted text — "$ 1,200.00" and "$ (900.00)" are not sortable strings.
+
+       Markup contract: add class "dds-sortable" to the <table>. Anything inside a
+       <tfoot> is left where it is (DataTables never sorts footer rows), so Average/
+       Total rows stay pinned.
+    -------------------------------------------------------------------------- */
+    DDS.sortable = function (el, opts) {
+        return DDS.dataTable(el, Object.assign({
+            paging: false,
+            searching: false,
+            info: false,
+            ordering: true,
+            order: []            // keep the server's row order until a header is clicked
+        }, opts || {}));
+    };
+    // Init every not-yet-initialised .dds-sortable within a root. Safe to call repeatedly:
+    // DDS.dataTable returns the existing instance rather than rebuilding.
+    DDS.sortableAll = function (root) {
+        (root || document).querySelectorAll('table.dds-sortable').forEach(function (t) { DDS.sortable(t); });
+    };
+    // For tables whose rows are injected by page JS AFTER first render (tbody.innerHTML = …).
+    // DataTables caches rows, so a fresh table body needs a rebuild, not a reuse.
+    DDS.sortableRefresh = function (el) {
+        if (!el) return null;
+        if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(jQuery(el))) {
+            jQuery(el).DataTable().destroy();
+        }
+        // Nothing to sort (empty state / single colspan placeholder row) → leave it plain.
+        if (!el.querySelector('tbody tr td:nth-child(2)')) return null;
+        return DDS.sortable(el);
+    };
+
     // Embedded-details drilldown from a rows[] array — the ONE implementation, replacing the
     // duplicated openOpsDrilldown / openMarketingDrilldown. Renders the shared, SORTABLE
     // DataTable (DDS.dataTable). Stackable; money/count auto-format + sort numerically.
@@ -295,9 +337,10 @@
         };
     };
 
-    // Auto-init any declarative tab bars on load.
+    // Auto-init any declarative tab bars, and every sortable table, on load.
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('[data-dds-tabs]').forEach(function (n) { DDS.tabs.init(n); });
+        DDS.sortableAll(document);
     });
 
     window.DDS = DDS;
