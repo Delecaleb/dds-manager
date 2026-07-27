@@ -177,7 +177,7 @@ class DepositSlipController extends Controller
     $defTable = (new \App\Models\OdDefinition)->getTable();
     $patientTable = (new \App\Models\OdPatient)->getTable();
     $providerTable = (new \App\Models\OdProvider)->getTable();
-    $splitTable = (new \App\Models\OdPaymentSplit)->getTable();
+    $splitTable = (new \App\Models\PaySplit)->getTable();
     $bankTable = (new \App\Models\OdBank)->getTable(); // if exists
 
     // Your existing summary query is fine...
