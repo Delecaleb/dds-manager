@@ -98,22 +98,22 @@ class DepositSlipController extends Controller
             ];
         }
 
-        // // Include claim payments to match insurance
-        // $claimPayments = \App\Models\OdClaimPayment::whereBetween('CheckDate', [$start, $end])
-        //     ->select('ClinicNum', \Illuminate\Support\Facades\DB::raw('SUM(CheckAmt) as amount'))
-        //     ->groupBy('ClinicNum')
-        //     ->get();
+        // Include claim payments to match insurance
+        $claimPayments = \App\Models\OdClaimPayment::whereBetween('CheckDate', [$start, $end])
+            ->select('ClinicNum', \Illuminate\Support\Facades\DB::raw('SUM(CheckAmt) as amount'))
+            ->groupBy('ClinicNum')
+            ->get();
 
-        // foreach ($claimPayments as $cp) {
-        //     $amt = (float) $cp->amount;
-        //     $totalAmount += $amt;
+        foreach ($claimPayments as $cp) {
+            $amt = (float) $cp->amount;
+            $totalAmount += $amt;
 
-        //     $results[] = [
-        //         'location' => $this->clinics->name((int) ($cp->ClinicNum ?? 0)),
-        //         'type' => 'Insurance Co Pmt',
-        //         'amount' => $amt
-        //     ];
-        // }
+            $results[] = [
+                'location' => $this->clinics->name((int) ($cp->ClinicNum ?? 0)),
+                'type' => 'Insurance Co Pmt',
+                'amount' => $amt
+            ];
+        }
 
         usort($results, function ($a, $b) {
             return strcmp($a['type'], $b['type']);

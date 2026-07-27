@@ -163,7 +163,7 @@
                 <h2 class="text-sm font-bold text-black tracking-wide">Age Brackets</h2>
             </div>
             <div class="bg-white border border-slate-200/60 rounded shadow-sm overflow-hidden min-h-[420px]">
-                <table class="w-full text-left border-collapse">
+                <table class="dds-table dds-sortable w-full text-left border-collapse">
                     <thead class="bg-[#f1f5f9]">
                         <tr>
                             <th class="py-3 px-4 text-xs font-bold text-[#334155]">Age</th>

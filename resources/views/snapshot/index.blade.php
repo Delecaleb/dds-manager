@@ -64,7 +64,7 @@
       </div>
 
       <div class="w-full overflow-x-auto max-h-[500px] overflow-y-auto border border-gray-200 rounded-lg">
-        <table class="w-full text-left border-collapse min-w-[2400px]">
+        <table class="dds-table dds-sortable w-full text-left border-collapse min-w-[2400px]">
           
           <thead class="sticky top-0 z-30 bg-gray-200 text-gray-700 text-xs font-bold uppercase tracking-wider shadow-sm">
             <tr>

@@ -216,7 +216,7 @@
 
                 <!-- Table Grid -->
                 <div class="overflow-x-auto border border-slate-100 rounded-md max-h-[60vh] relative min-w-full">
-                    <table class="w-full text-left border-collapse text-xs whitespace-nowrap" id="marketing_main_table">
+                    <table class="dds-table dds-sortable w-full text-left border-collapse text-xs whitespace-nowrap" id="marketing_main_table">
                         <thead class="sticky top-0 z-20 bg-gray-50 shadow-[0_1px_0_0_#e2e8f0]">
                             <tr>
                                 @foreach ($tableSpec['columns'] as $col)

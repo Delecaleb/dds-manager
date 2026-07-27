@@ -90,7 +90,7 @@
 
       <!-- Detail Table area -->
       <div id="detailContainer" class="hidden w-full overflow-x-auto border border-gray-100 rounded-sm">
-        <table class="w-full text-left border-collapse text-sm min-w-[1600px]">
+        <table class="dds-table dds-sortable w-full text-left border-collapse text-sm min-w-[1600px]">
           <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
               <th data-sort="office"

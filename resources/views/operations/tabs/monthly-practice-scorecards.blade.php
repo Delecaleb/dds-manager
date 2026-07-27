@@ -74,7 +74,7 @@
 
             <!-- Table Matrix -->
             <div class="overflow-x-auto overflow-y-auto" style="max-height: 555px;">
-                <table class="w-full text-left border-collapse min-w-max">
+                <table class="dds-table dds-sortable w-full text-left border-collapse min-w-max">
                     <thead class="sticky top-0 z-40 bg-white">
                         <tr>
                             <th

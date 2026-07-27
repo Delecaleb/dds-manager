@@ -661,7 +661,7 @@
 
       {{-- Table --}}
       <div class="overflow-x-auto">
-        <table id="scTable" class="w-full border-collapse">
+        <table id="scTable" class="dds-table dds-sortable w-full border-collapse">
           <thead id="scThead"></thead>
           <tbody id="scTbody">
             <tr>
@@ -729,7 +729,7 @@
       </div>
 
       <div class="flex-1 overflow-auto">
-        <table id="bkTable" class="w-full border-collapse">
+        <table id="bkTable" class="dds-table dds-sortable w-full border-collapse">
           <thead id="bkThead"></thead>
           <tbody id="bkTbody">
             <tr>

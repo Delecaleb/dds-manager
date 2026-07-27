@@ -194,29 +194,62 @@
        Total rows stay pinned.
     -------------------------------------------------------------------------- */
     DDS.sortable = function (el, opts) {
-        return DDS.dataTable(el, Object.assign({
+        var dt = DDS.dataTable(el, Object.assign({
             paging: false,
             searching: false,
             info: false,
             ordering: true,
-            order: []            // keep the server's row order until a header is clicked
+            order: [],           // keep the server's row order until a header is clicked
+            // Mark our own redraws so the tbody observer below can tell a DataTables
+            // sort apart from the page repainting the table with new data.
+            preDrawCallback: function () { el.__ddsDrawing = true; },
+            drawCallback: function () { el.__ddsDrawing = false; }
         }, opts || {}));
+        DDS.sortableObserve(el);
+        return dt;
     };
     // Init every not-yet-initialised .dds-sortable within a root. Safe to call repeatedly:
     // DDS.dataTable returns the existing instance rather than rebuilding.
     DDS.sortableAll = function (root) {
-        (root || document).querySelectorAll('table.dds-sortable').forEach(function (t) { DDS.sortable(t); });
+        (root || document).querySelectorAll('table.dds-sortable').forEach(function (t) {
+            // A table rendered empty (loading/placeholder row) can't be initialised yet, but
+            // the observer will pick it up the moment its rows arrive.
+            if (hasSortableRows(t)) DDS.sortable(t); else DDS.sortableObserve(t);
+        });
     };
-    // For tables whose rows are injected by page JS AFTER first render (tbody.innerHTML = …).
-    // DataTables caches rows, so a fresh table body needs a rebuild, not a reuse.
+    // A table is sortable once it holds a real data row — not a single colspan
+    // "Loading…" / "No records" placeholder, which has no cell in column 2.
+    function hasSortableRows(el) {
+        return !!el.querySelector('tbody tr td:nth-child(2)');
+    }
+    // Rebuild for tables whose rows are injected by page JS (tbody.innerHTML = …).
+    // DataTables caches its rows, so new markup needs a rebuild, not a reuse.
     DDS.sortableRefresh = function (el) {
         if (!el) return null;
+        el.__ddsDrawing = true;                 // suppress the observer for our own DOM churn
         if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(jQuery(el))) {
             jQuery(el).DataTable().destroy();
         }
-        // Nothing to sort (empty state / single colspan placeholder row) → leave it plain.
-        if (!el.querySelector('tbody tr td:nth-child(2)')) return null;
-        return DDS.sortable(el);
+        var dt = hasSortableRows(el) ? DDS.sortable(el) : null;
+        // Cleared on a macrotask: the observer's microtask callbacks for the churn above
+        // run first and are correctly ignored.
+        setTimeout(function () { el.__ddsDrawing = false; }, 0);
+        return dt;
+    };
+    /* Watch a sortable table's <tbody> so pages that repaint rows themselves
+       (tbody.innerHTML = …, the pattern across financials/kpis/deposit/explorer)
+       get sorting re-attached without every render function having to call us.
+       Our own draws set __ddsDrawing and are skipped, so this never self-triggers. */
+    DDS.sortableObserve = function (el) {
+        if (!el || el.__ddsObserved || !window.MutationObserver) return;
+        var tbody = el.querySelector('tbody');
+        if (!tbody) return;
+        el.__ddsObserved = true;
+        new MutationObserver(function () {
+            if (el.__ddsDrawing) return;
+            clearTimeout(el.__ddsReinit);
+            el.__ddsReinit = setTimeout(function () { DDS.sortableRefresh(el); }, 0);
+        }).observe(tbody, { childList: true });
     };
 
     // Embedded-details drilldown from a rows[] array — the ONE implementation, replacing the

@@ -246,7 +246,7 @@
 
           <!-- Table Content Container -->
           <div class="overflow-x-auto overflow-y-auto max-h-[600px] min-h-[350px] relative">
-            <table class="w-full text-left text-xs border-collapse" id="resultsTable">
+            <table class="dds-table dds-sortable w-full text-left text-xs border-collapse" id="resultsTable">
               <thead class="bg-slate-100 sticky top-0 z-10 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider">
                 <tr id="resultsTheadTr">
                   <th class="p-4 text-slate-400 italic font-normal">Select a table and click "Fetch Realtime Data" to query OpenDental.</th>

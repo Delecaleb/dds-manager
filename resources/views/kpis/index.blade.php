@@ -255,7 +255,7 @@
 
     <!-- Table Container -->
     <div class="overflow-x-auto ring-1 ring-gray-200 shadow rounded-sm mt-4">
-      <table class="min-w-full divide-y divide-gray-200 text-sm" id="providers-table">
+      <table class="dds-table dds-sortable min-w-full divide-y divide-gray-200 text-sm" id="providers-table">
         <thead class="bg-white">
           <tr id="providers-thead-tr">
             <!-- Headers injected via JS -->
