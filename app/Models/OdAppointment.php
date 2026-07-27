@@ -63,7 +63,7 @@ class OdAppointment extends Model
 
     public function scopeScheduled($query)
     {
-        return $query->whereIn('AptStatus', [1,2,4]);
+        return $query->whereIn('AptStatus', [1, 2, 4, '1', '2', '4']);
     }
 
     public function scopeInDateRange($query, $start, $end)
