@@ -2,9 +2,9 @@
 
 namespace App\Services\OpenDental;
 
+use App\Domain\Insurance\PayorService;
 use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
-use App\Domain\Insurance\PayorService;
 use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
@@ -950,7 +950,9 @@ class OperationsAnalyticsService
         $tot_days = 0;
 
         foreach ($dates as $d => $dateLabel) {
-            $ap = (float) ($actualProd[$d]->gross ?? 0);
+            $gross = (float) ($actualProd[$d]->gross ?? 0);
+            $adj = (float) ($adjData[$d] ?? 0);
+            $ap = $gross + $adj; // Net Production (Gross + Adjustments)
             $ac = (float) ($actualCol[$d] ?? 0);
             $apv = (int) ($actualProd[$d]->pts_visits ?? 0);
             $anv = (int) ($actualNpt[$d] ?? 0);
@@ -968,8 +970,7 @@ class OperationsAnalyticsService
             $avg_pv = $numProv > 0 ? round($apv / $numProv, 2) : 0;
             $avg_pp = $numProv > 0 ? round($ap / $numProv, 2) : 0;
 
-            $adj = (float) ($adjData[$d] ?? 0);
-            $adj_pct = $ap != 0 ? round(($adj / $ap) * 100, 2) : 0;
+            $adj_pct = $gross != 0 ? round(($adj / $gross) * 100, 2) : 0;
 
             $rows[] = [
                 'date' => $dateLabel,
