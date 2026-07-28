@@ -46,6 +46,9 @@ class CalendarEventTransformer
         ];
         $opTitle = $staticTitles[$appointment->Op] ?? ('Op '.$appointment->Op);
 
+        $procedure = trim($appointment->ProcDescript ?? '');
+        $note = trim($appointment->Note ?? '');
+
         return [
             'id' => $appointment->AptNum,
             'title' => $appointment->patient?->full_name ?? 'Unknown Patient',
@@ -56,11 +59,11 @@ class CalendarEventTransformer
             'borderColor' => $color,
             'textColor' => $textColor,
             'doctor' => $appointment->provider?->Abbr ?? '',
-            'procedure' => $appointment->ProcDescript ?? '',
+            'procedure' => $procedure,
             'status' => $status->text(),
             'operator' => $appointment->Op ?? '',
             'clinic' => $appointment->ClinicNum ?? '',
-            'note' => $appointment->Note ?? '',
+            'note' => $note,
             'patNum' => $appointment->PatNum,
             'isNewPatient' => (bool) $appointment->IsNewPatient,
             'phone' => $appointment->patient?->WirelessPhone ?: ($appointment->patient?->HmPhone ?: ''),

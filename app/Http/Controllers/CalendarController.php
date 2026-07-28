@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ClinicRegistry;
 use App\Models\OdAdjustment;
 use App\Models\OdAppointment;
 use App\Models\OdProcedureLog;
-use App\Domain\Support\ClinicRegistry;
 use App\Services\OpenDental\CalendarService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -258,5 +258,81 @@ class CalendarController extends Controller
         ];
 
         return DataTables::of(collect($data))->make(true);
+    }
+
+    public function scheduledProductionBreakdown(Request $request)
+    {
+        $date = $request->get('date') ?? date('Y-m-d');
+
+        $scheduledAppointments = OdAppointment::query()
+            ->with(['patient', 'provider', 'procedureLogs'])
+            ->where('AptStatus', '1')
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) = ?", [$date])
+            ->get();
+
+        $totalScheduled = 0;
+        $providerTotals = [];
+        $procedureTotals = [];
+        $itemizedApts = [];
+
+        foreach ($scheduledAppointments as $apt) {
+            $aptFee = (float) $apt->procedureLogs->sum('ProcFee');
+            $totalScheduled += $aptFee;
+
+            $provNum = $apt->ProvNum ? (int) $apt->ProvNum : 0;
+            $provName = $apt->provider
+                ? trim(($apt->provider->LName ?? '').', '.($apt->provider->PName ?? ''))
+                : 'Unassigned';
+
+            if (! isset($providerTotals[$provNum])) {
+                $providerTotals[$provNum] = [
+                    'id' => $provNum,
+                    'name' => $provName,
+                    'abbr' => $apt->provider?->Abbr ?? 'N/A',
+                    'count' => 0,
+                    'total' => 0,
+                ];
+            }
+            $providerTotals[$provNum]['count']++;
+            $providerTotals[$provNum]['total'] += $aptFee;
+
+            foreach ($apt->procedureLogs as $log) {
+                $desc = trim($log->ProcDescript ?? '') ?: 'Procedure #'.($log->ProcNum ?? '');
+                $fee = (float) ($log->ProcFee ?? 0);
+
+                if (! isset($procedureTotals[$desc])) {
+                    $procedureTotals[$desc] = [
+                        'code' => $desc,
+                        'count' => 0,
+                        'total' => 0,
+                    ];
+                }
+                $procedureTotals[$desc]['count']++;
+                $procedureTotals[$desc]['total'] += $fee;
+            }
+
+            $itemizedApts[] = [
+                'apt_num' => $apt->AptNum,
+                'patient_name' => $apt->patient?->full_name ?? 'Unknown Patient',
+                'pat_num' => $apt->PatNum,
+                'time' => (new Carbon($apt->AptDateTime))->format('h:i A'),
+                'operatory' => 'DR-'.($apt->Op ?? ''),
+                'provider' => $provName,
+                'procedures' => $apt->ProcDescript ?: 'No procedures specified',
+                'fee' => $aptFee,
+            ];
+        }
+
+        usort($providerTotals, fn ($a, $b) => $b['total'] <=> $a['total']);
+        usort($procedureTotals, fn ($a, $b) => $b['total'] <=> $a['total']);
+
+        return response()->json([
+            'date' => (new Carbon($date))->format('M d, Y'),
+            'total_scheduled' => $totalScheduled,
+            'appointment_count' => $scheduledAppointments->count(),
+            'by_provider' => array_values($providerTotals),
+            'by_procedure' => array_values($procedureTotals),
+            'appointments' => $itemizedApts,
+        ]);
     }
 }

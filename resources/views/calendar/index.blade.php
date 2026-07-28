@@ -207,18 +207,17 @@
                     </p>
                     <p class="text-xl font-bold text-slate-900" id="stat-production">—</p>
                 </div>
-                <div>
-                    <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
+                <div id="stat-scheduled-container" class="cursor-pointer group rounded-lg p-1.5 -m-1.5 transition hover:bg-emerald-50/60" title="Click to view scheduled production breakdown" onclick="openScheduledProductionModal()">
+                    <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1.5">
                         Scheduled Production
-                        <span class="text-slate-400 cursor-help"
-                            title="Display $ amount of what has been scheduled for the day">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                            Breakdown
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                             </svg>
                         </span>
                     </p>
-                    <p class="text-xl font-bold text-slate-900" id="stat-scheduled">—</p>
+                    <p class="text-xl font-bold text-slate-900 group-hover:text-emerald-700 transition-colors" id="stat-scheduled">—</p>
                 </div>
                 <div class="ml-auto flex items-center gap-2">
                     <label class="relative inline-flex items-center cursor-pointer">
@@ -841,6 +840,8 @@
             7: 'PtNote', 8: 'PtNoteCompleted'
         };
 
+        let currentCalDate = null;
+
         document.addEventListener('DOMContentLoaded', function () {
 
             const calEl = document.getElementById('calendar');
@@ -912,8 +913,21 @@
                     const phone = ext.phone
                         ? `<div style="font-size:9.5px;margin-top:1.5px;opacity:.9;font-weight:500;">${ext.phone}</div>`
                         : '';
-                    const note = ext.note
-                        ? `<div style="font-size:9.5px;margin-top:1.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;opacity:.75;line-height:1.2;">${ext.note}</div>`
+
+                    // Clean note text to prevent duplicate procedure code output on card
+                    let noteText = (ext.note || '').trim();
+                    if (ext.procedure && noteText) {
+                        const cleanProc = ext.procedure.trim();
+                        if (noteText.toLowerCase() === cleanProc.toLowerCase()) {
+                            noteText = '';
+                        } else if (cleanProc.length > 0) {
+                            const escapedProc = cleanProc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            noteText = noteText.replace(new RegExp('^' + escapedProc + '\\s*', 'i'), '').trim();
+                        }
+                    }
+
+                    const note = noteText
+                        ? `<div style="font-size:9.5px;margin-top:1.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;opacity:.75;line-height:1.2;">${noteText}</div>`
                         : '';
                     return {
                         html: `<div style="padding:4px 6px;height:100%;overflow:hidden;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-start;">
@@ -955,12 +969,16 @@
                     const day = String(d.getDate()).padStart(2, '0');
                     const dateStr = `${year}-${month}-${day}`;
 
+                    const dateChanged = currentCalDate !== null && currentCalDate !== dateStr;
+                    currentCalDate = dateStr;
+
                     document.getElementById('calDate').value = dateStr;
                     updateDateLabel(d);
 
-                    // Resources are provider columns for the CURRENT date; they must be
-                    // re-fetched whenever the visible date changes (FC does not do this automatically).
-                    calendar.refetchResources();
+                    // Resources are provider columns for the CURRENT date; re-fetch only when the date changes
+                    if (dateChanged) {
+                        calendar.refetchResources();
+                    }
                     // Production stats are computed server-side for the visible day.
                     fetchCalendarStats(dateStr);
                 },
@@ -1417,9 +1435,271 @@
                 if (aptCapacityTable) aptCapacityTable.search(this.value).draw();
             });
         }
+
+        // ── Scheduled Production Breakdown Modal ─────────────────────────
+        let rawSchedData = null;
+
+        function openScheduledProductionModal() {
+            const date = document.getElementById('calDate').value || '{{ date("Y-m-d") }}';
+            const modal = document.getElementById('scheduled-prod-modal');
+            modal.classList.remove('hidden');
+
+            document.getElementById('sched-modal-date').textContent = 'Loading...';
+            document.getElementById('sched-modal-total').textContent = '…';
+            document.getElementById('sched-modal-count').textContent = '…';
+            document.getElementById('sched-modal-prov-count').textContent = '…';
+            document.getElementById('sched-view-provider').innerHTML = '<div class="p-8 text-center text-xs text-slate-400">Loading breakdown data...</div>';
+
+            fetch(baseUrl + '/calendar/scheduled-production-breakdown?date=' + date)
+                .then(r => r.json())
+                .then(data => {
+                    rawSchedData = data;
+                    const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+                    document.getElementById('sched-modal-date').textContent = data.date;
+                    document.getElementById('sched-modal-total').textContent = usd.format(data.total_scheduled || 0);
+                    document.getElementById('sched-modal-count').textContent = data.appointment_count;
+                    document.getElementById('sched-modal-prov-count').textContent = data.by_provider.length;
+
+                    renderSchedProviderView(data.by_provider, data.total_scheduled);
+                    renderSchedProcedureView(data.by_procedure, data.total_scheduled);
+                    renderSchedAppointmentsTable(data.appointments);
+                })
+                .catch(err => {
+                    document.getElementById('sched-modal-date').textContent = 'Error loading breakdown';
+                });
+        }
+
+        function closeSchedProdModal() {
+            document.getElementById('scheduled-prod-modal').classList.add('hidden');
+        }
+
+        function switchSchedTab(tabName) {
+            document.querySelectorAll('.sched-modal-tab').forEach(t => {
+                t.classList.remove('font-bold', 'text-slate-900', 'border-emerald-500');
+                t.classList.add('font-medium', 'text-slate-400', 'border-transparent');
+            });
+            const activeTab = document.getElementById('sched-tab-' + tabName);
+            if (activeTab) {
+                activeTab.classList.remove('font-medium', 'text-slate-400', 'border-transparent');
+                activeTab.classList.add('font-bold', 'text-slate-900', 'border-emerald-500');
+            }
+
+            document.querySelectorAll('.sched-modal-view').forEach(v => v.classList.add('hidden'));
+            const targetView = document.getElementById('sched-view-' + tabName);
+            if (targetView) targetView.classList.remove('hidden');
+        }
+
+        function renderSchedProviderView(providers, grandTotal) {
+            const container = document.getElementById('sched-view-provider');
+            if (!providers || providers.length === 0) {
+                container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400">No scheduled providers found for this date</div>';
+                return;
+            }
+
+            const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+            container.innerHTML = providers.map(p => {
+                const pct = grandTotal > 0 ? Math.round((p.total / grandTotal) * 100) : 0;
+                return `
+                    <div class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs">
+                                    ${p.abbr.substring(0, 3)}
+                                </div>
+                                <div>
+                                    <div class="text-xs font-bold text-slate-900">${p.name}</div>
+                                    <div class="text-[10px] text-slate-500 font-medium">${p.count} appointment${p.count === 1 ? '' : 's'} scheduled</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm font-bold text-slate-900">${usd.format(p.total)}</div>
+                                <div class="text-[10px] font-semibold text-emerald-600">${pct}% of total</div>
+                            </div>
+                        </div>
+                        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                            <div class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width:${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderSchedProcedureView(procedures, grandTotal) {
+            const container = document.getElementById('sched-view-procedure');
+            if (!procedures || procedures.length === 0) {
+                container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400">No procedure codes scheduled for this date</div>';
+                return;
+            }
+
+            const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+            container.innerHTML = procedures.map(pr => {
+                const pct = grandTotal > 0 ? Math.round((pr.total / grandTotal) * 100) : 0;
+                return `
+                    <div class="bg-white border border-slate-200 rounded-lg p-3.5 shadow-sm flex items-center justify-between">
+                        <div>
+                            <div class="text-xs font-bold text-slate-900">${pr.code}</div>
+                            <div class="text-[10px] text-slate-500">Frequency: ${pr.count} procedure${pr.count === 1 ? '' : 's'}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs font-bold text-slate-900">${usd.format(pr.total)}</div>
+                            <div class="text-[10px] font-medium text-slate-400">${pct}%</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderSchedAppointmentsTable(appointments) {
+            const tbody = document.getElementById('sched-apts-tbody');
+            if (!appointments || appointments.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-xs text-slate-400">No scheduled appointments found for this date</td></tr>';
+                return;
+            }
+
+            const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+            const drawRows = (items) => {
+                if (items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-4 text-center text-xs text-slate-400">No matching appointments found</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = items.map(a => `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-4 py-2.5 font-bold text-slate-900">${a.patient_name}</td>
+                        <td class="px-4 py-2.5 font-medium text-slate-600">${a.time}</td>
+                        <td class="px-4 py-2.5 text-slate-600">${a.operatory}</td>
+                        <td class="px-4 py-2.5 font-medium text-slate-800">${a.provider}</td>
+                        <td class="px-4 py-2.5 text-slate-600 max-w-xs truncate" title="${a.procedures}">${a.procedures}</td>
+                        <td class="px-4 py-2.5 text-right font-bold text-emerald-600">${usd.format(a.fee)}</td>
+                    </tr>
+                `).join('');
+            };
+
+            drawRows(appointments);
+
+            const searchInput = document.getElementById('schedAptsSearch');
+            if (searchInput) {
+                searchInput.onkeyup = function () {
+                    const q = this.value.toLowerCase().trim();
+                    if (!q) {
+                        drawRows(appointments);
+                        return;
+                    }
+                    const filtered = appointments.filter(a =>
+                        a.patient_name.toLowerCase().includes(q) ||
+                        a.provider.toLowerCase().includes(q) ||
+                        a.procedures.toLowerCase().includes(q) ||
+                        a.operatory.toLowerCase().includes(q)
+                    );
+                    drawRows(filtered);
+                };
+            }
+        }
     </script>
 
     <x-app-components.patient-modal />
+
+    {{-- Scheduled Production Breakdown Modal --}}
+    <div id="scheduled-prod-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+            {{-- Modal Header --}}
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">Scheduled Production Breakdown</h3>
+                        <p class="text-xs text-slate-400 font-medium" id="sched-modal-date">—</p>
+                    </div>
+                </div>
+                <button onclick="closeSchedProdModal()" class="text-slate-400 hover:text-white transition p-1.5 rounded-lg hover:bg-slate-800">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <line x1="18" y1="6" x2="6" y2="18" stroke-width="2" />
+                        <line x1="6" y1="6" x2="18" y2="18" stroke-width="2" />
+                    </svg>
+                </button>
+            </div>
+
+            {{-- Summary Cards Header --}}
+            <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 grid grid-cols-3 gap-4 flex-shrink-0">
+                <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Scheduled Production</p>
+                    <p class="text-2xl font-black text-emerald-600" id="sched-modal-total">—</p>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Scheduled Appointments</p>
+                    <p class="text-2xl font-black text-slate-800" id="sched-modal-count">—</p>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Active Providers</p>
+                    <p class="text-2xl font-black text-slate-800" id="sched-modal-prov-count">—</p>
+                </div>
+            </div>
+
+            {{-- Modal Navigation Tabs --}}
+            <div class="bg-white border-b border-slate-200 px-6 flex-shrink-0">
+                <nav class="flex gap-6">
+                    <button onclick="switchSchedTab('provider')" id="sched-tab-provider" class="sched-modal-tab py-3 text-xs font-bold text-slate-900 border-b-2 border-emerald-500">
+                        By Provider
+                    </button>
+                    <button onclick="switchSchedTab('procedure')" id="sched-tab-procedure" class="sched-modal-tab py-3 text-xs font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition">
+                        By Procedure
+                    </button>
+                    <button onclick="switchSchedTab('appointments')" id="sched-tab-appointments" class="sched-modal-tab py-3 text-xs font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition">
+                        Itemized Appointments
+                    </button>
+                </nav>
+            </div>
+
+            {{-- Modal Body Content --}}
+            <div class="p-6 flex-1 overflow-y-auto bg-slate-50">
+                {{-- Tab 1: By Provider --}}
+                <div id="sched-view-provider" class="sched-modal-view space-y-3">
+                    <!-- Rendered dynamically -->
+                </div>
+
+                {{-- Tab 2: By Procedure --}}
+                <div id="sched-view-procedure" class="sched-modal-view hidden space-y-3">
+                    <!-- Rendered dynamically -->
+                </div>
+
+                {{-- Tab 3: Itemized Appointments --}}
+                <div id="sched-view-appointments" class="sched-modal-view hidden">
+                    <div class="mb-3 flex justify-between items-center">
+                        <input type="text" id="schedAptsSearch" placeholder="Search patient, provider, procedure..." class="border border-slate-300 rounded px-3 py-1.5 text-xs text-slate-700 bg-white w-64 focus:outline-emerald-500">
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                        <table class="w-full text-left text-xs text-slate-700">
+                            <thead class="bg-slate-100 uppercase text-[10px] font-bold text-slate-500 border-b border-slate-200">
+                                <tr>
+                                    <th class="px-4 py-3">Patient Name</th>
+                                    <th class="px-4 py-3">Time</th>
+                                    <th class="px-4 py-3">Operatory</th>
+                                    <th class="px-4 py-3">Provider</th>
+                                    <th class="px-4 py-3">Scheduled Procedures</th>
+                                    <th class="px-4 py-3 text-right">Fee</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sched-apts-tbody" class="divide-y divide-slate-100">
+                                <!-- Rendered dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Modal Footer --}}
+            <div class="px-6 py-3 bg-white border-t border-slate-200 flex justify-end flex-shrink-0">
+                <button onclick="closeSchedProdModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-5 py-1.5 rounded text-xs transition">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
 
     <div id="notes-hover-card"
         class="fixed hidden bg-slate-900/95 backdrop-blur-sm text-white rounded-lg p-2.5 shadow-xl max-w-xs z-50 leading-relaxed text-xs border border-slate-800 pointer-events-none transition-opacity duration-150 font-normal">

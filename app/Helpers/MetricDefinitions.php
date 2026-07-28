@@ -27,7 +27,7 @@ class MetricDefinitions
      */
     public static function scheduledPatients(?string $alias = null): string
     {
-        $raw = 'COUNT(DISTINCT PatNum)';
+        $raw = 'COUNT(*)';
 
         return $raw.($alias ? " AS {$alias}" : '');
     }

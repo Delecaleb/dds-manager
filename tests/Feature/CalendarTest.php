@@ -109,4 +109,38 @@ class CalendarTest extends TestCase
                 'color' => '#6DE5C1',
             ]);
     }
+
+    public function test_calendar_scheduled_production_breakdown_endpoint_returns_data(): void
+    {
+        $provider = OdProvider::create([
+            'ProvNum' => 81,
+            'LName' => 'Elias',
+            'PName' => 'Kathy',
+            'Abbr' => 'ELIAS',
+        ]);
+
+        OdAppointment::create([
+            'AptNum' => 99993,
+            'PatNum' => 1,
+            'AptStatus' => 1,
+            'Pattern' => '//',
+            'Op' => 2,
+            'ProvNum' => $provider->ProvNum,
+            'AptDateTime' => '2026-07-14 10:00:00',
+            'ProcDescript' => 'PeriodicX',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson(route('calendar.scheduled-production-breakdown', ['date' => '2026-07-14']));
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'date',
+                'total_scheduled',
+                'appointment_count',
+                'by_provider',
+                'by_procedure',
+                'appointments',
+            ]);
+    }
 }

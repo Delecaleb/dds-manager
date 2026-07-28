@@ -163,17 +163,17 @@ class FinancialController extends Controller
                 ->groupByRaw('DATE(ProcDate)')
                 ->pluck('cnt', 'date');
 
-            $dailyScheduled = OdAppointment::whereBetween('AptDateTime', [$start, $end])
+            $dailyScheduled = OdAppointment::whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
                 ->scheduled()
-                ->selectRaw('DATE(AptDateTime) as date, '.MetricDefinitions::scheduledPatients('cnt'))
-                ->groupByRaw('DATE(AptDateTime)')
+                ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date, ".MetricDefinitions::scheduledPatients('cnt'))
+                ->groupByRaw("DATE(REPLACE(AptDateTime, 'T', ' '))")
                 ->pluck('cnt', 'date');
 
-            $dailyNewScheduled = OdAppointment::whereBetween('AptDateTime', [$start, $end])
+            $dailyNewScheduled = OdAppointment::whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
                 ->scheduled()
                 ->where('IsNewPatient', 'true')
-                ->selectRaw('DATE(AptDateTime) as date, '.MetricDefinitions::scheduledPatients('cnt'))
-                ->groupByRaw('DATE(AptDateTime)')
+                ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date, ".MetricDefinitions::scheduledPatients('cnt'))
+                ->groupByRaw("DATE(REPLACE(AptDateTime, 'T', ' '))")
                 ->pluck('cnt', 'date');
 
             $dailyNewVisits = DB::table(function ($query) {
@@ -668,7 +668,7 @@ class FinancialController extends Controller
             FROM od_appointments a
             JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
-              AND a.AptStatus = 1
+              AND a.AptStatus IN (1, 2, 4)
             GROUP BY p.PatNum, p.LName, p.FName
             ORDER BY count DESC, p.LName
         ", [$start, $end]);
@@ -693,7 +693,7 @@ class FinancialController extends Controller
             FROM od_appointments a
             JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
-              AND a.AptStatus = 1
+              AND a.AptStatus IN (1, 2, 4)
               AND a.IsNewPatient = 'true'
             GROUP BY p.PatNum, p.LName, p.FName
             ORDER BY count DESC, p.LName

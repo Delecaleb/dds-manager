@@ -68,7 +68,10 @@ class OdAppointment extends Model
 
     public function scopeInDateRange($query, $start, $end)
     {
-        return $query->whereBetween('AptDateTime', [$start, $end]);
+        $startDate = substr($start, 0, 10);
+        $endDate = substr($end, 0, 10);
+
+        return $query->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$startDate, $endDate]);
     }
 
     public function scheduledPatients($start, $end)
