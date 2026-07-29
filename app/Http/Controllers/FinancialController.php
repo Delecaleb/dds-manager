@@ -664,7 +664,7 @@ class FinancialController extends Controller
                 p.PatNum                         AS patient_id,
                 CONCAT(p.LName, ', ', p.FName)   AS patient_name,
                 GROUP_CONCAT(DISTINCT DATE_FORMAT(a.AptDateTime, '%Y-%m-%d') ORDER BY a.AptDateTime SEPARATOR ', ') AS dates,
-                COUNT(*)                         AS count
+                COUNT(DISTINCT DATE(a.AptDateTime)) AS count
             FROM od_appointments a
             JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
@@ -689,7 +689,7 @@ class FinancialController extends Controller
                 p.PatNum                         AS patient_id,
                 CONCAT(p.LName, ', ', p.FName)   AS patient_name,
                 GROUP_CONCAT(DISTINCT DATE_FORMAT(a.AptDateTime, '%Y-%m-%d') ORDER BY a.AptDateTime SEPARATOR ', ') AS dates,
-                COUNT(*)                         AS count
+                COUNT(DISTINCT DATE(a.AptDateTime)) AS count
             FROM od_appointments a
             JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE DATE(a.AptDateTime) BETWEEN ? AND ?

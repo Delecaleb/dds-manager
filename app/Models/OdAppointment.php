@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Helpers\MetricDefinitions;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -76,17 +77,19 @@ class OdAppointment extends Model
 
     public function scheduledPatients($start, $end)
     {
-        return $this->inDateRange($start, $end)
+        return (int) $this->inDateRange($start, $end)
             ->scheduled()
-            ->count();
+            ->selectRaw(MetricDefinitions::scheduledPatients('cnt'))
+            ->value('cnt');
     }
 
     public function newPatientsScheduled($start, $end)
     {
-        return $this->inDateRange($start, $end)
+        return (int) $this->inDateRange($start, $end)
             ->scheduled()
             ->where('IsNewPatient', 'true')
-            ->count();
+            ->selectRaw(MetricDefinitions::scheduledPatients('cnt'))
+            ->value('cnt');
     }
 
     public function patient()
