@@ -87,7 +87,7 @@ class OdAppointment extends Model
     {
         return (int) $this->inDateRange($start, $end)
             ->scheduled()
-            ->where('IsNewPatient', 'true')
+            ->whereIn('IsNewPatient', ['1', 1, 'true', true])
             ->selectRaw(MetricDefinitions::scheduledPatients('cnt'))
             ->value('cnt');
     }

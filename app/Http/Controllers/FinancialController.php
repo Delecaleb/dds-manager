@@ -171,7 +171,7 @@ class FinancialController extends Controller
 
             $dailyNewScheduled = OdAppointment::whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
                 ->scheduled()
-                ->where('IsNewPatient', 'true')
+                ->whereIn('IsNewPatient', ['1', 1, 'true', true])
                 ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date, ".MetricDefinitions::scheduledPatients('cnt'))
                 ->groupByRaw("DATE(REPLACE(AptDateTime, 'T', ' '))")
                 ->pluck('cnt', 'date');
@@ -694,7 +694,7 @@ class FinancialController extends Controller
             JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
               AND a.AptStatus IN (1, 2, 4)
-              AND a.IsNewPatient = 'true'
+              AND a.IsNewPatient IN ('1', 'true', '1', 1)
             GROUP BY p.PatNum, p.LName, p.FName
             ORDER BY count DESC, p.LName
         ", [$start, $end]);
