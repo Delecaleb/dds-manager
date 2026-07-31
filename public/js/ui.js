@@ -227,14 +227,13 @@
     // DataTables caches its rows, so new markup needs a rebuild, not a reuse.
     DDS.sortableRefresh = function (el) {
         if (!el) return null;
-        el.__ddsDrawing = true;                 // suppress the observer for our own DOM churn
+        if (el.__ddsDrawing) return null;
+        el.__ddsDrawing = true;
         if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(jQuery(el))) {
             jQuery(el).DataTable().destroy();
         }
         var dt = hasSortableRows(el) ? DDS.sortable(el) : null;
-        // Cleared on a macrotask: the observer's microtask callbacks for the churn above
-        // run first and are correctly ignored.
-        setTimeout(function () { el.__ddsDrawing = false; }, 0);
+        setTimeout(function () { el.__ddsDrawing = false; }, 150);
         return dt;
     };
     /* Watch a sortable table's <tbody> so pages that repaint rows themselves
@@ -248,8 +247,12 @@
         el.__ddsObserved = true;
         new MutationObserver(function () {
             if (el.__ddsDrawing) return;
+            if (!hasSortableRows(el)) return;
             clearTimeout(el.__ddsReinit);
-            el.__ddsReinit = setTimeout(function () { DDS.sortableRefresh(el); }, 0);
+            el.__ddsReinit = setTimeout(function () {
+                if (el.__ddsDrawing) return;
+                DDS.sortableRefresh(el);
+            }, 50);
         }).observe(tbody, { childList: true });
     };
 
