@@ -121,6 +121,22 @@
         .skel-pulse {
             animation: skel-pulse 1.6s ease-in-out infinite;
         }
+
+        /* Month View overrides */
+        .fc-daygrid-day {
+            cursor: pointer;
+            min-height: 115px;
+            transition: background-color 0.15s ease;
+        }
+
+        .fc-daygrid-day:hover {
+            background-color: #f8fafc;
+        }
+
+        .fc-daygrid-day-frame {
+            min-height: 115px;
+            height: 100%;
+        }
     </style>
     <header class="bg-white border-b border-gray-100 px-8 py-4 flex justify-between items-center">
         <div class="flex items-center space-x-2">
@@ -678,14 +694,14 @@
                             <tr class="bg-gray-50 border-t border-slate-200">
                                 <td class="text-left font-bold text-xs py-3 px-4 dt-col-sticky border-r border-slate-200 shadow-sm"
                                     style="width:14rem">Total:</td>
-                                <td
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-1">
+                                <td onclick="openCapacityBreakdown('scheduled_appointments')"
+                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-1 cursor-pointer hover:bg-slate-100 transition">
                                     -</td>
-                                <td
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-2">
+                                <td onclick="openCapacityBreakdown('provider_count')"
+                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-2 cursor-pointer hover:bg-slate-100 transition">
                                     -</td>
-                                <td
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-3">
+                                <td onclick="openCapacityBreakdown('booked_hours')"
+                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-3 cursor-pointer hover:bg-slate-100 transition">
                                     -</td>
                                 <td class="border-r border-slate-200 bg-white"></td>
                                 <td class="border-r border-slate-200 bg-white"></td>
@@ -694,22 +710,23 @@
                             <tr class="bg-white border-t border-slate-50">
                                 <td class="text-left font-bold text-xs py-3 px-4 dt-col-sticky border-r border-slate-200 shadow-sm"
                                     style="width:14rem">Average:</td>
-                                <td
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-1">
+                                <td onclick="openCapacityBreakdown('scheduled_appointments')"
+                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-1 cursor-pointer hover:bg-slate-50 transition">
                                     -</td>
-                                <td
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-2">
+                                <td onclick="openCapacityBreakdown('provider_count')"
+                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-2 cursor-pointer hover:bg-slate-50 transition">
                                     -</td>
-                                <td
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-3">
+                                <td onclick="openCapacityBreakdown('booked_hours')"
+                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-3 cursor-pointer hover:bg-slate-50 transition">
                                     -</td>
-                                <td
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-4">
+                                <td onclick="openCapacityBreakdown('avg_lead_all')"
+                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-4 cursor-pointer hover:bg-slate-50 transition">
                                     -</td>
-                                <td
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-5">
+                                <td onclick="openCapacityBreakdown('avg_lead_new')"
+                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-5 cursor-pointer hover:bg-slate-50 transition">
                                     -</td>
-                                <td class="text-right font-bold text-xs py-3 px-6 capacity-avg-6">-</td>
+                                <td onclick="openCapacityBreakdown('avg_lead_emerg')"
+                                    class="text-right font-bold text-xs py-3 px-6 capacity-avg-6 cursor-pointer hover:bg-slate-50 transition">-</td>
                             </tr>
                         </x-slot:foot>
                     </x-data-table>
@@ -880,6 +897,11 @@
 
                 // ── Events (appointments) ─────────────────────────────────
                 events: function (info, success, fail) {
+                    const currentViewType = this.view ? this.view.type : (info.view ? info.view.type : '');
+                    if (currentViewType === 'dayGridMonth') {
+                        success([]);
+                        return;
+                    }
                     setProgress(55, 'Fetching appointments...');
                     const start = (info.startStr || info.start?.toISOString() || '{{ date("Y-m-d") }}').substring(0, 10);
                     const end = info.end
@@ -973,21 +995,24 @@
                     currentCalDate = dateStr;
 
                     document.getElementById('calDate').value = dateStr;
-                    updateDateLabel(d);
+                    updateDateLabel(d, info.view?.type);
 
-                    // Resources are provider columns for the CURRENT date; re-fetch only when the date changes
-                    if (dateChanged) {
-                        calendar.refetchResources();
+                    if (info.view?.type === 'dayGridMonth') {
+                        fetchMonthlySummary(info);
+                    } else {
+                        if (dateChanged) {
+                            calendar.refetchResources();
+                        }
+                        // Production stats are computed server-side for the visible day.
+                        fetchCalendarStats(dateStr);
                     }
-                    // Production stats are computed server-side for the visible day.
-                    fetchCalendarStats(dateStr);
                 },
             });
 
             calendar.render();
 
             // initialise date label & clock
-            updateDateLabel(new Date('{{ date("Y-m-d") }}T00:00:00'));
+            updateDateLabel(new Date('{{ date("Y-m-d") }}T00:00:00'), calendar.view?.type);
             startClock();
 
             // ── Active Columns Toggle ───────────────────────────────────────
@@ -1009,9 +1034,13 @@
             // ── Refresh ───────────────────────────────────────────────────
             document.getElementById('refreshBtn').addEventListener('click', () => {
                 showCalSkeleton('Refreshing...');
-                calendar.refetchEvents();
-                calendar.refetchResources();
-                fetchCalendarStats(document.getElementById('calDate').value);
+                if (calendar?.view?.type === 'dayGridMonth') {
+                    fetchMonthlySummary(calendar.view);
+                } else {
+                    calendar.refetchEvents();
+                    calendar.refetchResources();
+                    fetchCalendarStats(document.getElementById('calDate').value);
+                }
             });
 
             // ── Date picker ───────────────────────────────────────────────
@@ -1028,18 +1057,169 @@
                 });
             });
 
-            // ── Clicking outside events restores opacity ──────────────────
+            // ── Clicking month cell opens day view / clicking outside restores opacity ──
             document.getElementById('calendar-wrap').addEventListener('click', function (e) {
-                if (!e.target.closest('.fc-event')) {
-                    document.querySelectorAll('.fc-event').forEach(el => el.style.opacity = '1');
+                if (calendar && calendar.view.type === 'dayGridMonth') {
+                    const dayCell = e.target.closest('.fc-daygrid-day');
+                    if (dayCell) {
+                        const clickedDate = dayCell.getAttribute('data-date');
+                        if (clickedDate) {
+                            showCalSkeleton('Loading day view...');
+                            calendar.gotoDate(clickedDate);
+                            calendar.changeView('resourceTimeGridDay');
+                            document.querySelectorAll('.view-btn').forEach(b => {
+                                if (b.dataset.view === 'resourceTimeGridDay') {
+                                    b.classList.add('active');
+                                } else {
+                                    b.classList.remove('active');
+                                }
+                            });
+                        }
+                    }
+                } else {
+                    if (!e.target.closest('.fc-event')) {
+                        document.querySelectorAll('.fc-event').forEach(el => el.style.opacity = '1');
+                    }
                 }
             });
         });
 
         // ── Date label formatter ──────────────────────────────────────────
-        function updateDateLabel(date) {
-            document.getElementById('calDateLabel').textContent = date.toLocaleDateString('en-US', {
-                weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+        function updateDateLabel(date, viewType) {
+            if (viewType === 'dayGridMonth') {
+                document.getElementById('calDateLabel').textContent = date.toLocaleDateString('en-US', {
+                    month: 'long', year: 'numeric'
+                });
+            } else {
+                document.getElementById('calDateLabel').textContent = date.toLocaleDateString('en-US', {
+                    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+                });
+            }
+        }
+
+        // ── Month View Summary Helpers ────────────────────────────────────
+        function formatMonthCurrency(val) {
+            if (val === 0 || val === null || val === undefined) return '$ 0';
+            const isNeg = val < 0;
+            const absVal = Math.abs(val);
+            const formatted = absVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (isNeg) {
+                return `$ (${formatted})`;
+            }
+            return `$ ${formatted}`;
+        }
+
+        function fetchMonthlySummary(infoOrView) {
+            setProgress(30, 'Loading monthly summary...');
+            let startStr = '';
+            let endStr = '';
+
+            if (infoOrView) {
+                if (infoOrView.startStr) {
+                    startStr = infoOrView.startStr.substring(0, 10);
+                } else if (infoOrView.activeStart) {
+                    startStr = infoOrView.activeStart.toISOString().substring(0, 10);
+                }
+                if (infoOrView.endStr) {
+                    endStr = infoOrView.endStr.substring(0, 10);
+                } else if (infoOrView.activeEnd) {
+                    endStr = new Date(infoOrView.activeEnd.getTime() - 86400000).toISOString().substring(0, 10);
+                }
+            }
+
+            if (!startStr) {
+                startStr = document.getElementById('calDate').value || '{{ date("Y-m-d") }}';
+            }
+            if (!endStr) {
+                endStr = startStr;
+            }
+
+            fetch(baseUrl + '/calendar/monthly-summary?start=' + startStr + '&end=' + endStr)
+                .then(r => r.json())
+                .then(data => {
+                    renderMonthlySummary(data);
+                    setProgress(100, 'Ready');
+                })
+                .catch(err => {
+                    console.error('[Monthly Summary] Error:', err);
+                    setProgress(100, 'Error loading summary');
+                });
+        }
+
+        function renderMonthlySummary(data) {
+            Object.keys(data).forEach(dateStr => {
+                const dayCell = document.querySelector(`.fc-daygrid-day[data-date="${dateStr}"]`);
+                if (!dayCell) return;
+
+                const dayFrame = dayCell.querySelector('.fc-daygrid-day-frame');
+                if (!dayFrame) return;
+
+                const isOtherMonth = dayCell.classList.contains('fc-day-other');
+
+                if (isOtherMonth) {
+                    let metricsEl = dayFrame.querySelector('.month-day-metrics');
+                    if (metricsEl) metricsEl.remove();
+
+                    const dayTop = dayCell.querySelector('.fc-daygrid-day-top');
+                    if (dayTop) {
+                        dayTop.innerHTML = '';
+                    }
+                    const eventsEl = dayFrame.querySelector('.fc-daygrid-day-events');
+                    if (eventsEl) eventsEl.style.display = 'none';
+                    return;
+                }
+
+                const dayTop = dayCell.querySelector('.fc-daygrid-day-top');
+                const dayNumberEl = dayCell.querySelector('.fc-daygrid-day-number');
+                const dayNumText = dayNumberEl ? dayNumberEl.textContent.trim() : parseInt(dateStr.split('-')[2], 10);
+
+                const dayData = data[dateStr];
+
+                if (dayTop) {
+                    dayTop.style.display = 'flex';
+                    dayTop.style.justifyContent = 'space-between';
+                    dayTop.style.alignItems = 'flex-start';
+                    dayTop.style.padding = '4px 6px';
+                    dayTop.style.flexDirection = 'row-reverse';
+
+                    dayTop.innerHTML = `
+                        <a class="fc-daygrid-day-number text-xs font-semibold text-slate-700 hover:text-emerald-600">${dayNumText}</a>
+                        <div class="text-right leading-none">
+                            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Appointments</div>
+                            <div class="text-xs font-black text-slate-800">${dayData ? dayData.appointments : 0}</div>
+                        </div>
+                    `;
+                }
+
+                let metricsEl = dayFrame.querySelector('.month-day-metrics');
+                if (metricsEl) metricsEl.remove();
+
+                if (dayData) {
+                    metricsEl = document.createElement('div');
+                    metricsEl.className = 'month-day-metrics p-2 space-y-1 text-[11px] select-none';
+                    metricsEl.innerHTML = `
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-16 text-right text-slate-500 font-medium">New Pts:</span>
+                            <span class="font-bold text-slate-900">${dayData.new_pts}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-16 text-right text-slate-500 font-medium">Sched:</span>
+                            <span class="font-bold text-slate-900">${formatMonthCurrency(dayData.sched)}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-16 text-right text-slate-500 font-medium">Goal:</span>
+                            <span class="font-bold text-slate-900">${formatMonthCurrency(dayData.goal)}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-16 text-right text-slate-500 font-medium">Prod:</span>
+                            <span class="font-bold text-slate-900">${formatMonthCurrency(dayData.prod)}</span>
+                        </div>
+                    `;
+                    dayFrame.appendChild(metricsEl);
+                }
+
+                const eventsEl = dayFrame.querySelector('.fc-daygrid-day-events');
+                if (eventsEl) eventsEl.style.display = 'none';
             });
         }
 
@@ -1349,7 +1529,6 @@
                 if (left + cardWidth > window.innerWidth - 10) {
                     left = window.innerWidth - cardWidth - 10;
                 }
-
                 $card.css({
                     top: top + 'px',
                     left: left + 'px'
@@ -1399,7 +1578,7 @@
                     columns.forEach((col, index) => {
                         const td = $('td:eq(' + (index + 1) + ')', row);
                         const tier = data._tiers ? data._tiers[col] : 'mid';
-                        td.addClass('px-4 py-3 text-right font-medium text-slate-800');
+                        td.addClass('px-4 py-3 text-right font-medium text-slate-800 cursor-pointer hover:opacity-80 transition');
 
                         let bgColor = 'bg-yellow-100/70';
                         let arrow = '<svg class="w-3.5 h-3.5 text-yellow-600 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
@@ -1413,6 +1592,7 @@
                         }
 
                         td.addClass(bgColor);
+                        td.attr('onclick', "openCapacityBreakdown('" + col + "')");
                         const val = td.html();
                         td.html('<div class="flex items-center justify-end gap-2 w-full"><span class="truncate">' + val + '</span> <div class="border border-black/10 rounded-sm p-0.5 bg-black/5 flex-shrink-0">' + arrow + '</div></div>');
                     });
@@ -1434,6 +1614,86 @@
             $('#capacitySearch').on('keyup', function () {
                 if (aptCapacityTable) aptCapacityTable.search(this.value).draw();
             });
+        }
+
+        // ── Appointment Capacity Breakdown Modal ─────────────────────────
+        function openCapacityBreakdown(type) {
+            const datePicker = document.getElementById('calDate');
+            const date = datePicker ? datePicker.value : "{{ date('Y-m-d') }}";
+
+            let title = 'Capacity Breakdown';
+            let columns = [];
+
+            const patientRender = function (data, t, row) {
+                if (row.patient_id && row.patient_id !== 'N/A' && row.patient_id !== 0) {
+                    return `<a href="javascript:void(0)" onclick="openPatient(${row.patient_id})" class="text-emerald-600 hover:text-emerald-700 font-semibold hover:underline">${data}</a>`;
+                }
+                return data || '—';
+            };
+
+            if (type === 'scheduled_appointments') {
+                title = 'Scheduled Appointments Breakdown';
+                columns = [
+                    { data: 'patient', title: 'Patient', render: patientRender },
+                    { data: 'patient_id', title: 'Patient ID' },
+                    { data: 'date', title: 'Date' },
+                    { data: 'provider', title: 'Provider' },
+                    { data: 'provider_id', title: 'Provider ID' }
+                ];
+            } else if (type === 'provider_count') {
+                title = '# of Providers Breakdown';
+                columns = [
+                    { data: 'provider_name', title: 'Provider Name' },
+                    { data: 'provider_id', title: 'Provider ID' }
+                ];
+            } else if (type === 'booked_hours') {
+                title = 'Booked Hours Breakdown';
+                columns = [
+                    { data: 'patient', title: 'Patient', render: patientRender },
+                    { data: 'patient_id', title: 'Patient ID' },
+                    { data: 'duration', title: 'Duration (hrs)' },
+                    { data: 'provider', title: 'Provider' },
+                    { data: 'provider_id', title: 'Provider ID' }
+                ];
+            } else if (type === 'avg_lead_all') {
+                title = 'Avg. Lead Time - All Appointments Breakdown';
+                columns = [
+                    { data: 'patient', title: 'Patient', render: patientRender },
+                    { data: 'patient_id', title: 'Patient ID' },
+                    { data: 'lead_time', title: 'Lead Time (days)' },
+                    { data: 'provider', title: 'Provider' },
+                    { data: 'provider_id', title: 'Provider ID' }
+                ];
+            } else if (type === 'avg_lead_new') {
+                title = 'Avg. Lead Time - New Patients Breakdown';
+                columns = [
+                    { data: 'patient', title: 'Patient', render: patientRender },
+                    { data: 'patient_id', title: 'Patient ID' },
+                    { data: 'lead_time', title: 'Lead Time (days)' },
+                    { data: 'provider', title: 'Provider' },
+                    { data: 'provider_id', title: 'Provider ID' }
+                ];
+            } else if (type === 'avg_lead_emerg') {
+                title = 'Avg. Lead Time - Emergency Breakdown';
+                columns = [
+                    { data: 'patient', title: 'Patient', render: patientRender },
+                    { data: 'patient_id', title: 'Patient ID' },
+                    { data: 'lead_time', title: 'Lead Time (days)' },
+                    { data: 'provider', title: 'Provider' },
+                    { data: 'provider_id', title: 'Provider ID' }
+                ];
+            }
+
+            setDataTableModalLoading('capacity-breakdown-modal', title);
+
+            fetch(baseUrl + '/calendar/capacity-breakdown?date=' + date + '&type=' + type)
+                .then(r => r.json())
+                .then(data => {
+                    openDataTableModal('capacity-breakdown-modal', title, columns, data);
+                })
+                .catch(err => {
+                    console.error('Failed to load capacity breakdown data:', err);
+                });
         }
 
         // ── Scheduled Production Breakdown Modal ─────────────────────────
@@ -1599,6 +1859,7 @@
     </script>
 
     <x-app-components.patient-modal />
+    <x-app-components.datatable-modal id="capacity-breakdown-modal" />
 
     {{-- Scheduled Production Breakdown Modal --}}
     <div id="scheduled-prod-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">

@@ -260,6 +260,82 @@ class CalendarController extends Controller
         return DataTables::of(collect($data))->make(true);
     }
 
+    public function capacityBreakdown(Request $request)
+    {
+        $start = $request->get('start') ?? $request->get('date') ?? date('Y-m-d');
+        $end = $request->get('end') ?? $start;
+        $type = $request->get('type', 'scheduled_appointments');
+
+        $query = OdAppointment::whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->where('AptStatus', 1);
+
+        if ($type === 'avg_lead_new') {
+            $query->whereIn('IsNewPatient', ['1', 1, 'true', true]);
+        } elseif ($type === 'avg_lead_emerg') {
+            $query->where(function ($q) {
+                $q->where('ProcDescript', 'LIKE', '%emergency%')
+                    ->orWhere('ProcDescript', 'LIKE', '%D0140%')
+                    ->orWhere('Pattern', 'LIKE', '%emerg%');
+            });
+        }
+
+        $appointments = $query->with(['patient', 'provider'])->get();
+
+        if ($type === 'provider_count') {
+            $providers = $appointments->map(function ($apt) {
+                $prov = $apt->provider;
+                $name = $prov ? trim(($prov->LName ?? '').', '.($prov->FName ?: $prov->PName ?: $prov->Abbr ?: '')) : ('Provider #'.$apt->ProvNum);
+
+                return [
+                    'provider' => $name,
+                    'provider_name' => $name,
+                    'provider_id' => $apt->ProvNum ?: 'N/A',
+                ];
+            })->unique('provider_id')->values();
+
+            return response()->json($providers);
+        }
+
+        $rows = $appointments->map(function ($apt) {
+            $pat = $apt->patient;
+            $prov = $apt->provider;
+
+            $patName = 'Unknown Patient';
+            if ($pat) {
+                $formatted = trim(($pat->FName ?? '').' '.($pat->LName ?? ''));
+                if (empty($formatted)) {
+                    $formatted = trim(($pat->LName ?? '').', '.($pat->FName ?? ''));
+                }
+                if (! empty($formatted)) {
+                    $patName = $formatted;
+                }
+            }
+
+            $provName = $prov ? trim(($prov->LName ?? '').', '.($prov->FName ?: $prov->PName ?: $prov->Abbr ?: '')) : ('Provider #'.$apt->ProvNum);
+
+            $aptDate = substr(str_replace('T', ' ', $apt->AptDateTime), 0, 10);
+
+            $patternLen = strlen($apt->Pattern ?? '');
+            $durationHrs = number_format(($patternLen > 0 ? $patternLen * 10 : 60) / 60, 2);
+
+            $createdDt = new Carbon($apt->SecDateTEdit ?? $apt->DateTStamp ?? $apt->AptDateTime);
+            $aptDt = new Carbon($apt->AptDateTime);
+            $leadDays = number_format(max(0, $createdDt->diffInDays($aptDt)), 2);
+
+            return [
+                'patient' => $patName,
+                'patient_id' => $apt->PatNum,
+                'date' => $aptDate,
+                'duration' => $durationHrs,
+                'lead_time' => $leadDays,
+                'provider' => $provName,
+                'provider_id' => $apt->ProvNum ?: 'N/A',
+            ];
+        })->values();
+
+        return response()->json($rows);
+    }
+
     public function scheduledProductionBreakdown(Request $request)
     {
         $date = $request->get('date') ?? date('Y-m-d');
@@ -334,5 +410,97 @@ class CalendarController extends Controller
             'by_procedure' => array_values($procedureTotals),
             'appointments' => $itemizedApts,
         ]);
+    }
+
+    public function monthlySummary(Request $request)
+    {
+        $start = $request->get('start') ?? date('Y-m-01');
+        $end = $request->get('end') ?? date('Y-m-t');
+
+        // 1. Gross production per date
+        $grossByDate = OdProcedureLog::query()
+            ->whereIn('ProcStatus', ['C', '2'])
+            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->selectRaw("DATE(REPLACE(ProcDate, 'T', ' ')) as date_str, COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0) AS total")
+            ->groupBy('date_str')
+            ->pluck('total', 'date_str');
+
+        // 2. Adjustments per date
+        $adjByDate = OdAdjustment::query()
+            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->selectRaw("DATE(REPLACE(AdjDate, 'T', ' ')) as date_str, COALESCE(SUM(CAST(AdjAmt AS DECIMAL(12,2))), 0) AS total")
+            ->groupBy('date_str')
+            ->pluck('total', 'date_str');
+
+        // 3. Scheduled production per date
+        $schedByDate = OdAppointment::query()
+            ->join('od_procedure_logs as pl', 'pl.AptNum', '=', 'od_appointments.AptNum')
+            ->where('od_appointments.AptStatus', '1')
+            ->whereRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->selectRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) as date_str, COALESCE(SUM(CAST(pl.ProcFee AS DECIMAL(12,2))), 0) AS total")
+            ->groupBy('date_str')
+            ->pluck('total', 'date_str');
+
+        // 4. Appointments count & New Patients count per date
+        $aptsByDate = OdAppointment::query()
+            ->whereIn('AptStatus', [1, 2, 4, 5])
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date_str, COUNT(*) as total_apts, SUM(CASE WHEN IsNewPatient IN (1, '1', 'true', true) THEN 1 ELSE 0 END) as new_pts")
+            ->groupBy('date_str')
+            ->get()
+            ->keyBy('date_str');
+
+        $startDate = Carbon::parse($start);
+        $endDate = Carbon::parse($end);
+
+        // Precalculate weekdays in months covering the range
+        $weekdayCounts = [];
+        $curr = $startDate->copy();
+        while ($curr->lte($endDate)) {
+            $monthKey = $curr->format('Y-m');
+            if (! isset($weekdayCounts[$monthKey])) {
+                $daysInMonth = $curr->daysInMonth;
+                $weekdays = 0;
+                for ($d = 1; $d <= $daysInMonth; $d++) {
+                    $dayDt = Carbon::createFromDate($curr->year, $curr->month, $d);
+                    if ($dayDt->isWeekday()) {
+                        $weekdays++;
+                    }
+                }
+                $weekdayCounts[$monthKey] = max(1, $weekdays);
+            }
+            $curr->addDay();
+        }
+
+        $result = [];
+        $cursor = $startDate->copy();
+        while ($cursor->lte($endDate)) {
+            $dateStr = $cursor->format('Y-m-d');
+            $monthKey = $cursor->format('Y-m');
+            $weekdaysInMonth = $weekdayCounts[$monthKey] ?? 22;
+
+            $gross = (float) ($grossByDate[$dateStr] ?? 0);
+            $adj = (float) ($adjByDate[$dateStr] ?? 0);
+            $prod = $gross - $adj;
+            $sched = (float) ($schedByDate[$dateStr] ?? 0);
+
+            $aptRow = $aptsByDate[$dateStr] ?? null;
+            $aptsCount = $aptRow ? (int) $aptRow->total_apts : 0;
+            $newPtsCount = $aptRow ? (int) $aptRow->new_pts : 0;
+
+            $goal = $cursor->isWeekday() ? round(100000 / $weekdaysInMonth, 2) : 0.0;
+
+            $result[$dateStr] = [
+                'appointments' => $aptsCount,
+                'new_pts' => $newPtsCount,
+                'sched' => $sched,
+                'goal' => $goal,
+                'prod' => $prod,
+            ];
+
+            $cursor->addDay();
+        }
+
+        return response()->json($result);
     }
 }

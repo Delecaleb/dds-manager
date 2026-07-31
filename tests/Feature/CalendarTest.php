@@ -143,4 +143,19 @@ class CalendarTest extends TestCase
                 'appointments',
             ]);
     }
+
+    public function test_calendar_monthly_summary_endpoint_returns_daily_breakdown(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->getJson(route('calendar.monthly-summary', ['start' => '2026-07-01', 'end' => '2026-07-05']));
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                '2026-07-01' => ['appointments', 'new_pts', 'sched', 'goal', 'prod'],
+                '2026-07-02' => ['appointments', 'new_pts', 'sched', 'goal', 'prod'],
+                '2026-07-03' => ['appointments', 'new_pts', 'sched', 'goal', 'prod'],
+                '2026-07-04' => ['appointments', 'new_pts', 'sched', 'goal', 'prod'],
+                '2026-07-05' => ['appointments', 'new_pts', 'sched', 'goal', 'prod'],
+            ]);
+    }
 }

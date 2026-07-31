@@ -18,7 +18,7 @@
       <option>All Locations</option>
     </select>
 
-    <button
+    <button id="refreshBtn"
       class="bg-white border border-[#00c58e] text-[#00c58e] px-5 py-1.5 rounded text-sm font-bold hover:bg-emerald-50 transition shadow-xs">
       Refresh
     </button>
@@ -319,6 +319,7 @@
       $('#detailTableTotalAmount').text(fmtMoney(total));
       $('#detailTfoot').removeClass('hidden');
       if (_currentTab === 'detail') $('#paginationSummary').text(`1-${data.length} of ${data.length} items`);
+      if (window.DDS && DDS.sortableRefresh && $('#detailContainer table').length) DDS.sortableRefresh($('#detailContainer table')[0]);
     }
 
     function sortDetailData(key) {
@@ -452,8 +453,17 @@
     }
 
     function fetchDeposits(start, end) {
-      if (!start) start = moment().startOf('year').format('YYYY-MM-DD');
-      if (!end) end = moment().endOf('year').format('YYYY-MM-DD');
+      if (!start || !end) {
+        var picker = $('#drp').data('daterangepicker');
+        if (picker) {
+          start = picker.startDate.format('YYYY-MM-DD');
+          end = picker.endDate.format('YYYY-MM-DD');
+        } else {
+          var params = new URLSearchParams(window.location.search);
+          start = params.get('start_date') || moment().startOf('month').format('YYYY-MM-DD');
+          end = params.get('end_date') || moment().format('YYYY-MM-DD');
+        }
+      }
 
       var skelSummary = '';
       for (let i = 0; i < 3; i++) {
@@ -467,6 +477,9 @@
         skelDetail += '<tr class="animate-pulse">';
         for (let c = 0; c < 13; c++) skelDetail += '<td class="px-4 py-3"><div class="h-3 bg-gray-200 rounded w-full"></div></td>';
         skelDetail += '</tr>';
+      }
+      if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable('#detailContainer table')) {
+        $('#detailContainer table').DataTable().destroy();
       }
       $('#detailTbody').html(skelDetail);
       $('#detailTfoot').addClass('hidden');
@@ -578,6 +591,10 @@
     });
 
     window.onDrpApply = function (start, end) { fetchDeposits(start, end); };
+
+    $('#refreshBtn').on('click', function () {
+      fetchDeposits();
+    });
 
     $(document).ready(function () {
       fetchDeposits();

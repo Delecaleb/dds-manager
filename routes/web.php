@@ -77,7 +77,9 @@ Route::middleware('auth')->group(function () {
     Route::get('calendar/resources', [CalendarController::class, 'getResources'])->name('calendar.resources');
     Route::get('calendar/appointments-details-data', [CalendarController::class, 'appointmentsDetailsData'])->name('calendar.appointments-details-data');
     Route::get('calendar/appointment-capacity-data', [CalendarController::class, 'appointmentCapacityData'])->name('calendar.appointment-capacity-data');
+    Route::get('calendar/capacity-breakdown', [CalendarController::class, 'capacityBreakdown'])->name('calendar.capacity-breakdown');
     Route::get('calendar/scheduled-production-breakdown', [CalendarController::class, 'scheduledProductionBreakdown'])->name('calendar.scheduled-production-breakdown');
+    Route::get('calendar/monthly-summary', [CalendarController::class, 'monthlySummary'])->name('calendar.monthly-summary');
     Route::get('deposits', [DepositSlipController::class, 'index'])->name('deposits.index');
     Route::get('deposits/data', [DepositSlipController::class, 'data'])->name('deposits.data');
 

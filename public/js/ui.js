@@ -220,7 +220,8 @@
     // A table is sortable once it holds a real data row — not a single colspan
     // "Loading…" / "No records" placeholder, which has no cell in column 2.
     function hasSortableRows(el) {
-        return !!el.querySelector('tbody tr td:nth-child(2)');
+        var tr = el.querySelector('tbody tr:not(.animate-pulse)');
+        return !!(tr && tr.querySelector('td:nth-child(2)'));
     }
     // Rebuild for tables whose rows are injected by page JS (tbody.innerHTML = …).
     // DataTables caches its rows, so new markup needs a rebuild, not a reuse.
