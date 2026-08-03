@@ -265,7 +265,7 @@ class FinancialController extends Controller
             WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               {$provFilter}
-            GROUP BY pr.ProvNum, pr.LName, pr.PName, pc.CodeNum, pc.ProcCode, pc.Descript
+            GROUP BY pr.ProvNum, pr.Abbr, pr.LName, pr.PName, pc.CodeNum, pc.ProcCode, pc.Descript
             ORDER BY total_production DESC, cnt DESC
         ", $bindings);
 

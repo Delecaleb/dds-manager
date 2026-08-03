@@ -3,6 +3,7 @@
 namespace App\Helpers;
 
 use Illuminate\Database\Query\Expression;
+use Illuminate\Support\Facades\DB;
 
 class MetricDefinitions
 {
@@ -14,7 +15,10 @@ class MetricDefinitions
      */
     public static function patientVisits(?string $alias = null): string
     {
-        $raw = 'COUNT(DISTINCT PatNum, DATE(ProcDate))';
+        $driver = DB::connection()->getDriverName();
+        $raw = $driver === 'sqlite'
+            ? "COUNT(DISTINCT PatNum || '|' || DATE(ProcDate))"
+            : 'COUNT(DISTINCT PatNum, DATE(ProcDate))';
 
         return $raw.($alias ? " AS {$alias}" : '');
     }

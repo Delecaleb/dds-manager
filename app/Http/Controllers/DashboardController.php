@@ -78,18 +78,37 @@ class DashboardController extends Controller
             ->orderByDesc('total_production')
             ->get();
 
+        $adjustments = DB::table('od_adjustments')
+            ->selectRaw('ClinicNum, '.MetricDefinitions::adjustments('val'))
+            ->whereBetween('AdjDate', [$start, $end])
+            ->groupBy('ClinicNum')
+            ->pluck('val', 'ClinicNum');
+
+        $writeoffs = DB::table('od_claim_procs')
+            ->selectRaw('ClinicNum, '.MetricDefinitions::writeOffs('val'))
+            ->whereBetween('ProcDate', [$start, $end])
+            ->groupBy('ClinicNum')
+            ->pluck('val', 'ClinicNum');
+
         return response()->json(
-            $rows->map(function ($row, $i) {
+            $rows->map(function ($row, $i) use ($adjustments, $writeoffs) {
+                $gross = (float) $row->total_production;
+                $adj = (float) ($adjustments[$row->ClinicNum] ?? 0);
+                $wo = (float) ($writeoffs[$row->ClinicNum] ?? 0);
+
+                $net = $this->production->netFrom($gross, $adj, $wo);
+
                 $avg = $row->patient_count > 0
-                    ? round($row->total_production / $row->patient_count, 2)
+                    ? round($net / $row->patient_count, 2)
                     : 0;
 
                 return [
                     'rank' => $i + 1,
-                    'clinic_num' => $row->ClinicNum,
+                    'clinic_num' => (int) $row->ClinicNum,
                     'location' => $this->clinicNames[(int) $row->ClinicNum] ?? 'Location '.$row->ClinicNum,
-                    'total_production' => round($row->total_production, 2),
-                    'patient_count' => $row->patient_count,
+                    'total_production' => round($gross, 2),
+                    'net_production' => $net,
+                    'patient_count' => (int) $row->patient_count,
                     'avg_production' => $avg,
                 ];
             })->values()

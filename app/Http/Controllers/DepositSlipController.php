@@ -3,7 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Support\ClinicRegistry;
+use App\Models\OdClaimPayment;
+use App\Models\OdDefinition;
+use App\Models\OdPatient;
+use App\Models\OdPayment;
+use App\Models\OdProvider;
+use App\Models\PaySplit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DepositSlipController extends Controller
 {
@@ -72,14 +79,14 @@ class DepositSlipController extends Controller
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
 
-        $paymentTable = (new \App\Models\OdPayment)->getTable();
-        $defTable = (new \App\Models\OdDefinition)->getTable();
-        $patientTable = (new \App\Models\OdPatient)->getTable();
+        $paymentTable = (new OdPayment)->getTable();
+        $defTable = (new OdDefinition)->getTable();
+        $patientTable = (new OdPatient)->getTable();
 
-        // Basic query to group payments by PayType in this date range. 
-        $payments = \App\Models\OdPayment::leftJoin($defTable, "{$paymentTable}.PayType", '=', "{$defTable}.DefNum")
+        // Basic query to group payments by PayType in this date range.
+        $payments = OdPayment::leftJoin($defTable, "{$paymentTable}.PayType", '=', "{$defTable}.DefNum")
             ->whereBetween("{$paymentTable}.PayDate", [$start, $end])
-            ->select("{$paymentTable}.ClinicNum", "{$defTable}.ItemName as type", \Illuminate\Support\Facades\DB::raw("SUM({$paymentTable}.PayAmt) as amount"))
+            ->select("{$paymentTable}.ClinicNum", "{$defTable}.ItemName as type", DB::raw("SUM({$paymentTable}.PayAmt) as amount"))
             ->groupBy("{$paymentTable}.ClinicNum", "{$defTable}.ItemName")
             ->get();
 
@@ -94,13 +101,13 @@ class DepositSlipController extends Controller
             $results[] = [
                 'location' => $loc,
                 'type' => $type,
-                'amount' => $amt
+                'amount' => $amt,
             ];
         }
 
         // Include claim payments to match insurance
-        $claimPayments = \App\Models\OdClaimPayment::whereBetween('CheckDate', [$start, $end])
-            ->select('ClinicNum', \Illuminate\Support\Facades\DB::raw('SUM(CheckAmt) as amount'))
+        $claimPayments = OdClaimPayment::whereBetween('CheckDate', [$start, $end])
+            ->select('ClinicNum', DB::raw('SUM(CheckAmt) as amount'))
             ->groupBy('ClinicNum')
             ->get();
 
@@ -111,7 +118,7 @@ class DepositSlipController extends Controller
             $results[] = [
                 'location' => $this->clinics->name((int) ($cp->ClinicNum ?? 0)),
                 'type' => 'Insurance Co Pmt',
-                'amount' => $amt
+                'amount' => $amt,
             ];
         }
 
@@ -121,12 +128,14 @@ class DepositSlipController extends Controller
 
         // ── DETAILS TAB DATA ──
         $details = [];
-        $providers = \App\Models\OdProvider::pluck('Abbr', 'ProvNum');
+        $claimPaymentTable = (new OdClaimPayment)->getTable();
+        $providers = OdProvider::pluck('Abbr', 'ProvNum');
 
-        $paymentsForDetails = \App\Models\OdPayment::leftJoin($defTable, "{$paymentTable}.PayType", '=', "{$defTable}.DefNum")
+        $paymentsForDetails = OdPayment::leftJoin($defTable, "{$paymentTable}.PayType", '=', "{$defTable}.DefNum")
             ->leftJoin($patientTable, "{$paymentTable}.PatNum", '=', "{$patientTable}.PatNum")
             ->whereBetween("{$paymentTable}.PayDate", [$start, $end])
             ->select(
+                "{$paymentTable}.PayNum",
                 "{$paymentTable}.ClinicNum",
                 "{$defTable}.ItemName as type",
                 "{$paymentTable}.PayAmt as amount",
@@ -134,27 +143,73 @@ class DepositSlipController extends Controller
                 "{$paymentTable}.PatNum",
                 "{$patientTable}.FName",
                 "{$patientTable}.LName",
-                "{$paymentTable}.CheckNum"
+                "{$paymentTable}.CheckNum",
+                "{$paymentTable}.BankBranch"
             )
             ->orderBy("{$paymentTable}.PayDate", 'desc')
-            ->limit(100)
             ->get();
 
+        $payNums = $paymentsForDetails->pluck('PayNum')->filter()->values();
+        $paySplitsProvMap = [];
+        if ($payNums->isNotEmpty()) {
+            $paySplitsProvMap = PaySplit::whereIn('PayNum', $payNums)
+                ->whereNotNull('ProvNum')
+                ->where('ProvNum', '>', 0)
+                ->pluck('ProvNum', 'PayNum')
+                ->toArray();
+        }
+
         foreach ($paymentsForDetails as $p) {
+            $provNum = $paySplitsProvMap[$p->PayNum] ?? null;
+            $provAbbr = $provNum ? ($providers[$provNum] ?? '') : '';
+
             $details[] = [
                 'office' => $this->clinics->name((int) ($p->ClinicNum ?? 0)),
-                'patient_name' => ($p->LName || $p->FName) ? trim($p->LName . ', ' . $p->FName, ', ') : '',
+                'patient_name' => ($p->LName || $p->FName) ? trim($p->LName.', '.$p->FName, ', ') : '',
                 'patient_id' => $p->PatNum,
-                'provider' => '',
-                'provider_id' => '',
+                'provider' => $provAbbr,
+                'provider_id' => $provNum ? (string) $provNum : '',
                 'date' => $p->date,
-                'payment_type' => $p->type,
+                'payment_type' => $p->type ?: 'Uncategorized Payment',
                 'type' => 'Patient Payment',
                 'insurance' => '',
-                'bank' => '',
-                'check_number' => $p->CheckNum,
+                'bank' => $p->BankBranch ?: '',
+                'check_number' => $p->CheckNum ?: '',
                 'unallocated' => '',
-                'amount' => (float) $p->amount
+                'amount' => (float) $p->amount,
+            ];
+        }
+
+        // Include insurance claim payments in details tab
+        $claimPaymentsForDetails = OdClaimPayment::leftJoin($defTable, "{$claimPaymentTable}.PayType", '=', "{$defTable}.DefNum")
+            ->whereBetween("{$claimPaymentTable}.CheckDate", [$start, $end])
+            ->select(
+                "{$claimPaymentTable}.ClinicNum",
+                "{$defTable}.ItemName as type",
+                "{$claimPaymentTable}.CheckAmt as amount",
+                "{$claimPaymentTable}.CheckDate as date",
+                "{$claimPaymentTable}.CarrierName",
+                "{$claimPaymentTable}.BankBranch",
+                "{$claimPaymentTable}.CheckNum"
+            )
+            ->orderBy("{$claimPaymentTable}.CheckDate", 'desc')
+            ->get();
+
+        foreach ($claimPaymentsForDetails as $cp) {
+            $details[] = [
+                'office' => $this->clinics->name((int) ($cp->ClinicNum ?? 0)),
+                'patient_name' => '',
+                'patient_id' => '',
+                'provider' => '',
+                'provider_id' => '',
+                'date' => $cp->date,
+                'payment_type' => $cp->type ?: 'Insurance Co Pmt',
+                'type' => 'Insurance Co Pmt',
+                'insurance' => $cp->CarrierName ?: '',
+                'bank' => $cp->BankBranch ?: '',
+                'check_number' => $cp->CheckNum ?: '',
+                'unallocated' => '',
+                'amount' => (float) $cp->amount,
             ];
         }
 
@@ -163,7 +218,7 @@ class DepositSlipController extends Controller
             'details' => $details,
             'summary' => [
                 'total_amount' => $totalAmount,
-            ]
+            ],
         ]);
     }
 }
