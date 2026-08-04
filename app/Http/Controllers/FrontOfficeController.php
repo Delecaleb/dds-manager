@@ -98,7 +98,7 @@ class FrontOfficeController extends Controller
 
         $visits = OdAppointment::with('patient')
             ->whereBetween('AptDateTime', [$startOfWeekDate, $endOfWeekDate])
-            ->whereIn('AptStatus', [1, 2, 4]) // Schedule/Complete/ASAP
+            ->whereIn('AptStatus', [1, 2]) // Schedule / Complete
             ->get();
 
         $dailyNew = [0, 0, 0, 0, 0];
@@ -139,7 +139,7 @@ class FrontOfficeController extends Controller
         if (! empty($patNums)) {
             $futureApts = OdAppointment::whereIn('PatNum', $patNums)
                 ->where('AptDateTime', '>', $endOfMonth)
-                ->whereIn('AptStatus', [1, 2, 4])
+                ->whereIn('AptStatus', [1, 2])
                 ->pluck('PatNum')->toArray();
 
             $brokenScheduled = collect($brokenApts)->whereIn('PatNum', $futureApts)->count();
@@ -165,7 +165,7 @@ class FrontOfficeController extends Controller
             $hygPatNums = $hygApts->pluck('PatNum')->unique()->toArray();
             $hygFutureApts = OdAppointment::whereIn('PatNum', $hygPatNums)
                 ->where('AptDateTime', '>', $endOfMonth)
-                ->whereIn('AptStatus', [1, 2, 4])
+                ->whereIn('AptStatus', [1, 2])
                 ->pluck('PatNum')->toArray();
 
             $hygScheduled = collect($hygApts)->whereIn('PatNum', $hygFutureApts)->count();

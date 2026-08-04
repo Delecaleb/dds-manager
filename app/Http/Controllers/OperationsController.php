@@ -1024,7 +1024,7 @@ class OperationsController extends Controller
                 $reservations = DB::table('od_appointments')
                     ->select('PatNum')
                     ->whereIn('PatNum', $patNums)
-                    ->whereIn('AptStatus', [1, 4])
+                    ->whereIn('AptStatus', [1, 2])
                     ->where('AptDateTime', '>=', now()->toDateString())
                     ->groupBy('PatNum')
                     ->pluck('PatNum')->mapWithKeys(function ($item) {

@@ -878,7 +878,7 @@ class OperationsAnalyticsService
         // --- SCHEDULE METRICS ---
         $schedApptsQuery = DB::table('od_appointments')
             ->selectRaw('LEFT(AptDateTime, 10) as d, COUNT(*) as total')
-            ->where('AptStatus', '1') // Scheduled
+            ->whereIn('AptStatus', [1, 2]) // Scheduled & Complete
             ->whereRaw('LEFT(AptDateTime, 10) BETWEEN ? AND ?', [$start, $end]);
         if ($clinics) {
             $schedApptsQuery->whereIn('ClinicNum', $clinics);
@@ -887,7 +887,7 @@ class OperationsAnalyticsService
 
         $schedNptQuery = DB::table('od_appointments')
             ->selectRaw('LEFT(AptDateTime, 10) as d, COUNT(*) as total')
-            ->where('AptStatus', '1')
+            ->whereIn('AptStatus', [1, 2])
             ->where('IsNewPatient', 1)
             ->whereRaw('LEFT(AptDateTime, 10) BETWEEN ? AND ?', [$start, $end]);
         if ($clinics) {
@@ -901,7 +901,7 @@ class OperationsAnalyticsService
                     ->orOn('pl.PlannedAptNum', '=', 'a.AptNum');
             })
             ->selectRaw('LEFT(a.AptDateTime, 10) as d, SUM(pl.ProcFee) as total')
-            ->where('a.AptStatus', '1')
+            ->whereIn('a.AptStatus', [1, 2])
             ->whereRaw('LEFT(a.AptDateTime, 10) BETWEEN ? AND ?', [$start, $end]);
         if ($clinics) {
             $schedProdQuery->whereIn('a.ClinicNum', $clinics);
@@ -1707,7 +1707,7 @@ class OperationsAnalyticsService
         $activeBase = DB::table('od_procedure_logs as pl')
             ->leftJoin('od_appointments as apt', function ($join) use ($end) {
                 $join->on('pl.PatNum', '=', 'apt.PatNum')
-                    ->whereIn('apt.AptStatus', [1, 4])
+                    ->whereIn('apt.AptStatus', [1, 2])
                     ->where('apt.AptDateTime', '>', $end.' 23:59:59');
             })
             ->selectRaw('pl.ClinicNum, COUNT(DISTINCT pl.PatNum) as active_pts_count, COUNT(DISTINCT CASE WHEN apt.AptNum IS NOT NULL THEN pl.PatNum END) as act_pts_reservation')

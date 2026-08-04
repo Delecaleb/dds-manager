@@ -268,7 +268,7 @@ class DashboardController extends Controller
 
         $aptsSub = DB::table('od_appointments')
             ->select('ProvNum', DB::raw('COUNT(*) AS appointment_count'))
-            ->whereIn('AptStatus', [1, 2, 4])
+            ->whereIn('AptStatus', [1, 2])
             ->whereBetween('AptDateTime', [$start, $end])
             ->groupBy('ProvNum');
 
