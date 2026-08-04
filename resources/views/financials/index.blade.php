@@ -1276,6 +1276,17 @@
       document.getElementById('scSearch').value = '';
       document.getElementById('scTabProd').classList.toggle('active', tab === 'production');
       document.getElementById('scTabColl').classList.toggle('active', tab === 'collection');
+
+      var tbl = document.getElementById('scTable');
+      if (tbl && window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(jQuery(tbl))) {
+        jQuery(tbl).DataTable().destroy();
+      }
+      document.getElementById('scThead').innerHTML = '';
+      var colLen = (SC_COLS[tab] || []).length || 6;
+      document.getElementById('scTbody').innerHTML =
+        '<tr><td colspan="' + colLen + '" class="text-center py-10 text-gray-400 text-sm">Loading&hellip;</td></tr>';
+      document.getElementById('scTfoot').innerHTML = '';
+
       loadScoreCards();
     }
 
@@ -1285,10 +1296,15 @@
       var prov = document.getElementById('scProvider').value;
       var params = '?tab=' + _sc.tab + '&start_date=' + start + '&end_date=' + end + (prov ? '&provider_num=' + encodeURIComponent(prov) : '');
 
+      if (window.jQuery && jQuery.fn.DataTable) {
+        jQuery.fn.DataTable.ext.errMode = 'none';
+      }
+
+      var colLen = (SC_COLS[_sc.tab] || []).length || 6;
       document.getElementById('scKpiRow').innerHTML =
         '<div class="text-sm text-gray-400 py-2">Loading&hellip;</div>';
       document.getElementById('scTbody').innerHTML =
-        '<tr><td colspan="6" class="text-center py-10 text-gray-400 text-sm">Loading&hellip;</td></tr>';
+        '<tr><td colspan="' + colLen + '" class="text-center py-10 text-gray-400 text-sm">Loading&hellip;</td></tr>';
 
       fetch(baseUrl + '/financials/score-cards' + params)
         .then(function (r) { return r.json(); })
@@ -1304,10 +1320,11 @@
           scApplyFilters();
         })
         .catch(function () {
+          var colLen = (SC_COLS[_sc.tab] || []).length || 6;
           document.getElementById('scKpiRow').innerHTML =
             '<div class="text-sm text-red-500">Failed to load data.</div>';
           document.getElementById('scTbody').innerHTML =
-            '<tr><td colspan="6" class="text-center py-8 text-red-500 text-sm">Failed to load data.</td></tr>';
+            '<tr><td colspan="' + colLen + '" class="text-center py-8 text-red-500 text-sm">Failed to load data.</td></tr>';
         });
     }
 
@@ -1433,6 +1450,11 @@
     }
 
     function scRenderTable() {
+      var tbl = document.getElementById('scTable');
+      if (tbl && window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(jQuery(tbl))) {
+        jQuery(tbl).DataTable().destroy();
+      }
+
       var cols = SC_COLS[_sc.tab];
       var total = _sc.filtered.length;
       var pages = Math.max(1, Math.ceil(total / _sc.pageSize));

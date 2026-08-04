@@ -283,7 +283,17 @@ class FinancialController extends Controller
 
         $totalCount = (int) array_sum(array_map(fn ($r) => $r->cnt, $rows));
         $totalProd = (float) array_sum(array_map(fn ($r) => $r->total_production, $rows));
-        $uniquePriced = count(array_filter($rows, fn ($r) => (float) $r->service_fee > 0));
+
+        $uniquePricedQuery = DB::table('od_procedure_logs as pl')
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereBetween('pl.ProcDate', [$start, $end])
+            ->where('pl.ProcFee', '>', 0);
+
+        if ($provNum !== '') {
+            $uniquePricedQuery->where('pl.ProvNum', $provNum);
+        }
+
+        $uniquePriced = (int) $uniquePricedQuery->selectRaw('COUNT(DISTINCT pl.CodeNum) as cnt')->value('cnt');
 
         // Top-5 for charts
         $byCount = $rows;
