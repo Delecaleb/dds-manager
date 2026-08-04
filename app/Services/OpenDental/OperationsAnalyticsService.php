@@ -1979,12 +1979,13 @@ class OperationsAnalyticsService
         $nptYtdVisits = array_sum(array_column($metricsYtd, 'npt_visit'));
         $nptYtdGoal = $nptYtdVisits > 0 ? (int) ceil($nptYtdVisits * 1.5) : 300;
 
-        // 3. Age Brackets (Active patients)
+        // 3. Age Brackets (Active patients with completed procedures in the last 24 months)
+        $start24Months = date('Y-m-d', strtotime('-24 months', strtotime($end)));
         $qAct = DB::table('od_patients as pt')
             ->join('od_procedure_logs as pl', 'pt.PatNum', '=', 'pl.PatNum')
             ->select('pt.PatNum', 'pt.Birthdate')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereBetween('pl.ProcDate', [$start, $end])
+            ->whereBetween('pl.ProcDate', [$start24Months.' 00:00:00', $end.' 23:59:59'])
             ->where('pt.PatStatus', '0'); // 0 = Patient (Active)
 
         if ($clinics) {
