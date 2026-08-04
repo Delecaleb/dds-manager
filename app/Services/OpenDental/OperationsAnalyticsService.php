@@ -1420,17 +1420,34 @@ class OperationsAnalyticsService
         $broken = $this->countAppointments($start, $end, $clinics, '5');
 
         // Cancellation $ = production tied to cancelled/no-show (Broken) appointments.
-        // Procedures link to an appointment via AptNum.
-        $dollarsQ = DB::table('od_appointments as a')
-            ->join('od_procedure_logs as pl', 'pl.AptNum', '=', 'a.AptNum')
+        // Deduplicate broken appointments by AptNum to ensure procedure fees match breakdown modal exactly.
+        $brokenApptsQ = DB::table('od_appointments as a')
+            ->select('a.AptNum', 'a.ClinicNum')
             ->where('a.AptStatus', '5')
             ->whereNotIn('a.AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947])
-            ->whereRaw('LEFT(a.AptDateTime, 10) BETWEEN ? AND ?', [$start, $end])
-            ->selectRaw('a.ClinicNum, SUM(pl.ProcFee) AS dollars');
+            ->whereRaw('LEFT(a.AptDateTime, 10) BETWEEN ? AND ?', [$start, $end]);
+
         if ($clinics) {
-            $dollarsQ->whereIn('a.ClinicNum', $clinics);
+            $brokenApptsQ->whereIn('a.ClinicNum', $clinics);
         }
-        $dollars = $dollarsQ->groupBy('a.ClinicNum')->pluck('dollars', 'ClinicNum')->all();
+
+        $brokenAppts = $brokenApptsQ->get()->unique('AptNum');
+        $aptClinicMap = $brokenAppts->pluck('ClinicNum', 'AptNum')->all();
+        $uniqueAptNums = array_keys($aptClinicMap);
+
+        $dollars = [];
+        if (! empty($uniqueAptNums)) {
+            $feeRows = DB::table('od_procedure_logs')
+                ->selectRaw('AptNum, SUM(ProcFee) as total_fee')
+                ->whereIn('AptNum', $uniqueAptNums)
+                ->groupBy('AptNum')
+                ->get();
+
+            foreach ($feeRows as $fr) {
+                $c = $aptClinicMap[$fr->AptNum] ?? 0;
+                $dollars[$c] = ($dollars[$c] ?? 0) + (float) $fr->total_fee;
+            }
+        }
 
         $clinicNums = array_values(array_unique(array_keys($totals)));
         sort($clinicNums);
