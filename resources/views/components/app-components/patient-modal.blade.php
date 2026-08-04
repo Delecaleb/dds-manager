@@ -445,6 +445,14 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
     /* ── Patient Modal globals ─────────────────────────────────────── */
     var currentPatientId = null;
 
+    function activatePmTab(tabId) {
+        $('#patientTabNav .pm-tab').removeClass('border-emerald-500 text-slate-900 font-semibold').addClass('border-transparent text-slate-400 font-medium');
+        $('#patientTabNav .pm-tab[data-tab="' + tabId + '"]').removeClass('border-transparent text-slate-400 font-medium').addClass('border-emerald-500 text-slate-900 font-semibold');
+
+        $('.pm-panel').addClass('hidden');
+        $('#' + tabId).removeClass('hidden');
+    }
+
     /* Public: open the modal for a given patient ID. Safe to call from
        DataTables inline onclick (e.g. onclick="openPatient(${row.id})"). */
     function openPatient(id) {
@@ -725,6 +733,7 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
     $(function () {
         $('#patientTabNav').on('click', '.pm-tab', function () {
             var tab = $(this).data('tab');
+            activatePmTab(tab);
             if (tab === 'pm-txplans' && currentPatientId) _loadPatientTXPlans(currentPatientId);
             if (tab === 'pm-ar' && currentPatientId) _loadPatientAR(currentPatientId);
             if (tab === 'pm-family' && currentPatientId) _loadPatientFamily(currentPatientId);
