@@ -172,7 +172,17 @@
             info: true,
             autoWidth: false,
             order: [],
-            language: { search: '', searchPlaceholder: 'Search…', emptyTable: 'No records found.' }
+            language: {
+                search: '',
+                searchPlaceholder: 'Search…',
+                emptyTable: 'No records found.',
+                paginate: {
+                    first: '«',
+                    previous: '‹',
+                    next: '›',
+                    last: '»'
+                }
+            }
         }, opts || {}));
     };
     // Init every not-yet-initialised .dds-datatable within a root (called after a modal opens).
@@ -228,18 +238,14 @@
     DDS.sortableRefresh = function (el) {
         if (!el) return null;
         if (el.__ddsDrawing) return null;
-        el.__ddsDrawing = true;
         if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(jQuery(el))) {
-            jQuery(el).DataTable().destroy();
+            return jQuery(el).DataTable();
         }
         var dt = hasSortableRows(el) ? DDS.sortable(el) : null;
-        setTimeout(function () { el.__ddsDrawing = false; }, 150);
         return dt;
     };
-    /* Watch a sortable table's <tbody> so pages that repaint rows themselves
-       (tbody.innerHTML = …, the pattern across financials/kpis/deposit/explorer)
-       get sorting re-attached without every render function having to call us.
-       Our own draws set __ddsDrawing and are skipped, so this never self-triggers. */
+    /* Watch a sortable table's <tbody> for un-initialized tables whose rows arrive asynchronously.
+       Once DataTables is active, observer returns immediately to prevent re-initialization loops. */
     DDS.sortableObserve = function (el) {
         if (!el || el.__ddsObserved || !window.MutationObserver) return;
         var tbody = el.querySelector('tbody');
@@ -247,10 +253,12 @@
         el.__ddsObserved = true;
         new MutationObserver(function () {
             if (el.__ddsDrawing) return;
+            if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(jQuery(el))) return;
             if (!hasSortableRows(el)) return;
             clearTimeout(el.__ddsReinit);
             el.__ddsReinit = setTimeout(function () {
                 if (el.__ddsDrawing) return;
+                if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(jQuery(el))) return;
                 DDS.sortableRefresh(el);
             }, 50);
         }).observe(tbody, { childList: true });
@@ -276,7 +284,10 @@
                 return '<tr>' + keys.map(function (k) {
                     var v = item[k];
                     if (money.test(k) && typeof v === 'number') return '<td data-order="' + v + '" class="py-3 px-4 text-right font-medium text-gray-900">' + DDS.fmt.money(v) + '</td>';
-                    if (count.test(k) && typeof v === 'number') return '<td data-order="' + v + '" class="py-3 px-4 text-right font-medium text-gray-900">' + DDS.fmt.number(v) + '</td>';
+                    if (/note/i.test(k) && v) {
+                        var safeNote = String(v).replace(/"/g, '&quot;');
+                        return '<td class="py-3 px-4 text-gray-700 font-medium"><div class="group relative cursor-help max-w-[200px] inline-block align-middle" title="' + safeNote + '"><div class="truncate text-gray-700 font-normal max-w-[200px]">' + safeNote + '</div><div class="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 group-hover:block z-[150] w-64 rounded-lg bg-gray-900 px-3 py-2 text-xs font-normal text-white shadow-xl whitespace-normal break-words">' + safeNote + '<div class="absolute top-full left-1/2 -mt-1 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div></div></div></td>';
+                    }
                     return '<td class="py-3 px-4 text-gray-700 font-semibold">' + (v == null || v === '' ? '—' : v) + '</td>';
                 }).join('') + '</tr>';
             }).join('');

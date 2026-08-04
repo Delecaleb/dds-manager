@@ -1,4 +1,4 @@
-<x-app-components.drilldown.table-modal :title="$title">
+<x-app-components.drilldown.table-modal :title="$title" :provider-info="$providerInfo ?? null">
     {{-- dds-datatable → auto-initialised as the shared, sortable DataTable when the modal
          opens (DDS.dataTableAll). No fixed id, so stacked drilldowns never collide. --}}
     <table class="dds-table {{ count($rows) ? 'dds-datatable' : '' }} w-full text-left text-xs whitespace-nowrap">
@@ -49,12 +49,22 @@
                                 {!! e($displayStr) !!}
                                 <button type="button"
                                     class="text-[#00bfa5] ml-1 hover:text-[#009688] focus:outline-none shrink-0 inline-block align-middle"
-                                    onclick="if(typeof openProviderModal === 'function') openProviderModal('{{ $row['prov_id'] }}'); else alert('Provider dig-deep must be imported globally.');">
+                                    onclick="if(typeof openProviderModal === 'function') openProviderModal('{{ $row['prov_num'] ?? $row['prov_id'] }}'); else alert('Provider dig-deep must be imported globally.');">
                                     <svg class="h-3.5 w-3.5 stroke-current cursor-pointer" fill="none" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
                                             d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                                     </svg>
                                 </button>
+                            @elseif ($col['key'] === 'note')
+                                <div class="group relative cursor-help max-w-[200px] inline-block align-middle" title="{{ $displayStr }}">
+                                    <div class="truncate text-gray-700 font-normal max-w-[200px]">{!! e($displayStr) !!}</div>
+                                    @if (!empty($displayStr) && $displayStr !== '—' && $displayStr !== 'No note')
+                                        <div class="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 group-hover:block z-[150] w-64 rounded-lg bg-gray-900 px-3 py-2 text-xs font-normal text-white shadow-xl whitespace-normal break-words">
+                                            {!! e($displayStr) !!}
+                                            <div class="absolute top-full left-1/2 -mt-1 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                                        </div>
+                                    @endif
+                                </div>
                             @else
                                 {!! e($displayStr) !!}
                             @endif

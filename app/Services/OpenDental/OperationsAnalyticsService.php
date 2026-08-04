@@ -799,10 +799,10 @@ class OperationsAnalyticsService
             ['key' => 'date', 'label' => 'Entities', 'type' => 'text', 'sticky' => true, 'class' => 'border-r-[6px] border-white'],
 
             // ACTUAL
-            ['key' => 'actual_production', 'label' => 'PRODUCTION', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'actual_collection', 'label' => 'COLLECTION', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'actual_pts_visit', 'label' => 'PTS VISIT', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'actual_npt_visit', 'label' => 'NPT VISIT', 'type' => 'number', 'agg' => 'sum', 'class' => 'border-r-[6px] border-white'],
+            ['key' => 'actual_production', 'label' => 'PRODUCTION', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'net'],
+            ['key' => 'actual_collection', 'label' => 'COLLECTION', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'collection'],
+            ['key' => 'actual_pts_visit', 'label' => 'PTS VISIT', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'pts_visit'],
+            ['key' => 'actual_npt_visit', 'label' => 'NPT VISIT', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'npt_visit', 'class' => 'border-r-[6px] border-white'],
 
             // SCHEDULE
             ['key' => 'sched_production', 'label' => 'PRODUCTION', 'type' => 'money', 'agg' => 'sum'],
@@ -818,7 +818,7 @@ class OperationsAnalyticsService
             // AVERAGE
             ['key' => 'avg_actual_pvd_visit', 'label' => 'ACTUAL PVD VISIT', 'type' => 'number'],
             ['key' => 'avg_actual_pvd_prod', 'label' => 'ACTUAL PVD PROD', 'type' => 'money'],
-            ['key' => 'adj_discounts', 'label' => 'ADJ & DISCOUNTS', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'adj_discounts', 'label' => 'ADJ & DISCOUNTS', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'adjustment'],
             ['key' => 'adj_percentage', 'label' => 'ADJ PERCENTAGE', 'type' => 'percent', 'class' => 'border-r-[6px] border-white'],
 
             // PLACEMENTS
@@ -1182,16 +1182,16 @@ class OperationsAnalyticsService
     {
         return [
             ['key' => 'location', 'label' => 'Location', 'type' => 'text', 'sticky' => true],
-            ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'],
+            ['key' => 'provider', 'label' => 'Provider', 'type' => 'text', 'provider_modal' => true],
             ['key' => 'provider_id', 'label' => 'Provider ID', 'type' => 'text'],
             // By Provider
-            ['key' => 'gross', 'label' => 'Gross Production', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'net', 'label' => 'Net Production', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'adjustment', 'label' => 'Adjustment', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'collection', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'pts_visits', 'label' => 'Pts Visits', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'npt_visits', 'label' => 'Npt Visits', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'working_days', 'label' => 'Working Days', 'type' => 'number'],
+            ['key' => 'gross', 'label' => 'Gross Production', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'gross'],
+            ['key' => 'net', 'label' => 'Net Production', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'net'],
+            ['key' => 'adjustment', 'label' => 'Adjustment', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'adjustment'],
+            ['key' => 'collection', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'collection'],
+            ['key' => 'pts_visits', 'label' => 'Pts Visits', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'pts_visit'],
+            ['key' => 'npt_visits', 'label' => 'Npt Visits', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'npt_visit'],
+            ['key' => 'working_days', 'label' => 'Working Days', 'type' => 'number', 'drilldown_type' => 'working_days'],
             ['key' => 'procedures', 'label' => 'Procedures', 'type' => 'number', 'agg' => 'sum'],
             ['key' => 'retention', 'label' => 'Retention', 'type' => 'percent'],
             // Per Working Day
@@ -1293,6 +1293,7 @@ class OperationsAnalyticsService
             $rows[] = [
                 'row_key' => $key,
                 'clinic_num' => (int) $p->ClinicNum,
+                'prov_num' => (int) $p->ProvNum,
                 'location' => $this->clinicNames[(int) $p->ClinicNum] ?? ('Location '.$p->ClinicNum),
                 'provider' => $name !== '' ? $name : ('Provider '.$p->ProvNum),
                 'provider_id' => $p->ProvNum.($prov && $prov->Abbr ? ' - '.$prov->Abbr : ''),
@@ -1396,8 +1397,8 @@ class OperationsAnalyticsService
     {
         return [
             ['key' => 'location', 'label' => 'Location', 'type' => 'text', 'sticky' => true],
-            ['key' => 'cancellation', 'label' => 'Cancellation', 'type' => 'number', 'agg' => 'sum', 'heat' => 'invert'],
-            ['key' => 'cancellation_dollars', 'label' => 'Cancellation $', 'type' => 'money', 'agg' => 'sum', 'heat' => 'invert'],
+            ['key' => 'cancellation', 'label' => 'Cancellation', 'type' => 'number', 'agg' => 'sum', 'heat' => 'invert', 'drilldown_type' => 'cancellation'],
+            ['key' => 'cancellation_dollars', 'label' => 'Cancellation $', 'type' => 'money', 'agg' => 'sum', 'heat' => 'invert', 'drilldown_type' => 'cancellation'],
             ['key' => 'cancellation_rescheduled', 'label' => 'Cancellation Rescheduled', 'type' => 'number', 'agg' => 'sum'],
             ['key' => 'cancellation_rescheduled_dollars', 'label' => 'Cancellation Rescheduled $', 'type' => 'money', 'agg' => 'sum'],
             ['key' => 'cancellation_pct', 'label' => '% Cancellation', 'type' => 'percent', 'heat' => 'invert'],
@@ -1426,6 +1427,7 @@ class OperationsAnalyticsService
                     ->orOn('pl.PlannedAptNum', '=', 'a.AptNum');
             })
             ->where('a.AptStatus', '5')
+            ->whereNotIn('a.AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947])
             ->whereRaw('LEFT(a.AptDateTime, 10) BETWEEN ? AND ?', [$start, $end])
             ->selectRaw('a.ClinicNum, SUM(pl.ProcFee) AS dollars');
         if ($clinics) {
@@ -1466,6 +1468,9 @@ class OperationsAnalyticsService
 
         if ($status !== null) {
             $q->where('AptStatus', $status);
+            if ($status === '5') {
+                $q->whereNotIn('AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947]);
+            }
         }
         if ($clinics) {
             $q->whereIn('ClinicNum', $clinics);
@@ -2512,7 +2517,7 @@ class OperationsAnalyticsService
     {
         $columns = [
             ['key' => 'location', 'label' => 'Location', 'type' => 'text', 'sticky' => true],
-            ['key' => 'provider', 'label' => 'Provider', 'type' => 'text', 'sticky' => true, 'class' => 'border-r-[6px] border-white'],
+            ['key' => 'provider', 'label' => 'Provider', 'type' => 'text', 'sticky' => true, 'provider_modal' => true, 'class' => 'border-r-[6px] border-white'],
             ['key' => 'total_prod', 'label' => 'Production', 'type' => 'money', 'drilldown' => true],
             ['key' => 'total_visits', 'label' => 'Patients Visits', 'type' => 'number', 'class' => 'border-r-[6px] border-white', 'drilldown' => true],
             ['key' => 'pwd_prod', 'label' => 'Production', 'type' => 'money'],
@@ -2600,6 +2605,7 @@ class OperationsAnalyticsService
                     'row_key' => $base['row_key'],
                     'location' => $base['location'],
                     'provider' => $base['provider'],
+                    'prov_num' => $base['prov_num'] ?? null,
                     'title' => $base['title'] ?? '',
                 ];
 
@@ -2788,6 +2794,8 @@ class OperationsAnalyticsService
 
             $tableRows[] = [
                 'row_key' => $l->ClinicNum.'_'.$l->ProvNum,
+                'clinic_num' => (int) $l->ClinicNum,
+                'prov_num' => (int) $l->ProvNum,
                 'location' => $this->clinicNames[$l->ClinicNum] ?? 'Location '.$l->ClinicNum,
                 'provider' => $name,
                 'total_prod' => (float) $l->total_fee,

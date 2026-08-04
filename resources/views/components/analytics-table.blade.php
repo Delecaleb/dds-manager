@@ -192,15 +192,29 @@
                         <td class="{{ $cellClasses }} {{ ops_heat_class($heat, $col['key'], $rawValue) }}" {!! $orderAttr !!}>
                             @if ($isDiffMode)
                                 <div class="flex items-center gap-1.5 {{ $type === 'text' ? 'justify-start' : 'justify-end' }}">{!! $cellContent !!}</div>
-                            @elseif (!empty($col['drilldown_type']) && isset($row['clinic_num']))
+                            @elseif (($col['key'] === 'provider' || !empty($col['provider_modal'])) && !empty($row['prov_num']))
+                                <div class="flex items-center justify-start gap-1.5">
+                                    <span>{!! $cellContent !!}</span>
+                                    <button type="button" class="text-emerald-500 hover:text-emerald-700 focus:outline-none shrink-0 inline-block align-middle"
+                                            onclick="if(typeof openProviderModal === 'function') openProviderModal('{{ $row['prov_num'] }}'); else alert('Provider modal not loaded.');"
+                                            title="View Provider Information">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-emerald-500 hover:text-emerald-700 cursor-pointer shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                            <polyline points="15 3 21 3 21 9"></polyline>
+                                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                                        </svg>
+                                    </button>
+                                </div>
+                            @elseif (!empty($col['drilldown_type']) && (isset($row['clinic_num']) || isset($row['prov_num'])))
                                 @php
-                                    $ddUrl = route('operations.drilldown', [
+                                    $ddUrl = route('operations.drilldown', array_filter([
                                         'metric' => $col['drilldown_type'],
-                                        'clinic_num' => $row['clinic_num'],
+                                        'clinic_num' => $row['clinic_num'] ?? null,
+                                        'prov_num' => $row['prov_num'] ?? null,
                                         'start_date' => request('start_date', now()->startOfMonth()->toDateString()),
                                         'end_date' => request('end_date', now()->toDateString()),
                                         'subtab' => $activeSubtab ?? 'default',
-                                    ]);
+                                    ]));
                                 @endphp
                                 <div class="flex items-center justify-end gap-1.5 {{ $type === 'text' ? 'justify-start' : '' }}">
                                     {!! $cellContent !!}

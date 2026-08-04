@@ -86,45 +86,12 @@
                     {{ request('end', 'May 31, 2026') }}</span>
             </div>
             <div class="flex-1 overflow-auto bg-white">
-                <table class="w-full text-sm text-left">
+                <table class="dds-table dds-sortable w-full text-sm text-left">
                     <thead class="bg-gray-50/50 text-gray-900 sticky top-0 z-10 border-b border-gray-100">
                         <tr>
-                            <th class="py-3 px-4 font-extrabold w-12 text-center text-[11px]">
-                                <div class="flex flex-col items-center justify-center">
-                                    <svg class="w-3 h-3 text-gray-400 -mb-0.5" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M5 15l7-7 7 7" />
-                                    </svg>
-                                    <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </div>
-                            </th>
-                            <th class="py-3 px-4 font-extrabold text-[12px]">
-                                <div class="flex items-center gap-1">
-                                    Zip Code
-                                </div>
-                            </th>
-                            <th class="py-3 px-6 font-extrabold text-right text-[12px]">
-                                <div class="flex items-center justify-end gap-1">
-                                    <div class="flex flex-col items-center justify-center mr-1">
-                                        <svg class="w-3 h-3 text-gray-400 -mb-0.5" fill="none" viewBox="0 0 24 24"
-                                            stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M5 15l7-7 7 7" />
-                                        </svg>
-                                        <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24"
-                                            stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </div>
-                                    New Patient Visits
-                                </div>
-                            </th>
+                            <th class="py-3 px-4 font-extrabold w-12 text-center text-[11px]">Rank</th>
+                            <th class="py-3 px-4 font-extrabold text-[12px]">Zip Code</th>
+                            <th class="py-3 px-6 font-extrabold text-right text-[12px]">New Patient Visits</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-gray-700 font-semibold text-xs">
@@ -132,9 +99,9 @@
                             @php $rank = 1; @endphp
                             @foreach($spec['top_zips'] as $zip => $count)
                                 <tr class="hover:bg-gray-50/80 transition-colors">
-                                    <td class="py-4 px-4 text-center font-bold text-gray-900">{{ $rank++ }}</td>
+                                    <td class="py-4 px-4 text-center font-bold text-gray-900" data-order="{{ (float) $rank }}">{{ $rank++ }}</td>
                                     <td class="py-4 px-4 text-gray-800">{{ $zip ?: 'No Zip' }}</td>
-                                    <td class="py-4 px-6 text-right text-gray-900">{{ number_format($count) }}</td>
+                                    <td class="py-4 px-6 text-right text-gray-900" data-order="{{ (float) $count }}">{{ number_format($count) }}</td>
                                 </tr>
                             @endforeach
                         @else
@@ -538,7 +505,7 @@
                     <h3 class="text-[15px] font-bold text-gray-900 leading-tight">Age Brackets</h3>
                 </div>
                 <div class="flex-1 overflow-auto bg-white pt-2">
-                    <table class="w-full text-sm text-left">
+                    <table class="dds-table dds-sortable w-full text-sm text-left">
                         <thead class="bg-white text-gray-900 sticky top-0 z-10">
                             <tr>
                                 <th class="pb-1 px-4 font-extrabold text-[12px] border-b border-gray-100 align-bottom border-r"
@@ -566,17 +533,21 @@
                                 $total24 = max(1, array_sum($spec['ages24'] ?? []));
                             @endphp
                             @foreach(($spec['ages24'] ?? []) as $bracket => $count24)
-                                @php $count18 = $spec['ages18'][$bracket] ?? 0; @endphp
+                                @php
+                                    $count18 = $spec['ages18'][$bracket] ?? 0;
+                                    $pct18 = ($count18 / $total18) * 100;
+                                    $pct24 = ($count24 / $total24) * 100;
+                                @endphp
                                 <tr class="hover:bg-gray-50/80 transition-colors border-b border-gray-50">
                                     <td class="py-1.5 px-4 text-gray-900 font-extrabold border-r border-gray-50">{{ $bracket }}
                                     </td>
-                                    <td class="py-1.5 px-2 text-center text-gray-700">{{ number_format($count18) }}</td>
-                                    <td class="py-1.5 px-2 text-center text-gray-500 border-r border-gray-50">
-                                        {{ number_format(($count18 / $total18) * 100, 1) }}%
+                                    <td class="py-1.5 px-2 text-center text-gray-700" data-order="{{ (float) $count18 }}">{{ number_format($count18) }}</td>
+                                    <td class="py-1.5 px-2 text-center text-gray-500 border-r border-gray-50" data-order="{{ (float) $pct18 }}">
+                                        {{ number_format($pct18, 1) }}%
                                     </td>
-                                    <td class="py-1.5 px-2 text-center text-gray-700">{{ number_format($count24) }}</td>
-                                    <td class="py-1.5 px-2 text-center text-gray-500">
-                                        {{ number_format(($count24 / $total24) * 100, 1) }}%
+                                    <td class="py-1.5 px-2 text-center text-gray-700" data-order="{{ (float) $count24 }}">{{ number_format($count24) }}</td>
+                                    <td class="py-1.5 px-2 text-center text-gray-500" data-order="{{ (float) $pct24 }}">
+                                        {{ number_format($pct24, 1) }}%
                                     </td>
                                 </tr>
                             @endforeach

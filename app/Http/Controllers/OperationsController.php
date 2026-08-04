@@ -232,6 +232,7 @@ class OperationsController extends Controller
     {
         $metric = $request->input('metric');
         $clinicNum = $request->input('clinic_num');
+        $provNum = $request->input('prov_num');
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
 
@@ -245,13 +246,24 @@ class OperationsController extends Controller
         $rows = [];
         $totals = null;
 
+        $providerInfo = null;
+        if ($provNum) {
+            $p = OdProvider::where('ProvNum', $provNum)->first();
+            if ($p) {
+                $name = trim(($p->LName ?? '').(($p->LName && $p->PName) ? ', ' : '').($p->PName ?? ''));
+                $providerInfo = [
+                    'name' => $name ?: 'Provider '.$p->ProvNum,
+                    'id' => $p->ProvNum.($p->Abbr ? ' - '.$p->Abbr : ''),
+                ];
+            }
+        }
+
         // Common Provider mapping
         $provMap = OdProvider::all()->mapWithKeys(function ($p) {
             return [$p->ProvNum => $p->LName.($p->PName ? ', '.$p->PName : '')];
         })->toArray();
 
         // Common Patient mapping
-        // We will fetch only patients included in the queries to save memory
         $mapPatients = function ($patNums) {
             return OdPatient::whereIn('PatNum', $patNums)->get()->mapWithKeys(function ($p) {
                 return [$p->PatNum => $p->LName.', '.$p->FName];
@@ -263,18 +275,26 @@ class OperationsController extends Controller
             $columns = [
                 ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
                 ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
-                ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'],
-                ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'],
-                ['key' => 'date', 'label' => 'Date', 'type' => 'text'],
-                ['key' => 'gross', 'label' => 'Gross Production', 'type' => 'money', 'agg' => 'sum'],
             ];
+            if (! $provNum) {
+                $columns[] = ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'];
+                $columns[] = ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'];
+            }
+            $columns[] = ['key' => 'date', 'label' => 'Dates', 'type' => 'text'];
+            $columns[] = ['key' => 'gross', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'];
 
-            $logs = DB::table('od_procedure_logs')
+            $logsQuery = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
-                ->where('ClinicNum', $clinicNum)
                 ->whereIn('ProcStatus', ProcStatus::completed())
-                ->whereBetween('ProcDate', [$start, $end])
-                ->get();
+                ->whereBetween('ProcDate', [$start, $end]);
+
+            if ($provNum) {
+                $logsQuery->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $logsQuery->where('ClinicNum', $clinicNum);
+            }
+
+            $logs = $logsQuery->get();
 
             $patMap = $mapPatients($logs->pluck('PatNum')->unique());
 
@@ -286,20 +306,20 @@ class OperationsController extends Controller
                 }
                 $totalGross += $gross;
 
-                $rows[] = [
+                $r = [
                     'pat_id' => $log->PatNum,
                     'patient' => [
                         'label' => $patMap[$log->PatNum] ?? 'Unknown',
                         'link' => true,
                     ],
-                    'prov_id' => $log->ProvNum,
-                    'provider' => [
-                        'label' => $provMap[$log->ProvNum] ?? 'Unknown',
-                        'link' => true,
-                    ],
                     'date' => date('M d, Y', strtotime($log->ProcDate)),
                     'gross' => $gross,
                 ];
+                if (! $provNum) {
+                    $r['prov_id'] = $log->ProvNum;
+                    $r['provider'] = ['label' => $provMap[$log->ProvNum] ?? 'Unknown', 'link' => true];
+                }
+                $rows[] = $r;
             }
             $totals = ['gross' => $totalGross];
 
@@ -308,31 +328,37 @@ class OperationsController extends Controller
             $columns = [
                 ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
                 ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
-                ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'],
-                ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'],
-                ['key' => 'date', 'label' => 'Date', 'type' => 'text'],
-                ['key' => 'adj_type', 'label' => 'Adjustment Type', 'type' => 'text'],
-                ['key' => 'adj_amt', 'label' => 'Adjustment', 'type' => 'money', 'agg' => 'sum'],
             ];
+            if (! $provNum) {
+                $columns[] = ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'];
+                $columns[] = ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'];
+            }
+            $columns[] = ['key' => 'date', 'label' => 'Dates', 'type' => 'text'];
+            $columns[] = ['key' => 'adj_type', 'label' => 'Adjustment Type', 'type' => 'text'];
+            $columns[] = ['key' => 'adj_amt', 'label' => 'Adjustment', 'type' => 'money', 'agg' => 'sum'];
 
             if ($metric === 'adj_production') {
                 $columns[] = ['key' => 'gross', 'label' => 'Gross Production', 'type' => 'money', 'agg' => 'sum'];
                 $columns[] = ['key' => 'adj_pct', 'label' => 'Adj %', 'type' => 'percent'];
             }
 
-            $adjs = DB::table('od_adjustments')
+            $adjsQuery = DB::table('od_adjustments')
                 ->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt', 'AdjType')
-                ->where('ClinicNum', $clinicNum)
-                ->whereBetween('AdjDate', [$start, $end])
-                ->get();
+                ->whereBetween('AdjDate', [$start, $end]);
+
+            if ($provNum) {
+                $adjsQuery->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $adjsQuery->where('ClinicNum', $clinicNum);
+            }
+
+            $adjs = $adjsQuery->get();
 
             $patMap = $mapPatients($adjs->pluck('PatNum')->unique());
-
-            // Map Definition for definitions table where Category=1 (AdjTypes)
             $defMap = DB::table('od_definitions')->where('Category', 1)->pluck('ItemName', 'DefNum')->toArray();
 
             $totalAdj = 0;
-            $totalGrossAll = 0; // only used if adj_production
+            $totalGrossAll = 0;
 
             foreach ($adjs as $adj) {
                 $amt = (float) $adj->AdjAmt;
@@ -347,21 +373,16 @@ class OperationsController extends Controller
                         'label' => $patMap[$adj->PatNum] ?? 'Unknown',
                         'link' => true,
                     ],
-                    'prov_id' => $adj->ProvNum,
-                    'provider' => [
-                        'label' => $provMap[$adj->ProvNum] ?? 'Unknown',
-                        'link' => true,
-                    ],
                     'date' => date('M d, Y', strtotime($adj->AdjDate)),
                     'adj_type' => $defMap[$adj->AdjType] ?? 'Type '.$adj->AdjType,
                     'adj_amt' => $amt,
                 ];
+                if (! $provNum) {
+                    $row['prov_id'] = $adj->ProvNum;
+                    $row['provider'] = ['label' => $provMap[$adj->ProvNum] ?? 'Unknown', 'link' => true];
+                }
 
                 if ($metric === 'adj_production') {
-                    // For "Adjustment of production", since adjustments are not tied to a specific procedure directly
-                    // we approximate the gross production for that patient on that day?
-                    // "Same thing as adjustment but witth an addition of Gross production and adjustment %"
-                    // Let's pull the patient's gross production on that date
                     $gross = (float) DB::table('od_procedure_logs')
                         ->where('PatNum', $adj->PatNum)
                         ->where('ProcDate', 'like', substr($adj->AdjDate, 0, 10).'%')
@@ -384,25 +405,31 @@ class OperationsController extends Controller
         } elseif ($metric === 'collection') {
             $title = 'Collection Breakdown';
             $columns = [
-                ['key' => 'date', 'label' => 'Date', 'type' => 'text'],
                 ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
                 ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
-                ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'],
-                ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'],
-                ['key' => 'method', 'label' => 'Payment Method', 'type' => 'text'],
-                ['key' => 'amount', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'],
             ];
+            if (! $provNum) {
+                $columns[] = ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'];
+                $columns[] = ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'];
+                $columns[] = ['key' => 'method', 'label' => 'Payment Method', 'type' => 'text'];
+            }
+            $columns[] = ['key' => 'date', 'label' => 'Dates', 'type' => 'text'];
+            $columns[] = ['key' => 'amount', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'];
 
-            // splits map to payments (which has the payment method)
-            $splits = DB::table('od_pay_splits as s')
-                ->join('od_payments as p', 'p.PayNum', '=', 's.PayNum')
+            $splitsQuery = DB::table('od_pay_splits as s')
+                ->leftJoin('od_payments as p', 'p.PayNum', '=', 's.PayNum')
                 ->select('s.PatNum', 's.ProvNum', 's.DatePay', 's.SplitAmt', 'p.PayType')
-                ->where('s.ClinicNum', $clinicNum)
-                ->whereBetween('s.DatePay', [$start, $end])
-                ->get();
+                ->whereBetween('s.DatePay', [$start.' 00:00:00', $end.' 23:59:59']);
+
+            if ($provNum) {
+                $splitsQuery->where('s.ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $splitsQuery->where('s.ClinicNum', $clinicNum);
+            }
+
+            $splits = $splitsQuery->get();
 
             $patMap = $mapPatients($splits->pluck('PatNum')->unique());
-            // Map Definition for PaymentTypes (Category=10)
             $defMap = DB::table('od_definitions')->where('Category', 10)->pluck('ItemName', 'DefNum')->toArray();
 
             $totalCol = 0;
@@ -413,57 +440,62 @@ class OperationsController extends Controller
                 }
                 $totalCol += $amt;
 
-                $rows[] = [
+                $r = [
                     'date' => date('M d, Y', strtotime($sp->DatePay)),
                     'pat_id' => $sp->PatNum,
                     'patient' => [
                         'label' => $patMap[$sp->PatNum] ?? 'Unknown',
                         'link' => true,
                     ],
-                    'prov_id' => $sp->ProvNum,
-                    'provider' => [
-                        'label' => $provMap[$sp->ProvNum] ?? 'Unknown',
-                        'link' => true,
-                    ],
-                    'method' => $defMap[$sp->PayType] ?? 'Type '.$sp->PayType,
                     'amount' => $amt,
                 ];
+                if (! $provNum) {
+                    $r['prov_id'] = $sp->ProvNum;
+                    $r['provider'] = ['label' => $provMap[$sp->ProvNum] ?? 'Unknown', 'link' => true];
+                    $r['method'] = $defMap[$sp->PayType] ?? 'Type '.$sp->PayType;
+                }
+                $rows[] = $r;
             }
             $totals = ['amount' => $totalCol];
 
         } elseif ($metric === 'net' || $metric === 'coll_pct') {
             $title = $metric === 'coll_pct' ? 'Collection % Breakdown' : 'Net Production Breakdown';
-            $columns = [];
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+            ];
+            if (! $provNum) {
+                $columns[] = ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'];
+                $columns[] = ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'];
+            }
+            $columns[] = ['key' => 'date', 'label' => 'Dates', 'type' => 'text'];
+            $columns[] = ['key' => 'net', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'];
             if ($metric === 'coll_pct') {
-                $columns = [
-                    ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
-                    ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
-                    ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'],
-                    ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'],
-                    ['key' => 'date', 'label' => 'Date', 'type' => 'text'],
-                    ['key' => 'coll', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'],
-                    ['key' => 'net', 'label' => 'Net Production', 'type' => 'money', 'agg' => 'sum'],
-                    ['key' => 'coll_pct', 'label' => 'Collection %', 'type' => 'percent'],
-                ];
-            } else {
-                $columns = [
-                    ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
-                    ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
-                    ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'],
-                    ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'],
-                    ['key' => 'date', 'label' => 'Date', 'type' => 'text'],
-                    ['key' => 'net', 'label' => 'Net Production', 'type' => 'money', 'agg' => 'sum'],
-                ];
+                $columns[] = ['key' => 'coll', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'];
+                $columns[] = ['key' => 'coll_pct', 'label' => 'Collection %', 'type' => 'percent'];
             }
 
-            $logs = DB::table('od_procedure_logs')->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')->where('ClinicNum', $clinicNum)->whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$start, $end])->get();
-            $adjs = DB::table('od_adjustments')->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt')->where('ClinicNum', $clinicNum)->whereBetween('AdjDate', [$start, $end])->get();
-            $wos = DB::table('od_claim_procs')->select('PatNum', 'ProvNum', 'ProcDate', 'WriteOff')->where('ClinicNum', $clinicNum)->whereBetween('ProcDate', [$start, $end])->get();
+            $logsQuery = DB::table('od_procedure_logs')->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')->whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$start, $end]);
+            $adjsQuery = DB::table('od_adjustments')->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt')->whereBetween('AdjDate', [$start, $end]);
+            $wosQuery = DB::table('od_claim_procs')->select('PatNum', 'ProvNum', 'ProcDate', 'WriteOff')->whereBetween('ProcDate', [$start, $end]);
+            $splitsQuery = DB::table('od_pay_splits')->select('PatNum', 'ProvNum', 'DatePay', 'SplitAmt')->whereBetween('DatePay', [$start, $end]);
 
-            $splits = [];
-            if ($metric === 'coll_pct') {
-                $splits = DB::table('od_pay_splits')->select('PatNum', 'ProvNum', 'DatePay', 'SplitAmt')->where('ClinicNum', $clinicNum)->whereBetween('DatePay', [$start, $end])->get();
+            if ($provNum) {
+                $logsQuery->where('ProvNum', $provNum);
+                $adjsQuery->where('ProvNum', $provNum);
+                $wosQuery->where('ProvNum', $provNum);
+                $splitsQuery->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $logsQuery->where('ClinicNum', $clinicNum);
+                $adjsQuery->where('ClinicNum', $clinicNum);
+                $wosQuery->where('ClinicNum', $clinicNum);
+                $splitsQuery->where('ClinicNum', $clinicNum);
             }
+
+            $logs = $logsQuery->get();
+            $adjs = $adjsQuery->get();
+            $wos = $wosQuery->get();
+            $splits = $metric === 'coll_pct' ? $splitsQuery->get() : [];
 
             $map = [];
             $allPats = [];
@@ -524,11 +556,13 @@ class OperationsController extends Controller
                 $row = [
                     'pat_id' => $m['pat'],
                     'patient' => ['label' => $patMap[$m['pat']] ?? 'Unknown', 'link' => true],
-                    'prov_id' => $m['prov'],
-                    'provider' => ['label' => $provMap[$m['prov']] ?? 'Unknown', 'link' => true],
                     'date' => date('M d, Y', strtotime($m['date'])),
                     'net' => $net,
                 ];
+                if (! $provNum) {
+                    $row['prov_id'] = $m['prov'];
+                    $row['provider'] = ['label' => $provMap[$m['prov']] ?? 'Unknown', 'link' => true];
+                }
                 if ($metric === 'coll_pct') {
                     $row['coll'] = $coll;
                     $row['coll_pct'] = $net > 0 ? ($coll / $net) * 100 : 0;
@@ -536,7 +570,6 @@ class OperationsController extends Controller
                 $rows[] = $row;
             }
 
-            // Sort rows descending by date
             usort($rows, function ($a, $b) {
                 return strtotime($b['date']) <=> strtotime($a['date']);
             });
@@ -548,20 +581,26 @@ class OperationsController extends Controller
             }
 
         } elseif ($metric === 'pts_visit') {
-            $title = 'Patient Visits Breakdown';
+            $title = 'Pts Visits Breakdown';
             $columns = [
                 ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
                 ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
                 ['key' => 'visit_days', 'label' => 'Visit Days', 'type' => 'text'],
-                ['key' => 'count', 'label' => '# of visits', 'type' => 'number', 'agg' => 'sum'],
+                ['key' => 'count', 'label' => '# of Visit', 'type' => 'number', 'agg' => 'sum'],
             ];
 
-            $logs = DB::table('od_procedure_logs')
+            $logsQuery = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ProcDate')
-                ->where('ClinicNum', $clinicNum)
                 ->whereIn('ProcStatus', ProcStatus::completed())
-                ->whereBetween('ProcDate', [$start, $end])
-                ->get();
+                ->whereBetween('ProcDate', [$start, $end]);
+
+            if ($provNum) {
+                $logsQuery->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $logsQuery->where('ClinicNum', $clinicNum);
+            }
+
+            $logs = $logsQuery->get();
 
             $patMap = $mapPatients($logs->pluck('PatNum')->unique());
             $patVisits = [];
@@ -581,7 +620,6 @@ class OperationsController extends Controller
                         'label' => $patMap[$patNum] ?? 'Unknown',
                         'link' => true,
                     ],
-                    // We map each date to a friendlier format and join them.
                     'visit_days' => implode(', ', array_map(function ($d) {
                         return date('M d, Y', strtotime($d));
                     }, array_keys($days))),
@@ -589,6 +627,191 @@ class OperationsController extends Controller
                 ];
             }
             $totals = ['count' => $totalVisits];
+
+        } elseif ($metric === 'npt_visit') {
+            $title = 'Npt Visits Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'visit_days', 'label' => 'Visit Days', 'type' => 'text'],
+                ['key' => 'count', 'label' => '# of Visit', 'type' => 'number', 'agg' => 'sum'],
+            ];
+
+            $firstVisitSubQ = $this->patients->firstVisitCohort();
+
+            $logsQuery = DB::table('od_procedure_logs as pl')
+                ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
+                ->select('pl.PatNum', 'pl.ProcDate')
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereRaw('LEFT(pl.ProcDate, 10) = LEFT(fv.first_date, 10)')
+                ->whereBetween('pl.ProcDate', [$start.' 00:00:00', $end.' 23:59:59']);
+
+            if ($provNum) {
+                $logsQuery->where('pl.ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $logsQuery->where('pl.ClinicNum', $clinicNum);
+            }
+
+            $logs = $logsQuery->get();
+
+            $patMap = $mapPatients($logs->pluck('PatNum')->unique());
+            $patVisits = [];
+
+            foreach ($logs as $log) {
+                $d = date('Y-m-d', strtotime($log->ProcDate));
+                $patVisits[$log->PatNum][$d] = true;
+            }
+
+            $totalVisits = 0;
+            foreach ($patVisits as $patNum => $days) {
+                $count = count($days);
+                $totalVisits += $count;
+                $rows[] = [
+                    'pat_id' => $patNum,
+                    'patient' => [
+                        'label' => $patMap[$patNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'visit_days' => implode(', ', array_map(function ($d) {
+                        return date('M d, Y', strtotime($d));
+                    }, array_keys($days))),
+                    'count' => $count,
+                ];
+            }
+            $totals = ['count' => $totalVisits];
+
+        } elseif ($metric === 'cancellation') {
+            $title = 'Cancellation Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'appt_id', 'label' => 'Appt ID', 'type' => 'text'],
+                ['key' => 'appt_date', 'label' => 'Appt Date', 'type' => 'text'],
+                ['key' => 'note', 'label' => 'Note', 'type' => 'text'],
+                ['key' => 'type', 'label' => 'Type', 'type' => 'text'],
+                ['key' => 'amount', 'label' => 'Amount', 'type' => 'money', 'agg' => 'sum'],
+            ];
+
+            $query = DB::table('od_appointments as a')
+                ->select(
+                    'a.AptNum',
+                    'a.PatNum',
+                    'a.ProvNum',
+                    'a.AptDateTime',
+                    'a.Note',
+                    'a.ProcDescript'
+                )
+                ->where('a.AptStatus', '5')
+                ->whereNotIn('a.AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947])
+                ->whereBetween('a.AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
+
+            if ($provNum) {
+                $query->where('a.ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $query->where('a.ClinicNum', $clinicNum);
+            }
+
+            $appts = $query->get();
+
+            $patMap = $mapPatients($appts->pluck('PatNum')->unique());
+
+            $providers = OdProvider::whereIn('ProvNum', $appts->pluck('ProvNum')->unique())
+                ->get()
+                ->keyBy('ProvNum');
+
+            $aptNums = $appts->pluck('AptNum')->unique();
+            $fees = [];
+            if ($aptNums->isNotEmpty()) {
+                $fees = DB::table('od_procedure_logs')
+                    ->selectRaw('AptNum, SUM(ProcFee) as total_fee')
+                    ->whereIn('AptNum', $aptNums)
+                    ->groupBy('AptNum')
+                    ->pluck('total_fee', 'AptNum')
+                    ->all();
+            }
+
+            $totAmt = 0;
+            foreach ($appts as $apt) {
+                $p = $providers[$apt->ProvNum] ?? null;
+                $provName = $p ? trim(($p->LName ?? '').(($p->LName && $p->PName) ? ', ' : '').($p->PName ?? '')) : ($provMap[$apt->ProvNum] ?? 'Unknown');
+                $provAbbr = $p ? ($p->Abbr ?? '') : '';
+                $provIdStr = $apt->ProvNum.($provAbbr ? ' - '.strtoupper($provAbbr) : '');
+
+                $amt = (float) ($fees[$apt->AptNum] ?? 0);
+                $totAmt += $amt;
+
+                $noteText = trim(($apt->Note ?: $apt->ProcDescript) ?: 'No note');
+
+                $rows[] = [
+                    'pat_id' => $apt->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$apt->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provIdStr,
+                    'provider' => [
+                        'label' => $provName,
+                        'link' => true,
+                        'prov_num' => $apt->ProvNum,
+                    ],
+                    'prov_num' => $apt->ProvNum,
+                    'appt_id' => $apt->AptNum,
+                    'appt_date' => date('M d, Y', strtotime($apt->AptDateTime)),
+                    'note' => $noteText,
+                    'type' => 'Cancellation',
+                    'amount' => $amt,
+                ];
+            }
+
+            $totals = ['amount' => $totAmt];
+
+        } elseif ($metric === 'working_days') {
+            $title = 'Working Days Breakdown';
+            $columns = [
+                ['key' => 'date', 'label' => 'Date', 'type' => 'text'],
+                ['key' => 'pts_visits', 'label' => 'Patient Visits', 'type' => 'number', 'agg' => 'sum'],
+                ['key' => 'procedures', 'label' => 'Procedures', 'type' => 'number', 'agg' => 'sum'],
+                ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
+            ];
+
+            $query = DB::table('od_procedure_logs')
+                ->selectRaw('ProcDate, COUNT(DISTINCT PatNum) as pts_visits, COUNT(*) as procedures, SUM(ProcFee) as production')
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$start, $end]);
+
+            if ($provNum) {
+                $query->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $query->where('ClinicNum', $clinicNum);
+            }
+
+            $logs = $query->groupBy('ProcDate')->get();
+
+            $totVisits = 0;
+            $totProcs = 0;
+            $totProd = 0;
+            foreach ($logs as $l) {
+                $v = (int) $l->pts_visits;
+                $p = (int) $l->procedures;
+                $pr = (float) $l->production;
+                $totVisits += $v;
+                $totProcs += $p;
+                $totProd += $pr;
+
+                $rows[] = [
+                    'date' => date('M d, Y', strtotime($l->ProcDate)),
+                    'pts_visits' => $v,
+                    'procedures' => $p,
+                    'production' => $pr,
+                ];
+            }
+            $totals = [
+                'pts_visits' => $totVisits,
+                'procedures' => $totProcs,
+                'production' => $totProd,
+            ];
         } elseif ($metric === 'unique_pts') {
             $title = 'Unique Patients Breakdown';
             $columns = [
@@ -920,6 +1143,6 @@ class OperationsController extends Controller
             $totals = [];
         }
 
-        return view('components.app-components.drilldown.table-content', compact('title', 'columns', 'rows', 'totals'));
+        return view('components.app-components.drilldown.table-content', compact('title', 'columns', 'rows', 'totals', 'providerInfo'));
     }
 }

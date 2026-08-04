@@ -149,6 +149,7 @@
                             oldScript.parentNode.replaceChild(newScript, oldScript);
                         });
                         if (window.lucide) lucide.createIcons();
+                        if (window.DDS && DDS.sortableAll) DDS.sortableAll(content);
                     })
                     .catch(() => {
                         content.innerHTML =

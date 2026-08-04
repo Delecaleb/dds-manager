@@ -129,7 +129,7 @@
                                         $arrow = $col['diff'] >= 0 ? '<span class="text-green-500 mx-1">↑</span>' : '<span class="text-red-500 mx-1">↓</span>';
                                     @endphp
 
-                                    <td class="py-2 px-3 text-right tabular-nums whitespace-nowrap {{ $bgClass }}">
+                                    <td class="py-2 px-3 text-right tabular-nums whitespace-nowrap {{ $bgClass }}" data-order="{{ (float) ($col['raw_val'] ?? 0) }}">
                                         @if ($activeSubtab === 'default')
                                             {{ $valStr }}
                                         @elseif ($activeSubtab === 'diff-last-year')

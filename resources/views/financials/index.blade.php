@@ -661,7 +661,7 @@
 
       {{-- Table --}}
       <div class="overflow-x-auto">
-        <table id="scTable" class="dds-table dds-sortable w-full border-collapse">
+        <table id="scTable" class="dds-table w-full border-collapse">
           <thead id="scThead"></thead>
           <tbody id="scTbody">
             <tr>
@@ -729,7 +729,7 @@
       </div>
 
       <div class="flex-1 overflow-auto">
-        <table id="bkTable" class="dds-table dds-sortable w-full border-collapse">
+        <table id="bkTable" class="dds-table w-full border-collapse">
           <thead id="bkThead"></thead>
           <tbody id="bkTbody">
             <tr>
@@ -1242,10 +1242,42 @@
     });
 
     /* ── Score Cards ─────────────────────────────────────────────────────────── */
-    var _sc = { tab: 'production', data: null, tier: 'all', search: '', filtered: [], page: 1, pageSize: 10 };
+    var _sc = { tab: 'production', data: null, tier: 'all', search: '', filtered: [], page: 1, pageSize: 10, sortKey: null, sortAsc: true };
     var _scChartCounts = null;
     var _scChartValues = null;
     var SC_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+    function sortArrayByKey(arr, key, sortAsc) {
+      return arr.sort(function (a, b) {
+        var valA = a[key];
+        var valB = b[key];
+        if (valA === valB) return 0;
+        if (valA === null || valA === undefined || valA === '') return 1;
+        if (valB === null || valB === undefined || valB === '') return -1;
+        var numA = Number(valA);
+        var numB = Number(valB);
+        if (!isNaN(numA) && !isNaN(numB) && typeof valA !== 'boolean' && typeof valB !== 'boolean') {
+          return sortAsc ? numA - numB : numB - numA;
+        }
+        var strA = String(valA).toLowerCase();
+        var strB = String(valB).toLowerCase();
+        return sortAsc ? strA.localeCompare(strB) : strB.localeCompare(strA);
+      });
+    }
+
+    function scSortBy(key) {
+      if (_sc.sortKey === key) {
+        _sc.sortAsc = !_sc.sortAsc;
+      } else {
+        _sc.sortKey = key;
+        _sc.sortAsc = true;
+      }
+      if (_sc.sortKey) {
+        sortArrayByKey(_sc.filtered, _sc.sortKey, _sc.sortAsc);
+      }
+      _sc.page = 1;
+      scRenderTable();
+    }
 
     var SC_COLS = {
       production: [
@@ -1273,6 +1305,8 @@
       _sc.tier = 'all';
       _sc.search = '';
       _sc.page = 1;
+      _sc.sortKey = null;
+      _sc.sortAsc = true;
       document.getElementById('scSearch').value = '';
       document.getElementById('scTabProd').classList.toggle('active', tab === 'production');
       document.getElementById('scTabColl').classList.toggle('active', tab === 'collection');
@@ -1313,6 +1347,8 @@
           _sc.filtered = data.rows.slice();
           _sc.tier = 'all';
           _sc.page = 1;
+          _sc.sortKey = null;
+          _sc.sortAsc = true;
 
           scRenderKpis(data.kpis);
           scRenderCharts(data);
@@ -1439,6 +1475,9 @@
       if (q) rows = rows.filter(function (r) {
         return Object.values(r).some(function (v) { return v !== null && String(v).toLowerCase().includes(q); });
       });
+      if (_sc.sortKey) {
+        sortArrayByKey(rows, _sc.sortKey, _sc.sortAsc);
+      }
       _sc.filtered = rows;
       _sc.page = 1;
       scRenderTable();
@@ -1463,7 +1502,18 @@
       var pageRows = _sc.filtered.slice(start, start + _sc.pageSize);
 
       document.getElementById('scThead').innerHTML =
-        '<tr>' + cols.map(function (c) { return '<th>' + c.title + '</th>'; }).join('') + '</tr>';
+        '<tr>' + cols.map(function (c) {
+          var isSorted = _sc.sortKey === c.key;
+          var arrow = isSorted ? (_sc.sortAsc ? '▲' : '▼') : '↕';
+          var arrowClass = isSorted ? 'text-emerald-600 font-bold' : 'text-gray-400 opacity-60';
+          var alignCls = (c.cls && c.cls.includes('text-right')) ? 'justify-end' : (c.cls && c.cls.includes('text-center')) ? 'justify-center' : 'justify-start';
+          return '<th onclick="scSortBy(\'' + c.key + '\')" class="cursor-pointer select-none px-4 py-3 hover:bg-gray-100 transition-colors whitespace-nowrap">' +
+            '<span class="inline-flex items-center gap-1.5 w-full ' + alignCls + '">' +
+            '<span>' + c.title + '</span>' +
+            '<span class="' + arrowClass + ' text-[11px]">' + arrow + '</span>' +
+            '</span>' +
+            '</th>';
+        }).join('') + '</tr>';
 
       var rowsHtml = '';
       if (pageRows.length === 0) {
@@ -1570,10 +1620,11 @@
         var isSorted = _bk.sortKey === c.key;
         var arrow = isSorted ? (_bk.sortAsc ? '▲' : '▼') : '↕';
         var arrowClass = isSorted ? 'text-emerald-700 font-bold' : 'text-slate-500 opacity-60';
+        var alignCls = (c.cls && c.cls.includes('bk-money')) ? 'justify-end' : (c.cls && c.cls.includes('bk-center')) ? 'justify-center' : 'justify-start';
         return '<th onclick="bkSortBy(\'' + c.key + '\')" class="cursor-pointer select-none text-xs font-bold text-slate-900 px-4 py-3 border-r border-slate-300 hover:bg-slate-300 transition-colors whitespace-nowrap">' +
-          '<span class="inline-flex items-center gap-1.5">' +
-          '<span class="' + arrowClass + ' text-[11px]">' + arrow + '</span>' +
+          '<span class="inline-flex items-center gap-1.5 w-full ' + alignCls + '">' +
           '<span>' + c.title + '</span>' +
+          '<span class="' + arrowClass + ' text-[11px]">' + arrow + '</span>' +
           '</span>' +
           '</th>';
       }).join('') + '</tr>';
@@ -1587,17 +1638,9 @@
         _bk.sortAsc = true;
       }
 
-      _bk.filtered.sort(function (a, b) {
-        var valA = a[key];
-        var valB = b[key];
-        if (valA === valB) return 0;
-        if (valA === null || valA === undefined) return 1;
-        if (valB === null || valB === undefined) return -1;
-        if (typeof valA === 'number' && typeof valB === 'number') {
-          return _bk.sortAsc ? valA - valB : valB - valA;
-        }
-        return _bk.sortAsc ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
-      });
+      if (_bk.sortKey) {
+        sortArrayByKey(_bk.filtered, _bk.sortKey, _bk.sortAsc);
+      }
 
       _bk.page = 1;
       bkRenderPage();
@@ -1688,9 +1731,7 @@
       return String(v);
     }
 
-    function bkBuildHeader(cols) {
-      return '<tr>' + cols.map(function (c) { return '<th>' + c.title + '</th>'; }).join('') + '</tr>';
-    }
+
 
     function bkBuildRows(cols, rows) {
       if (rows.length === 0) {
@@ -1760,11 +1801,15 @@
 
     function bkApplySearch(q) {
       q = q.toLowerCase().trim();
-      _bk.filtered = q
+      var filtered = q
         ? _bk.allData.filter(function (r) {
           return Object.values(r).some(function (v) { return v !== null && String(v).toLowerCase().includes(q); });
         })
         : _bk.allData.slice();
+      if (_bk.sortKey) {
+        sortArrayByKey(filtered, _bk.sortKey, _bk.sortAsc);
+      }
+      _bk.filtered = filtered;
       _bk.page = 1;
       bkRenderPage();
     }
@@ -1844,7 +1889,8 @@
       return {
         data: 'patient_id',
         title: title || 'Patient ID',
-        render: function (data) {
+        render: function (data, type) {
+          if (type !== 'display') return data;
           if (!data) return '—';
           return '<button type="button" onclick="openPatient(' + data + ')" class="text-emerald-600 hover:text-emerald-800 font-semibold hover:underline cursor-pointer" title="View Patient Details">' + data + '</button>';
         }
@@ -1909,7 +1955,8 @@
             { data: 'dates', title: 'First Visit Date' },
             { data: 'service_codes', title: 'Service Code' },
             {
-              data: 'amount', title: 'Production', render: function (val) {
+              data: 'amount', title: 'Production', render: function (val, type) {
+                if (type !== 'display') return val;
                 return fmtMoney(val);
               }
             }

@@ -175,8 +175,8 @@
                         @forelse($spec['age_brackets']['rows'] ?? [] as $r)
                         <tr class="even:bg-slate-50 border-t border-slate-200/60">
                             <td class="py-3 px-4 text-[13px] text-slate-700 font-medium border-r border-slate-200/60">{{ $r['label'] }}</td>
-                            <td class="py-3 px-4 text-[13px] text-slate-700 text-right bg-white">{{ number_format($r['count']) }}</td>
-                            <td class="py-3 px-4 text-[13px] text-slate-700 text-right font-medium bg-[#f8fafc] border-l border-slate-200/60">{{ number_format($r['pct'], 2) }}%</td>
+                            <td class="py-3 px-4 text-[13px] text-slate-700 text-right bg-white" data-order="{{ (float) $r['count'] }}">{{ number_format($r['count']) }}</td>
+                            <td class="py-3 px-4 text-[13px] text-slate-700 text-right font-medium bg-[#f8fafc] border-l border-slate-200/60" data-order="{{ (float) $r['pct'] }}">{{ number_format($r['pct'], 2) }}%</td>
                         </tr>
                         @empty
                         <tr>

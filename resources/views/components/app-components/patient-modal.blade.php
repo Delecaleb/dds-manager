@@ -725,7 +725,6 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
     $(function () {
         $('#patientTabNav').on('click', '.pm-tab', function () {
             var tab = $(this).data('tab');
-            activatePmTab(tab);
             if (tab === 'pm-txplans' && currentPatientId) _loadPatientTXPlans(currentPatientId);
             if (tab === 'pm-ar' && currentPatientId) _loadPatientAR(currentPatientId);
             if (tab === 'pm-family' && currentPatientId) _loadPatientFamily(currentPatientId);
@@ -746,58 +745,172 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
     });
 
     /* ── Provider Detail Modal logic ──────────────────────────────── */
+    var _pmProdChart = null, _pmVisitsChart = null, _pmTxChart = null;
+    var _pmCurrentData = null;
+
+    function switchPmTab(tabName) {
+        $('.pm-tab-btn').removeClass('border-emerald-500 text-emerald-600 font-semibold').addClass('border-transparent text-slate-400 font-medium');
+        $('.pm-tab-btn[data-tab="' + tabName + '"]').addClass('border-emerald-500 text-emerald-600 font-semibold').removeClass('border-transparent text-slate-400 font-medium');
+
+        $('.pm-tab-panel').addClass('hidden');
+        $('#pm-tab-' + tabName).removeClass('hidden');
+
+        if (_pmCurrentData && typeof Chart !== 'undefined') {
+            renderPmCharts(tabName);
+        }
+    }
+
+    function renderPmCharts(tabName) {
+        if (!_pmCurrentData) return;
+        var d = _pmCurrentData;
+
+        var dates = (d.daily_production || []).map(function (item) {
+            return item.date ? moment(item.date).format('MMM DD') : '';
+        });
+
+        if (tabName === 'production' && document.getElementById('provModalProductionChart')) {
+            if (_pmProdChart) { _pmProdChart.destroy(); _pmProdChart = null; }
+            _pmProdChart = new Chart(document.getElementById('provModalProductionChart'), {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Production ($)',
+                            data: (d.daily_production || []).map(function (i) { return i.production || 0; }),
+                            backgroundColor: '#10b981', barPercentage: 1.0, categoryPercentage: 0.6
+                        },
+                        {
+                            label: 'Per Visit ($)',
+                            data: (d.daily_production || []).map(function (i) { return i.per_visit || 0; }),
+                            backgroundColor: '#8b5cf6', barPercentage: 1.0, categoryPercentage: 0.6
+                        }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        if (tabName === 'visits' && document.getElementById('provModalVisitsChart')) {
+            if (_pmVisitsChart) { _pmVisitsChart.destroy(); _pmVisitsChart = null; }
+            _pmVisitsChart = new Chart(document.getElementById('provModalVisitsChart'), {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Patient Visits',
+                            data: (d.daily_visits || []).map(function (i) { return i.patient_visits || 0; }),
+                            backgroundColor: '#10b981', barPercentage: 1.0, categoryPercentage: 0.6
+                        },
+                        {
+                            label: 'New Patient Visits',
+                            data: (d.daily_visits || []).map(function (i) { return i.new_patient_visits || 0; }),
+                            backgroundColor: '#8b5cf6', barPercentage: 1.0, categoryPercentage: 0.6
+                        }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        if (tabName === 'tx-accepted' && document.getElementById('provModalTxChart')) {
+            if (_pmTxChart) { _pmTxChart.destroy(); _pmTxChart = null; }
+            _pmTxChart = new Chart(document.getElementById('provModalTxChart'), {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Accepted TX Plan (%)',
+                            data: (d.daily_tx || []).map(function (i) { return i.rate || 0; }),
+                            backgroundColor: '#10b981', barPercentage: 1.0, categoryPercentage: 0.6
+                        }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+    }
+
     function openProviderModal(id) {
         $('#providerModal').removeClass('hidden');
 
-        // Dynamically inflate z-index per instance to stack over limitless modals
         window._limitlessZIndex = (window._limitlessZIndex || 120) + 10;
         document.getElementById('providerModal').style.zIndex = window._limitlessZIndex;
 
-        $('#providerModalContent').html('<div class="flex justify-center p-6"><div class="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>');
+        switchPmTab('info');
+        _pmCurrentData = null;
+
+        $('#pm-avatar').css('background', '#6366f1').text('..');
+        $('#pm-name').text('Loading...');
+        $('#pm-abbr').text('');
+
+        $('#pm-info-gender').text('N/A');
+        $('#pm-info-specialty').text('Loading...');
+        $('#pm-info-net').text('$ 0');
+        $('#pm-info-avg-day').text('$ 0');
+        $('#pm-info-per-visit').text('$ 0');
+        $('#pm-info-tx-rate').text('0.00%');
+        $('#pm-info-patient-visits').text('0');
+        $('#pm-info-new-visits').text('0');
+
+        var start = window._currentStart || moment().startOf('month').format('YYYY-MM-DD');
+        var end = window._currentEnd || moment().format('YYYY-MM-DD');
+
         $.ajax({
             url: "{{ url('/dashboard/providers') }}/" + id,
             type: 'GET',
+            data: { start_date: start, end_date: end },
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             success: function (res) {
-                if (!res.provider) {
-                    $('#providerModalContent').html('<div class="text-center text-slate-500 py-4">Provider not found</div>');
-                    return;
-                }
+                if (!res || !res.provider) return;
+                _pmCurrentData = res;
                 var p = res.provider;
-                var s = res.stats;
-                $('#providerModalContent').html(
-                    '<div class="flex items-center gap-4 mb-4">' +
-                    '<div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-lg uppercase">' + (p.Abbr || 'PR') + '</div>' +
-                    '<div>' +
-                    '<h4 class="text-lg font-bold text-slate-800">' + (p.PName || p.LName || 'Unknown') + '</h4>' +
-                    '<p class="text-sm text-slate-500">' + (p.Specialty || 'General') + '</p>' +
-                    '</div>' +
-                    '</div>' +
-                    '<div class="grid grid-cols-2 gap-3 text-sm">' +
-                    '<div class="bg-slate-50 border border-slate-100 p-3 rounded">' +
-                    '<p class="text-slate-500 text-xs mb-1">Net Production</p>' +
-                    '<p class="font-bold text-slate-800">$' + Number(s.net_production).toLocaleString() + '</p>' +
-                    '</div>' +
-                    '<div class="bg-slate-50 border border-slate-100 p-3 rounded">' +
-                    '<p class="text-slate-500 text-xs mb-1">Avg Production/Day</p>' +
-                    '<p class="font-bold text-slate-800">$' + Number(s.avg_production_per_day).toLocaleString() + '</p>' +
-                    '</div>' +
-                    '<div class="bg-slate-50 border border-slate-100 p-3 rounded">' +
-                    '<p class="text-slate-500 text-xs mb-1">Patient Visits</p>' +
-                    '<p class="font-bold text-slate-800">' + s.patient_visits + ' (' + s.new_patient_visits + ' New)</p>' +
-                    '</div>' +
-                    '<div class="bg-slate-50 border border-slate-100 p-3 rounded">' +
-                    '<p class="text-slate-500 text-xs mb-1">TX Acceptance</p>' +
-                    '<p class="font-bold text-slate-800">' + s.tx_accepted_rate + '%</p>' +
-                    '</div>' +
-                    '</div>'
-                );
-            },
-            error: function () {
-                $('#providerModalContent').html('<div class="text-center text-red-500 py-4">Failed to load provider data.</div>');
+                var s = res.stats || {};
+
+                var fullName = (p.LName || '') + (p.PName ? ', ' + p.PName : '');
+                if (!fullName) fullName = p.Abbr || ('Provider ' + id);
+
+                var initials = (p.PName ? p.PName.charAt(0) : '') + (p.LName ? p.LName.charAt(0) : '');
+                if (!initials) initials = (p.Abbr || 'PR').substring(0, 2);
+
+                $('#pm-avatar').text(initials.toUpperCase());
+                $('#pm-name').text(fullName);
+                $('#pm-abbr').text(p.Abbr ? '(' + p.Abbr + ')' : '');
+
+                $('#pm-info-gender').text(p.Gender || 'N/A');
+                $('#pm-info-specialty').text(p.Specialty || 'General');
+
+                var netVal = s.net_production != null ? Number(s.net_production) : 0;
+                var avgDayVal = s.avg_production_per_day != null ? Number(s.avg_production_per_day) : 0;
+                var perVisitVal = s.production_per_visit != null ? Number(s.production_per_visit) : 0;
+                var txRateVal = s.tx_accepted_rate != null ? Number(s.tx_accepted_rate) : 0;
+                var visitsVal = s.patient_visits != null ? Number(s.patient_visits) : 0;
+                var newVisitsVal = s.new_patient_visits != null ? Number(s.new_patient_visits) : 0;
+
+                $('#pm-info-net').text('$ ' + netVal.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}));
+                $('#pm-info-avg-day').text('$ ' + avgDayVal.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}));
+                $('#pm-info-per-visit').text('$ ' + perVisitVal.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}));
+                $('#pm-info-tx-rate').text(txRateVal.toFixed(2) + '%');
+                $('#pm-info-patient-visits').text(visitsVal.toLocaleString());
+                $('#pm-info-new-visits').text(newVisitsVal.toLocaleString());
+
+                $('#pm-prod-net').text('$ ' + netVal.toLocaleString());
+                $('#pm-prod-avg').text('$ ' + avgDayVal.toLocaleString());
+                $('#pm-prod-per-visit').text('$ ' + perVisitVal.toLocaleString());
+
+                $('#pm-visits-total').text(visitsVal.toLocaleString());
+                $('#pm-visits-new').text(newVisitsVal.toLocaleString());
+
+                $('#pm-tx-rate').text(txRateVal.toFixed(2) + '%');
             }
         });
     }
+
+    window.openProvider = function(id) {
+        openProviderModal(id);
+    };
 
     $(function () {
         $('#providerModal').on('click', function (e) {
@@ -806,35 +919,207 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
     });
 </script>
 
-{{-- Provider Detail Modal (Stackable) --}}
+{{-- Provider Detail Modal (Stackable & Shared Reusable Modal) --}}
 <div id="providerModal"
-    class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col transform transition-all">
-        <div class="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100 bg-slate-50">
-            <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-500" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                Provider Information
-            </h3>
-            <button onclick="$('#providerModal').addClass('hidden')"
-                class="text-slate-400 hover:text-slate-700 transition">
+    class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden transform transition-all border border-slate-200/60">
+
+        <!-- Modal header -->
+        <div class="flex items-center justify-between px-6 pt-5 pb-3 bg-white flex-shrink-0">
+            <h3 class="text-base font-bold text-slate-900 tracking-tight">Provider Information</h3>
+            <button type="button" onclick="$('#providerModal').addClass('hidden')"
+                class="text-slate-400 hover:text-slate-700 transition p-1 rounded-lg hover:bg-slate-100 focus:outline-none">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2.5">
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
             </button>
         </div>
-        <div class="p-6">
-            <div id="providerModalContent" class="space-y-4">
-                <div class="flex justify-center p-6">
-                    <div class="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin">
+
+        <!-- Provider identity -->
+        <div class="flex items-center gap-3.5 px-6 pb-4 bg-white flex-shrink-0">
+            <div id="pm-avatar"
+                class="w-11 h-11 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-extrabold shrink-0 shadow-sm">
+                HA
+            </div>
+            <div>
+                <h4 id="pm-name" class="text-lg font-bold text-slate-900 leading-snug">Haddow, Mason</h4>
+                <p id="pm-abbr" class="text-xs text-slate-400 font-medium"></p>
+            </div>
+        </div>
+
+        <!-- Tabs Navigation Bar -->
+        <div class="flex border-b border-slate-200/80 px-6 flex-shrink-0 bg-white">
+            <button type="button" onclick="switchPmTab('info')"
+                class="pm-tab-btn border-b-2 border-emerald-500 text-emerald-600 font-semibold py-2.5 pr-6 text-sm transition-colors focus:outline-none"
+                data-tab="info">Info</button>
+            <button type="button" onclick="switchPmTab('production')"
+                class="pm-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 font-medium py-2.5 pr-6 text-sm transition-colors focus:outline-none"
+                data-tab="production">Production</button>
+            <button type="button" onclick="switchPmTab('visits')"
+                class="pm-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 font-medium py-2.5 pr-6 text-sm transition-colors focus:outline-none"
+                data-tab="visits">Visits</button>
+            <button type="button" onclick="switchPmTab('tx-accepted')"
+                class="pm-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 font-medium py-2.5 text-sm transition-colors focus:outline-none"
+                data-tab="tx-accepted">TX Accepted</button>
+        </div>
+
+        <!-- Tab Content Body (Gray background container matching screenshot) -->
+        <div class="flex-1 overflow-y-auto bg-[#f8fafc] p-6">
+
+            <!-- 1. Info Tab Panel (Matches Screenshot Pixel for Pixel) -->
+            <div id="pm-tab-info" class="pm-tab-panel">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                    <!-- Left Column: Provider Information + Address -->
+                    <div class="lg:col-span-7 space-y-4">
+                        <h5 class="text-[13px] font-bold text-slate-600 uppercase tracking-wider">Provider Information</h5>
+
+                        <!-- Top Card: Gender & Specialty -->
+                        <div class="bg-white rounded-lg border border-slate-200/90 shadow-sm p-4">
+                            <div class="grid grid-cols-2 divide-x divide-slate-100">
+                                <div class="pr-4">
+                                    <p class="text-xs text-slate-400 font-medium mb-1">Gender</p>
+                                    <p id="pm-info-gender" class="text-sm font-extrabold text-slate-900">N/A</p>
+                                </div>
+                                <div class="pl-4">
+                                    <p class="text-xs text-slate-400 font-medium mb-1">Specialty</p>
+                                    <p id="pm-info-specialty" class="text-sm font-extrabold text-slate-900">Invisalign</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Card: Map & Address -->
+                        <div class="bg-white rounded-lg border border-slate-200/90 shadow-sm p-4 space-y-4">
+                            <!-- Map placeholder canvas -->
+                            <div class="h-44 bg-gradient-to-b from-slate-100 to-slate-200/80 rounded-md flex items-center justify-center border border-slate-200/60 relative overflow-hidden">
+                                <div class="text-center p-4">
+                                    <svg class="w-8 h-8 text-slate-300 mx-auto mb-1" xmlns="http://www.w3.org/2000/svg"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                        <circle cx="12" cy="10" r="3" />
+                                    </svg>
+                                    <p class="text-xs font-medium text-slate-400">Map not available</p>
+                                </div>
+                            </div>
+                            <!-- Address 4-column footer -->
+                            <div class="grid grid-cols-4 divide-x divide-slate-100 bg-slate-50/60 rounded p-2.5 text-left">
+                                <div class="pr-2">
+                                    <p class="text-[10px] text-slate-400 font-medium mb-0.5">Address</p>
+                                    <p class="text-xs font-bold text-slate-800 truncate">--</p>
+                                </div>
+                                <div class="px-2">
+                                    <p class="text-[10px] text-slate-400 font-medium mb-0.5">City</p>
+                                    <p class="text-xs font-bold text-slate-800 truncate">--</p>
+                                </div>
+                                <div class="px-2">
+                                    <p class="text-[10px] text-slate-400 font-medium mb-0.5">State</p>
+                                    <p class="text-xs font-bold text-slate-800 truncate">--</p>
+                                </div>
+                                <div class="pl-2">
+                                    <p class="text-[10px] text-slate-400 font-medium mb-0.5">Zip</p>
+                                    <p class="text-xs font-bold text-slate-800 truncate">--</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Overview -->
+                    <div class="lg:col-span-5 space-y-4">
+                        <h5 class="text-[13px] font-bold text-slate-600 uppercase tracking-wider">Overview</h5>
+
+                        <div class="bg-white rounded-lg border border-slate-200/90 shadow-sm p-4">
+                            <div class="divide-y divide-slate-100">
+                                <!-- Row 1 -->
+                                <div class="grid grid-cols-2 divide-x divide-slate-100 pb-3.5">
+                                    <div class="pr-3">
+                                        <p class="text-xs text-slate-400 font-medium mb-1">Production</p>
+                                        <p id="pm-info-net" class="text-base font-extrabold text-slate-900">$ 0</p>
+                                    </div>
+                                    <div class="pl-3">
+                                        <p class="text-xs text-slate-400 font-medium mb-1">Avg. Production / Day</p>
+                                        <p id="pm-info-avg-day" class="text-base font-extrabold text-slate-900">$ 0</p>
+                                    </div>
+                                </div>
+                                <!-- Row 2 -->
+                                <div class="grid grid-cols-2 divide-x divide-slate-100 py-3.5">
+                                    <div class="pr-3">
+                                        <p class="text-xs text-slate-400 font-medium mb-1">Production / Patient Visit</p>
+                                        <p id="pm-info-per-visit" class="text-base font-extrabold text-slate-900">$ 0</p>
+                                    </div>
+                                    <div class="pl-3">
+                                        <p class="text-xs text-slate-400 font-medium mb-1">Accepted TX Plan</p>
+                                        <p id="pm-info-tx-rate" class="text-base font-extrabold text-slate-900">0.00%</p>
+                                    </div>
+                                </div>
+                                <!-- Row 3 -->
+                                <div class="grid grid-cols-2 divide-x divide-slate-100 pt-3.5">
+                                    <div class="pr-3">
+                                        <p class="text-xs text-slate-400 font-medium mb-1">Patient Visits</p>
+                                        <p id="pm-info-patient-visits" class="text-base font-extrabold text-slate-900">1</p>
+                                    </div>
+                                    <div class="pl-3">
+                                        <p class="text-xs text-slate-400 font-medium mb-1">New Patient Visits</p>
+                                        <p id="pm-info-new-visits" class="text-base font-extrabold text-slate-900">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- 2. Production Tab Panel -->
+            <div id="pm-tab-production" class="pm-tab-panel hidden space-y-4">
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="bg-white p-3.5 rounded-lg border border-slate-200/80 shadow-sm">
+                        <p class="text-xs text-slate-400 font-medium mb-1">Net Production</p>
+                        <p id="pm-prod-net" class="text-base font-extrabold text-slate-900">$ 0</p>
+                    </div>
+                    <div class="bg-white p-3.5 rounded-lg border border-slate-200/80 shadow-sm">
+                        <p class="text-xs text-slate-400 font-medium mb-1">Avg. Production / Day</p>
+                        <p id="pm-prod-avg" class="text-base font-extrabold text-slate-900">$ 0</p>
+                    </div>
+                    <div class="bg-white p-3.5 rounded-lg border border-slate-200/80 shadow-sm">
+                        <p class="text-xs text-slate-400 font-medium mb-1">Production / Visit</p>
+                        <p id="pm-prod-per-visit" class="text-base font-extrabold text-slate-900">$ 0</p>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-lg border border-slate-200/80 shadow-sm">
+                    <canvas id="provModalProductionChart" class="w-full h-64"></canvas>
+                </div>
+            </div>
+
+            <!-- 3. Visits Tab Panel -->
+            <div id="pm-tab-visits" class="pm-tab-panel hidden space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-white p-3.5 rounded-lg border border-slate-200/80 shadow-sm">
+                        <p class="text-xs text-slate-400 font-medium mb-1">Total Patient Visits</p>
+                        <p id="pm-visits-total" class="text-base font-extrabold text-slate-900">0</p>
+                    </div>
+                    <div class="bg-white p-3.5 rounded-lg border border-slate-200/80 shadow-sm">
+                        <p class="text-xs text-slate-400 font-medium mb-1">New Patient Visits</p>
+                        <p id="pm-visits-new" class="text-base font-extrabold text-slate-900">0</p>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-lg border border-slate-200/80 shadow-sm">
+                    <canvas id="provModalVisitsChart" class="w-full h-64"></canvas>
+                </div>
+            </div>
+
+            <!-- 4. TX Accepted Tab Panel -->
+            <div id="pm-tab-tx-accepted" class="pm-tab-panel hidden space-y-4">
+                <div class="bg-white p-3.5 rounded-lg border border-slate-200/80 shadow-sm max-w-xs">
+                    <p class="text-xs text-slate-400 font-medium mb-1">Accepted TX Plan</p>
+                    <p id="pm-tx-rate" class="text-base font-extrabold text-slate-900">0.00%</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg border border-slate-200/80 shadow-sm">
+                    <canvas id="provModalTxChart" class="w-full h-64"></canvas>
+                </div>
+            </div>
+
         </div>
     </div>
+</div>
 </div>
