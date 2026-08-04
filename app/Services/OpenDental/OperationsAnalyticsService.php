@@ -1420,12 +1420,9 @@ class OperationsAnalyticsService
         $broken = $this->countAppointments($start, $end, $clinics, '5');
 
         // Cancellation $ = production tied to cancelled/no-show (Broken) appointments.
-        // Procedures link to an appointment via AptNum (scheduled) or PlannedAptNum (planned).
+        // Procedures link to an appointment via AptNum.
         $dollarsQ = DB::table('od_appointments as a')
-            ->join('od_procedure_logs as pl', function ($join) {
-                $join->on('pl.AptNum', '=', 'a.AptNum')
-                    ->orOn('pl.PlannedAptNum', '=', 'a.AptNum');
-            })
+            ->join('od_procedure_logs as pl', 'pl.AptNum', '=', 'a.AptNum')
             ->where('a.AptStatus', '5')
             ->whereNotIn('a.AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947])
             ->whereRaw('LEFT(a.AptDateTime, 10) BETWEEN ? AND ?', [$start, $end])
@@ -1463,7 +1460,7 @@ class OperationsAnalyticsService
     private function countAppointments(string $start, string $end, array $clinics, ?string $status): array
     {
         $q = DB::table('od_appointments')
-            ->selectRaw('ClinicNum, COUNT(*) AS total')
+            ->selectRaw('ClinicNum, COUNT(DISTINCT AptNum) AS total')
             ->whereRaw('LEFT(AptDateTime, 10) BETWEEN ? AND ?', [$start, $end]);
 
         if ($status !== null) {

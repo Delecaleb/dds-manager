@@ -713,7 +713,7 @@ class OperationsController extends Controller
                 $query->where('a.ClinicNum', $clinicNum);
             }
 
-            $appts = $query->get();
+            $appts = $query->get()->unique('AptNum');
 
             $patMap = $mapPatients($appts->pluck('PatNum')->unique());
 
