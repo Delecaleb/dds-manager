@@ -4,12 +4,10 @@ use App\Http\Controllers\AgingController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\KpisController;
-<<<<<<< Updated upstream
-=======
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\OpenDentalExplorerController;
 use App\Http\Controllers\OperationsController;
->>>>>>> Stashed changes
+
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\FinancialController;
