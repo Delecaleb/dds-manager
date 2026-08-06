@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class PaySplit extends Model
 {
+    protected $table = 'od_pay_splits';
+
     protected $fillable = [
         'SplitNum', 
         'SplitAmt', 

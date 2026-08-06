@@ -6,6 +6,8 @@ use App\Models\OdProcedureLog;
 
 class ProcedureLogSyncService extends BaseQuerySyncService
 {
+    protected int $batchSize = 1000;
+
     protected function table(): string
     {
         return 'procedurelog';
@@ -26,7 +28,17 @@ class ProcedureLogSyncService extends BaseQuerySyncService
      */
     protected function syncColumn(): ?string
     {
-        return 'SecDateEntry';
+        return 'DateTStamp';
+    }
+
+    /**
+     * Business date a windowed sync (sync:procedurelogs-range) filters on.
+     * ProcDate is what every production metric buckets by, so it is the only
+     * correct bound for a "from 2025 till date" backfill.
+     */
+    protected function dateColumn(): ?string
+    {
+        return 'ProcDate';
     }
 
     /**

@@ -2,18 +2,27 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ProcStatus;
+use App\Helpers\MetricDefinitions;
+use App\Models\OdAppointment;
+use App\Models\OdProcedureLog;
 use App\Services\OpenDental\FinancialAnalyticsService;
 use App\Services\OpenDental\PatientAnalyticsService;
+use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class FinancialController extends Controller
 {
+    /** Pre-rendered completed-status IN-list for raw-SQL heredoc interpolation (DRY). */
+    private readonly string $completedIn;
+
     public function __construct(
         protected FinancialAnalyticsService $financialAnalytics,
-        protected PatientAnalyticsService   $patientAnalytics
-    ) {}
+        protected PatientAnalyticsService $patientAnalytics
+    ) {
+        $this->completedIn = ProcStatus::inList(ProcStatus::completed());
+    }
 
     public function index()
     {
@@ -23,37 +32,217 @@ class FinancialController extends Controller
     public function data(Request $request)
     {
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
-        $end   = $request->input('end_date',   now()->toDateString());
-        return response()->json(array_merge(
-            $this->patientAnalytics->getPatientAnalytics($start, $end),
-            $this->financialAnalytics->filterAnalysis($start, $end),
-        ));
+        $end = $request->input('end_date', now()->toDateString());
+        $section = $request->input('section', 'all');
+
+        $response = [];
+
+        if (in_array($section, ['all', 'revenue-kpis'])) {
+            $response = array_merge(
+                $response,
+                $this->financialAnalytics->filterAnalysis($start, $end)
+            );
+        }
+
+        if (in_array($section, ['all', 'patient-kpis'])) {
+            $response = array_merge(
+                $response,
+                $this->patientAnalytics->getPatientAnalytics($start, $end)
+            );
+        }
+
+        // Utilization Data Chart (Provider Production)
+        if (in_array($section, ['all', 'utilization-chart'])) {
+            $utilizationData = DB::select("
+                SELECT
+                    COALESCE(NULLIF(pr.Abbr, ''), pr.LName, CAST(pr.ProvNum AS CHAR)) AS provider,
+                    SUM(pl.ProcFee) AS production
+                FROM od_procedure_logs pl
+                JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
+                WHERE pl.ProcStatus IN ({$this->completedIn})
+                  AND pr.IsHidden IN ('false', '0', 0)
+                  AND pl.ProcDate BETWEEN ? AND ?
+                GROUP BY pr.ProvNum, pr.Abbr, pr.LName
+                HAVING SUM(pl.ProcFee) > 0
+                ORDER BY production DESC
+            ", [$start, $end]);
+
+            $response['utilization'] = $utilizationData;
+        }
+
+        // Adjustment Chart
+        if (in_array($section, ['all', 'adjustment-chart'])) {
+            $adjustmentData = DB::select('
+                SELECT
+                    d.ItemName AS label,
+                    SUM(a.AdjAmt) AS value
+                FROM od_adjustments a
+                JOIN od_definitions d ON a.AdjType = d.DefNum
+                WHERE a.AdjDate BETWEEN ? AND ?
+                GROUP BY d.DefNum, d.ItemName
+                ORDER BY ABS(SUM(a.AdjAmt)) DESC
+            ', [$start, $end]);
+
+            $response['adjustments_breakdown'] = $adjustmentData;
+        }
+
+        // Top Services Chart
+        if (in_array($section, ['all', 'top-services-chart'])) {
+            $topServicesData = DB::select("
+                SELECT
+                    d.ItemName AS label,
+                    SUM(pl.ProcFee) AS value
+                FROM od_procedure_logs pl
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
+                JOIN od_definitions d ON pc.ProcCat = d.DefNum
+                WHERE pl.ProcStatus IN ({$this->completedIn})
+                  AND pl.ProcDate BETWEEN ? AND ?
+                GROUP BY d.DefNum, d.ItemName
+                ORDER BY SUM(pl.ProcFee) DESC
+                LIMIT 5
+            ", [$start, $end]);
+
+            $response['top_services'] = $topServicesData;
+        }
+
+        // Daily Revenue Data
+        if (in_array($section, ['all', 'daily-revenue-chart'])) {
+            $dailyGross = DB::table('od_procedure_logs')
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$start, $end])
+                ->selectRaw('DATE(ProcDate) as date, '.MetricDefinitions::grossProduction('amount'))
+                ->groupByRaw('DATE(ProcDate)')
+                ->pluck('amount', 'date');
+
+            $dailyAdj = DB::table('od_adjustments')
+                ->whereBetween('AdjDate', [$start, $end])
+                ->selectRaw('DATE(AdjDate) as date, '.MetricDefinitions::adjustments('amount'))
+                ->groupByRaw('DATE(AdjDate)')
+                ->pluck('amount', 'date');
+
+            $dailyWriteOffs = DB::table('od_claim_procs')
+                ->whereBetween('ProcDate', [$start, $end])
+                ->selectRaw('DATE(ProcDate) as date, '.MetricDefinitions::writeOffs('amount'))
+                ->groupByRaw('DATE(ProcDate)')
+                ->pluck('amount', 'date');
+
+            $dailyColl = DB::table('od_pay_splits')
+                ->whereBetween('DatePay', [$start, $end])
+                ->selectRaw('DATE(DatePay) as date, '.MetricDefinitions::collections('amount'))
+                ->groupByRaw('DATE(DatePay)')
+                ->pluck('amount', 'date');
+
+            $period = CarbonPeriod::create($start, $end);
+            $allDates = collect();
+            foreach ($period as $dt) {
+                $allDates->push($dt->toDateString());
+            }
+
+            $response['daily_revenue'] = $allDates->map(function ($date) use ($dailyGross, $dailyAdj, $dailyWriteOffs, $dailyColl) {
+                $g = (float) ($dailyGross[$date] ?? 0);
+                $a = (float) ($dailyAdj[$date] ?? 0);
+                $w = (float) ($dailyWriteOffs[$date] ?? 0);
+                $c = (float) ($dailyColl[$date] ?? 0);
+                $n = $g + $a + $w;
+
+                return [
+                    'date' => $date,
+                    'gross' => $g,
+                    'adjustments' => $a,
+                    'collections' => $c,
+                    'net' => $n,
+                ];
+            })->values();
+        }
+
+        // Daily Patient Statistics
+        if (in_array($section, ['all', 'daily-patient-chart'])) {
+            $dailyVisits = OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$start, $end])
+                ->selectRaw('DATE(ProcDate) as date, '.MetricDefinitions::patientVisits('cnt'))
+                ->groupByRaw('DATE(ProcDate)')
+                ->pluck('cnt', 'date');
+
+            $dailyScheduled = OdAppointment::whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+                ->scheduled()
+                ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date, ".MetricDefinitions::scheduledPatients('cnt'))
+                ->groupByRaw("DATE(REPLACE(AptDateTime, 'T', ' '))")
+                ->pluck('cnt', 'date');
+
+            $dailyNewScheduled = OdAppointment::whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+                ->scheduled()
+                ->whereIn('IsNewPatient', ['1', 1, 'true', true])
+                ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date, ".MetricDefinitions::scheduledPatients('cnt'))
+                ->groupByRaw("DATE(REPLACE(AptDateTime, 'T', ' '))")
+                ->pluck('cnt', 'date');
+
+            $dailyNewVisits = DB::table(function ($query) {
+                $query->from('od_procedure_logs')
+                    ->whereIn('ProcStatus', ProcStatus::completed())
+                    ->select('PatNum')
+                    ->selectRaw('MIN(DATE(ProcDate)) as first_visit')
+                    ->groupBy('PatNum');
+            }, 'first_visits')
+                ->whereBetween('first_visit', [$start, $end])
+                ->select('first_visit as date')
+                ->selectRaw('COUNT(*) as cnt')
+                ->groupBy('first_visit')
+                ->pluck('cnt', 'date');
+
+            $dailyCancelled = DB::table('od_procedure_logs as pl')
+                ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereIn('pc.ProcCode', ['D9986', 'D9987'])
+                ->whereBetween('pl.ProcDate', [$start, $end])
+                ->selectRaw('DATE(pl.ProcDate) as date, COUNT(*) as cnt')
+                ->groupByRaw('DATE(pl.ProcDate)')
+                ->pluck('cnt', 'date');
+
+            $period = CarbonPeriod::create($start, $end);
+            $allStatDates = collect();
+            foreach ($period as $dt) {
+                $allStatDates->push($dt->toDateString());
+            }
+
+            $response['daily_patient_stats'] = $allStatDates->map(function ($date) use ($dailyVisits, $dailyScheduled, $dailyNewScheduled, $dailyNewVisits, $dailyCancelled) {
+                return [
+                    'date' => $date,
+                    'patient_visits' => (int) ($dailyVisits[$date] ?? 0),
+                    'new_patient_visits' => (int) ($dailyNewVisits[$date] ?? 0),
+                    'patient_scheduled' => (int) ($dailyScheduled[$date] ?? 0),
+                    'new_patient_scheduled' => (int) ($dailyNewScheduled[$date] ?? 0),
+                    'broken_cancelled' => (int) ($dailyCancelled[$date] ?? 0),
+                ];
+            })->values();
+        }
+
+        return response()->json($response);
     }
 
     // ── Score Cards ───────────────────────────────────────────────────────────
     public function scoreCards(Request $request)
     {
-        $start   = $request->input('start_date', now()->startOfMonth()->toDateString());
-        $end     = $request->input('end_date',   now()->toDateString());
-        $tab     = $request->input('tab', 'production');
+        $start = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $end = $request->input('end_date', now()->toDateString());
+        $tab = $request->input('tab', 'production');
         $provNum = $request->input('provider_num', '');
 
         return response()->json(
             $tab === 'collection'
-                ? $this->scoreCardsCollection($start, $end, $provNum)
-                : $this->scoreCardsProduction($start, $end, $provNum)
+            ? $this->scoreCardsCollection($start, $end, $provNum)
+            : $this->scoreCardsProduction($start, $end, $provNum)
         );
     }
 
     private function providerExpr(string $alias): string
     {
-        return "IF({$alias}.PName IS NULL OR {$alias}.PName = '', {$alias}.LName, CONCAT({$alias}.LName, ', ', {$alias}.PName))";
+        return "COALESCE(NULLIF({$alias}.Abbr, ''), {$alias}.LName, CAST({$alias}.ProvNum AS CHAR))";
     }
 
     private function scoreCardsProduction(string $start, string $end, string $provNum): array
     {
         $provFilter = '';
-        $bindings   = [$start, $end];
+        $bindings = [$start, $end];
         if ($provNum !== '') {
             $provFilter = 'AND pl.ProvNum = ?';
             $bindings[] = $provNum;
@@ -73,62 +262,74 @@ class FinancialController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             JOIN od_providers  pr ON pl.ProvNum  = pr.ProvNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               {$provFilter}
-            GROUP BY pr.ProvNum, pr.LName, pr.PName, pc.CodeNum, pc.ProcCode, pc.Descript
+            GROUP BY pr.ProvNum, pr.Abbr, pr.LName, pr.PName, pc.CodeNum, pc.ProcCode, pc.Descript
             ORDER BY total_production DESC, cnt DESC
         ", $bindings);
 
         // Tier assignment (sorted by total_production DESC — already sorted)
-        $n        = count($rows);
-        $topCut   = max(1, (int) ceil($n * 0.2));
-        $botCut   = max(1, (int) ceil($n * 0.2));
+        $n = count($rows);
+        $topCut = max(1, (int) ceil($n * 0.2));
+        $botCut = max(1, (int) ceil($n * 0.2));
         foreach ($rows as $i => $r) {
             $r->tier = match (true) {
-                $i < $topCut          => 'top',
-                $i >= $n - $botCut    => 'bottom',
-                default               => 'mid',
+                $i < $topCut => 'top',
+                $i >= $n - $botCut => 'bottom',
+                default => 'mid',
             };
         }
 
-        $totalCount   = (int) array_sum(array_map(fn ($r) => $r->cnt,              $rows));
-        $totalProd    = (float) array_sum(array_map(fn ($r) => $r->total_production, $rows));
-        $uniquePriced = count(array_filter($rows, fn ($r) => (float) $r->service_fee > 0));
+        $totalCount = (int) array_sum(array_map(fn ($r) => $r->cnt, $rows));
+        $totalProd = (float) array_sum(array_map(fn ($r) => $r->total_production, $rows));
+
+        $uniquePricedQuery = DB::table('od_procedure_logs as pl')
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereBetween('pl.ProcDate', [$start, $end])
+            ->where('pl.ProcFee', '>', 0);
+
+        if ($provNum !== '') {
+            $uniquePricedQuery->where('pl.ProvNum', $provNum);
+        }
+
+        $uniquePriced = (int) $uniquePricedQuery->selectRaw('COUNT(DISTINCT pl.CodeNum) as cnt')->value('cnt');
 
         // Top-5 for charts
         $byCount = $rows;
         usort($byCount, fn ($a, $b) => $b->cnt <=> $a->cnt);
 
         $providers = DB::table('od_providers')
-            ->where('IsHidden', 'false')
+            ->whereIn('IsHidden', ['false', '0', 0, false])
             ->orderBy('LName')
-            ->get(['ProvNum', 'LName', 'PName']);
+            ->get(['ProvNum', 'Abbr', 'LName']);
 
         return [
             'kpis' => [
-                'total_count'       => $totalCount,
+                'total_count' => $totalCount,
                 'unique_by_pricing' => $uniquePriced,
-                'total_production'  => round($totalProd, 2),
+                'total_production' => round($totalProd, 2),
             ],
-            'chart_counts'   => array_slice(array_map(fn ($r) => [
-                'label' => $r->service, 'value' => (int) $r->cnt,
+            'chart_counts' => array_slice(array_map(fn ($r) => [
+                'label' => $r->service,
+                'value' => (int) $r->cnt,
             ], $byCount), 0, 5),
             'chart_services' => array_slice(array_map(fn ($r) => [
-                'label' => $r->service, 'value' => round((float) $r->total_production, 2),
+                'label' => $r->service,
+                'value' => round((float) $r->total_production, 2),
             ], $rows), 0, 5),
             'rows' => array_map(fn ($r) => [
-                'provider'         => $r->provider ?? 'Unknown',
-                'service'          => $r->service,
-                'service_code'     => $r->service_code,
-                'count'            => (int) $r->cnt,
-                'service_fee'      => round((float) $r->service_fee, 2),
+                'provider' => $r->provider ?? 'Unknown',
+                'service' => $r->service,
+                'service_code' => $r->service_code,
+                'count' => (int) $r->cnt,
+                'service_fee' => round((float) $r->service_fee, 2),
                 'total_production' => round((float) $r->total_production, 2),
-                'tier'             => $r->tier,
+                'tier' => $r->tier,
             ], $rows),
             'providers' => $providers->map(fn ($p) => [
-                'id'   => $p->ProvNum,
-                'name' => $p->PName ? "{$p->LName}, {$p->PName}" : $p->LName,
+                'id' => $p->ProvNum,
+                'name' => $p->Abbr ?: $p->LName,
             ])->values(),
         ];
     }
@@ -136,7 +337,7 @@ class FinancialController extends Controller
     private function scoreCardsCollection(string $start, string $end, string $provNum): array
     {
         $provFilter = '';
-        $bindings   = [$start, $end];
+        $bindings = [$start, $end];
         if ($provNum !== '') {
             $provFilter = 'AND ps.ProvNum = ?';
             $bindings[] = $provNum;
@@ -147,65 +348,83 @@ class FinancialController extends Controller
         $rows = DB::select("
             SELECT
                 {$provExpr}                     AS provider,
-                'Payment'                        AS description,
+                COALESCE(pt.ItemName, 'Payment') AS description,
                 'Payment'                        AS type,
-                COUNT(*)                         AS cnt,
-                SUM(ps.SplitAmt)                 AS service_fee,
-                SUM(ps.SplitAmt)                 AS total_payments
+                1                                AS cnt,
+                ps.SplitAmt                      AS service_fee,
+                ps.DatePay                       AS payment_date,
+                ps.SplitAmt                      AS total_payments
             FROM od_pay_splits ps
             LEFT JOIN od_providers pr ON ps.ProvNum = pr.ProvNum
+            LEFT JOIN od_payments p ON ps.PayNum = p.PayNum
+            LEFT JOIN od_definitions pt ON p.PayType = pt.DefNum
             WHERE ps.DatePay BETWEEN ? AND ?
               AND ps.SplitAmt != 0
               {$provFilter}
-            GROUP BY ps.ProvNum, pr.LName, pr.PName
-            ORDER BY total_payments DESC
+            ORDER BY ps.DatePay DESC
         ", $bindings);
 
-        $n      = count($rows);
+        $n = count($rows);
         $topCut = max(1, (int) ceil($n * 0.2));
         $botCut = max(1, (int) ceil($n * 0.2));
         foreach ($rows as $i => $r) {
             $r->tier = match (true) {
-                $i < $topCut       => 'top',
+                $i < $topCut => 'top',
                 $i >= $n - $botCut => 'bottom',
-                default            => 'mid',
+                default => 'mid',
             };
         }
 
-        $totalCount = (int) array_sum(array_map(fn ($r) => $r->cnt,          $rows));
-        $totalPay   = (float) array_sum(array_map(fn ($r) => $r->total_payments, $rows));
-
-        $byCount = $rows;
-        usort($byCount, fn ($a, $b) => $b->cnt <=> $a->cnt);
+        $totalCount = count($rows);
+        $totalPay = (float) array_sum(array_map(fn ($r) => $r->total_payments, $rows));
 
         $providers = DB::table('od_providers')
-            ->where('IsHidden', 'false')
+            ->whereIn('IsHidden', ['false', '0', 0, false])
             ->orderBy('LName')
-            ->get(['ProvNum', 'LName', 'PName']);
+            ->get(['ProvNum', 'Abbr', 'LName']);
+
+        // Collection Scorecard - Top Counts and Top Payments Charts
+        $topPayments = DB::select('
+            SELECT 
+                pt.ItemName AS PaymentType,
+                COUNT(p.PayNum) AS CountValue,
+                SUM(p.PayAmt) AS AmountValue
+            FROM od_payments p
+            LEFT JOIN od_definitions pt ON p.PayType = pt.DefNum
+            WHERE p.PayDate BETWEEN ? AND ?
+            GROUP BY pt.ItemName, p.PayType
+            ORDER BY SUM(p.PayAmt) DESC
+        ', [$start, $end]);
+
+        $byCount = $topPayments;
+        usort($byCount, fn ($a, $b) => $b->CountValue <=> $a->CountValue);
 
         return [
             'kpis' => [
-                'total_count'    => $totalCount,
+                'total_count' => $totalCount,
                 'total_payments' => round($totalPay, 2),
             ],
-            'chart_counts'   => array_slice(array_map(fn ($r) => [
-                'label' => $r->description, 'value' => (int) $r->cnt,
-            ], $byCount), 0, 5),
-            'chart_payments' => array_slice(array_map(fn ($r) => [
-                'label' => $r->description, 'value' => round((float) $r->total_payments, 2),
-            ], $rows), 0, 5),
+            'chart_counts' => array_map(fn ($r) => [
+                'label' => $r->PaymentType ?? 'Unknown',
+                'value' => (int) $r->CountValue,
+            ], array_slice($byCount, 0, 6)),
+            'chart_payments' => array_map(fn ($r) => [
+                'label' => $r->PaymentType ?? 'Unknown',
+                'value' => round((float) $r->AmountValue, 2),
+            ], array_slice($topPayments, 0, 6)),
             'rows' => array_map(fn ($r) => [
-                'provider'      => $r->provider ?? 'Unknown',
-                'description'   => $r->description,
-                'type'          => $r->type,
-                'count'         => (int) $r->cnt,
-                'service_fee'   => round((float) $r->service_fee, 2),
-                'total_payments'=> round((float) $r->total_payments, 2),
-                'tier'          => $r->tier,
+                'provider' => $r->provider ?? 'Unknown',
+                'payment_date' => $r->payment_date,
+                'description' => $r->description,
+                'type' => $r->type,
+                'count' => (int) $r->cnt,
+                'service_fee' => round((float) $r->service_fee, 2),
+                'total_payments' => round((float) $r->total_payments, 2),
+                'tier' => $r->tier,
             ], $rows),
             'providers' => $providers->map(fn ($p) => [
-                'id'   => $p->ProvNum,
-                'name' => $p->PName ? "{$p->LName}, {$p->PName}" : $p->LName,
+                'id' => $p->ProvNum,
+                'name' => $p->Abbr ?: $p->LName,
             ])->values(),
         ];
     }
@@ -213,20 +432,21 @@ class FinancialController extends Controller
     public function breakdown(Request $request)
     {
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
-        $end   = $request->input('end_date',   now()->toDateString());
-        $type  = $request->input('type', '');
+        $end = $request->input('end_date', now()->toDateString());
+        $type = $request->input('type', '');
 
         $rows = match ($type) {
-            'gross_production'           => $this->bkGrossProduction($start, $end),
-            'net_production'             => $this->bkNetProduction($start, $end),
-            'adjustment'                 => $this->bkAdjustment($start, $end),
-            'collection'                 => $this->bkCollection($start, $end),
-            'patient_visits'             => $this->bkPatientVisits($start, $end),
-            'new_patient_visits'         => $this->bkNewPatientVisits($start, $end),
-            'patients_scheduled'         => $this->bkPatientsScheduled($start, $end),
-            'new_patients_scheduled'     => $this->bkNewPatientsScheduled($start, $end),
+            'gross_production' => $this->bkGrossProduction($start, $end),
+            'net_production' => $this->bkNetProduction($start, $end),
+            'adjustment' => $this->bkAdjustment($start, $end),
+            'collection' => $this->bkCollection($start, $end),
+            'patient_visits' => $this->bkPatientVisits($start, $end),
+            'new_patient_visits' => $this->bkNewPatientVisits($start, $end),
+            'patients_scheduled' => $this->bkPatientsScheduled($start, $end),
+            'new_patients_scheduled' => $this->bkNewPatientsScheduled($start, $end),
+            'broken_cancelled' => $this->bkBrokenCancelled($start, $end),
             'avg_production_per_patient' => $this->bkAvgProductionPerPatient($start, $end),
-            default                      => [],
+            default => [],
         };
 
         return response()->json($rows);
@@ -246,7 +466,7 @@ class FinancialController extends Controller
             FROM od_procedure_logs pl
             JOIN od_patients  p  ON pl.PatNum  = p.PatNum
             JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY p.PatNum, p.LName, p.FName,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
@@ -255,12 +475,12 @@ class FinancialController extends Controller
         ", [$start, $end]);
 
         return array_map(fn ($r) => [
-            'patient_id'   => $r->patient_id,
+            'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
-            'providers'    => $r->providers,
-            'dates'        => $r->dates,
-            'amount'       => round((float) $r->amount, 2),
+            'providers' => $r->providers,
+            'dates' => $r->dates,
+            'amount' => round((float) $r->amount, 2),
         ], $rows);
     }
 
@@ -280,7 +500,7 @@ class FinancialController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_patients  p  ON pl.PatNum  = p.PatNum
                 JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-                WHERE pl.ProcStatus = 'C'
+                WHERE pl.ProcStatus IN ({$this->completedIn})
                   AND pl.ProcDate BETWEEN ? AND ?
                 GROUP BY p.PatNum, p.LName, p.FName,
                          pr.ProvNum, pr.Abbr, pr.LName, pr.PName, pl.ProcDate
@@ -298,17 +518,36 @@ class FinancialController extends Controller
                 JOIN od_patients  p  ON a.PatNum  = p.PatNum
                 LEFT JOIN od_providers pr ON a.ProvNum = pr.ProvNum
                 WHERE a.AdjDate BETWEEN ? AND ?
+
+                UNION ALL
+
+                -- Writeoffs reduce net (stored positive → shown negative) so the ledger
+                -- total reconciles with Net = gross + adjustments − writeoffs (D3).
+                SELECT
+                    p.PatNum                                          AS patient_id,
+                    CONCAT(p.LName, ', ', p.FName)                   AS patient_name,
+                    COALESCE(CONCAT(pr.ProvNum, ' - ', pr.Abbr), '') AS provider_ids,
+                    COALESCE(CONCAT(pr.LName, ', ', pr.PName), '')   AS providers,
+                    cp.ProcDate                                       AS dates,
+                    -SUM(cp.WriteOff)                                 AS amount
+                FROM od_claim_procs cp
+                JOIN od_patients  p  ON cp.PatNum  = p.PatNum
+                LEFT JOIN od_providers pr ON cp.ProvNum = pr.ProvNum
+                WHERE cp.ProcDate BETWEEN ? AND ?
+                  AND cp.WriteOff <> 0
+                GROUP BY p.PatNum, p.LName, p.FName,
+                         pr.ProvNum, pr.Abbr, pr.LName, pr.PName, cp.ProcDate
             ) combined
             ORDER BY dates, patient_name
-        ", [$start, $end, $start, $end]);
+        ", [$start, $end, $start, $end, $start, $end]);
 
         return array_map(fn ($r) => [
-            'patient_id'   => $r->patient_id,
+            'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
-            'providers'    => $r->providers,
-            'dates'        => $r->dates,
-            'amount'       => round((float) $r->amount, 2),
+            'providers' => $r->providers,
+            'dates' => $r->dates,
+            'amount' => round((float) $r->amount, 2),
         ], $rows);
     }
 
@@ -333,13 +572,13 @@ class FinancialController extends Controller
         ", [$start, $end]);
 
         return array_map(fn ($r) => [
-            'patient_id'   => $r->patient_id,
+            'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
-            'providers'    => $r->providers,
-            'dates'        => $r->dates,
-            'amount'       => round((float) $r->amount, 2),
-            'adj_type'     => ((float) $r->amount >= 0 ? '+' : '-') . ' Adjustment (Type #' . $r->adj_type_id . ')',
+            'providers' => $r->providers,
+            'dates' => $r->dates,
+            'amount' => round((float) $r->amount, 2),
+            'adj_type' => ((float) $r->amount >= 0 ? '+' : '-').' Adjustment (Type #'.$r->adj_type_id.')',
         ], $rows);
     }
 
@@ -365,12 +604,12 @@ class FinancialController extends Controller
         ", [$start, $end]);
 
         return array_map(fn ($r) => [
-            'patient_id'   => $r->patient_id,
+            'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
-            'providers'    => $r->providers,
-            'dates'        => $r->dates,
-            'amount'       => round((float) $r->amount, 2),
+            'providers' => $r->providers,
+            'dates' => $r->dates,
+            'amount' => round((float) $r->amount, 2),
         ], $rows);
     }
 
@@ -381,21 +620,21 @@ class FinancialController extends Controller
             SELECT
                 p.PatNum                         AS patient_id,
                 CONCAT(p.LName, ', ', p.FName)   AS patient_name,
-                pl.ProcDate                      AS dates,
-                COUNT(DISTINCT pl.ProcDate)      AS count
+                GROUP_CONCAT(DISTINCT DATE_FORMAT(pl.ProcDate, '%Y-%m-%d') ORDER BY pl.ProcDate SEPARATOR ', ') AS dates,
+                COUNT(DISTINCT DATE(pl.ProcDate)) AS count
             FROM od_procedure_logs pl
             JOIN od_patients p ON pl.PatNum = p.PatNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
-            GROUP BY p.PatNum, p.LName, p.FName, pl.ProcDate
-            ORDER BY pl.ProcDate, p.LName
+            GROUP BY p.PatNum, p.LName, p.FName
+            ORDER BY count DESC, p.LName
         ", [$start, $end]);
 
         return array_map(fn ($r) => [
-            'patient_id'   => $r->patient_id,
+            'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
-            'dates'        => $r->dates,
-            'count'        => (int) $r->count,
+            'dates' => $r->dates,
+            'count' => (int) $r->count,
         ], $rows);
     }
 
@@ -412,18 +651,18 @@ class FinancialController extends Controller
             FROM od_procedure_logs pl
             JOIN od_patients   p  ON pl.PatNum  = p.PatNum
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
             GROUP BY p.PatNum, p.LName, p.FName
             HAVING MIN(pl.ProcDate) BETWEEN ? AND ?
             ORDER BY dates, p.LName
         ", [$start, $end]);
 
         return array_map(fn ($r) => [
-            'patient_id'    => $r->patient_id,
-            'patient_name'  => $r->patient_name,
-            'dates'         => $r->dates,
+            'patient_id' => $r->patient_id,
+            'patient_name' => $r->patient_name,
+            'dates' => $r->dates,
             'service_codes' => $r->service_codes,
-            'amount'        => round((float) $r->amount, 2),
+            'amount' => round((float) $r->amount, 2),
         ], $rows);
     }
 
@@ -434,21 +673,21 @@ class FinancialController extends Controller
             SELECT
                 p.PatNum                         AS patient_id,
                 CONCAT(p.LName, ', ', p.FName)   AS patient_name,
-                DATE(a.AptDateTime)              AS dates,
-                COUNT(*)                         AS count
+                GROUP_CONCAT(DISTINCT DATE_FORMAT(a.AptDateTime, '%Y-%m-%d') ORDER BY a.AptDateTime SEPARATOR ', ') AS dates,
+                COUNT(DISTINCT DATE(a.AptDateTime)) AS count
             FROM od_appointments a
             JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
-              AND a.AptStatus = 1
-            GROUP BY p.PatNum, p.LName, p.FName, DATE(a.AptDateTime)
-            ORDER BY dates, p.LName
+              AND a.AptStatus IN (1, 2)
+            GROUP BY p.PatNum, p.LName, p.FName
+            ORDER BY count DESC, p.LName
         ", [$start, $end]);
 
         return array_map(fn ($r) => [
-            'patient_id'   => $r->patient_id,
+            'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
-            'dates'        => $r->dates,
-            'count'        => (int) $r->count,
+            'dates' => $r->dates,
+            'count' => (int) $r->count,
         ], $rows);
     }
 
@@ -459,22 +698,22 @@ class FinancialController extends Controller
             SELECT
                 p.PatNum                         AS patient_id,
                 CONCAT(p.LName, ', ', p.FName)   AS patient_name,
-                DATE(a.AptDateTime)              AS dates,
-                COUNT(*)                         AS count
+                GROUP_CONCAT(DISTINCT DATE_FORMAT(a.AptDateTime, '%Y-%m-%d') ORDER BY a.AptDateTime SEPARATOR ', ') AS dates,
+                COUNT(DISTINCT DATE(a.AptDateTime)) AS count
             FROM od_appointments a
             JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
-              AND a.AptStatus = 1
-              AND a.IsNewPatient = 1
-            GROUP BY p.PatNum, p.LName, p.FName, DATE(a.AptDateTime)
-            ORDER BY dates, p.LName
+              AND a.AptStatus IN (1, 2)
+              AND a.IsNewPatient IN ('1', 'true', '1', 1)
+            GROUP BY p.PatNum, p.LName, p.FName
+            ORDER BY count DESC, p.LName
         ", [$start, $end]);
 
         return array_map(fn ($r) => [
-            'patient_id'   => $r->patient_id,
+            'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
-            'dates'        => $r->dates,
-            'count'        => (int) $r->count,
+            'dates' => $r->dates,
+            'count' => (int) $r->count,
         ], $rows);
     }
 
@@ -489,17 +728,43 @@ class FinancialController extends Controller
                 SUM(pl.ProcFee)                  AS amount
             FROM od_procedure_logs pl
             JOIN od_patients p ON pl.PatNum = p.PatNum
-            WHERE pl.ProcStatus = 'C'
+            WHERE pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY p.PatNum, p.LName, p.FName
             ORDER BY p.LName
         ", [$start, $end]);
 
         return array_map(fn ($r) => [
-            'patient_id'   => $r->patient_id,
+            'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
-            'count'        => (int) $r->count,
-            'amount'       => round((float) $r->amount, 2),
+            'count' => (int) $r->count,
+            'amount' => round((float) $r->amount, 2),
+        ], $rows);
+    }
+
+    // ── Broken & Cancelled Appointments ────────────────────────────────────────
+    private function bkBrokenCancelled(string $start, string $end): array
+    {
+        $rows = DB::select("
+            SELECT
+                p.PatNum                         AS patient_id,
+                CONCAT(p.LName, ', ', p.FName)   AS patient_name,
+                pl.ProcDate                      AS dates,
+                pc.ProcCode                      AS service_codes
+            FROM od_procedure_logs pl
+            JOIN od_patients   p  ON pl.PatNum  = p.PatNum
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
+            WHERE pl.ProcStatus IN ({$this->completedIn})
+              AND pc.ProcCode IN ('D9986', 'D9987')
+              AND pl.ProcDate BETWEEN ? AND ?
+            ORDER BY dates, p.LName
+        ", [$start, $end]);
+
+        return array_map(fn ($r) => [
+            'patient_id' => $r->patient_id,
+            'patient_name' => $r->patient_name,
+            'dates' => $r->dates,
+            'type' => $r->service_codes === 'D9986' ? 'No-Show' : 'Cancelled',
         ], $rows);
     }
 }

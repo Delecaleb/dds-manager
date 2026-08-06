@@ -2,16 +2,15 @@
 
 namespace App\Services\Sync;
 
-<<<<<<< Updated upstream
-=======
 use App\Models\Office;
 use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
->>>>>>> Stashed changes
 use Exception;
 use Illuminate\Support\Facades\DB;
 use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
+use Exception;
+use Illuminate\Support\Facades\DB;
 
 abstract class BaseQuerySyncService
 {
@@ -23,19 +22,13 @@ abstract class BaseQuerySyncService
 
     protected int $sleepSeconds = 1;
 
-<<<<<<< Updated upstream
-=======
-    protected int $overlapSeconds = 300;
-
     protected ?string $windowStart = null;
 
     protected ?string $windowEnd = null;
 
->>>>>>> Stashed changes
     public function __construct(
         protected QueryService $queryService
-    ) {
-    }
+    ) {}
 
     public function forOffice(?Office $office): static
     {
@@ -60,14 +53,49 @@ abstract class BaseQuerySyncService
         return null;
     }
 
+    /**
+     * Business-date column the optional sync window filters on (e.g.
+     * procedurelog.ProcDate). Null — the default — means the table cannot be
+     * windowed and withDateWindow() will be rejected.
+     *
+     * This is deliberately NOT syncColumn(): syncColumn() is the *change*
+     * timestamp driving incremental runs, while this is the *business* date
+     * that decides whether a row belongs to the period we care about.
+     */
+    protected function dateColumn(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Restrict this sync to rows whose dateColumn() falls inside the window.
+     *
+     * Both bounds are inclusive and either may be null (open-ended). A windowed
+     * sync gets its OWN sync_logs row (see module()), so a backfill can never
+     * overwrite the cursor or watermark of the full-table sync.
+     *
+     * @param  string|null  $start  'Y-m-d'
+     * @param  string|null  $end  'Y-m-d'
+     */
+    public function withDateWindow(?string $start, ?string $end = null): static
+    {
+        if ($this->dateColumn() === null) {
+            throw new Exception(static::class.' does not support a date window (no dateColumn() defined).');
+        }
+
+        if ($start !== null && $end !== null && $start > $end) {
+            throw new Exception("Invalid sync window: start ({$start}) is after end ({$end}).");
+        }
+
+        $this->windowStart = $start;
+        $this->windowEnd = $end;
+
+        return $this;
+    }
+
     protected function module(): string
     {
-<<<<<<< Updated upstream
         return $this->table();
-=======
-        $officeId = $this->getOffice()->id ?? 1;
-
-        return "office_{$officeId}:".$this->table().$this->windowSuffix();
     }
 
     /**
@@ -150,7 +178,7 @@ abstract class BaseQuerySyncService
         $timestamp = strtotime($value);
 
         return $timestamp !== false ? date('Y-m-d H:i:s', $timestamp) : null;
->>>>>>> Stashed changes
+
     }
 
     public function sync(): void
@@ -163,7 +191,7 @@ abstract class BaseQuerySyncService
             [
                 'office_id' => $office->id ?? 1,
                 'status' => 'idle',
-                'total_processed' => 0
+                'total_processed' => 0,
             ]
         );
 
@@ -171,14 +199,26 @@ abstract class BaseQuerySyncService
             'office_id' => $office->id ?? 1,
             'status' => 'running',
             'started_at' => now(),
-            'last_error' => null
+            'last_error' => null,
         ]);
 
         try {
 
-            if ($log->last_primary_key === null) {
+            // Initial mode until a full pass has completed at least once
+            // (last_synced_at is only stamped on initial completion), or
+            // always when the table has no incremental sync column.
+            if ($this->syncColumn() === null || $log->last_synced_at === null) {
+
+                $runStartedAt = now()->format('Y-m-d H:i:s');
 
                 $this->runInitialSync($log);
+
+                // Watermark for the first incremental run. Anything that
+                // changed remotely while the initial sync was running is
+                // covered by overlapSeconds + the hash-skip on re-scan.
+                if ($this->syncColumn() !== null) {
+                    $log->update(['last_synced_at' => $runStartedAt]);
+                }
 
             } else {
 
@@ -189,7 +229,7 @@ abstract class BaseQuerySyncService
             $log->update([
                 'status' => 'completed',
                 'finished_at' => now(),
-                'retry_count' => 0
+                'retry_count' => 0,
             ]);
 
         } catch (Exception $e) {
@@ -198,7 +238,7 @@ abstract class BaseQuerySyncService
 
             $log->update([
                 'status' => 'failed',
-                'last_error' => $e->getMessage()
+                'last_error' => $e->getMessage(),
             ]);
 
             throw $e;
@@ -207,15 +247,17 @@ abstract class BaseQuerySyncService
 
     protected function runInitialSync(SyncLog $log): void
     {
-        $lastId = $log->last_primary_key ?? 0;
+        $pk = $this->primaryKey();
+        $lastId = (int) ($log->last_primary_key ?? 0);
+        $window = $this->windowClause();
 
         while (true) {
 
             $sql = "
                 SELECT *
                 FROM {$this->table()}
-                WHERE {$this->primaryKey()} > {$lastId}
-                ORDER BY {$this->primaryKey()}
+                WHERE {$pk} > {$lastId}{$window}
+                ORDER BY {$pk}
                 LIMIT {$this->batchSize}
             ";
 
@@ -225,31 +267,10 @@ abstract class BaseQuerySyncService
                 break;
             }
 
-            DB::transaction(function () use ($rows, $log, &$lastId) {
-
-                $model = $this->model();
-
-                foreach ($rows as $row) {
-
-                    $model::updateOrCreate(
-
-                        [
-                            $this->primaryKey() => $row[$this->primaryKey()]
-                        ],
-
-                        $row
-
-                    );
-
-                    $lastId = $row[$this->primaryKey()];
-
-                    $log->increment('total_processed');
-                }
-
-            });
+            [, $lastId] = $this->persistBatch($rows, $log);
 
             $log->update([
-                'last_primary_key' => $lastId
+                'last_primary_key' => $lastId,
             ]);
 
             $this->logOutput("Synced through ID {$lastId}\n");
@@ -260,22 +281,40 @@ abstract class BaseQuerySyncService
 
     protected function runIncrementalSync(SyncLog $log): void
     {
-        $lastSync = $log->last_synced_at;
+        $pk = $this->primaryKey();
+        $col = $this->syncColumn();
+
+        // Rewind the cursor to re-scan the boundary window. Rows already
+        // stored identically are skipped by hash, so this costs reads only.
+        $lastSync = date(
+            'Y-m-d H:i:s',
+            strtotime((string) $log->last_synced_at) - $this->overlapSeconds
+        );
+
+        $lastId = 0;
+        $window = $this->windowClause();
 
         while (true) {
 
+            $safeSync = addslashes($lastSync);
+
+            // Keyset pagination on the (syncColumn, primaryKey) tuple.
+            // A bare "syncColumn > X" cursor either skips rows that share a
+            // timestamp across a batch boundary (with ">") or loops forever
+            // when more than batchSize rows share one timestamp (with ">=").
+            // The tuple cursor always advances and never skips.
+            // The keyset OR-group is wrapped in its own parentheses so an
+            // appended window clause ANDs against the whole cursor, not just
+            // the second branch of the OR.
             $sql = "
-
                 SELECT *
-
                 FROM {$this->table()}
-
-                WHERE {$this->syncColumn()} > '{$lastSync}'
-
-                ORDER BY {$this->syncColumn()},{$this->primaryKey()}
-
+                WHERE (
+                          ({$col} > '{$safeSync}')
+                       OR ({$col} = '{$safeSync}' AND {$pk} > {$lastId})
+                      ){$window}
+                ORDER BY {$col}, {$pk}
                 LIMIT {$this->batchSize}
-
             ";
 
             $rows = $this->executeWithRetry($sql);
@@ -284,13 +323,12 @@ abstract class BaseQuerySyncService
                 break;
             }
 
-            DB::transaction(function () use ($rows, $log, &$lastSync) {
+            [$lastSync, $lastId] = $this->persistBatch($rows, $log, $lastSync, $lastId);
 
-<<<<<<< Updated upstream
+
                 $model = $this->model();
 
                 foreach ($rows as $row) {
-=======
             // Persist both halves of the cursor so a kill mid-run resumes
             // exactly where it left off (minus the overlap window).
             $log->update([
@@ -303,7 +341,6 @@ abstract class BaseQuerySyncService
             sleep($this->sleepSeconds);
         }
     }
-
     /**
      * Persist a batch of rows idempotently and advance the cursor.
      *
@@ -324,19 +361,11 @@ abstract class BaseQuerySyncService
         $officeId = $this->getOffice()->id ?? 1;
 
         DB::transaction(function () use ($rows, $log, $modelClass, $pk, $col, $officeId, &$lastSync, &$lastId) {
->>>>>>> Stashed changes
 
-                    $model::updateOrCreate(
+            foreach ($rows as $row) {
 
-                        [
-                            $this->primaryKey() => $row[$this->primaryKey()]
-                        ],
+                $data = $this->transformRow($row);
 
-                        $row
-
-<<<<<<< Updated upstream
-                    );
-=======
                 $data['office_id'] = $officeId;
 
                 // Safeguard non-note string attributes from exceeding MySQL VARCHAR limits
@@ -347,26 +376,35 @@ abstract class BaseQuerySyncService
                 }
 
                 $existing = $modelClass::where('office_id', $officeId)->where($pk, $row[$pk])->first();
->>>>>>> Stashed changes
 
-                    if (isset($row[$this->syncColumn()])) {
-                        $lastSync = $row[$this->syncColumn()];
-                    }
+                if ($existing === null) {
+
+                    $model = new $modelClass;
+                    $model->fill($data);
+                    $model->{$pk} = $row[$pk];
+                    $model->save();
 
                     $log->increment('total_processed');
+                } else {
+
+                    $existing->fill($data);
+
+                    if ($existing->isDirty()) {
+                        $existing->save();
+                        $log->increment('total_processed');
+                    }
                 }
 
-            });
+                $lastId = (int) $row[$pk];
 
-            $log->update([
-                'last_synced_at' => $lastSync
-            ]);
+                if ($col !== null && isset($row[$col])) {
+                    $lastSync = $this->normalizeDateTime($row[$col]) ?? $lastSync;
+                }
+            }
 
-            echo "Synced through {$lastSync}\n";
+        });
 
-            sleep($this->sleepSeconds);
-
-        }
+        return [$lastSync, $lastId];
     }
 
     protected function executeWithRetry(string $sql): array
@@ -384,7 +422,6 @@ abstract class BaseQuerySyncService
                 if ($attempt >= $this->maxRetries) {
 
                     throw $e;
-
                 }
 
                 $wait = pow(2, $attempt);
@@ -401,9 +438,6 @@ abstract class BaseQuerySyncService
 
     }
 
-<<<<<<< Updated upstream
-}
-=======
     protected function logOutput(string $msg): void
     {
         if (app()->runningInConsole() && ! app()->runningUnitTests()) {
@@ -411,4 +445,3 @@ abstract class BaseQuerySyncService
         }
     }
 }
->>>>>>> Stashed changes

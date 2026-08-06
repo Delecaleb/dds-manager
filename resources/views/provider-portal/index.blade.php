@@ -184,12 +184,9 @@
     var BASE = '';
 
     /* ── Format helpers ─────────────────────────────────────────────────────── */
+    // Canonical formatter (single source: DDS.fmt.money in ui.js).
     function fmtMoney(v) {
-        if (v === null || v === undefined || v === '') return '—';
-        var n = parseFloat(v);
-        if (isNaN(n)) return '—';
-        var abs = Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        return n < 0 ? '$ (' + abs + ')' : '$ ' + abs;
+        return DDS.fmt.money(v);
     }
     function fmtDec1(v) {
         if (v === null || v === undefined) return '—';
@@ -425,7 +422,7 @@
                     return;
                 }
 
-                _table = $('#portalTable').DataTable({
+                _table = DDS.dataTable(document.getElementById('portalTable'), {
                     data: data,
                     dom: 'tip',
                     pageLength: 25,

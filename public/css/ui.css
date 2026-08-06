@@ -1,0 +1,384 @@
+/* ============================================================================
+   DDS Manager — shared UI stylesheet (single source of truth for component CSS)
+   Loaded once in layouts/app.blade.php. No build step (served statically).
+   Canonical look = the Operations analytics table (teal accent, heatmap, sticky).
+   ============================================================================ */
+
+:root {
+    --dds-accent: #00bfa5;
+    --dds-accent-dark: #009688;
+    --dds-heat-top: #c8f7dc; /* top 20%  */
+    --dds-heat-mid: #fef3c7; /* mid tier */
+    --dds-heat-bottom: #fecdd3; /* bottom 20% */
+    --dds-border: #e5e7eb;
+    --dds-head-bg: #f9fafb;
+    --dds-sticky-col-w: 12rem; /* width reserved for the first sticky column */
+    --dds-modal-base-z: 120; /* stacking modals increment from here */
+}
+
+/* ── Canonical table shell ────────────────────────────────────────────────── */
+.dds-table {
+    width: 100%;
+    border-collapse: collapse;
+    white-space: nowrap;
+}
+/* Scroll container: width:100% + min-width:0 pin it to the parent's width so a wide
+   table is clipped and scrolls HERE, instead of forcing ancestors wide and scrolling
+   the whole page. (Matches the working x-data-table wrapper's w-full + overflow-x-auto.) */
+.dds-table-scroll {
+    overflow-x: auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    -webkit-overflow-scrolling: touch;
+}
+ 
+/* Fixed (sticky) header — works everywhere, unlike the old no-op tb:sm:* classes */
+.dds-table thead.dds-head-sticky th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+.dds-table tfoot.dds-foot-sticky td {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+}
+
+/* ── Sort indicators ──────────────────────────────────────────────────────────
+   The app loads DataTables' JS but not its stylesheet, so the sort affordance has
+   to live here (table LOOK belongs in ui.css). DataTables 2 tags each header cell
+   with .dt-orderable-* (this column can sort) and .dt-ordering-* (this column IS
+   the sort), and injects <span class="dt-column-order"> for the arrow.
+
+   Idle columns show a dimmed double chevron on hover, the active column a solid
+   single chevron — otherwise a sortable table looks identical to a static one and
+   nobody discovers the sorting. */
+.dds-table thead th.dt-orderable-asc,
+.dds-table thead th.dt-orderable-desc {
+    cursor: pointer;
+    position: relative;
+    padding-right: 1.35rem !important;
+    user-select: none;
+}
+.dds-table thead th.dt-orderable-asc:hover,
+.dds-table thead th.dt-orderable-desc:hover {
+    background-color: #f1f5f9;
+}
+.dds-table thead th span.dt-column-order {
+    position: absolute;
+    right: 0.45rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.6rem;
+    line-height: 1;
+    color: #94a3b8;
+}
+.dds-table thead th.dt-orderable-asc span.dt-column-order::before {
+    content: '\2195'; /* ↕ — sortable, not currently sorted */
+    opacity: 0.45;
+}
+.dds-table thead th.dt-ordering-asc span.dt-column-order::before {
+    content: '\25B2'; /* ▲ */
+    opacity: 1;
+    color: var(--dds-accent, #009688);
+}
+.dds-table thead th.dt-ordering-desc span.dt-column-order::before {
+    content: '\25BC'; /* ▼ */
+    opacity: 1;
+    color: var(--dds-accent, #009688);
+}
+.dds-table thead th.dt-orderable-asc:hover span.dt-column-order {
+    opacity: 1;
+}
+
+/* ── Sticky columns (REAL implementation — replaces undefined tb:sm:stick-*) ──
+   Apply .dds-stick to the 1st frozen column cell (th+td), .dds-stick-2 to a 2nd.
+   Header/footer sticky cells sit above body sticky cells via z-index. */
+.dds-stick,
+.dds-stick-2 {
+    position: sticky;
+    background: inherit;
+    z-index: 15;
+}
+.dds-stick {
+    left: 0;
+}
+.dds-stick-2 {
+    left: var(--dds-sticky-col-w);
+}
+.dds-stick-shadow {
+    box-shadow: 6px 0 6px -4px rgba(0, 0, 0, 0.12);
+}
+
+.dds-table thead .dds-stick,
+.dds-table thead .dds-stick-2 {
+    z-index: 30;
+    background: var(--dds-head-bg);
+}
+.dds-table tfoot .dds-stick,
+.dds-table tfoot .dds-stick-2 {
+    z-index: 25;
+    background: var(--dds-head-bg);
+}
+.dds-table tbody tr {
+    background: #fff;
+}
+.dds-table tbody tr:hover {
+    background: #f8fafc;
+}
+.dds-table tbody tr:hover .dds-stick,
+.dds-table tbody tr:hover .dds-stick-2 {
+    background: #f8fafc;
+}
+
+/* Legacy alias so existing `.dt-col-sticky` markup keeps working during migration */
+.dt-col-sticky {
+    position: sticky !important;
+    left: 0;
+    background: inherit;
+    box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
+    border-right: 1px solid var(--dds-border) !important;
+    z-index: 15;
+}
+.dt-col-sticky {
+}
+
+/* ── Heatmap cell backgrounds ─────────────────────────────────────────────── */
+.dds-heat-top {
+    background-color: var(--dds-heat-top);
+}
+.dds-heat-mid {
+    background-color: var(--dds-heat-mid);
+}
+.dds-heat-bottom {
+    background-color: var(--dds-heat-bottom);
+}
+
+/* ── Accent helpers ───────────────────────────────────────────────────────── */
+.dds-accent {
+    color: var(--dds-accent);
+}
+.dds-accent-bg {
+    background-color: var(--dds-accent);
+}
+.dds-btn-accent {
+    border: 1px solid var(--dds-accent);
+    color: var(--dds-accent);
+    background: #fff;
+    transition:
+        background-color 0.15s,
+        color 0.15s;
+}
+.dds-btn-accent:hover {
+    background: var(--dds-accent);
+    color: #fff;
+}
+
+/* ── Tabs (URL-driven; JS in ui.js) ───────────────────────────────────────── */
+.dds-tab {
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+}
+.dds-tab[aria-selected="true"] {
+    color: #000;
+    border-bottom-color: var(--dds-accent);
+    font-weight: 600;
+}
+.dds-tab[aria-selected="false"] {
+    color: #94a3b8;
+}
+.dds-tab[aria-selected="false"]:hover {
+    color: #475569;
+}
+
+/* ── Stacking modals (JS in ui.js: DDS.modal) ─────────────────────────────── */
+.dds-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+}
+.dds-modal-panel {
+    background: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    max-height: 85vh;
+    width: 100%;
+    max-width: 56rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Loading skeleton ─────────────────────────────────────────────────────── */
+.dds-skeleton {
+    position: relative;
+    overflow: hidden;
+    background: #eef2f6;
+    border-radius: 0.375rem;
+}
+.dds-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.6),
+        transparent
+    );
+    animation: dds-shimmer 1.3s infinite;
+}
+@keyframes dds-shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* Respect reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    .dds-skeleton::after {
+        animation: none;
+    }
+}
+
+/* ── DataTables Pagination & Wrapper Styles ──────────────────────────── */
+.dataTables_wrapper,
+.dt-container {
+    width: 100%;
+}
+
+.dataTables_wrapper::after,
+.dt-container::after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+/* Info Text */
+.dataTables_info,
+.dt-info {
+    float: left;
+    padding-top: 0.75rem;
+    padding-bottom: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #64748b;
+}
+
+/* Pagination Container */
+.dataTables_paginate,
+.dt-paging {
+    float: right;
+    padding-top: 0.75rem;
+    padding-bottom: 0.5rem;
+    display: flex !important;
+    align-items: center;
+    gap: 0.25rem;
+    user-select: none;
+}
+
+/* Pagination Buttons */
+.dataTables_paginate .paginate_button,
+.dt-paging .dt-paging-button,
+.dt-paging button.dt-paging-button {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #334155 !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 0.375rem !important;
+    cursor: pointer !important;
+    text-decoration: none !important;
+    transition: all 0.15s ease-in-out;
+    margin: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.dataTables_paginate .paginate_button:hover:not(.disabled):not(.current),
+.dt-paging .dt-paging-button:hover:not(.disabled):not(.current),
+.dt-paging button.dt-paging-button:hover:not(.disabled):not(.current) {
+    background-color: #f1f5f9 !important;
+    border-color: #94a3b8 !important;
+    color: #0f172a !important;
+}
+
+.dataTables_paginate .paginate_button.current,
+.dataTables_paginate .paginate_button.current:hover,
+.dt-paging .dt-paging-button.current,
+.dt-paging .dt-paging-button.current:hover,
+.dt-paging button.dt-paging-button.active,
+.dt-paging button.dt-paging-button.active:hover {
+    background-color: #00bfa5 !important;
+    border-color: #00bfa5 !important;
+    color: #ffffff !important;
+    font-weight: 700;
+}
+
+.dataTables_paginate .paginate_button.disabled,
+.dataTables_paginate .paginate_button.disabled:hover,
+.dt-paging .dt-paging-button.disabled,
+.dt-paging .dt-paging-button.disabled:hover,
+.dt-paging button.dt-paging-button.disabled,
+.dt-paging button.dt-paging-button.disabled:hover {
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+    color: #94a3b8 !important;
+}
+
+/* DataTables length select & filter inputs */
+.dataTables_length,
+.dt-length {
+    float: left;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    color: #475569;
+    font-weight: 500;
+}
+.dataTables_length select,
+.dt-length select {
+    padding: 0.25rem 0.5rem;
+    margin: 0 0.25rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.375rem;
+    background-color: #ffffff;
+    font-size: 0.75rem;
+    color: #0f172a;
+}
+.dataTables_filter,
+.dt-search {
+    float: right;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    color: #475569;
+}
+.dataTables_filter input,
+.dt-search input {
+    padding: 0.375rem 0.75rem;
+    margin-left: 0.5rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    outline: none;
+}
+.dataTables_filter input:focus,
+.dt-search input:focus {
+    border-color: #00bfa5;
+    box-shadow: 0 0 0 1px #00bfa5;
+}

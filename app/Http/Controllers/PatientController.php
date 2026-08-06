@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ProcStatus;
 use App\Models\OdAppointment;
 use App\Models\OdPatient;
 use App\Models\OdPatientBalance;
@@ -31,8 +32,6 @@ class PatientController extends Controller
         $query = OdPatient::query()
             ->select('od_patients.*')
             ->selectSub(function ($q) {
-<<<<<<< Updated upstream
-=======
                 // Fetch Guarantor Full Name via SubQuery Map securely
                 $concatSql = DB::getDriverName() === 'sqlite'
                     ? "LName || ', ' || FName"
@@ -40,37 +39,29 @@ class PatientController extends Controller
 
                 $q->from('od_patients as gp')
                     ->selectRaw($concatSql)
+                // Fetch Guarantor Full Name via SubQuery Map securely
+                $q->from('od_patients as gp')
+                    ->selectRaw('CONCAT(LName, ", ", FName)')
                     ->whereColumn('gp.PatNum', 'od_patients.Guarantor')
                     ->limit(1);
             }, 'guarantor_name')
             ->selectSub(function ($q) {
->>>>>>> Stashed changes
                 $q->from('od_appointments')
                     ->selectRaw('MIN(AptDateTime)')
                     ->whereColumn('od_appointments.PatNum', 'od_patients.PatNum');
             }, 'first_visit')
             ->selectSub(function ($q) {
-                $q->from('od_appointments')
-                    ->selectRaw('MAX(AptDateTime)')
-                    ->whereColumn('od_appointments.PatNum', 'od_patients.PatNum');
-            }, 'last_visit')
-            ->selectSub(function ($q) {
                 $q->from('od_procedure_logs')
                     ->selectRaw('COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0)')
                     ->whereColumn('od_procedure_logs.PatNum', 'od_patients.PatNum');
-            }, 'lifetime_production');
+            }, 'lifetime_production')
+            ->selectSub(function ($q) {
+                $q->from('od_pay_splits')
+                    ->selectRaw('COALESCE(SUM(CAST(SplitAmt AS DECIMAL(12,2))), 0)')
+                    ->whereColumn('od_pay_splits.PatNum', 'od_patients.PatNum');
+            }, 'lifetime_collection');
 
         return DataTables::eloquent($query)
-<<<<<<< Updated upstream
-            ->addColumn('id', fn($patient) => $patient->PatNum)
-            ->addColumn('patient_id', fn($patient) => $patient->PatNum)
-            ->addColumn('name', fn($patient) => trim(($patient->LName ?? '') . ' ' . ($patient->FName ?? '')))
-            ->addColumn('phone', fn($patient) => $patient->WirelessPhone ?? '')
-            ->addColumn('email', fn($patient) => $patient->Email ?? '')
-            ->addColumn('birthdate', fn($patient) => $patient->Birthdate ?? '')
-            ->addColumn('city', fn($patient) => $patient->City ?? '')
-            ->addColumn('state', fn($patient) => $patient->State ?? '')
-=======
             ->addColumn('id', fn ($patient) => $patient->PatNum)
             ->addColumn('name', fn ($patient) => trim(($patient->LName ?? '').' '.($patient->FName ?? '')))
             ->addColumn('patient_id', fn ($patient) => $patient->PatNum)
@@ -98,6 +89,11 @@ class PatientController extends Controller
             ->addColumn('home_phone', fn ($patient) => $patient->HmPhone ?? '')
             ->addColumn('mobile_phone', fn ($patient) => $patient->WirelessPhone ?? '')
             ->addColumn('email', fn ($patient) => $patient->Email ?? '')
+            ->addColumn('zip', fn($patient) => $patient->Zip ?? '')
+            ->addColumn('work_phone', fn($patient) => $patient->WkPhone ?? '')
+            ->addColumn('home_phone', fn($patient) => $patient->HmPhone ?? '')
+            ->addColumn('mobile_phone', fn($patient) => $patient->WirelessPhone ?? '')
+            ->addColumn('email', fn($patient) => $patient->Email ?? '')
             ->addColumn('birthdate', function ($patient) {
                 $dobStr = $patient->Birthdate ?? null;
                 if ($dobStr && $dobStr !== '0001-01-01' && date_create($dobStr)) {
@@ -109,10 +105,10 @@ class PatientController extends Controller
             ->addColumn('first_visit', function ($patient) {
                 return $patient->first_visit ? date('M d, Y', strtotime($patient->first_visit)) : 'N/A';
             })
-            ->addColumn('lifetime_value_production', fn ($patient) => floatval($patient->lifetime_production))
-            ->addColumn('lifetime_value_collection', fn ($patient) => floatval($patient->lifetime_collection))
-            ->addColumn('referral_source', fn ($patient) => 'N/A')
->>>>>>> Stashed changes
+
+            ->addColumn('lifetime_value_production', fn($patient) => floatval($patient->lifetime_production))
+            ->addColumn('lifetime_value_collection', fn($patient) => floatval($patient->lifetime_collection))
+            ->addColumn('referral_source', fn($patient) => 'N/A')
             ->filterColumn('name', function ($query, $keyword) {
                 $query->where(function ($q) use ($keyword) {
                     $q->where('LName', 'like', "%{$keyword}%")
@@ -120,24 +116,13 @@ class PatientController extends Controller
                         ->orWhereRaw("CONCAT(LName, ' ', FName) like ?", ["%{$keyword}%"]);
                 });
             })
-            ->filterColumn('first_visit', fn($query, $keyword) => null)
-            ->filterColumn('last_visit', fn($query, $keyword) => null)
-            ->filterColumn('lifetime_production', fn($query, $keyword) => null)
-            ->orderColumn('name', fn($query, $order) => $query->orderBy('LName', $order)->orderBy('FName', $order))
-            ->orderColumn('first_visit', fn($query, $order) => $query->orderBy('first_visit', $order))
-            ->orderColumn('last_visit', fn($query, $order) => $query->orderBy('last_visit', $order))
-            ->orderColumn('lifetime_production', fn($query, $order) => $query->orderBy('lifetime_production', $order))
             ->make(true);
     }
 
-    public function show($id)
+    public function show($id, Request $request)
     {
         $patient = OdPatient::where('PatNum', $id)->first();
 
-<<<<<<< Updated upstream
-        if (!$patient) {
-            return response()->json(['error' => 'Patient not found'], 404);
-=======
         if (! $patient) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(['error' => 'Patient not found'], 404);
@@ -147,7 +132,7 @@ class PatientController extends Controller
 
         if (! $request->expectsJson() && ! $request->ajax()) {
             return redirect()->route('patients.index', ['open_patient_id' => $id]);
->>>>>>> Stashed changes
+
         }
 
         $dobStr = $patient->Birthdate ?? null;
@@ -156,7 +141,7 @@ class PatientController extends Controller
 
         if ($dobStr && $dobStr !== '0001-01-01' && date_create($dobStr)) {
             $dob = new \DateTime($dobStr);
-            $age = $dob->diff(new \DateTime())->y;
+            $age = $dob->diff(new \DateTime)->y;
             $birthdateFormatted = $dob->format('M d, Y');
         }
 
@@ -200,18 +185,25 @@ class PatientController extends Controller
         $scheduledTPFee = floatval($scheduledTP->sum('ProcFee'));
         $unscheduledTPFee = floatval($unscheduledTP->sum('ProcFee'));
 
+        $codeMap = OdProcedure::all()->keyBy('CodeNum');
 
         $ledgerItems = [];
-        foreach ($patientProcedures->where('ProcStatus', 'C') as $proc) {
+        foreach ($patientProcedures->whereIn('ProcStatus', ProcStatus::completed()) as $proc) {
             $provNum = $proc->ProvNum ?? null;
             $provName = $provNum && isset($provMap[$provNum]) ? $provMap[$provNum] : '—';
+
+            $codeRecord = isset($proc->CodeNum) ? $codeMap->get($proc->CodeNum) : null;
+            $codeStr = $codeRecord->ProcCode ?? ($proc->OldCode ?? ($proc->ProcCode ?? '—'));
+            $descStr = $codeRecord->Descript ?? ($proc->Descript ?? 'Procedure');
+
             $ledgerItems[] = [
-                'code' => $proc->ProcCode ?? ($proc->OldCode ?? '—'),
-                'description' => $proc->Descript ?? 'Procedure',
+                'code' => $codeStr,
+                'description' => $descStr,
                 'tooth' => $proc->ToothNum ?? '',
                 'surface' => $proc->Surf ?? '',
                 'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
                 'provider' => $provName,
+                'provider_id' => $provNum,
                 'date' => isset($proc->ProcDate) ? date('M d, Y', strtotime($proc->ProcDate)) : '—',
                 'timestamp' => strtotime($proc->ProcDate ?? ''),
             ];
@@ -231,6 +223,10 @@ class PatientController extends Controller
         foreach ($txProcedures as $proc) {
             $provNum = $proc->ProvNum ?? null;
             $provName = $provNum && isset($provMap[$provNum]) ? $provMap[$provNum] : '—';
+
+            $codeRecord = isset($proc->CodeNum) ? $codeMap->get($proc->CodeNum) : null;
+            $codeStr = $codeRecord->ProcCode ?? ($proc->OldCode ?? ($proc->ProcCode ?? '—'));
+            $descStr = $codeRecord->Descript ?? ($proc->Descript ?? 'Procedure');
 
             $rawStatus = $proc->ProcStatus ?? '';
             $statusText = 'Unscheduled';
@@ -262,12 +258,13 @@ class PatientController extends Controller
                 : (isset($proc->DateEntryC) ? date('M d, Y', strtotime($proc->DateEntryC)) : '—');
 
             $txplansItems[] = [
-                'code' => $proc->ProcCode ?? ($proc->OldCode ?? '—'),
-                'description' => $proc->Descript ?? 'Procedure',
+                'code' => $codeStr,
+                'description' => $descStr,
                 'tooth' => $proc->ToothNum ?? '',
                 'surface' => $proc->Surf ?? '',
                 'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
                 'provider' => $provName,
+                'provider_id' => $provNum,
                 'status' => $statusText,
                 'planned' => $datePlanned,
                 'scheduled' => $dateScheduled,
@@ -488,7 +485,7 @@ class PatientController extends Controller
                     '30_days' => 0,
                     '60_days' => 0,
                     '90_days' => 0,
-                ]
+                ],
             ], 201);
         }
 
@@ -501,7 +498,7 @@ class PatientController extends Controller
                 '30_days' => number_format($ar->Bal_31_60 ?? 0, 2),
                 '60_days' => number_format($ar->Bal_61_90 ?? 0, 2),
                 '90_days' => number_format($ar->BalOver90 ?? 0, 2),
-            ]
+            ],
         ]);
     }
 
@@ -511,8 +508,9 @@ class PatientController extends Controller
         $ar = $this->ar->aging($patientId);
 
         // Fetch Live completed transactions for the sub-log
-        $patientProcedures = OdProcedureLog::where('PatNum', $patientId)->where('ProcStatus', 'C')->get();
+        $patientProcedures = OdProcedureLog::where('PatNum', $patientId)->whereIn('ProcStatus', ProcStatus::completed())->get();
         $provMap = OdProvider::all()->pluck('LName', 'ProvNum')->toArray();
+        $codeMap = OdProcedure::all()->keyBy('CodeNum');
 
         $arTransactions = [];
         foreach ($patientProcedures as $proc) {
@@ -522,17 +520,21 @@ class PatientController extends Controller
             $provNum = $proc->ProvNum ?? null;
             $provName = $provNum && isset($provMap[$provNum]) ? $provMap[$provNum] : '—';
 
+            $codeRecord = isset($proc->CodeNum) ? $codeMap->get($proc->CodeNum) : null;
+            $codeStr = $codeRecord->ProcCode ?? ($proc->OldCode ?? ($proc->ProcCode ?? '—'));
+            $descStr = $codeRecord->Descript ?? ($proc->Descript ?? 'Procedure');
+
             $arTransactions[] = [
-<<<<<<< Updated upstream
-                'description' => $proc->Descript ?? 'Procedure',
-                'code' => $proc->ProcCode ?? ($proc->OldCode ?? '—'),
+                'description' => $descStr,
+                'code' => $codeStr,
                 'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
-=======
+
                 'description' => $descStr,
                 'code' => $codeStr,
                 'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
->>>>>>> Stashed changes
+
                 'provider' => $provName,
+                'provider_id' => $provNum,
                 'date' => isset($proc->ProcDate) ? date('M d, Y', strtotime($proc->ProcDate)) : '—',
             ];
         }
@@ -545,7 +547,7 @@ class PatientController extends Controller
             'thirty_days' => number_format($ar['Bal_31_60'] ?? 0, 2),
             'sixty_days' => number_format($ar['Bal_61_90'] ?? 0, 2),
             'ninety_days' => number_format($ar['BalOver90'] ?? 0, 2),
-            'transactions' => $arTransactions
+            'transactions' => $arTransactions,
         ]);
     }
 }

@@ -15,13 +15,8 @@ class ScheduledPatientsTest extends TestCase
 
     public function test_metric_definitions_scheduled_patients_query_expression(): void
     {
-        $driver = DB::connection()->getDriverName();
-        $expected = $driver === 'sqlite'
-            ? "COUNT(DISTINCT PatNum || '|' || DATE(AptDateTime)) AS cnt"
-            : 'COUNT(DISTINCT PatNum, DATE(AptDateTime)) AS cnt';
-
         $sql = MetricDefinitions::scheduledPatients('cnt');
-        $this->assertEquals($expected, $sql);
+        $this->assertEquals('COUNT(DISTINCT PatNum, DATE(AptDateTime)) AS cnt', $sql);
     }
 
     public function test_od_appointment_scheduled_patients_counts_distinct_patient_days(): void

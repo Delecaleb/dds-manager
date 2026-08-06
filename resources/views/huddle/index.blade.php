@@ -15,7 +15,6 @@
                     <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-slate-600">
                         <i data-lucide="user" class="w-4 h-4"></i>
                     </div>
-                    <span>Hello, Adeniyi</span>
                 </div>
                 <div class="text-[11px] font-mono border-l border-slate-200 pl-4 space-y-0.5">
                     <div class="flex justify-between gap-4">

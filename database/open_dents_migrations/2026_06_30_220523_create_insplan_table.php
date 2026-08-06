@@ -5,118 +5,117 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 
-return new class extends Migration
-{
+return new class extends Migration {
 
-public function up()
-{
+    public function up()
+    {
 
-Schema::create('insplan', function(Blueprint $table){
+        Schema::create('insplan', function (Blueprint $table) {
 
-$table->integer('PlanNum');
+            $table->integer('PlanNum');
 
-$table->string('GroupName');
+            $table->string('GroupName');
 
-$table->string('GroupNum');
+            $table->string('GroupNum');
 
-$table->text('PlanNote');
+            $table->text('PlanNote');
 
-$table->integer('FeeSched');
+            $table->integer('FeeSched');
 
-$table->string('PlanType');
+            $table->string('PlanType');
 
-$table->integer('ClaimFormNum');
+            $table->integer('ClaimFormNum');
 
-$table->integer('UseAltCode');
+            $table->integer('UseAltCode');
 
-$table->integer('ClaimsUseUCR');
+            $table->integer('ClaimsUseUCR');
 
-$table->integer('CopayFeeSched');
+            $table->integer('CopayFeeSched');
 
-$table->integer('EmployerNum');
+            $table->integer('EmployerNum');
 
-$table->integer('CarrierNum');
+            $table->integer('CarrierNum');
 
-$table->integer('AllowedFeeSched');
+            $table->integer('AllowedFeeSched');
 
-$table->string('TrojanID');
+            $table->string('TrojanID');
 
-$table->string('DivisionNo');
+            $table->string('DivisionNo');
 
-$table->integer('IsMedical');
+            $table->integer('IsMedical');
 
-$table->integer('FilingCode');
+            $table->integer('FilingCode');
 
-$table->integer('DentaideCardSequence');
+            $table->integer('DentaideCardSequence');
 
-$table->integer('ShowBaseUnits');
+            $table->integer('ShowBaseUnits');
 
-$table->integer('CodeSubstNone');
+            $table->integer('CodeSubstNone');
 
-$table->integer('IsHidden');
+            $table->integer('IsHidden');
 
-$table->integer('MonthRenew');
+            $table->integer('MonthRenew');
 
-$table->integer('FilingCodeSubtype');
+            $table->integer('FilingCodeSubtype');
 
-$table->string('CanadianPlanFlag');
+            $table->string('CanadianPlanFlag');
 
-$table->string('CanadianDiagnosticCode');
+            $table->string('CanadianDiagnosticCode');
 
-$table->string('CanadianInstitutionCode');
+            $table->string('CanadianInstitutionCode');
 
-$table->string('RxBIN');
+            $table->string('RxBIN');
 
-$table->integer('CobRule');
+            $table->integer('CobRule');
 
-$table->string('SopCode');
+            $table->string('SopCode');
 
-$table->integer('SecUserNumEntry');
+            $table->integer('SecUserNumEntry');
 
-$table->date('SecDateEntry');
+            $table->date('SecDateEntry');
 
-$table->string('SecDateTEdit');
+            $table->string('SecDateTEdit');
 
-$table->integer('HideFromVerifyList');
+            $table->integer('HideFromVerifyList');
 
-$table->integer('OrthoType');
+            $table->integer('OrthoType');
 
-$table->integer('OrthoAutoProcFreq');
+            $table->integer('OrthoAutoProcFreq');
 
-$table->integer('OrthoAutoProcCodeNumOverride');
+            $table->integer('OrthoAutoProcCodeNumOverride');
 
-$table->string('OrthoAutoFeeBilled');
+            $table->string('OrthoAutoFeeBilled');
 
-$table->integer('OrthoAutoClaimDaysWait');
+            $table->integer('OrthoAutoClaimDaysWait');
 
-$table->integer('BillingType');
+            $table->integer('BillingType');
 
-$table->integer('HasPpoSubstWriteoffs');
+            $table->integer('HasPpoSubstWriteoffs');
 
-$table->integer('ExclusionFeeRule');
+            $table->integer('ExclusionFeeRule');
 
-$table->integer('ManualFeeSchedNum');
+            $table->integer('ManualFeeSchedNum');
 
-$table->integer('IsBlueBookEnabled');
+            $table->integer('IsBlueBookEnabled');
 
-$table->integer('InsPlansZeroWriteOffsOnAnnualMaxOverride');
+            $table->integer('InsPlansZeroWriteOffsOnAnnualMaxOverride');
 
-$table->integer('InsPlansZeroWriteOffsOnFreqOrAgingOverride');
+            $table->integer('InsPlansZeroWriteOffsOnFreqOrAgingOverride');
 
-$table->string('PerVisitPatAmount');
+            $table->string('PerVisitPatAmount');
 
-$table->string('PerVisitInsAmount');
-
+            $table->string('PerVisitInsAmount');
 
 
-});
 
-}
+        });
+
+    }
 
 
-public function down()
-{
-Schema::dropIfExists('insplan');
-}
+    public function down()
+    {
+        Schema::dropIfExists('insplan');
+    }
 
 };

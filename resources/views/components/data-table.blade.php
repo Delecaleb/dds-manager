@@ -46,7 +46,7 @@
 >
     <table
         id="{{ $id }}"
-        class="w-full text-left border-collapse"
+        class="dds-table w-full text-left border-collapse"
         style="min-width: {{ $minWidth }}"
     >
         @if($head->isNotEmpty())
@@ -55,10 +55,12 @@
         </thead>
         @endif
 
-        <tbody class="divide-y divide-gray-100 text-xs font-medium text-gray-600 bg-white"></tbody>
+        <tbody class="divide-y divide-gray-100 text-xs font-medium text-gray-600 bg-white">
+            {{ $slot }}
+        </tbody>
 
         @if(isset($foot) && $foot->isNotEmpty())
-        <tfoot>
+        <tfoot class="sticky bottom-0 z-20 bg-gray-50 shadow-[0_-1px_2px_rgba(0,0,0,0.1)] border-t border-gray-200">
             {{ $foot }}
         </tfoot>
         @endif
@@ -73,7 +75,7 @@
 ────────────────────────────────────────────────────────────────────────────── */
 .dt-col-sticky {
     position: sticky !important;
-    left: 0 !important;
+    left: 0;
     background: inherit;
     box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.10);
     border-right: 1px solid #e5e7eb !important;

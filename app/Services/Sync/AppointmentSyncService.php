@@ -18,11 +18,26 @@ class AppointmentSyncService extends BaseQuerySyncService
 
     protected function syncColumn(): ?string
     {
-        return 'SecDateTEdit';
+        return 'DateTStamp';
     }
 
     protected function primaryKey(): string
     {
         return 'AptNum';
+    }
+
+    /**
+     * AptDateTime is a real DATETIME column locally, but OpenDental sends it
+     * as an ISO-8601 string with a 'T' separator. Normalize it on the way in
+     * so the value stores cleanly and stays range-queryable (calendar, KPIs,
+     * financials all filter appointments by AptDateTime).
+     */
+    protected function transformRow(array $row): array
+    {
+        if (array_key_exists('AptDateTime', $row)) {
+            $row['AptDateTime'] = $this->normalizeDateTime($row['AptDateTime']);
+        }
+
+        return $row;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Domain\Support\ClinicRegistry;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +12,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Single, request-scoped clinic identity map (multi-office source of truth).
+        $this->app->singleton(ClinicRegistry::class);
     }
 
     /**
