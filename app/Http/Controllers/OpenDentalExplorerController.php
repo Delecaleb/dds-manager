@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Office;
 use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
 use Exception;
@@ -111,7 +112,7 @@ class OpenDentalExplorerController extends Controller
                     : ($foundKey !== false ? $foundKey : $table);
 
                 $sql = $this->buildRawSqlString($odTableName, $colsToSelect, $conditions, $orderBy, $orderDir, $limit, $tableColumns);
-                $rows = $this->queryService->shortQuery($sql);
+                $rows = $this->queryService->forOffice(Office::getActiveOffice())->shortQuery($sql);
 
                 $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
                 $actualColumns = ($colsToSelect === ['*'])
@@ -354,6 +355,8 @@ class OpenDentalExplorerController extends Controller
 
         $primaryKey = $this->getPrimaryKeyForTable($resolvedTable, $tableColumns);
         $syncedCount = 0;
+        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
+        $hasOfficeCol = in_array('office_id', $tableColumns, true);
 
         $validRecords = [];
         foreach ($rows as $row) {
@@ -365,6 +368,10 @@ class OpenDentalExplorerController extends Controller
                 }
             }
 
+            if ($hasOfficeCol) {
+                $cleanRow['office_id'] = $activeOfficeId;
+            }
+
             if (! empty($cleanRow)) {
                 $validRecords[] = $cleanRow;
             }
@@ -374,14 +381,15 @@ class OpenDentalExplorerController extends Controller
             return response()->json(['error' => 'No matching valid columns to sync into local database.'], 400);
         }
 
-        DB::transaction(function () use ($resolvedTable, $validRecords, $primaryKey, &$syncedCount) {
+        DB::transaction(function () use ($resolvedTable, $validRecords, $primaryKey, $hasOfficeCol, &$syncedCount) {
             $updateColumns = array_values(array_diff(array_keys($validRecords[0]), [$primaryKey]));
+            $upsertKeys = $hasOfficeCol ? ['office_id', $primaryKey] : [$primaryKey];
 
             if ($primaryKey && isset($validRecords[0][$primaryKey])) {
                 foreach (array_chunk($validRecords, 500) as $chunk) {
                     DB::table($resolvedTable)->upsert(
                         $chunk,
-                        [$primaryKey],
+                        $upsertKeys,
                         $updateColumns
                     );
                     $syncedCount += count($chunk);

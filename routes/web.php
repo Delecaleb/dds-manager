@@ -8,8 +8,10 @@ use App\Http\Controllers\FinancialController;
 use App\Http\Controllers\FrontOfficeController;
 use App\Http\Controllers\HygieneRecallController;
 use App\Http\Controllers\KpisController;
+use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\OpenDentalExplorerController;
 use App\Http\Controllers\OperationsController;
+
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProviderPortalController;
@@ -30,6 +32,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/patient-visits-per-location', [DashboardController::class, 'patientVisitsPerLocationData'])->name('dashboard.patient-visits-per-location');
     Route::get('/dashboard/providers', [DashboardController::class, 'providerPerformance'])->name('dashboard.providers');
     Route::get('/dashboard/providers/{id}', [DashboardController::class, 'providerDetails'])->name('dashboard.provider-details');
+
+    Route::resource('offices', OfficeController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::post('offices/switch', [OfficeController::class, 'switch'])->name('offices.switch');
+    Route::post('offices/{office}/sync', [OfficeController::class, 'syncNow'])->name('offices.sync');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

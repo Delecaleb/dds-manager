@@ -2,6 +2,11 @@
 
 namespace App\Services\Sync;
 
+use App\Models\Office;
+use App\Models\SyncLog;
+use App\Services\OpenDental\QueryService;
+use Exception;
+use Illuminate\Support\Facades\DB;
 use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
 use Exception;
@@ -9,28 +14,14 @@ use Illuminate\Support\Facades\DB;
 
 abstract class BaseQuerySyncService
 {
+    protected ?Office $office = null;
+
     protected int $batchSize = 1000;
 
     protected int $maxRetries = 5;
 
     protected int $sleepSeconds = 1;
 
-    /**
-     * How far (seconds) to rewind last_synced_at at the start of every
-     * incremental run. This closes the classic boundary hole: a run killed
-     * at time T records last_synced_at = T, but a remote row committed AT
-     * exactly T (or slightly earlier, due to clock skew / long remote
-     * transactions) was never persisted. The old strict ">" comparison
-     * would skip that row forever. Rewinding re-scans the window; the
-     * content hash below makes the re-scan free of duplicate writes.
-     */
-    protected int $overlapSeconds = 300;
-
-    /**
-     * Inclusive bounds of the optional date window (see withDateWindow()).
-     * Null on both sides — the default — means "whole table", so every
-     * existing sync service behaves exactly as before.
-     */
     protected ?string $windowStart = null;
 
     protected ?string $windowEnd = null;
@@ -38,6 +29,18 @@ abstract class BaseQuerySyncService
     public function __construct(
         protected QueryService $queryService
     ) {}
+
+    public function forOffice(?Office $office): static
+    {
+        $this->office = $office;
+
+        return $this;
+    }
+
+    public function getOffice(): Office
+    {
+        return $this->office ?? Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
+    }
 
     abstract protected function table(): string;
 
@@ -92,7 +95,7 @@ abstract class BaseQuerySyncService
 
     protected function module(): string
     {
-        return $this->table().$this->windowSuffix();
+        return $this->table();
     }
 
     /**
@@ -175,19 +178,25 @@ abstract class BaseQuerySyncService
         $timestamp = strtotime($value);
 
         return $timestamp !== false ? date('Y-m-d H:i:s', $timestamp) : null;
+
     }
 
     public function sync(): void
     {
+        $office = $this->getOffice();
+        $this->queryService->forOffice($office);
+
         $log = SyncLog::firstOrCreate(
             ['module' => $this->module()],
             [
+                'office_id' => $office->id ?? 1,
                 'status' => 'idle',
                 'total_processed' => 0,
             ]
         );
 
         $log->update([
+            'office_id' => $office->id ?? 1,
             'status' => 'running',
             'started_at' => now(),
             'last_error' => null,
@@ -264,7 +273,7 @@ abstract class BaseQuerySyncService
                 'last_primary_key' => $lastId,
             ]);
 
-            echo "Synced through ID {$lastId}\n";
+            $this->logOutput("Synced through ID {$lastId}\n");
 
             sleep($this->sleepSeconds);
         }
@@ -316,6 +325,10 @@ abstract class BaseQuerySyncService
 
             [$lastSync, $lastId] = $this->persistBatch($rows, $log, $lastSync, $lastId);
 
+
+                $model = $this->model();
+
+                foreach ($rows as $row) {
             // Persist both halves of the cursor so a kill mid-run resumes
             // exactly where it left off (minus the overlap window).
             $log->update([
@@ -323,12 +336,11 @@ abstract class BaseQuerySyncService
                 'last_primary_key' => $lastId,
             ]);
 
-            echo "Synced through {$lastSync} (ID {$lastId})\n";
+            $this->logOutput("Synced through {$lastSync} (ID {$lastId})\n");
 
             sleep($this->sleepSeconds);
         }
     }
-
     /**
      * Persist a batch of rows idempotently and advance the cursor.
      *
@@ -346,17 +358,24 @@ abstract class BaseQuerySyncService
         $modelClass = $this->model();
         $pk = $this->primaryKey();
         $col = $this->syncColumn();
+        $officeId = $this->getOffice()->id ?? 1;
 
-        DB::transaction(function () use ($rows, $log, $modelClass, $pk, $col, &$lastSync, &$lastId) {
+        DB::transaction(function () use ($rows, $log, $modelClass, $pk, $col, $officeId, &$lastSync, &$lastId) {
 
             foreach ($rows as $row) {
 
                 $data = $this->transformRow($row);
 
-                // Ignore local-only auto-generated columns
-                unset($data['id'], $data['created_at'], $data['updated_at'], $data['row_hash']);
+                $data['office_id'] = $officeId;
 
-                $existing = $modelClass::where($pk, $row[$pk])->first();
+                // Safeguard non-note string attributes from exceeding MySQL VARCHAR limits
+                foreach ($data as $key => $val) {
+                    if (is_string($val) && strlen($val) > 255 && ! str_contains(strtolower($key), 'note')) {
+                        $data[$key] = mb_substr($val, 0, 255);
+                    }
+                }
+
+                $existing = $modelClass::where('office_id', $officeId)->where($pk, $row[$pk])->first();
 
                 if ($existing === null) {
 
@@ -407,7 +426,7 @@ abstract class BaseQuerySyncService
 
                 $wait = pow(2, $attempt);
 
-                echo "Retry {$attempt} after {$wait} seconds...\n";
+                $this->logOutput("Retry {$attempt} after {$wait} seconds...\n");
 
                 sleep($wait);
 
@@ -417,5 +436,12 @@ abstract class BaseQuerySyncService
 
         }
 
+    }
+
+    protected function logOutput(string $msg): void
+    {
+        if (app()->runningInConsole() && ! app()->runningUnitTests()) {
+            echo $msg;
+        }
     }
 }

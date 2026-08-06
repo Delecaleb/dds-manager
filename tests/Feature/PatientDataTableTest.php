@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\OdPatient;
 use App\Models\User;
 use App\Services\OpenDental\AppointmentService;
-use App\Services\OpenDental\PatientService;
 use App\Services\OpenDental\ProcedureService;
 use Tests\TestCase;
 
@@ -15,23 +15,19 @@ class PatientDataTableTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        $patientsMock = $this->createMock(PatientService::class);
-        $patientsMock->method('all')->willReturn([
-            [
-                'PatNum' => 1,
-                'FName' => 'Ada',
-                'LName' => 'Lovelace',
-                'WirelessPhone' => '123',
-                'Email' => 'ada@example.com',
-                'Birthdate' => '2001-01-01',
-                'Address' => '1 Main',
-                'Address2' => '',
-                'City' => 'Detroit',
-                'Zip' => '48201',
-                'State' => 'MI',
-            ]
+        OdPatient::create([
+            'office_id' => 1,
+            'PatNum' => 1,
+            'FName' => 'Ada',
+            'LName' => 'Lovelace',
+            'WirelessPhone' => '123',
+            'Email' => 'ada@example.com',
+            'Birthdate' => '2001-01-01',
+            'Address' => '1 Main',
+            'City' => 'Detroit',
+            'Zip' => '48201',
+            'State' => 'MI',
         ]);
-        app()->instance(PatientService::class, $patientsMock);
 
         $appointmentsMock = $this->createMock(AppointmentService::class);
         $appointmentsMock->method('all')->willReturn([]);
@@ -49,7 +45,7 @@ class PatientDataTableTest extends TestCase
                 'recordsTotal',
                 'recordsFiltered',
                 'data' => [
-                    ['patient_id', 'name', 'phone', 'email', 'birthdate', 'address', 'city', 'zip', 'state', 'first_visit', 'last_visit', 'lifetime_production'],
+                    ['patient_id', 'name', 'mobile_phone', 'email', 'birthdate', 'address', 'city', 'zip', 'state', 'first_visit', 'lifetime_value_production'],
                 ],
             ]);
     }

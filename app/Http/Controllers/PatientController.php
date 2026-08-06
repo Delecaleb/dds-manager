@@ -13,14 +13,14 @@ use App\Models\OdTreatmentPlanAttachments;
 use App\Models\TreatmentPlan;
 use App\Services\OpenDental\AccountModuleService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\Facades\DataTables;
 
 class PatientController extends Controller
 {
     public function __construct(
         protected AccountModuleService $ar
-    ) {
-    }
+    ) {}
 
     public function index()
     {
@@ -32,6 +32,13 @@ class PatientController extends Controller
         $query = OdPatient::query()
             ->select('od_patients.*')
             ->selectSub(function ($q) {
+                // Fetch Guarantor Full Name via SubQuery Map securely
+                $concatSql = DB::getDriverName() === 'sqlite'
+                    ? "LName || ', ' || FName"
+                    : 'CONCAT(LName, ", ", FName)';
+
+                $q->from('od_patients as gp')
+                    ->selectRaw($concatSql)
                 // Fetch Guarantor Full Name via SubQuery Map securely
                 $q->from('od_patients as gp')
                     ->selectRaw('CONCAT(LName, ", ", FName)')
@@ -55,11 +62,11 @@ class PatientController extends Controller
             }, 'lifetime_collection');
 
         return DataTables::eloquent($query)
-            ->addColumn('id', fn($patient) => $patient->PatNum)
-            ->addColumn('name', fn($patient) => trim(($patient->LName ?? '') . ' ' . ($patient->FName ?? '')))
-            ->addColumn('patient_id', fn($patient) => $patient->PatNum)
-            ->addColumn('guarantor', fn($patient) => $patient->guarantor_name ?? '')
-            ->addColumn('guarantor_id', fn($patient) => $patient->Guarantor ?? '')
+            ->addColumn('id', fn ($patient) => $patient->PatNum)
+            ->addColumn('name', fn ($patient) => trim(($patient->LName ?? '').' '.($patient->FName ?? '')))
+            ->addColumn('patient_id', fn ($patient) => $patient->PatNum)
+            ->addColumn('guarantor', fn ($patient) => $patient->guarantor_name ?? '')
+            ->addColumn('guarantor_id', fn ($patient) => $patient->Guarantor ?? '')
             ->addColumn('age', function ($patient) {
                 $dobStr = $patient->Birthdate ?? null;
                 if ($dobStr && $dobStr !== '0001-01-01' && date_create($dobStr)) {
@@ -74,9 +81,14 @@ class PatientController extends Controller
 
                 return is_numeric($raw) ? ($genderMap[intval($raw)] ?? 'Unknown') : ($raw ?: 'Unknown');
             })
-            ->addColumn('address', fn($patient) => trim(($patient->Address ?? '') . ' ' . ($patient->Address2 ?? '')))
-            ->addColumn('city', fn($patient) => $patient->City ?? '')
-            ->addColumn('state', fn($patient) => $patient->State ?? '')
+            ->addColumn('address', fn ($patient) => trim(($patient->Address ?? '').' '.($patient->Address2 ?? '')))
+            ->addColumn('city', fn ($patient) => $patient->City ?? '')
+            ->addColumn('state', fn ($patient) => $patient->State ?? '')
+            ->addColumn('zip', fn ($patient) => $patient->Zip ?? '')
+            ->addColumn('work_phone', fn ($patient) => $patient->WkPhone ?? '')
+            ->addColumn('home_phone', fn ($patient) => $patient->HmPhone ?? '')
+            ->addColumn('mobile_phone', fn ($patient) => $patient->WirelessPhone ?? '')
+            ->addColumn('email', fn ($patient) => $patient->Email ?? '')
             ->addColumn('zip', fn($patient) => $patient->Zip ?? '')
             ->addColumn('work_phone', fn($patient) => $patient->WkPhone ?? '')
             ->addColumn('home_phone', fn($patient) => $patient->HmPhone ?? '')
@@ -93,6 +105,7 @@ class PatientController extends Controller
             ->addColumn('first_visit', function ($patient) {
                 return $patient->first_visit ? date('M d, Y', strtotime($patient->first_visit)) : 'N/A';
             })
+
             ->addColumn('lifetime_value_production', fn($patient) => floatval($patient->lifetime_production))
             ->addColumn('lifetime_value_collection', fn($patient) => floatval($patient->lifetime_collection))
             ->addColumn('referral_source', fn($patient) => 'N/A')
@@ -110,15 +123,16 @@ class PatientController extends Controller
     {
         $patient = OdPatient::where('PatNum', $id)->first();
 
-        if (!$patient) {
+        if (! $patient) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(['error' => 'Patient not found'], 404);
             }
             abort(404);
         }
 
-        if (!$request->expectsJson() && !$request->ajax()) {
+        if (! $request->expectsJson() && ! $request->ajax()) {
             return redirect()->route('patients.index', ['open_patient_id' => $id]);
+
         }
 
         $dobStr = $patient->Birthdate ?? null;
@@ -146,18 +160,18 @@ class PatientController extends Controller
         $nowStr = now()->format('Y-m-d H:i:s');
 
         $nextApt = $patientAppointments
-            ->filter(fn($apt) => ($apt->AptDateTime ?? '') >= $nowStr)
+            ->filter(fn ($apt) => ($apt->AptDateTime ?? '') >= $nowStr)
             ->sortBy('AptDateTime')
             ->first();
 
         $lastApt = $patientAppointments
-            ->filter(fn($apt) => ($apt->AptDateTime ?? '') < $nowStr)
+            ->filter(fn ($apt) => ($apt->AptDateTime ?? '') < $nowStr)
             ->sortByDesc('AptDateTime')
             ->first();
 
-        $completedCount = $patientAppointments->filter(fn($apt) => in_array($apt->AptStatus ?? '', [2, 'Complete', 'Completed']))->count();
-        $scheduledCount = $patientAppointments->filter(fn($apt) => in_array($apt->AptStatus ?? '', [1, 'Scheduled', 'Active', 'Scheduled/Active']))->count();
-        $brokenCount = $patientAppointments->filter(fn($apt) => in_array($apt->AptStatus ?? '', [5, 'Broken']))->count();
+        $completedCount = $patientAppointments->filter(fn ($apt) => in_array($apt->AptStatus ?? '', [2, 'Complete', 'Completed']))->count();
+        $scheduledCount = $patientAppointments->filter(fn ($apt) => in_array($apt->AptStatus ?? '', [1, 'Scheduled', 'Active', 'Scheduled/Active']))->count();
+        $brokenCount = $patientAppointments->filter(fn ($apt) => in_array($apt->AptStatus ?? '', [5, 'Broken']))->count();
         $totalApts = $completedCount + $scheduledCount + $brokenCount;
 
         $completedPct = $totalApts > 0 ? round(($completedCount / $totalApts) * 100, 2) : 0.00;
@@ -165,8 +179,9 @@ class PatientController extends Controller
         $brokenPct = $totalApts > 0 ? round(($brokenCount / $totalApts) * 100, 2) : 0.00;
 
         $lifetimeValue = floatval($patientProcedures->sum('ProcFee'));
-        $scheduledTP = $patientProcedures->filter(fn($p) => in_array($p->ProcStatus ?? '', ['Scheduled', 'Active', 'Accepted']));
-        $unscheduledTP = $patientProcedures->filter(fn($p) => !in_array($p->ProcStatus ?? '', ['Scheduled', 'Active', 'Accepted']));
+        $tpProcedures = $patientProcedures->filter(fn ($p) => in_array($p->ProcStatus ?? '', ProcStatus::TREATMENT_PLANNED));
+        $scheduledTP = $tpProcedures->filter(fn ($p) => ($p->AptNum ?? 0) > 0);
+        $unscheduledTP = $tpProcedures->filter(fn ($p) => ($p->AptNum ?? 0) == 0);
         $scheduledTPFee = floatval($scheduledTP->sum('ProcFee'));
         $unscheduledTPFee = floatval($unscheduledTP->sum('ProcFee'));
 
@@ -186,7 +201,7 @@ class PatientController extends Controller
                 'description' => $descStr,
                 'tooth' => $proc->ToothNum ?? '',
                 'surface' => $proc->Surf ?? '',
-                'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
+                'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
                 'provider' => $provName,
                 'provider_id' => $provNum,
                 'date' => isset($proc->ProcDate) ? date('M d, Y', strtotime($proc->ProcDate)) : '—',
@@ -194,10 +209,18 @@ class PatientController extends Controller
             ];
         }
 
-        usort($ledgerItems, fn($a, $b) => $b['timestamp'] <=> $a['timestamp']);
+        usort($ledgerItems, fn ($a, $b) => $b['timestamp'] <=> $a['timestamp']);
+
+        $planNums = TreatmentPlan::where('PatNum', $id)->pluck('TreatPlanNum');
+        $attachedProcNums = OdTreatmentPlanAttachments::whereIn('TreatPlanNum', $planNums)->pluck('ProcNum')->filter()->unique();
+
+        $txProcedures = $patientProcedures->filter(function ($proc) use ($attachedProcNums) {
+            return in_array($proc->ProcStatus ?? '', ProcStatus::TREATMENT_PLANNED)
+                || ($attachedProcNums->isNotEmpty() && $attachedProcNums->contains($proc->ProcNum));
+        });
 
         $txplansItems = [];
-        foreach ($patientProcedures as $proc) {
+        foreach ($txProcedures as $proc) {
             $provNum = $proc->ProvNum ?? null;
             $provName = $provNum && isset($provMap[$provNum]) ? $provMap[$provNum] : '—';
 
@@ -207,11 +230,11 @@ class PatientController extends Controller
 
             $rawStatus = $proc->ProcStatus ?? '';
             $statusText = 'Unscheduled';
-            if ($rawStatus === 'C') {
+            if ($rawStatus === 'C' || $rawStatus === '2') {
                 $statusText = 'Completed';
-            } elseif ($rawStatus === 'TP') {
+            } elseif (in_array($rawStatus, ProcStatus::TREATMENT_PLANNED)) {
                 $statusText = ($proc->AptNum ?? 0) > 0 ? 'Scheduled' : 'Unscheduled';
-            } elseif ($rawStatus === 'D') {
+            } elseif ($rawStatus === 'D' || $rawStatus === '6') {
                 $statusText = 'Deleted';
             }
 
@@ -227,7 +250,7 @@ class PatientController extends Controller
                 }
             }
 
-            $dateCompleted = $rawStatus === 'C' && isset($proc->ProcDate)
+            $dateCompleted = ($rawStatus === 'C' || $rawStatus === '2') && isset($proc->ProcDate)
                 ? date('M d, Y', strtotime($proc->ProcDate))
                 : '—';
             $dateCreated = isset($proc->SecDateEntry)
@@ -239,7 +262,7 @@ class PatientController extends Controller
                 'description' => $descStr,
                 'tooth' => $proc->ToothNum ?? '',
                 'surface' => $proc->Surf ?? '',
-                'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
+                'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
                 'provider' => $provName,
                 'provider_id' => $provNum,
                 'status' => $statusText,
@@ -250,13 +273,13 @@ class PatientController extends Controller
                 'timestamp' => strtotime($proc->ProcDate ?? ''),
             ];
         }
-        usort($txplansItems, fn($a, $b) => $b['timestamp'] <=> $a['timestamp']);
+        usort($txplansItems, fn ($a, $b) => $b['timestamp'] <=> $a['timestamp']);
 
         $notes = $patient->AddrNote ?? 'No activities or notes available.';
 
         return response()->json([
             'id' => $patient->PatNum,
-            'name' => ($patient->LName ?? '') . ', ' . ($patient->FName ?? ''),
+            'name' => ($patient->LName ?? '').', '.($patient->FName ?? ''),
             'age' => $age,
             'gender' => $gender,
             'birthdate' => $birthdateFormatted,
@@ -265,7 +288,7 @@ class PatientController extends Controller
             'work_phone' => $patient->WkPhone ?: 'N/A',
             'home_phone' => $patient->HmPhone ?: 'N/A',
             'email' => $patient->Email ?: 'N/A',
-            'address' => trim(($patient->Address ?? '') . ' ' . ($patient->Address2 ?? '')),
+            'address' => trim(($patient->Address ?? '').' '.($patient->Address2 ?? '')),
             'city' => $patient->City ?? '',
             'state' => $patient->State ?? '',
             'zip' => $patient->Zip ?? '',
@@ -317,14 +340,19 @@ class PatientController extends Controller
             ->filter()
             ->unique();
 
-        $procedures = $attachedProcNums->isNotEmpty()
-            ? OdProcedureLog::whereIn('ProcNum', $attachedProcNums)->get()
-            : OdProcedureLog::where('PatNum', $patientId)->get();
+        $procedures = OdProcedureLog::where('PatNum', $patientId)
+            ->where(function ($query) use ($attachedProcNums) {
+                $query->whereIn('ProcStatus', ProcStatus::TREATMENT_PLANNED);
+                if ($attachedProcNums->isNotEmpty()) {
+                    $query->orWhereIn('ProcNum', $attachedProcNums);
+                }
+            })
+            ->get();
 
         $provMap = OdProvider::all()->pluck('LName', 'ProvNum')->toArray();
         $codeMap = OdProcedure::all()->keyBy('CodeNum');
 
-        $aptNums = $procedures->pluck('AptNum')->filter(fn($aptNum) => ($aptNum ?? 0) > 0)->unique();
+        $aptNums = $procedures->pluck('AptNum')->filter(fn ($aptNum) => ($aptNum ?? 0) > 0)->unique();
         $appointments = OdAppointment::whereIn('AptNum', $aptNums)->get()->keyBy('AptNum');
 
         $items = $procedures->map(function ($proc) use ($provMap, $codeMap, $appointments) {
@@ -337,11 +365,11 @@ class PatientController extends Controller
 
             $rawStatus = $proc->ProcStatus ?? '';
             $statusText = 'Unscheduled';
-            if ($rawStatus === 'C') {
+            if ($rawStatus === 'C' || $rawStatus === '2') {
                 $statusText = 'Completed';
-            } elseif ($rawStatus === 'TP') {
+            } elseif (in_array($rawStatus, ProcStatus::TREATMENT_PLANNED)) {
                 $statusText = ($proc->AptNum ?? 0) > 0 ? 'Scheduled' : 'Unscheduled';
-            } elseif ($rawStatus === 'D') {
+            } elseif ($rawStatus === 'D' || $rawStatus === '6') {
                 $statusText = 'Deleted';
             }
 
@@ -354,7 +382,7 @@ class PatientController extends Controller
                 $dateScheduled = date('M d, Y', strtotime($appointments[$proc->AptNum]->AptDateTime));
             }
 
-            $dateCompleted = $rawStatus === 'C' && isset($proc->ProcDate)
+            $dateCompleted = ($rawStatus === 'C' || $rawStatus === '2') && isset($proc->ProcDate)
                 ? date('M d, Y', strtotime($proc->ProcDate))
                 : '—';
 
@@ -367,7 +395,7 @@ class PatientController extends Controller
                 'description' => $description,
                 'tooth' => $proc->ToothNum ?? '',
                 'surface' => $proc->Surf ?? '',
-                'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
+                'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
                 'provider' => $provName,
                 'status' => $statusText,
                 'date_planned' => $datePlanned,
@@ -379,7 +407,7 @@ class PatientController extends Controller
         })
             ->sortByDesc('timestamp')
             ->values()
-            ->map(fn($item) => collect($item)->except('timestamp')->all());
+            ->map(fn ($item) => collect($item)->except('timestamp')->all());
 
         return response()->json($items);
     }
@@ -388,13 +416,13 @@ class PatientController extends Controller
     {
         $patient = OdPatient::where('PatNum', $patientId)->first();
 
-        if (!$patient) {
+        if (! $patient) {
             return response()->json([], 404);
         }
 
         $guarantorId = $patient->Guarantor ?? null;
 
-        if (!$guarantorId) {
+        if (! $guarantorId) {
             return response()->json([]);
         }
 
@@ -406,8 +434,8 @@ class PatientController extends Controller
 
         return response()->json($familyMembers->map(function ($m) use ($genderMap, $statusMap, $nowStr) {
             $mApts = OdAppointment::where('PatNum', $m->PatNum)->get();
-            $mNext = $mApts->filter(fn($apt) => ($apt->AptDateTime ?? '') >= $nowStr)->sortBy('AptDateTime')->first();
-            $mLast = $mApts->filter(fn($apt) => ($apt->AptDateTime ?? '') < $nowStr)->sortByDesc('AptDateTime')->first();
+            $mNext = $mApts->filter(fn ($apt) => ($apt->AptDateTime ?? '') >= $nowStr)->sortBy('AptDateTime')->first();
+            $mLast = $mApts->filter(fn ($apt) => ($apt->AptDateTime ?? '') < $nowStr)->sortByDesc('AptDateTime')->first();
 
             $mGenderRaw = $m->Gender ?? '';
             $mGender = is_numeric($mGenderRaw) ? ($genderMap[intval($mGenderRaw)] ?? 'Unknown') : ($mGenderRaw ?: 'Unknown');
@@ -415,7 +443,7 @@ class PatientController extends Controller
             $mStatus = is_numeric($mStatusRaw) ? ($statusMap[intval($mStatusRaw)] ?? 'Active') : ($mStatusRaw ?: 'Active');
 
             return [
-                'name' => ($m->LName ?? '') . ', ' . ($m->FName ?? ''),
+                'name' => ($m->LName ?? '').', '.($m->FName ?? ''),
                 'status' => $mStatus,
                 'gender' => $mGender,
                 'last_visit' => $mLast ? date('M d, Y', strtotime($mLast->AptDateTime)) : '—',
@@ -429,7 +457,7 @@ class PatientController extends Controller
     {
         $patient = OdPatient::where('PatNum', $patientId)->first();
 
-        if (!$patient) {
+        if (! $patient) {
             return response()->json(['name' => null], 404);
         }
 
@@ -438,7 +466,7 @@ class PatientController extends Controller
 
         return response()->json([
             'employer_num' => $employerNum,
-            'name' => $employerNum ? 'Employer #' . $employerNum : null,
+            'name' => $employerNum ? 'Employer #'.$employerNum : null,
             'note' => $employmentNote,
         ]);
     }
@@ -447,7 +475,7 @@ class PatientController extends Controller
     {
         $ar = OdPatientBalance::where('PatNum', $patientId)->first();
 
-        if (!$ar) {
+        if (! $ar) {
             return response()->json([
                 'total' => 0,
                 'insurance_claims' => 0,
@@ -500,6 +528,11 @@ class PatientController extends Controller
                 'description' => $descStr,
                 'code' => $codeStr,
                 'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
+
+                'description' => $descStr,
+                'code' => $codeStr,
+                'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
+
                 'provider' => $provName,
                 'provider_id' => $provNum,
                 'date' => isset($proc->ProcDate) ? date('M d, Y', strtotime($proc->ProcDate)) : '—',

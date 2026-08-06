@@ -98,6 +98,11 @@
                             @if(request()->routeIs('operations.index')) aria-current="page" @endif>
                             <i data-lucide="briefcase" class="w-4 h-4"></i> Operations
                         </a>
+                        <a href="{{ route('offices.index') }}"
+                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('offices.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                            @if(request()->routeIs('offices.*')) aria-current="page" @endif>
+                            <i data-lucide="building-2" class="w-4 h-4 text-blue-600"></i> Offices / Locations
+                        </a>
                         <a href="{{ route('od-explorer.index') }}"
                             class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('od-explorer.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
                             @if(request()->routeIs('od-explorer.*')) aria-current="page" @endif>
@@ -155,7 +160,28 @@
                     <span class="font-bold text-md tracking-tight text-slate-900">DDS Manager</span>
                 </div>
             </div>
-            <div class="flex items-center gap-3"></div>
+            <div class="flex items-center gap-3">
+                @php
+                    $allOffices = \App\Models\Office::where('is_active', true)->get();
+                    $activeOfficeId = \App\Models\Office::getActiveOfficeId();
+                    $currentOffice = $allOffices->firstWhere('id', $activeOfficeId) ?? $allOffices->first();
+                @endphp
+                @if($allOffices->count() > 0)
+                    <form method="POST" action="{{ route('offices.switch') }}" class="flex items-center gap-2">
+                        @csrf
+                        <div class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg text-xs font-semibold text-slate-700 border border-slate-200">
+                            <i data-lucide="building" class="w-3.5 h-3.5 text-blue-600"></i>
+                            <select name="office_id" onchange="this.form.submit()" class="bg-transparent font-medium text-slate-800 text-xs focus:outline-none cursor-pointer">
+                                @foreach($allOffices as $off)
+                                    <option value="{{ $off->id }}" {{ $off->id == $activeOfficeId ? 'selected' : '' }}>
+                                        Location: {{ $off->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </form>
+                @endif
+            </div>
         </header>
 
         <main class="flex-1 overflow-y-auto">

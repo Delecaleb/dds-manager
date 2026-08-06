@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 class SyncLog extends Model
 {
+    use BelongsToOffice;
+
     protected $fillable = [
+        'office_id',
         'module',
         'last_primary_key',
         'last_synced_at',
@@ -15,6 +19,6 @@ class SyncLog extends Model
         'status',
         'last_error',
         'started_at',
-        'finished_at'
+        'finished_at',
     ];
 }
