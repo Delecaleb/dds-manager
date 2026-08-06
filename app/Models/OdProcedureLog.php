@@ -3,11 +3,15 @@
 namespace App\Models;
 
 use App\Domain\Support\ProcStatus;
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 class OdProcedureLog extends Model
 {
+    use BelongsToOffice;
+
     protected $fillable = [
+        'office_id',
         'ProcNum',
         'PatNum',
         'AptNum',
@@ -91,5 +95,4 @@ class OdProcedureLog extends Model
     {
         return $query->whereBetween('ProcDate', [$start, $end]);
     }
-
 }

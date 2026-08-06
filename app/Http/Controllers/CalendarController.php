@@ -73,7 +73,10 @@ class CalendarController extends Controller
         $produced = $gross - $adjustments;
 
         $scheduled = (float) OdAppointment::query()
-            ->join('od_procedure_logs as pl', 'pl.AptNum', '=', 'od_appointments.AptNum')
+            ->join('od_procedure_logs as pl', function ($join) {
+                $join->on('pl.AptNum', '=', 'od_appointments.AptNum')
+                    ->on('pl.office_id', '=', 'od_appointments.office_id');
+            })
             ->where('od_appointments.AptStatus', '1')
             ->whereRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) = ?", [$date])
             ->selectRaw('COALESCE(SUM(CAST(pl.ProcFee AS DECIMAL(12,2))), 0) AS total')

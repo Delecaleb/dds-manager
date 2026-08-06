@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Helpers\MetricDefinitions;
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -19,7 +20,10 @@ use Illuminate\Database\Eloquent\Model;
  */
 class OdAppointment extends Model
 {
+    use BelongsToOffice;
+
     protected $fillable = [
+        'office_id',
         'AptNum',
         'PatNum',
         'AptStatus',

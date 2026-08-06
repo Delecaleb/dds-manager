@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 class TreatmentPlan extends Model
 {
+    use BelongsToOffice;
+
     protected $fillable = [
+        'office_id',
         'TreatPlanNum',
         'PatNum',
         'DateTP',
