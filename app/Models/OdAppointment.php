@@ -65,9 +65,6 @@ class OdAppointment extends Model
     public function scopeScheduled($query)
     {
         return $query->whereIn('AptStatus', [1, 4]);
-    public function scopeScheduled($query)
-    {
-        return $query->whereIn('AptStatus', [1, 2]);
     }
 
     public function scopeInDateRange($query, $start, $end)
@@ -77,7 +74,6 @@ class OdAppointment extends Model
 
         return $query->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$startDate, $endDate]);
     }
-
 
     public function scheduledPatients($start, $end)
     {

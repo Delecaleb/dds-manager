@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
-
 /**
  * Enum:PatientStatus
  * Patient: 0
@@ -28,7 +27,6 @@ use Illuminate\Database\Eloquent\Model;
  * Widowed: 3
  * Divorced: 4
  */
-
 class OdPatient extends Model
 {
     use BelongsToOffice;
@@ -89,10 +87,6 @@ class OdPatient extends Model
     public function getFullNameAttribute(): string
     {
         return trim(($this->FName ?? '').' '.($this->LName ?? ''));
-    }
-    public function getFullNameAttribute(): string
-    {
-        return trim(($this->FName ?? '') . ' ' . ($this->LName ?? ''));
     }
 
     public $incrementing = false;

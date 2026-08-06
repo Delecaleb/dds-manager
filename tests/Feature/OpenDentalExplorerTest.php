@@ -51,6 +51,7 @@ class OpenDentalExplorerTest extends TestCase
         $user = User::factory()->create();
 
         $this->mock(QueryService::class, function (MockInterface $mock) {
+            $mock->shouldReceive('forOffice')->andReturnSelf();
             $mock->shouldReceive('shortQuery')
                 ->once()
                 ->andReturn([

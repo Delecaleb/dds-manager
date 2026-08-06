@@ -31,7 +31,10 @@ class MetricDefinitions
      */
     public static function scheduledPatients(?string $alias = null): string
     {
-        $raw = 'COUNT(DISTINCT PatNum, DATE(AptDateTime))';
+        $driver = DB::connection()->getDriverName();
+        $raw = $driver === 'sqlite'
+            ? "COUNT(DISTINCT PatNum || '|' || DATE(AptDateTime))"
+            : 'COUNT(DISTINCT PatNum, DATE(AptDateTime))';
 
         return $raw.($alias ? " AS {$alias}" : '');
     }

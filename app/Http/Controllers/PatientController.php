@@ -39,9 +39,6 @@ class PatientController extends Controller
 
                 $q->from('od_patients as gp')
                     ->selectRaw($concatSql)
-                // Fetch Guarantor Full Name via SubQuery Map securely
-                $q->from('od_patients as gp')
-                    ->selectRaw('CONCAT(LName, ", ", FName)')
                     ->whereColumn('gp.PatNum', 'od_patients.Guarantor')
                     ->limit(1);
             }, 'guarantor_name')
@@ -89,11 +86,11 @@ class PatientController extends Controller
             ->addColumn('home_phone', fn ($patient) => $patient->HmPhone ?? '')
             ->addColumn('mobile_phone', fn ($patient) => $patient->WirelessPhone ?? '')
             ->addColumn('email', fn ($patient) => $patient->Email ?? '')
-            ->addColumn('zip', fn($patient) => $patient->Zip ?? '')
-            ->addColumn('work_phone', fn($patient) => $patient->WkPhone ?? '')
-            ->addColumn('home_phone', fn($patient) => $patient->HmPhone ?? '')
-            ->addColumn('mobile_phone', fn($patient) => $patient->WirelessPhone ?? '')
-            ->addColumn('email', fn($patient) => $patient->Email ?? '')
+            ->addColumn('zip', fn ($patient) => $patient->Zip ?? '')
+            ->addColumn('work_phone', fn ($patient) => $patient->WkPhone ?? '')
+            ->addColumn('home_phone', fn ($patient) => $patient->HmPhone ?? '')
+            ->addColumn('mobile_phone', fn ($patient) => $patient->WirelessPhone ?? '')
+            ->addColumn('email', fn ($patient) => $patient->Email ?? '')
             ->addColumn('birthdate', function ($patient) {
                 $dobStr = $patient->Birthdate ?? null;
                 if ($dobStr && $dobStr !== '0001-01-01' && date_create($dobStr)) {
@@ -106,9 +103,9 @@ class PatientController extends Controller
                 return $patient->first_visit ? date('M d, Y', strtotime($patient->first_visit)) : 'N/A';
             })
 
-            ->addColumn('lifetime_value_production', fn($patient) => floatval($patient->lifetime_production))
-            ->addColumn('lifetime_value_collection', fn($patient) => floatval($patient->lifetime_collection))
-            ->addColumn('referral_source', fn($patient) => 'N/A')
+            ->addColumn('lifetime_value_production', fn ($patient) => floatval($patient->lifetime_production))
+            ->addColumn('lifetime_value_collection', fn ($patient) => floatval($patient->lifetime_collection))
+            ->addColumn('referral_source', fn ($patient) => 'N/A')
             ->filterColumn('name', function ($query, $keyword) {
                 $query->where(function ($q) use ($keyword) {
                     $q->where('LName', 'like', "%{$keyword}%")
@@ -527,7 +524,7 @@ class PatientController extends Controller
             $arTransactions[] = [
                 'description' => $descStr,
                 'code' => $codeStr,
-                'amount' => '$ ' . number_format(floatval($proc->ProcFee ?? 0), 2),
+                'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
 
                 'description' => $descStr,
                 'code' => $codeStr,

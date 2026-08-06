@@ -7,10 +7,6 @@ use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
 use Exception;
 use Illuminate\Support\Facades\DB;
-use App\Models\SyncLog;
-use App\Services\OpenDental\QueryService;
-use Exception;
-use Illuminate\Support\Facades\DB;
 
 abstract class BaseQuerySyncService
 {
@@ -21,6 +17,8 @@ abstract class BaseQuerySyncService
     protected int $maxRetries = 5;
 
     protected int $sleepSeconds = 1;
+
+    protected int $overlapSeconds = 300;
 
     protected ?string $windowStart = null;
 
@@ -95,7 +93,9 @@ abstract class BaseQuerySyncService
 
     protected function module(): string
     {
-        return $this->table();
+        $officeId = $this->getOffice()->id ?? 1;
+
+        return "office_{$officeId}:".$this->table().$this->windowSuffix();
     }
 
     /**
@@ -178,7 +178,6 @@ abstract class BaseQuerySyncService
         $timestamp = strtotime($value);
 
         return $timestamp !== false ? date('Y-m-d H:i:s', $timestamp) : null;
-
     }
 
     public function sync(): void
@@ -325,10 +324,6 @@ abstract class BaseQuerySyncService
 
             [$lastSync, $lastId] = $this->persistBatch($rows, $log, $lastSync, $lastId);
 
-
-                $model = $this->model();
-
-                foreach ($rows as $row) {
             // Persist both halves of the cursor so a kill mid-run resumes
             // exactly where it left off (minus the overlap window).
             $log->update([
@@ -341,6 +336,7 @@ abstract class BaseQuerySyncService
             sleep($this->sleepSeconds);
         }
     }
+
     /**
      * Persist a batch of rows idempotently and advance the cursor.
      *
@@ -365,6 +361,9 @@ abstract class BaseQuerySyncService
             foreach ($rows as $row) {
 
                 $data = $this->transformRow($row);
+
+                // Ignore local-only auto-generated columns
+                unset($data['id'], $data['created_at'], $data['updated_at'], $data['row_hash']);
 
                 $data['office_id'] = $officeId;
 

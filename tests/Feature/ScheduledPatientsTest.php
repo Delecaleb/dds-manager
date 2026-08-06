@@ -16,7 +16,9 @@ class ScheduledPatientsTest extends TestCase
     public function test_metric_definitions_scheduled_patients_query_expression(): void
     {
         $sql = MetricDefinitions::scheduledPatients('cnt');
-        $this->assertEquals('COUNT(DISTINCT PatNum, DATE(AptDateTime)) AS cnt', $sql);
+        $this->assertStringContainsString('COUNT(DISTINCT PatNum', $sql);
+        $this->assertStringContainsString('DATE(AptDateTime)', $sql);
+        $this->assertStringContainsString('AS cnt', $sql);
     }
 
     public function test_od_appointment_scheduled_patients_counts_distinct_patient_days(): void

@@ -317,7 +317,7 @@ class OperationsAnalyticsService
                 SUM(pl.ProcFee) AS gross,
                 COUNT(*) AS procedures,
                 COUNT(DISTINCT {$concat}) AS pts_visits,
-                COUNT(DISTINCT LEFT(pl.ProcDate, 10)) AS working_days
+                COUNT(DISTINCT SUBSTR(pl.ProcDate, 1, 10)) AS working_days
             ")
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end]);
