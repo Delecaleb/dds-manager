@@ -1,0 +1,358 @@
+<div class="mx-auto px-6 py-10 pt-4 xl:px-10 w-full">
+    <div
+        data-v-dcbd9f04=""
+        class="bg-white relative p-6 dark:bg-gray-700 shadow"
+    >
+        <div class="md:flex md:flex-wrap md:items-center lg:flex-no-wrap">
+            <div class="md:flex-1 lg:flex-none">
+                <div class="flex justify-start content-center">
+                    <ul class="inline-flex items-center">
+                        <li class="text-xs">
+                            <span
+                                class="p-2 block bg-ja-green-000 dark:bg-dark-green dark:text-white"
+                            >
+                                Top 20%
+                            </span>
+                        </li>
+                        <li class="text-xs">
+                            <span
+                                class="p-2 block bg-yellow-000 dark:bg-dark-orange dark:text-white"
+                            >
+                                Mid Tier
+                            </span>
+                        </li>
+                        <li class="text-xs">
+                            <span
+                                class="p-2 block bg-red-000 dark:bg-dark-red dark:text-white"
+                            >
+                                Bottom 20%
+                            </span>
+                        </li>
+                    </ul>
+                    <!---->
+                </div>
+            </div>
+            <div
+                class="sm:flex lg:flex-1 sm:items-center mt-4 md:ml-10 md:mt-0"
+            >
+                <label
+                    data-v-134f4067=""
+                    class="items-center dark:text-white flex text-xs"
+                    ><input
+                        data-v-134f4067=""
+                        type="checkbox"
+                        class="appearance-none w-12 h-6 relative select-none rounded-full bg-switch bg-gray-200 dark:bg-gray-600 border border-gray-300 dark:border-gray-1100 flex-shrink-0 focus:outline-none cursor-pointer mr-2"
+                        value=""
+                    />
+                    Date
+                </label>
+                <label
+                    data-v-134f4067=""
+                    class="items-center dark:text-white mt-4 sm:ml-6 sm:mt-0 flex text-xs"
+                    ><input
+                        data-v-134f4067=""
+                        type="checkbox"
+                        class="appearance-none w-12 h-6 relative select-none rounded-full bg-switch bg-gray-200 dark:bg-gray-600 border border-gray-300 dark:border-gray-1100 flex-shrink-0 focus:outline-none cursor-pointer mr-2"
+                        value=""
+                    />
+                    Provider
+                </label>
+                <!---->
+            </div>
+            <div
+                class="mt-4 lg:mt-0 md:flex md:items-center md:justify-end md:w-full"
+            >
+                <div class="relative block">
+                    <input
+                        type="search"
+                        autocomplete="off"
+                        placeholder="Search"
+                        class="appearance-none bg-white dark:bg-gray-800 dark:text-white border border-gray-700 dark:border-gray-800 rounded-sm p-2 placeholder-gray-400 dark:placeholder-white focus:outline-none focus:border-ja-green-200 dark:focus:border-ja-green-200 focus:bg-gray-000 bg-search dark:bg-search w-full text-xs h-9"
+                    />
+                </div>
+                <div class="mt-4 sm:ml-1 sm:mt-0">
+                    <div>
+                        <button
+                            type="button"
+                            class="border-2 appearance-none flex items-center justify-center select-none font-bold focus:outline-none rounded-sm py-2 px-3 bg-white dark:bg-gray-800 border-ja-green-200 dark:text-white hover:text-white hover:bg-ja-green-200 dark:hover:bg-ja-green-200 text-xs h-9 cursor-pointer w-full"
+                        >
+                            <span>Export CSV</span>
+                        </button>
+                        <div class="v-portal" style="display: none"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div
+            class="overflow-auto tb-max-h tb-min-h mt-6"
+            style="--max-height: 555px; --min-height: 0px"
+        >
+            <table class="tb-table">
+                <thead class="sticky top-0 z-50">
+                    <tr class="bg-white dark:bg-gray-700">
+                        <th
+                            colspan="1"
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white tb:sm:stick-to-left tb:sm:stick-shadow-r"
+                        ></th>
+                        <th
+                            colspan="5"
+                            class="text-left border-r-8 text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                        >
+                            By Office
+                        </th>
+                        <th
+                            colspan="4"
+                            class="text-left border-r-8 text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                        >
+                            Per Working Day
+                        </th>
+                        <th
+                            colspan="3"
+                            class="text-left border-r-8 text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                        >
+                            Per Patient Visit
+                        </th>
+                        <th
+                            colspan="2"
+                            class="text-left text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                        >
+                            Per Procedure
+                        </th>
+                    </tr>
+                    <tr class="bg-white dark:bg-gray-700">
+                        <th
+                            aria-sort=""
+                            class="text-left text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white tb:sm:stick-to-left tb:sm:stick-shadow-r"
+                            style="min-width: 12rem"
+                        >
+                            Location
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                            style="min-width: 8rem"
+                        >
+                            Production
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                            style="min-width: 8rem"
+                        >
+                            Adjustment
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                            style="min-width: 8rem"
+                        >
+                            Collection
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                            style="min-width: 8rem"
+                        >
+                            Pts Visits
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white border-r-8"
+                            style="min-width: 8rem"
+                        >
+                            New Pts Visit
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                            style="min-width: 8rem"
+                        >
+                            Production
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                            style="min-width: 8rem"
+                        >
+                            Collection
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                            style="min-width: 8rem"
+                        >
+                            Pts Visit
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white border-r-8"
+                            style="min-width: 8rem"
+                        >
+                            Npt Visit
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                            style="min-width: 8rem"
+                        >
+                            Production
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                            style="min-width: 8rem"
+                        >
+                            Collection
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white border-r-8"
+                            style="min-width: 8rem"
+                        >
+                            Procedures
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                            style="min-width: 8rem"
+                        >
+                            Production
+                        </th>
+                        <th
+                            aria-sort=""
+                            class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white"
+                            style="min-width: 8rem"
+                        >
+                            Collection
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr
+                        class="odd:bg-gray-000 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+                    >
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white tb:sm:stick-to-left tb:sm:stick-shadow-r"
+                        >
+                            8 Mile
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">$ 0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">$ 0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">$ 0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white border-r-8 bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">$ 0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">$ 0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white border-r-8 bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">$ 0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">$ 0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white border-r-8 bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">$ 0</span></span
+                            >
+                        </td>
+                        <td
+                            class="text-xs py-2 px-3 border-l border-t border-gray-200 dark:border-gray-800 dark:text-white bg-red-000 dark:bg-dark-red dark:text-white"
+                        >
+                            <span
+                                class="flex justify-between whitespace-no-wrap"
+                                ><span class="">$ 0</span></span
+                            >
+                        </td>
+                    </tr>
+                    <!---->
+                    <!---->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

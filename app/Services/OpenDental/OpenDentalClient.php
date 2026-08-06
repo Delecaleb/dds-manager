@@ -2,28 +2,43 @@
 
 namespace App\Services\OpenDental;
 
+use App\Models\Office;
 use Illuminate\Support\Facades\Http;
 
 class OpenDentalClient
 {
-    protected $baseUrl;
+    protected ?Office $office = null;
 
-    public function __construct()
+    public function __construct(?Office $office = null)
     {
-        $this->baseUrl = config('opendental.url');
+        $this->office = $office;
+    }
+
+    public function forOffice(?Office $office): static
+    {
+        $this->office = $office;
+
+        return $this;
+    }
+
+    protected function getTargetOffice(): ?Office
+    {
+        return $this->office ?? Office::getActiveOffice();
     }
 
     protected function request()
     {
+        $office = $this->getTargetOffice();
+
+        $developerKey = $office?->developer_key ?: config('opendental.developer_key');
+        $customerKey = $office?->customer_key ?: config('opendental.customer_key');
+        $baseUrl = $office?->api_url ?: config('opendental.url');
+
         return Http::withHeaders([
-            'Authorization' =>
-                'ODFHIR '
-                . config('opendental.developer_key')
-                . '/'
-                . config('opendental.customer_key'),
-            'Content-Type' => 'application/json'
+            'Authorization' => 'ODFHIR '.$developerKey.'/'.$customerKey,
+            'Content-Type' => 'application/json',
         ])
-            ->baseUrl($this->baseUrl)
+            ->baseUrl($baseUrl)
             ->timeout(120);
     }
 

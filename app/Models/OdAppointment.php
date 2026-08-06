@@ -49,6 +49,22 @@ class OdAppointment extends Model
 
     public $incrementing = false;
 
+<<<<<<< Updated upstream
+=======
+    public function scopeScheduled($query)
+    {
+        return $query->whereIn('AptStatus', [1, 4]);
+    }
+
+    public function scopeInDateRange($query, $start, $end)
+    {
+        $startDate = substr($start, 0, 10);
+        $endDate = substr($end, 0, 10);
+
+        return $query->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$startDate, $endDate]);
+    }
+
+>>>>>>> Stashed changes
     public function scheduledPatients($start, $end)
     {
         return OdAppointment::whereBetween('AptDateTime', [$start, $end])
