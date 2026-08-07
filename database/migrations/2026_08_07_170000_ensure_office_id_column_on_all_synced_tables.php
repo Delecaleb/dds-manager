@@ -81,13 +81,13 @@ return new class extends Migration
                     }
                 }
 
-                Schema::table($tableName, function (Blueprint $table) use ($pk, $indexName) {
-                    try {
+                try {
+                    Schema::table($tableName, function (Blueprint $table) use ($pk, $indexName) {
                         $table->unique(['office_id', $pk], $indexName);
-                    } catch (Throwable $e) {
-                        // Index might already exist
-                    }
-                });
+                    });
+                } catch (Throwable $e) {
+                    // Index might already exist
+                }
             }
         }
     }

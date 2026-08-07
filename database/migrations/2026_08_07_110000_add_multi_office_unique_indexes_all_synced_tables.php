@@ -91,13 +91,13 @@ return new class extends Migration
             // 2. Add composite unique index on [office_id, <primaryKey>] for tables not yet indexed
             if ($hasOfficeId && ! in_array($tableName, $this->alreadyIndexed, true)) {
                 $indexName = "{$tableName}_office_".strtolower($pk).'_unique';
-                Schema::table($tableName, function (Blueprint $table) use ($pk, $indexName) {
-                    try {
+                try {
+                    Schema::table($tableName, function (Blueprint $table) use ($pk, $indexName) {
                         $table->unique(['office_id', $pk], $indexName);
-                    } catch (Throwable $e) {
-                        // Index may already exist
-                    }
-                });
+                    });
+                } catch (Throwable $e) {
+                    // Index may already exist
+                }
             }
         }
     }
@@ -114,13 +114,13 @@ return new class extends Migration
 
             $indexName = "{$tableName}_office_".strtolower($pk).'_unique';
 
-            Schema::table($tableName, function (Blueprint $table) use ($indexName) {
-                try {
+            try {
+                Schema::table($tableName, function (Blueprint $table) use ($indexName) {
                     $table->dropUnique($indexName);
-                } catch (Throwable $e) {
-                    // Index may not exist
-                }
-            });
+                });
+            } catch (Throwable $e) {
+                // Index may not exist
+            }
         }
     }
 };
