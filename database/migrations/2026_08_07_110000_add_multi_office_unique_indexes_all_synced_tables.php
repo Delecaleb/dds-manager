@@ -65,6 +65,14 @@ return new class extends Migration
             // 1. Check and drop duplicate records before applying unique constraint
             if (Schema::hasColumn($tableName, 'id')) {
                 try {
+                    Schema::table($tableName, function (Blueprint $table) use ($pk) {
+                        $table->index($pk);
+                    });
+                } catch (Throwable $e) {
+                    // Index may already exist
+                }
+
+                try {
                     if ($hasOfficeId) {
                         DB::statement("
                             DELETE t1 FROM `{$tableName}` t1

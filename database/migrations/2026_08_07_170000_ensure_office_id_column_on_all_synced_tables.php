@@ -68,6 +68,14 @@ return new class extends Migration
                 // Clean up duplicates if needed
                 if (Schema::hasColumn($tableName, 'id')) {
                     try {
+                        Schema::table($tableName, function (Blueprint $table) use ($pk) {
+                            $table->index($pk);
+                        });
+                    } catch (Throwable $e) {
+                        // Index may already exist
+                    }
+
+                    try {
                         DB::statement("
                             DELETE t1 FROM `{$tableName}` t1
                             INNER JOIN `{$tableName}` t2

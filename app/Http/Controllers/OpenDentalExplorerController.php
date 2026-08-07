@@ -36,6 +36,84 @@ class OpenDentalExplorerController extends Controller
         'userod' => 'od_user_ods',
     ];
 
+    /**
+     * Map of common table aliases to native OpenDental table names.
+     */
+    protected array $tableAliases = [
+        'od_claim_proc' => 'claimproc',
+        'od_claim_procs' => 'claimproc',
+        'claim_proc' => 'claimproc',
+        'claim_procs' => 'claimproc',
+        'claimprocs' => 'claimproc',
+        'od_claimproc' => 'claimproc',
+
+        'od_patient' => 'patient',
+        'od_patients' => 'patient',
+        'patients' => 'patient',
+
+        'od_procedure_log' => 'procedurelog',
+        'od_procedure_logs' => 'procedurelog',
+        'procedurelogs' => 'procedurelog',
+        'procedure_log' => 'procedurelog',
+
+        'od_procedure' => 'procedurecode',
+        'od_procedures' => 'procedurecode',
+        'procedurecodes' => 'procedurecode',
+
+        'od_appointment' => 'appointment',
+        'od_appointments' => 'appointment',
+        'appointments' => 'appointment',
+
+        'od_provider' => 'provider',
+        'od_providers' => 'provider',
+        'providers' => 'provider',
+
+        'od_pay_split' => 'paysplit',
+        'od_pay_splits' => 'paysplit',
+        'pay_splits' => 'paysplit',
+
+        'od_treatment_plan' => 'treatmentplan',
+        'od_treatment_plans' => 'treatmentplan',
+        'treatment_plans' => 'treatmentplan',
+        'treatmentplans' => 'treatmentplan',
+
+        'od_claim' => 'claim',
+        'od_claims' => 'claim',
+        'claims' => 'claim',
+
+        'od_adjustment' => 'adjustment',
+        'od_adjustments' => 'adjustment',
+        'adjustments' => 'adjustment',
+
+        'od_pay_plan' => 'payplan',
+        'od_pay_plans' => 'payplan',
+        'pay_plans' => 'payplan',
+
+        'od_payment' => 'payment',
+        'od_payments' => 'payment',
+        'payments' => 'payment',
+
+        'od_recall' => 'recall',
+        'od_recalls' => 'recall',
+        'recalls' => 'recall',
+
+        'od_ins_plan' => 'insplan',
+        'od_ins_plans' => 'insplan',
+        'ins_plans' => 'insplan',
+
+        'od_clinic' => 'clinic',
+        'od_clinics' => 'clinic',
+        'clinics' => 'clinic',
+
+        'od_operatory' => 'operatory',
+        'od_operatories' => 'operatory',
+        'operatories' => 'operatory',
+
+        'od_user_od' => 'userod',
+        'od_user_ods' => 'userod',
+        'user_ods' => 'userod',
+    ];
+
     public function __construct(
         protected QueryService $queryService
     ) {}
@@ -107,9 +185,10 @@ class OpenDentalExplorerController extends Controller
         if ($source === 'opendental_live') {
             try {
                 $foundKey = array_search($table, $this->openDentalNativeTables, true);
-                $odTableName = isset($this->openDentalNativeTables[$table])
-                    ? $table
-                    : ($foundKey !== false ? $foundKey : $table);
+                $odTableName = $this->tableAliases[$table]
+                    ?? (isset($this->openDentalNativeTables[$table])
+                        ? $table
+                        : ($foundKey !== false ? $foundKey : $table));
 
                 $sql = $this->buildRawSqlString($odTableName, $colsToSelect, $conditions, $orderBy, $orderDir, $limit, $tableColumns);
                 $rows = $this->queryService->forOffice(Office::getActiveOffice())->shortQuery($sql);
@@ -223,6 +302,14 @@ class OpenDentalExplorerController extends Controller
     {
         if (isset($this->openDentalNativeTables[$table])) {
             $mapped = $this->openDentalNativeTables[$table];
+            if (DB::getSchemaBuilder()->hasTable($mapped)) {
+                return $mapped;
+            }
+        }
+
+        $nativeKey = $this->tableAliases[$table] ?? null;
+        if ($nativeKey && isset($this->openDentalNativeTables[$nativeKey])) {
+            $mapped = $this->openDentalNativeTables[$nativeKey];
             if (DB::getSchemaBuilder()->hasTable($mapped)) {
                 return $mapped;
             }
@@ -364,7 +451,14 @@ class OpenDentalExplorerController extends Controller
             $cleanRow = [];
             foreach ($tableColumns as $col) {
                 if (array_key_exists($col, $rowArr)) {
-                    $cleanRow[$col] = $rowArr[$col];
+                    $val = $rowArr[$col];
+                    if (is_string($val) && (str_contains(strtolower($col), 'date') || str_contains(strtolower($col), 'time'))) {
+                        $val = str_replace('T', ' ', trim($val));
+                        if ($val === '' || $val < '1000-01-01' || $val > '9999-12-31') {
+                            $val = null;
+                        }
+                    }
+                    $cleanRow[$col] = $val;
                 }
             }
 

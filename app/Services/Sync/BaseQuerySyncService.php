@@ -180,6 +180,27 @@ abstract class BaseQuerySyncService
         return $timestamp !== false ? date('Y-m-d H:i:s', $timestamp) : null;
     }
 
+    /**
+     * Convert an OpenDental date string into a MySQL-storable "Y-m-d" value,
+     * or null when the source is blank/sentinel/out-of-range.
+     */
+    protected function normalizeDate($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = str_replace('T', ' ', trim((string) $value));
+
+        if ($value === '' || $value < '1000-01-01' || $value > '9999-12-31') {
+            return null;
+        }
+
+        $timestamp = strtotime($value);
+
+        return $timestamp !== false ? date('Y-m-d', $timestamp) : null;
+    }
+
     public function sync(): void
     {
         $office = $this->getOffice();

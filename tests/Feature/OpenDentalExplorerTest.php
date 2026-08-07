@@ -186,4 +186,64 @@ class OpenDentalExplorerTest extends TestCase
             'last_primary_key' => 0,
         ]);
     }
+
+    public function test_od_explorer_supports_od_claim_proc_alias_for_columns_and_query(): void
+    {
+        $user = User::factory()->create();
+
+        $colsRes = $this->actingAs($user)->getJson('/open-dental-explorer/columns?table=od_claim_proc');
+        $colsRes->assertStatus(200);
+        $colsRes->assertJson([
+            'table' => 'od_claim_proc',
+            'resolved_table' => 'od_claim_procs',
+        ]);
+
+        $this->mock(QueryService::class, function (MockInterface $mock) {
+            $mock->shouldReceive('forOffice')->andReturnSelf();
+            $mock->shouldReceive('shortQuery')
+                ->once()
+                ->andReturn([
+                    ['ClaimProcNum' => 1001, 'ClaimNum' => 50, 'Status' => 1, 'DateCP' => '0001-01-01'],
+                ]);
+        });
+
+        $queryRes = $this->actingAs($user)->postJson('/open-dental-explorer/query', [
+            'source' => 'opendental_live',
+            'table' => 'od_claim_proc',
+            'limit' => 10,
+        ]);
+
+        $queryRes->assertStatus(200);
+        $queryRes->assertJson([
+            'source_type' => 'OpenDental Realtime API',
+            'table' => 'claimproc',
+            'count' => 1,
+        ]);
+
+        $syncRes = $this->actingAs($user)->postJson('/open-dental-explorer/sync-to-local', [
+            'table' => 'od_claim_proc',
+            'rows' => [
+                [
+                    'ClaimProcNum' => 88888,
+                    'ClaimPaymentNum' => 0,
+                    'Status' => 0,
+                    'DateCP' => '0001-01-01',
+                    'ProcDate' => '2026-08-01',
+                ],
+            ],
+        ]);
+
+        $syncRes->assertStatus(200);
+        $syncRes->assertJson([
+            'success' => true,
+            'table' => 'od_claim_procs',
+            'synced_count' => 1,
+        ]);
+
+        $this->assertDatabaseHas('od_claim_procs', [
+            'ClaimProcNum' => 88888,
+            'ProcDate' => '2026-08-01',
+            'DateCP' => null,
+        ]);
+    }
 }
