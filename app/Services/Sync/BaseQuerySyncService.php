@@ -7,6 +7,7 @@ use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
 use Exception;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 abstract class BaseQuerySyncService
 {
@@ -205,6 +206,17 @@ abstract class BaseQuerySyncService
     {
         $office = $this->getOffice();
         $this->queryService->forOffice($office);
+
+        $modelClass = $this->model();
+        if (class_exists($modelClass)) {
+            $model = new $modelClass;
+            $tableName = $model->getTable();
+            if (Schema::hasTable($tableName) && ! Schema::hasColumn($tableName, 'office_id')) {
+                Schema::table($tableName, function ($table) {
+                    $table->unsignedBigInteger('office_id')->default(1)->index();
+                });
+            }
+        }
 
         $log = SyncLog::firstOrCreate(
             ['module' => $this->module()],
