@@ -3,6 +3,7 @@
 namespace App\Services\Sync;
 
 use App\Models\Office;
+use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -123,52 +124,69 @@ class HardDeleteSyncService
         $targetOffice = $office ?? Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
         $officeId = (int) ($targetOffice->id ?? 1);
 
-        $this->queryService->forOffice($targetOffice);
+        $module = "office_{$officeId}:prune-deleted:{$tableKey}:full";
 
-        $pk = $config['pk'];
-        $odTable = $config['od_table'];
+        if (! $dryRun) {
+            $this->startSyncLog($officeId, $module);
+        }
 
-        // Get all local primary keys for this table and office
-        $localKeys = array_map('intval', DB::table($tableKey)->where('office_id', $officeId)->pluck($pk)->toArray());
-        $localCount = count($localKeys);
+        try {
+            $this->queryService->forOffice($targetOffice);
 
-        $orphanKeys = [];
+            $pk = $config['pk'];
+            $odTable = $config['od_table'];
 
-        if (! empty($localKeys)) {
-            // Process in chunks of 500 keys to avoid SQL query length limits
-            foreach (array_chunk($localKeys, 500) as $chunk) {
-                $inClause = implode(',', $chunk);
-                $odSql = "SELECT {$pk} FROM {$odTable} WHERE {$pk} IN ({$inClause})";
+            // Get all local primary keys for this table and office
+            $localKeys = array_map('intval', DB::table($tableKey)->where('office_id', $officeId)->pluck($pk)->toArray());
+            $localCount = count($localKeys);
 
-                $odRows = $this->queryService->shortQuery($odSql);
-                $remoteKeys = array_map('intval', array_column($odRows, $pk));
+            $orphanKeys = [];
 
-                $chunkOrphans = array_values(array_diff($chunk, $remoteKeys));
-                if (! empty($chunkOrphans)) {
-                    $orphanKeys = array_merge($orphanKeys, $chunkOrphans);
+            if (! empty($localKeys)) {
+                // Process in chunks of 500 keys to avoid SQL query length limits
+                foreach (array_chunk($localKeys, 500) as $chunk) {
+                    $inClause = implode(',', $chunk);
+                    $odSql = "SELECT {$pk} FROM {$odTable} WHERE {$pk} IN ({$inClause})";
+
+                    $odRows = $this->queryService->shortQuery($odSql);
+                    $remoteKeys = array_map('intval', array_column($odRows, $pk));
+
+                    $chunkOrphans = array_values(array_diff($chunk, $remoteKeys));
+                    if (! empty($chunkOrphans)) {
+                        $orphanKeys = array_merge($orphanKeys, $chunkOrphans);
+                    }
                 }
             }
-        }
 
-        // Delete orphan records if not dry run
-        if (! $dryRun && ! empty($orphanKeys)) {
-            foreach (array_chunk($orphanKeys, 500) as $chunk) {
-                DB::table($tableKey)
-                    ->where('office_id', $officeId)
-                    ->whereIn($pk, $chunk)
-                    ->delete();
+            // Delete orphan records if not dry run
+            if (! $dryRun && ! empty($orphanKeys)) {
+                foreach (array_chunk($orphanKeys, 500) as $chunk) {
+                    DB::table($tableKey)
+                        ->where('office_id', $officeId)
+                        ->whereIn($pk, $chunk)
+                        ->delete();
+                }
             }
-        }
 
-        return [
-            'table' => $tableKey,
-            'office_id' => $officeId,
-            'mode' => 'full',
-            'local_count' => $localCount,
-            'orphan_count' => count($orphanKeys),
-            'orphan_keys' => $orphanKeys,
-            'deleted' => ! $dryRun && ! empty($orphanKeys),
-        ];
+            if (! $dryRun) {
+                $this->completeSyncLog($officeId, $module, count($orphanKeys));
+            }
+
+            return [
+                'table' => $tableKey,
+                'office_id' => $officeId,
+                'mode' => 'full',
+                'local_count' => $localCount,
+                'orphan_count' => count($orphanKeys),
+                'orphan_keys' => $orphanKeys,
+                'deleted' => ! $dryRun && ! empty($orphanKeys),
+            ];
+        } catch (Exception $e) {
+            if (! $dryRun) {
+                $this->failSyncLog($officeId, $module, $e->getMessage());
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -228,60 +246,145 @@ class HardDeleteSyncService
         $targetOffice = $office ?? Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
         $officeId = (int) ($targetOffice->id ?? 1);
 
-        $this->queryService->forOffice($targetOffice);
+        $module = "office_{$officeId}:prune-deleted:{$tableKey}";
 
-        $pk = $config['pk'];
-        $odTable = $config['od_table'];
-        $dateCol = $config['date_col'];
-        $isDateTime = $config['is_datetime'];
-
-        // 1. Prepare OpenDental SQL query
-        if ($isDateTime) {
-            $startBound = "{$startDate} 00:00:00";
-            $endBound = "{$endDate} 23:59:59";
-            $odSql = "SELECT {$pk} FROM {$odTable} WHERE {$dateCol} >= '{$startBound}' AND {$dateCol} <= '{$endBound}'";
-        } else {
-            $startBound = $startDate;
-            $endBound = $endDate;
-            $odSql = "SELECT {$pk} FROM {$odTable} WHERE {$dateCol} >= '{$startBound}' AND {$dateCol} <= '{$endBound}'";
+        if (! $dryRun) {
+            $this->startSyncLog($officeId, $module);
         }
 
-        // 2. Fetch primary keys present in OpenDental
-        $odRows = $this->queryService->shortQuery($odSql);
-        $remoteKeys = array_map('intval', array_column($odRows, $pk));
+        try {
+            $this->queryService->forOffice($targetOffice);
 
-        // 3. Fetch primary keys present in local database
-        $localQuery = DB::table($tableKey)->where('office_id', $officeId);
-        if ($isDateTime) {
-            $localQuery->whereBetween($dateCol, ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
-        } else {
-            $localQuery->whereBetween($dateCol, [$startDate, $endDate]);
-        }
-        $localKeys = array_map('intval', $localQuery->pluck($pk)->toArray());
+            $pk = $config['pk'];
+            $odTable = $config['od_table'];
+            $dateCol = $config['date_col'];
+            $isDateTime = $config['is_datetime'];
 
-        // 4. Identify local keys missing from OpenDental (hard-deleted in OpenDental)
-        $orphanKeys = array_values(array_diff($localKeys, $remoteKeys));
-
-        // 5. Delete orphan records if not dry run
-        if (! $dryRun && ! empty($orphanKeys)) {
-            foreach (array_chunk($orphanKeys, 500) as $chunk) {
-                DB::table($tableKey)
-                    ->where('office_id', $officeId)
-                    ->whereIn($pk, $chunk)
-                    ->delete();
+            // 1. Prepare OpenDental SQL query
+            if ($isDateTime) {
+                $startBound = "{$startDate} 00:00:00";
+                $endBound = "{$endDate} 23:59:59";
+                $odSql = "SELECT {$pk} FROM {$odTable} WHERE {$dateCol} >= '{$startBound}' AND {$dateCol} <= '{$endBound}'";
+            } else {
+                $startBound = $startDate;
+                $endBound = $endDate;
+                $odSql = "SELECT {$pk} FROM {$odTable} WHERE {$dateCol} >= '{$startBound}' AND {$dateCol} <= '{$endBound}'";
             }
-        }
 
-        return [
-            'table' => $tableKey,
+            // 2. Fetch primary keys present in OpenDental
+            $odRows = $this->queryService->shortQuery($odSql);
+            $remoteKeys = array_map('intval', array_column($odRows, $pk));
+
+            // 3. Fetch primary keys present in local database
+            $localQuery = DB::table($tableKey)->where('office_id', $officeId);
+            if ($isDateTime) {
+                $localQuery->whereBetween($dateCol, ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
+            } else {
+                $localQuery->whereBetween($dateCol, [$startDate, $endDate]);
+            }
+            $localKeys = array_map('intval', $localQuery->pluck($pk)->toArray());
+
+            // 4. Identify local keys missing from OpenDental (hard-deleted in OpenDental)
+            $orphanKeys = array_values(array_diff($localKeys, $remoteKeys));
+
+            // 5. Delete orphan records if not dry run
+            if (! $dryRun && ! empty($orphanKeys)) {
+                foreach (array_chunk($orphanKeys, 500) as $chunk) {
+                    DB::table($tableKey)
+                        ->where('office_id', $officeId)
+                        ->whereIn($pk, $chunk)
+                        ->delete();
+                }
+            }
+
+            if (! $dryRun) {
+                $this->completeSyncLog($officeId, $module, count($orphanKeys));
+            }
+
+            return [
+                'table' => $tableKey,
+                'office_id' => $officeId,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'remote_count' => count($remoteKeys),
+                'local_count' => count($localKeys),
+                'orphan_count' => count($orphanKeys),
+                'orphan_keys' => $orphanKeys,
+                'deleted' => ! $dryRun && ! empty($orphanKeys),
+            ];
+        } catch (Exception $e) {
+            if (! $dryRun) {
+                $this->failSyncLog($officeId, $module, $e->getMessage());
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Start sync_logs record for hard-delete prune run.
+     */
+    protected function startSyncLog(int $officeId, string $module): void
+    {
+        $log = SyncLog::firstOrCreate(
+            ['module' => $module],
+            [
+                'office_id' => $officeId,
+                'status' => 'idle',
+                'total_processed' => 0,
+            ]
+        );
+
+        $log->update([
             'office_id' => $officeId,
-            'start_date' => $startDate,
-            'end_date' => $endDate,
-            'remote_count' => count($remoteKeys),
-            'local_count' => count($localKeys),
-            'orphan_count' => count($orphanKeys),
-            'orphan_keys' => $orphanKeys,
-            'deleted' => ! $dryRun && ! empty($orphanKeys),
-        ];
+            'status' => 'running',
+            'started_at' => now(),
+            'last_error' => null,
+        ]);
+    }
+
+    /**
+     * Mark sync_logs record as completed.
+     */
+    protected function completeSyncLog(int $officeId, string $module, int $totalProcessed): void
+    {
+        $log = SyncLog::firstOrCreate(
+            ['module' => $module],
+            [
+                'office_id' => $officeId,
+                'status' => 'idle',
+                'total_processed' => 0,
+            ]
+        );
+
+        $log->update([
+            'office_id' => $officeId,
+            'status' => 'completed',
+            'finished_at' => now(),
+            'total_processed' => $totalProcessed,
+            'last_synced_at' => now(),
+            'retry_count' => 0,
+        ]);
+    }
+
+    /**
+     * Mark sync_logs record as failed.
+     */
+    protected function failSyncLog(int $officeId, string $module, string $error): void
+    {
+        $log = SyncLog::firstOrCreate(
+            ['module' => $module],
+            [
+                'office_id' => $officeId,
+                'status' => 'idle',
+                'total_processed' => 0,
+            ]
+        );
+
+        $log->increment('retry_count');
+        $log->update([
+            'office_id' => $officeId,
+            'status' => 'failed',
+            'last_error' => $error,
+        ]);
     }
 }
