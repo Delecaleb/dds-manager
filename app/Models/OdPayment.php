@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class OdPayment extends Model
 {
+    protected $primaryKey = 'PayNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
         'PayNum',
         'PayType',

@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class OdPatientBalance extends Model
 {
+    protected $primaryKey = 'PatNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
 
         'PatNum',
@@ -23,7 +27,7 @@ class OdPatientBalance extends Model
 
         'PatEstBal',
 
-        'Unearned'
+        'Unearned',
 
     ];
 }

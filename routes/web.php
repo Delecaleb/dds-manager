@@ -11,7 +11,6 @@ use App\Http\Controllers\KpisController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\OpenDentalExplorerController;
 use App\Http\Controllers\OperationsController;
-
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProviderPortalController;
@@ -75,6 +74,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('financials', [FinancialController::class, 'index'])->name('financials.index');
     Route::get('financials/data', [FinancialController::class, 'data'])->name('financials.data');
+    Route::get('financials/revenue', [FinancialController::class, 'revenue'])->name('financials.revenue');
     Route::get('financials/breakdown', [FinancialController::class, 'breakdown'])->name('financials.breakdown');
     Route::get('financials/score-cards', [FinancialController::class, 'scoreCards'])->name('financials.score-cards');
     Route::get('calendar', [CalendarController::class, 'index'])->name('calendar.index');

@@ -29,6 +29,16 @@ class FinancialController extends Controller
         return view('financials.index');
     }
 
+    public function revenue(Request $request)
+    {
+        $start = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $end = $request->input('end_date', now()->toDateString());
+
+        return response()->json(
+            $this->financialAnalytics->filterAnalysis($start, $end)
+        );
+    }
+
     public function data(Request $request)
     {
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
@@ -37,7 +47,7 @@ class FinancialController extends Controller
 
         $response = [];
 
-        if (in_array($section, ['all', 'revenue-kpis'])) {
+        if (in_array($section, ['all', 'revenue-kpis', 'revenue'])) {
             $response = array_merge(
                 $response,
                 $this->financialAnalytics->filterAnalysis($start, $end)

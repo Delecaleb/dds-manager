@@ -8,6 +8,10 @@ class OdDeposit extends Model
 {
     protected $table = 'od_deposits';
 
+    protected $primaryKey = 'DepositNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
         'DepositNum',
         'DateDeposit',

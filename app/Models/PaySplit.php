@@ -11,6 +11,10 @@ class PaySplit extends Model
 
     protected $table = 'od_pay_splits';
 
+    protected $primaryKey = 'SplitNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
         'office_id',
         'SplitNum',

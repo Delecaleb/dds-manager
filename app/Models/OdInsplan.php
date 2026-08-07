@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class OdInsplan extends Model
 {
+    protected $primaryKey = 'PlanNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
         'PlanNum',
         'GroupName',

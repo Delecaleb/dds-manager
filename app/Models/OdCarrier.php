@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class OdCarrier extends Model
 {
+    protected $primaryKey = 'CarrierNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
         'CarrierNum',
         'CarrierName',

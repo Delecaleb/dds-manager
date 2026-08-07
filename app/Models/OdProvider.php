@@ -9,6 +9,10 @@ class OdProvider extends Model
 {
     use BelongsToOffice;
 
+    protected $primaryKey = 'ProvNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
         'office_id',
         'ProvNum',

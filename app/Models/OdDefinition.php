@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class OdDefinition extends Model
 {
+    protected $primaryKey = 'DefNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
         'DefNum',
         'Category',

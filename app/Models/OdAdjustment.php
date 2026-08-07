@@ -9,6 +9,10 @@ class OdAdjustment extends Model
 {
     use BelongsToOffice;
 
+    protected $primaryKey = 'AdjNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
         'office_id',
         'AdjNum',

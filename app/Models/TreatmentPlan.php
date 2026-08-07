@@ -9,6 +9,10 @@ class TreatmentPlan extends Model
 {
     use BelongsToOffice;
 
+    protected $primaryKey = 'TreatPlanNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
         'office_id',
         'TreatPlanNum',

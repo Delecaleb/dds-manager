@@ -826,8 +826,17 @@
     function fetchAnalytics(start, end) {
       showSkeletons();
 
-      // Load blocks concurrently to prevent massive response sizes generating bottlenecks
-      var sections = ['revenue-kpis', 'patient-kpis', 'utilization-chart', 'adjustment-chart', 'top-services-chart', 'daily-revenue-chart', 'daily-patient-chart'];
+      // Fetch gross production, net production, adjustments & collections from revenue route
+      $.get(baseUrl + '/financials/revenue', { start_date: start, end_date: end })
+        .done(function (data) {
+          populate(data);
+        })
+        .fail(function (err) {
+          console.error('Failed to load revenue route:', err);
+        });
+
+      // Load remaining blocks concurrently to prevent massive response sizes generating bottlenecks
+      var sections = ['patient-kpis', 'utilization-chart', 'adjustment-chart', 'top-services-chart', 'daily-revenue-chart', 'daily-patient-chart'];
       sections.forEach(function (section) {
         $.get(baseUrl + '/financials/data', { start_date: start, end_date: end, section: section })
           .done(function (data) {

@@ -14,6 +14,10 @@ class ClaimProcs extends Model
 
     protected $table = 'od_claim_procs';
 
+    protected $primaryKey = 'ClaimProcNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
         'office_id',
         'ClaimProcNum',

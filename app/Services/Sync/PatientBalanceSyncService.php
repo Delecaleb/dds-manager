@@ -39,7 +39,7 @@ class PatientBalanceSyncService
             foreach (array_chunk($rows, 500) as $batch) {
                 DB::table('od_patient_balances')->upsert(
                     $batch,
-                    ['PatNum'],
+                    ['office_id', 'PatNum'],
                     ['Bal_0_30', 'Bal_31_60', 'Bal_61_90', 'BalOver90', 'Total', 'InsEst', 'updated_at']
                 );
             }
@@ -68,9 +68,13 @@ class PatientBalanceSyncService
         $now = now();
 
         return DB::table('od_patients as p')
-            ->leftJoin('od_patients as g', 'p.Guarantor', '=', 'g.PatNum')
-            ->groupBy(DB::raw('COALESCE(g.PatNum, p.PatNum)'))
+            ->leftJoin('od_patients as g', function ($join) {
+                $join->on('p.Guarantor', '=', 'g.PatNum')
+                    ->on('p.office_id', '=', 'g.office_id');
+            })
+            ->groupBy('p.office_id', DB::raw('COALESCE(g.PatNum, p.PatNum)'))
             ->selectRaw("
+                p.office_id as office_id,
                 COALESCE(g.PatNum, p.PatNum) as PatNum,
                 COALESCE(SUM(CAST(NULLIF(p.Bal_0_30, '') AS DECIMAL(10,2))), 0)  as Bal_0_30,
                 COALESCE(SUM(CAST(NULLIF(p.Bal_31_60, '') AS DECIMAL(10,2))), 0) as Bal_31_60,

@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class OdClinics extends Model
 {
+    protected $primaryKey = 'ClinicNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
         'ClinicNum',
         'Abbr',
