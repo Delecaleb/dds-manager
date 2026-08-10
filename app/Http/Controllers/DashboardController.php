@@ -142,6 +142,7 @@ class DashboardController extends Controller
 
         $patientVisits = DB::table('od_procedure_logs')
             ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
+            ->where('CodeNum', '!=', 626)
             ->whereBetween('ProcDate', [$start, $end])
             ->selectRaw('PatNum, DATE(ProcDate)')
             ->distinct()
@@ -413,6 +414,7 @@ class DashboardController extends Controller
         $buildVisitStats = function ($s, $e) {
             $patientVisits = DB::table('od_procedure_logs')
                 ->whereIn('ProcStatus', ProcStatus::completed())
+                ->where('CodeNum', '!=', 626)
                 ->whereBetween('ProcDate', [$s, $e])
                 ->selectRaw('ClinicNum, '.MetricDefinitions::patientVisits('val'))
                 ->groupBy('ClinicNum')
@@ -422,6 +424,7 @@ class DashboardController extends Controller
             $newPatientVisits = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ClinicNum', DB::raw('MIN(ProcDate) as first_visit'))
                 ->whereIn('ProcStatus', ProcStatus::completed())
+                ->where('CodeNum', '!=', 626)
                 ->groupBy('PatNum', 'ClinicNum')
                 ->havingBetween('first_visit', [$s, $e])
                 ->get()

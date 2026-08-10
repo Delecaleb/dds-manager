@@ -31,6 +31,7 @@ class PatientService
         return DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
             ->whereIn('ProcStatus', ProcStatus::completed())
+            ->where('CodeNum', '!=', 626)
             ->groupBy('PatNum');
     }
 
@@ -39,14 +40,14 @@ class PatientService
      * that can't take a query builder (e.g. KpisController's bundled single-scan KPIs).
      * Same definition as firstVisitCohort(); keeps the cohort single-sourced everywhere.
      *
-     * @param string $dateAlias column alias for the first-visit date (default 'first_date')
+     * @param  string  $dateAlias  column alias for the first-visit date (default 'first_date')
      */
     public function firstVisitCohortSql(string $dateAlias = 'first_date'): string
     {
         $completed = ProcStatus::inList(ProcStatus::completed());
 
         return "SELECT PatNum, MIN(ProcDate) AS {$dateAlias} "
-            . "FROM od_procedure_logs WHERE ProcStatus IN ({$completed}) GROUP BY PatNum";
+            ."FROM od_procedure_logs WHERE ProcStatus IN ({$completed}) AND CodeNum != 626 GROUP BY PatNum";
     }
 
     /** Patients seen (any completed procedure) in the period. */
@@ -80,6 +81,7 @@ class PatientService
     {
         $q = DB::table('od_procedure_logs as pl')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->where('pl.CodeNum', '!=', 626)
             ->whereBetween('pl.ProcDate', [$filter->start, $filter->end]);
 
         if ($filter->clinics) {

@@ -2224,6 +2224,7 @@ class OperationsAnalyticsService
                 $qTab = DB::table('od_procedure_logs')
                     ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, ".MetricDefinitions::patientVisits('val'))
                     ->whereIn('ProcStatus', ProcStatus::completed())
+                    ->where('CodeNum', '!=', 626)
                     ->whereBetween('ProcDate', [$startRange, $endRange]);
                 if ($clinics) {
                     $qTab->whereIn('ClinicNum', $clinics);
@@ -2414,6 +2415,7 @@ class OperationsAnalyticsService
             $qTab = DB::table('od_procedure_logs')
                 ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, ".MetricDefinitions::patientVisits('val'))
                 ->whereIn('ProcStatus', ProcStatus::completed())
+                ->where('CodeNum', '!=', 626)
                 ->whereBetween('ProcDate', [$start, $end]);
             if ($clinics) {
                 $qTab->whereIn('ClinicNum', $clinics);

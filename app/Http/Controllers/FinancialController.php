@@ -168,6 +168,7 @@ class FinancialController extends Controller
         // Daily Patient Statistics
         if (in_array($section, ['all', 'daily-patient-chart'])) {
             $dailyVisits = OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())
+                ->where('CodeNum', '!=', 626)
                 ->whereBetween('ProcDate', [$start, $end])
                 ->selectRaw('DATE(ProcDate) as date, '.MetricDefinitions::patientVisits('cnt'))
                 ->groupByRaw('DATE(ProcDate)')
@@ -189,6 +190,7 @@ class FinancialController extends Controller
             $dailyNewVisits = DB::table(function ($query) {
                 $query->from('od_procedure_logs')
                     ->whereIn('ProcStatus', ProcStatus::completed())
+                    ->where('CodeNum', '!=', 626)
                     ->select('PatNum')
                     ->selectRaw('MIN(DATE(ProcDate)) as first_visit')
                     ->groupBy('PatNum');
@@ -635,6 +637,7 @@ class FinancialController extends Controller
             FROM od_procedure_logs pl
             JOIN od_patients p ON pl.PatNum = p.PatNum
             WHERE pl.ProcStatus IN ({$this->completedIn})
+              AND pl.CodeNum != 626
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY p.PatNum, p.LName, p.FName
             ORDER BY count DESC, p.LName
@@ -662,6 +665,7 @@ class FinancialController extends Controller
             JOIN od_patients   p  ON pl.PatNum  = p.PatNum
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             WHERE pl.ProcStatus IN ({$this->completedIn})
+              AND pl.CodeNum != 626
             GROUP BY p.PatNum, p.LName, p.FName
             HAVING MIN(pl.ProcDate) BETWEEN ? AND ?
             ORDER BY dates, p.LName

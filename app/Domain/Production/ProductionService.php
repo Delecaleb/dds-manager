@@ -94,6 +94,7 @@ class ProductionService
     public function patientVisits(MetricFilter $filter): int
     {
         return (int) $this->completedProcedures($filter)
+            ->where('pl.CodeNum', '!=', 626)
             ->distinct()
             ->count(DB::raw($this->visitKeyExpr()));
     }
