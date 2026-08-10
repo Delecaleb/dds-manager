@@ -14,11 +14,11 @@ return new class extends Migration
         Schema::create('sync_requests', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('office_id')->default(1);
-            $table->string('module');
+            $table->string('module', 50);
             $table->date('start_date')->nullable();
             $table->date('end_date')->nullable();
             $table->boolean('prune_deleted')->default(false);
-            $table->string('status')->default('pending'); // pending, running, completed, failed, cancelled
+            $table->string('status', 50)->default('pending'); // pending, running, completed, failed, cancelled
             $table->integer('total_processed')->default(0);
             $table->text('error_message')->nullable();
             $table->timestamp('started_at')->nullable();
