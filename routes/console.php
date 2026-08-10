@@ -24,6 +24,7 @@ Artisan::command('inspire', function () {
 | HIGH FREQUENCY (every 5 minutes) — operational data that changes constantly.
 | Staggered start minutes so the syncs don't all fire at once.
 */
+Schedule::command('sync:process-pending')->everyMinute()->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:appointments')->cron('*/5 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:procedurelogs')->cron('1-59/5 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:adjustments')->cron('2-59/5 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
@@ -58,4 +59,3 @@ Schedule::command('sync:insplan')->dailyAt('01:20')->withoutOverlapping()->runIn
 | Prunes records in local DB that were hard-deleted in OpenDental for current year.
 */
 Schedule::command('sync:prune-deleted all --current-year')->cron('30 2 */2 * *')->withoutOverlapping()->runInBackground()->onOneServer();
-

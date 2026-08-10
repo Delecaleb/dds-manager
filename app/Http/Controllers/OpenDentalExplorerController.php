@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Office;
 use App\Models\SyncLog;
+use App\Models\SyncRequest;
 use App\Services\OpenDental\QueryService;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -603,6 +604,89 @@ class OpenDentalExplorerController extends Controller
             'success' => true,
             'module' => $module,
             'message' => "Successfully reset sync checkpoint for module '{$module}'.",
+        ]);
+    }
+
+    public function getSyncRequests(): JsonResponse
+    {
+        $requests = SyncRequest::with(['user:id,name'])
+            ->orderBy('id', 'desc')
+            ->take(50)
+            ->get();
+
+        return response()->json([
+            'requests' => $requests,
+        ]);
+    }
+
+    public function triggerDateSync(Request $request): JsonResponse
+    {
+        $request->validate([
+            'module' => 'required|string',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+            'prune_deleted' => 'nullable|boolean',
+        ]);
+
+        $module = strtolower(trim((string) $request->input('module')));
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        $pruneDeleted = (bool) $request->input('prune_deleted', false);
+
+        if ($startDate && $endDate && $startDate > $endDate) {
+            return response()->json(['error' => 'Start date cannot be after end date.'], 422);
+        }
+
+        $syncReq = SyncRequest::create([
+            'office_id' => Office::getActiveOffice()->id ?? 1,
+            'module' => $module,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'prune_deleted' => $pruneDeleted,
+            'status' => 'pending',
+            'created_by' => auth()->id(),
+        ]);
+
+        // Attempt background execution immediately so server-to-server sync starts instantly
+        try {
+            if (str_contains(PHP_OS_FAMILY, 'Windows')) {
+                pclose(popen('start /B php '.base_path('artisan')." sync:process-pending --id={$syncReq->id} > NUL 2>&1", 'r'));
+            } else {
+                exec('php '.base_path('artisan')." sync:process-pending --id={$syncReq->id} > /dev/null 2>&1 &");
+            }
+        } catch (Exception $e) {
+            // Log warning, background schedule cron will pick it up
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Server-to-server sync request created for '{$module}' module.",
+            'sync_request' => $syncReq,
+        ]);
+    }
+
+    public function cancelSyncRequest(Request $request): JsonResponse
+    {
+        $id = (int) $request->input('id');
+        $syncReq = SyncRequest::find($id);
+
+        if (! $syncReq) {
+            return response()->json(['error' => 'Sync request not found.'], 404);
+        }
+
+        if (in_array($syncReq->status, ['completed', 'failed', 'cancelled'])) {
+            return response()->json(['error' => "Cannot cancel a sync request with status '{$syncReq->status}'."], 422);
+        }
+
+        $syncReq->update([
+            'status' => 'cancelled',
+            'completed_at' => now(),
+            'error_message' => 'Cancelled by user.',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Sync request #{$id} has been cancelled.",
         ]);
     }
 }

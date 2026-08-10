@@ -14,6 +14,7 @@ use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProviderPortalController;
+use App\Http\Controllers\SyncManagerController;
 use App\Http\Controllers\TxMinerController;
 use Illuminate\Support\Facades\Route;
 
@@ -138,6 +139,16 @@ Route::middleware('auth')->group(function () {
     Route::post('open-dental-explorer/sync-to-local', [OpenDentalExplorerController::class, 'syncToLocal'])->name('od-explorer.sync');
     Route::get('open-dental-explorer/sync-checkpoints', [OpenDentalExplorerController::class, 'syncCheckpoints'])->name('od-explorer.checkpoints');
     Route::post('open-dental-explorer/reset-sync-checkpoint', [OpenDentalExplorerController::class, 'resetSyncCheckpoint'])->name('od-explorer.reset-checkpoint');
+    Route::get('open-dental-explorer/sync-requests', [OpenDentalExplorerController::class, 'getSyncRequests'])->name('od-explorer.sync-requests');
+    Route::post('open-dental-explorer/trigger-date-sync', [OpenDentalExplorerController::class, 'triggerDateSync'])->name('od-explorer.trigger-date-sync');
+    Route::post('open-dental-explorer/cancel-sync-request', [OpenDentalExplorerController::class, 'cancelSyncRequest'])->name('od-explorer.cancel-sync-request');
+
+    Route::get('sync-manager', [SyncManagerController::class, 'index'])->name('sync-manager.index');
+    Route::get('sync-manager/requests', [SyncManagerController::class, 'requests'])->name('sync-manager.requests');
+    Route::post('sync-manager/trigger', [SyncManagerController::class, 'triggerSync'])->name('sync-manager.trigger');
+    Route::post('sync-manager/cancel', [SyncManagerController::class, 'cancelSync'])->name('sync-manager.cancel');
+    Route::get('sync-manager/checkpoints', [SyncManagerController::class, 'checkpoints'])->name('sync-manager.checkpoints');
+    Route::post('sync-manager/reset-checkpoint', [SyncManagerController::class, 'resetCheckpoint'])->name('sync-manager.reset-checkpoint');
 });
 
 require __DIR__.'/auth.php';

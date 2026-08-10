@@ -108,6 +108,11 @@
                             @if(request()->routeIs('od-explorer.*')) aria-current="page" @endif>
                             <i data-lucide="database" class="w-4 h-4 text-emerald-600"></i> OD Data Explorer
                         </a>
+                        <a href="{{ route('sync-manager.index') }}"
+                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('sync-manager.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                            @if(request()->routeIs('sync-manager.*')) aria-current="page" @endif>
+                            <i data-lucide="cloud-lightning" class="w-4 h-4 text-amber-500"></i> Data Sync Manager
+                        </a>
                         <a href="{{ route('patients.index') }}"
                             class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('patients.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
                             @if(request()->routeIs('patients.index')) aria-current="page" @endif>

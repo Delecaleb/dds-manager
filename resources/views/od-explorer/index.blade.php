@@ -773,22 +773,155 @@
     function switchOdTab(tab) {
       var queryView = document.getElementById('tabQueryBuilderView');
       var checkView = document.getElementById('tabSyncCheckpointsView');
+      var dateView = document.getElementById('tabDateSyncView');
+
       var qBtn = document.getElementById('tabQueryBuilderBtn');
       var cBtn = document.getElementById('tabSyncCheckpointsBtn');
+      var dBtn = document.getElementById('tabDateSyncBtn');
+
+      queryView.classList.add('hidden');
+      checkView.classList.add('hidden');
+      dateView.classList.add('hidden');
+
+      qBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition';
+      cBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition';
+      dBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition';
 
       if (tab === 'syncCheckpoints') {
-        queryView.classList.add('hidden');
         checkView.classList.remove('hidden');
-        qBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition';
         cBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 transition';
         loadSyncCheckpoints();
+      } else if (tab === 'dateSync') {
+        dateView.classList.remove('hidden');
+        dBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-amber-50 text-amber-700 border border-amber-200 transition';
+        loadDateSyncRequests();
       } else {
-        checkView.classList.add('hidden');
         queryView.classList.remove('hidden');
         qBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 transition';
-        cBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition';
       }
       if (window.lucide) lucide.createIcons();
+    }
+
+    function loadDateSyncRequests() {
+      var tbody = document.getElementById('syncRequestsTbody');
+      if (!tbody) return;
+
+      fetch('{{ url("/open-dental-explorer/sync-requests") }}')
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (!res.requests || !res.requests.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 text-sm">No server-to-server sync requests logged yet.</td></tr>';
+            return;
+          }
+
+          var hasActiveJobs = false;
+
+          var html = res.requests.map(function (req) {
+            var statusBadge = '';
+            if (req.status === 'pending') {
+              hasActiveJobs = true;
+              statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200"><span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span> Pending</span>';
+            } else if (req.status === 'running') {
+              hasActiveJobs = true;
+              statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200"><svg class="animate-spin w-3 h-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Running</span>';
+            } else if (req.status === 'completed') {
+              statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">✓ Completed</span>';
+            } else if (req.status === 'failed') {
+              statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200" title="' + escHtml(req.error_message || '') + '">✕ Failed</span>';
+            } else {
+              statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">Cancelled</span>';
+            }
+
+            var windowStr = (req.start_date || 'All past') + ' → ' + (req.end_date || 'Today');
+            var pruneStr = req.prune_deleted ? '<span class="text-amber-600 font-bold">Yes</span>' : '<span class="text-slate-400">No</span>';
+            var startedStr = req.started_at ? new Date(req.started_at).toLocaleString() : '—';
+            var completedStr = req.completed_at ? new Date(req.completed_at).toLocaleString() : '—';
+
+            var cancelBtn = (req.status === 'pending' || req.status === 'running')
+              ? '<button onclick="cancelSyncReq(' + req.id + ')" class="px-2.5 py-1 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition">Cancel</button>'
+              : '—';
+
+            var errHtml = req.error_message ? '<div class="text-[11px] text-red-600 mt-1 max-w-md truncate" title="' + escHtml(req.error_message) + '">' + escHtml(req.error_message) + '</div>' : '';
+
+            return '<tr>' +
+              '<td class="px-4 py-3 font-bold text-slate-800">#' + req.id + '</td>' +
+              '<td class="px-4 py-3 font-extrabold text-slate-900">' + escHtml(req.module) + '</td>' +
+              '<td class="px-4 py-3 text-xs text-slate-600">' + windowStr + '</td>' +
+              '<td class="px-4 py-3 text-xs">' + pruneStr + '</td>' +
+              '<td class="px-4 py-3">' + statusBadge + errHtml + '</td>' +
+              '<td class="px-4 py-3 text-xs text-slate-500">' + startedStr + '</td>' +
+              '<td class="px-4 py-3 text-xs text-slate-500">' + completedStr + '</td>' +
+              '<td class="px-4 py-3 text-right">' + cancelBtn + '</td>' +
+              '</tr>';
+          }).join('');
+
+          tbody.innerHTML = html;
+
+          if (hasActiveJobs) {
+            setTimeout(loadDateSyncRequests, 4000);
+          }
+        });
+    }
+
+    function submitDateSyncForm(e) {
+      e.preventDefault();
+      var btn = document.getElementById('submitSyncReqBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<svg class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Launching...';
+
+      fetch('{{ url("/open-dental-explorer/trigger-date-sync") }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+          module: document.getElementById('syncModuleSelect').value,
+          start_date: document.getElementById('syncStartDate').value || null,
+          end_date: document.getElementById('syncEndDate').value || null,
+          prune_deleted: document.getElementById('syncPruneDeleted').checked
+        })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="zap" class="w-4 h-4 fill-current"></i> Launch Server-to-Server Sync';
+          if (window.lucide) lucide.createIcons();
+
+          if (res.error) {
+            alert('Error: ' + res.error);
+            return;
+          }
+          alert(res.message || 'Server-to-server sync launched successfully.');
+          loadDateSyncRequests();
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="zap" class="w-4 h-4 fill-current"></i> Launch Server-to-Server Sync';
+          if (window.lucide) lucide.createIcons();
+          alert('Failed to launch sync: ' + err.message);
+        });
+    }
+
+    function cancelSyncReq(id) {
+      if (!confirm('Are you sure you want to cancel sync request #' + id + '?')) return;
+
+      fetch('{{ url("/open-dental-explorer/cancel-sync-request") }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ id: id })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.error) {
+            alert('Error: ' + res.error);
+            return;
+          }
+          loadDateSyncRequests();
+        });
     }
 
     function loadSyncCheckpoints() {
