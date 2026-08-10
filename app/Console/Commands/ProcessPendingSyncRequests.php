@@ -37,6 +37,18 @@ class ProcessPendingSyncRequests extends Command
      */
     public function handle(): int
     {
+        @set_time_limit(0);
+        @ini_set('memory_limit', '512M');
+
+        // Self-heal any stale 'running' jobs (older than 10 minutes)
+        SyncRequest::where('status', 'running')
+            ->where('started_at', '<', now()->subMinutes(10))
+            ->update([
+                'status' => 'failed',
+                'error_message' => 'Sync process timed out or was terminated by server.',
+                'completed_at' => now(),
+            ]);
+
         $specificId = $this->option('id');
 
         $query = SyncRequest::where('status', 'pending')->orderBy('id', 'asc');
@@ -67,6 +79,18 @@ class ProcessPendingSyncRequests extends Command
             'error_message' => null,
         ]);
 
+        // Register shutdown function to catch fatal errors and prevent stuck jobs
+        register_shutdown_function(function () use ($req) {
+            $error = error_get_last();
+            if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+                $req->update([
+                    'status' => 'failed',
+                    'error_message' => 'Fatal PHP Error: '.$error['message'],
+                    'completed_at' => now(),
+                ]);
+            }
+        });
+
         $this->info("Starting sync request #{$req->id} for module '{$req->module}' (Window: {$req->start_date} to {$req->end_date})");
 
         try {
@@ -74,7 +98,6 @@ class ProcessPendingSyncRequests extends Command
             $module = strtolower(trim($req->module));
             $startDate = $req->start_date ? $req->start_date->format('Y-m-d') : null;
             $endDate = $req->end_date ? $req->end_date->format('Y-m-d') : null;
-            $totalProcessed = 0;
 
             $moduleServiceMap = [
                 'appointment' => AppointmentSyncService::class,

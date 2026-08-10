@@ -31,7 +31,7 @@ class PatientService
         return DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
             ->whereIn('ProcStatus', ProcStatus::completed())
-            ->where('CodeNum', '!=', 626)
+            ->whereRaw('COALESCE(CodeNum, 0) != 626')
             ->groupBy('PatNum');
     }
 
@@ -47,7 +47,7 @@ class PatientService
         $completed = ProcStatus::inList(ProcStatus::completed());
 
         return "SELECT PatNum, MIN(ProcDate) AS {$dateAlias} "
-            ."FROM od_procedure_logs WHERE ProcStatus IN ({$completed}) AND CodeNum != 626 GROUP BY PatNum";
+            ."FROM od_procedure_logs WHERE ProcStatus IN ({$completed}) AND COALESCE(CodeNum, 0) != 626 GROUP BY PatNum";
     }
 
     /** Patients seen (any completed procedure) in the period. */
