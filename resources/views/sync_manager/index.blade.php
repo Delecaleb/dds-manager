@@ -228,10 +228,6 @@
           }).join('');
 
           tbody.innerHTML = html;
-
-          if (hasActiveJobs) {
-            setTimeout(loadSyncRequests, 4000);
-          }
         });
     }
 
