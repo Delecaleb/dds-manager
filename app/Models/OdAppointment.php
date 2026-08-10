@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Helpers\MetricDefinitions;
 use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 /**
  * ApptStatus Enum mappings in OpenDental:
@@ -68,7 +69,7 @@ class OdAppointment extends Model
 
     public function scopeScheduled($query)
     {
-        return $query->whereIn('AptStatus', [1, 4]);
+        return $query->whereIn('AptStatus', [1, 2]);
     }
 
     public function scopeInDateRange($query, $start, $end)
@@ -89,11 +90,26 @@ class OdAppointment extends Model
 
     public function newPatientsScheduled($start, $end)
     {
-        return (int) $this->inDateRange($start, $end)
-            ->scheduled()
-            ->whereIn('IsNewPatient', ['1', 1, 'true', true])
-            ->selectRaw(MetricDefinitions::scheduledPatients('cnt'))
-            ->value('cnt');
+        $startDate = substr($start, 0, 10).' 00:00:00';
+        $endDate = substr($end, 0, 10).' 23:59:59';
+        $startDay = substr($start, 0, 10);
+
+        $firstApts = DB::table('od_appointments')
+            ->select('PatNum', DB::raw('MIN(AptDateTime) as first_apt'))
+            ->whereIn('AptStatus', [1, 2])
+            ->groupBy('PatNum');
+
+        return (int) DB::table('od_patients as p')
+            ->joinSub($firstApts, 'fa', 'p.PatNum', '=', 'fa.PatNum')
+            ->whereBetween('fa.first_apt', [$startDate, $endDate])
+            ->whereNotIn('p.PatNum', function ($query) use ($startDay) {
+                $query->select('PatNum')
+                    ->from('od_procedure_logs')
+                    ->where('ProcDate', '<', $startDay)
+                    ->whereIn('ProcStatus', ['C', '2', 'D']);
+            })
+            ->whereNotIn('p.PatNum', [21216, 21231, 21254])
+            ->count('p.PatNum');
     }
 
     public function patient()

@@ -29,12 +29,13 @@ class MetricDefinitions
      * @param  string|null  $alias  Optional AS alias.
      * @return Expression
      */
-    public static function scheduledPatients(?string $alias = null): string
+    public static function scheduledPatients(?string $alias = null, string $tablePrefix = ''): string
     {
+        $prefix = $tablePrefix !== '' ? "{$tablePrefix}." : '';
         $driver = DB::connection()->getDriverName();
         $raw = $driver === 'sqlite'
-            ? "COUNT(DISTINCT PatNum || '|' || DATE(AptDateTime))"
-            : 'COUNT(DISTINCT PatNum, DATE(AptDateTime))';
+            ? "COUNT(DISTINCT {$prefix}PatNum || '|' || DATE({$prefix}AptDateTime))"
+            : "COUNT(DISTINCT {$prefix}PatNum, DATE({$prefix}AptDateTime))";
 
         return $raw.($alias ? " AS {$alias}" : '');
     }

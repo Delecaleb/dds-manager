@@ -1841,9 +1841,13 @@
     document.getElementById('bkExportBtn').addEventListener('click', function () {
       if (_bk.filtered.length === 0) return;
       var cols = BK_COLS[_bk.type];
-      var headers = cols.map(function (c) { return c.title; }).join(',');
+      var headers = cols.map(function (c) { return '"' + (c.title || '').replace(/"/g, '""') + '"'; }).join(',');
       var rows = _bk.filtered.map(function (r) {
-        return cols.map(function (c) { return JSON.stringify(r[c.key] !== null ? r[c.key] : ''); }).join(',');
+        return cols.map(function (c) {
+          var val = r[c.key];
+          if (val === null || val === undefined) val = '';
+          return '"' + String(val).replace(/"/g, '""') + '"';
+        }).join(',');
       });
       var csv = [headers].concat(rows).join('\n');
       var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

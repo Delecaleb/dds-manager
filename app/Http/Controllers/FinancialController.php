@@ -180,11 +180,25 @@ class FinancialController extends Controller
                 ->groupByRaw("DATE(REPLACE(AptDateTime, 'T', ' '))")
                 ->pluck('cnt', 'date');
 
-            $dailyNewScheduled = OdAppointment::whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
-                ->scheduled()
-                ->whereIn('IsNewPatient', ['1', 1, 'true', true])
-                ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date, ".MetricDefinitions::scheduledPatients('cnt'))
-                ->groupByRaw("DATE(REPLACE(AptDateTime, 'T', ' '))")
+            $dailyNewScheduled = DB::table(function ($query) {
+                $query->from('od_appointments')
+                    ->whereIn('AptStatus', [1, 2])
+                    ->select('PatNum')
+                    ->selectRaw("MIN(DATE(REPLACE(AptDateTime, 'T', ' '))) as first_apt")
+                    ->groupBy('PatNum');
+            }, 'fa')
+                ->join('od_patients as p', 'fa.PatNum', '=', 'p.PatNum')
+                ->whereBetween('fa.first_apt', [$start, $end])
+                ->whereNotIn('p.PatNum', function ($query) use ($start) {
+                    $query->select('PatNum')
+                        ->from('od_procedure_logs')
+                        ->where('ProcDate', '<', $start)
+                        ->whereIn('ProcStatus', ['C', '2', 'D']);
+                })
+                ->whereNotIn('p.PatNum', [21216, 21231, 21254])
+                ->select('fa.first_apt as date')
+                ->selectRaw('COUNT(*) as cnt')
+                ->groupBy('fa.first_apt')
                 ->pluck('cnt', 'date');
 
             $dailyNewVisits = DB::table(function ($query) {
@@ -712,16 +726,25 @@ class FinancialController extends Controller
             SELECT
                 p.PatNum                         AS patient_id,
                 CONCAT(p.LName, ', ', p.FName)   AS patient_name,
-                GROUP_CONCAT(DISTINCT DATE_FORMAT(a.AptDateTime, '%Y-%m-%d') ORDER BY a.AptDateTime SEPARATOR ', ') AS dates,
-                COUNT(DISTINCT DATE(a.AptDateTime)) AS count
-            FROM od_appointments a
-            JOIN od_patients p ON a.PatNum = p.PatNum
-            WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
-              AND a.AptStatus IN (1, 2)
-              AND a.IsNewPatient IN ('1', 'true', '1', 1)
-            GROUP BY p.PatNum, p.LName, p.FName
-            ORDER BY count DESC, p.LName
-        ", [$start, $end]);
+                DATE_FORMAT(fa.first_apt, '%Y-%m-%d') AS dates,
+                1                                AS count
+            FROM od_patients p
+            JOIN (
+                SELECT PatNum, MIN(AptDateTime) AS first_apt
+                FROM od_appointments
+                WHERE AptStatus IN (1, 2)
+                GROUP BY PatNum
+            ) fa ON p.PatNum = fa.PatNum
+            WHERE fa.first_apt BETWEEN ? AND ?
+              AND p.PatNum NOT IN (
+                  SELECT DISTINCT PatNum
+                  FROM od_procedure_logs
+                  WHERE ProcDate < ?
+                    AND ProcStatus IN ('C', '2', 'D')
+              )
+              AND p.PatNum NOT IN (21216, 21231, 21254)
+            ORDER BY p.LName
+        ", [$start.' 00:00:00', $end.' 23:59:59', $start]);
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
