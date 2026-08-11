@@ -58,4 +58,4 @@ Schedule::command('sync:insplan')->dailyAt('01:20')->withoutOverlapping()->runIn
 | HARD DELETE RECONCILIATION (once every 2 days at 02:30 AM)
 | Prunes records in local DB that were hard-deleted in OpenDental for current year.
 */
-Schedule::command('sync:prune-deleted all --current-year')->cron('30 2 */2 * *')->withoutOverlapping()->runInBackground()->onOneServer();
+// Schedule::command('sync:prune-deleted all --current-year')->cron('30 2 */2 * *')->withoutOverlapping()->runInBackground()->onOneServer();

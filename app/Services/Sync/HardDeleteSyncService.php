@@ -60,7 +60,7 @@ class HardDeleteSyncService
         'od_claim_payments' => [
             'od_table' => 'claimpayment',
             'pk' => 'ClaimPaymentNum',
-            'date_col' => 'PayDate',
+            'date_col' => 'SecDateTEdit',
             'is_datetime' => false,
         ],
         'od_recalls' => [
@@ -69,7 +69,7 @@ class HardDeleteSyncService
             'date_col' => 'DateDue',
             'is_datetime' => false,
         ],
-        'od_schedule' => [
+        'od_schedules' => [
             'od_table' => 'schedule',
             'pk' => 'ScheduleNum',
             'date_col' => 'SchedDate',
