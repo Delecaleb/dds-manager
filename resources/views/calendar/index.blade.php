@@ -1373,6 +1373,17 @@
             document.querySelectorAll('.fc-event').forEach(el => el.style.opacity = '1');
         }
 
+        function syncDateRangeFromSinglePicker() {
+            const singleDate = document.getElementById('calDate')?.value;
+            if (!singleDate) return;
+            if (window.jQuery && jQuery('#calDateRange').data('daterangepicker') && typeof moment !== 'undefined') {
+                const drp = jQuery('#calDateRange').data('daterangepicker');
+                const m = moment(singleDate, 'YYYY-MM-DD');
+                drp.setStartDate(m);
+                drp.setEndDate(m);
+            }
+        }
+
         function getCalendarDateRange() {
             const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
             if (activeTab === 'view-details' || activeTab === 'view-capacity') {
@@ -1438,6 +1449,7 @@
                     rangeDateWrapper?.classList.add('hidden');
                     viewToggleWrapper?.classList.remove('hidden');
                 } else {
+                    syncDateRangeFromSinglePicker();
                     singleDateWrapper?.classList.add('hidden');
                     rangeDateWrapper?.classList.remove('hidden');
                     viewToggleWrapper?.classList.add('hidden');

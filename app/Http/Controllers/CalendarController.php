@@ -207,15 +207,15 @@ class CalendarController extends Controller
         $start = $request->get('start') ?? date('Y-m-d');
         $end = $request->get('end') ?? date('Y-m-d');
 
-        // We fetch scheduled appointments for the date frame. Match by calendar
+        // We fetch scheduled & completed appointments for the date frame. Match by calendar
         // date regardless of AptDateTime storage format (see AppointmentRepository).
         $appointments = OdAppointment::whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
-            ->where('AptStatus', 1) // Only count Scheduled
+            ->whereIn('AptStatus', [1, 2]) // Scheduled & Complete
             ->get();
 
         // Calculate aggregate metrics
         $scheduledApts = $appointments->count();
-        $providerCount = $appointments->pluck('ProvNum')->unique()->count();
+        $providerCount = $appointments->pluck('ProvNum')->filter(fn ($p) => (int) $p > 0)->unique()->count();
 
         $bookedMinutes = $appointments->sum(function ($apt) {
             return strlen($apt->Pattern ?? '') > 0 ? strlen($apt->Pattern) * 10 : 60;
@@ -224,9 +224,14 @@ class CalendarController extends Controller
         // Compute Lead Time logic
         $allLeadTimes = [];
         $newPatLeadTimes = [];
+        $emergLeadTimes = [];
 
         foreach ($appointments as $apt) {
-            $createdDt = new Carbon($apt->DateTStamp ?? $apt->SecDateTEdit ?? $apt->AptDateTime);
+            $createdStr = ($apt->SecDateTEntry && $apt->SecDateTEntry !== '0001-01-01T00:00:00')
+                ? $apt->SecDateTEntry
+                : ($apt->DateTStamp ?? $apt->AptDateTime);
+
+            $createdDt = new Carbon($createdStr);
             $aptDt = new Carbon($apt->AptDateTime);
             $diffDays = max(0, $createdDt->diffInDays($aptDt));
 
@@ -235,11 +240,19 @@ class CalendarController extends Controller
             if ((bool) $apt->IsNewPatient) {
                 $newPatLeadTimes[] = $diffDays;
             }
+
+            $isEmerg = str_contains(strtolower($apt->ProcDescript ?? ''), 'emergency')
+                || str_contains(strtolower($apt->ProcDescript ?? ''), 'd0140')
+                || str_contains(strtolower($apt->Pattern ?? ''), 'emerg');
+
+            if ($isEmerg) {
+                $emergLeadTimes[] = $diffDays;
+            }
         }
 
         $avgLeadTime = count($allLeadTimes) > 0 ? array_sum($allLeadTimes) / count($allLeadTimes) : 0;
         $avgNewPatientLeadTime = count($newPatLeadTimes) > 0 ? array_sum($newPatLeadTimes) / count($newPatLeadTimes) : 0;
-        $avgEmergLeadTime = 0; // matching Screenshot 0.00 usually
+        $avgEmergLeadTime = count($emergLeadTimes) > 0 ? array_sum($emergLeadTimes) / count($emergLeadTimes) : 0;
 
         // Mock tiers heavily matching the requested UI visually
         $data = [
@@ -272,7 +285,7 @@ class CalendarController extends Controller
         $type = $request->get('type', 'scheduled_appointments');
 
         $query = OdAppointment::whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
-            ->where('AptStatus', 1);
+            ->whereIn('AptStatus', [1, 2]);
 
         if ($type === 'avg_lead_new') {
             $query->whereIn('IsNewPatient', ['1', 1, 'true', true]);
