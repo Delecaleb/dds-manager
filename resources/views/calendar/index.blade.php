@@ -148,7 +148,7 @@
         {{-- ══════════════════ TOP TOOLBAR ══════════════════ --}}
         <div class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0">
             <div class="flex items-center gap-3">
-                <div
+                <div id="singleDateWrapper"
                     class="relative flex items-center border border-slate-300 rounded px-3 py-1.5 gap-2 bg-white shadow-sm">
                     <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24">
@@ -160,6 +160,10 @@
                     <input type="date" id="calDate"
                         class="border-0 outline-none text-sm font-semibold text-slate-700 bg-transparent cursor-pointer"
                         value="{{ date('Y-m-d') }}">
+                </div>
+
+                <div id="rangeDateWrapper" class="hidden">
+                    <x-daterange-picker id="calDateRange" on-apply="onCalendarRangeApply" />
                 </div>
 
                 <select id="clinicFilter"
@@ -174,7 +178,7 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <div class="flex bg-slate-100 rounded-md border border-slate-200 p-0.5 gap-0.5">
+                <div id="viewToggleWrapper" class="flex bg-slate-100 rounded-md border border-slate-200 p-0.5 gap-0.5">
                     <button class="view-btn px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
                         data-view="dayGridMonth">Month</button>
                     <button class="view-btn px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
@@ -1033,13 +1037,20 @@
 
             // ── Refresh ───────────────────────────────────────────────────
             document.getElementById('refreshBtn').addEventListener('click', () => {
-                showCalSkeleton('Refreshing...');
-                if (calendar?.view?.type === 'dayGridMonth') {
-                    fetchMonthlySummary(calendar.view);
+                const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
+                if (activeTab === 'view-details') {
+                    if (aptDetailsTable) aptDetailsTable.ajax.reload();
+                } else if (activeTab === 'view-capacity') {
+                    if (aptCapacityTable) aptCapacityTable.ajax.reload();
                 } else {
-                    calendar.refetchEvents();
-                    calendar.refetchResources();
-                    fetchCalendarStats(document.getElementById('calDate').value);
+                    showCalSkeleton('Refreshing...');
+                    if (calendar?.view?.type === 'dayGridMonth') {
+                        fetchMonthlySummary(calendar.view);
+                    } else {
+                        calendar.refetchEvents();
+                        calendar.refetchResources();
+                        fetchCalendarStats(document.getElementById('calDate').value);
+                    }
                 }
             });
 
@@ -1362,6 +1373,36 @@
             document.querySelectorAll('.fc-event').forEach(el => el.style.opacity = '1');
         }
 
+        function getCalendarDateRange() {
+            const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
+            if (activeTab === 'view-details' || activeTab === 'view-capacity') {
+                const drp = window.jQuery && jQuery('#calDateRange').data('daterangepicker');
+                if (drp && drp.startDate && drp.endDate) {
+                    return {
+                        start: drp.startDate.format('YYYY-MM-DD'),
+                        end: drp.endDate.format('YYYY-MM-DD')
+                    };
+                }
+            }
+            const singleDate = document.getElementById('calDate')?.value || "{{ date('Y-m-d') }}";
+            return { start: singleDate, end: singleDate };
+        }
+
+        window.onCalendarRangeApply = function(start, end) {
+            const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
+            if (activeTab === 'view-details' && aptDetailsTable) {
+                aptDetailsTable.ajax.reload();
+            } else if (activeTab === 'view-capacity' && aptCapacityTable) {
+                aptCapacityTable.ajax.reload();
+            }
+        };
+
+        document.addEventListener('daterange:changed', function(e) {
+            if (e.detail && e.detail.id === 'calDateRange') {
+                window.onCalendarRangeApply(e.detail.start, e.detail.end);
+            }
+        });
+
         // ── Tabs logic ────────────────────────────────────────────────────
         document.querySelectorAll('.cal-tab').forEach(tab => {
             tab.addEventListener('click', function (e) {
@@ -1385,8 +1426,24 @@
                 document.getElementById('view-capacity').classList.add('hidden');
                 document.getElementById('view-capacity').classList.remove('flex');
 
-                // Show target view
                 const target = this.getAttribute('data-target');
+
+                // Toggle date selection input vs range picker & calendar view buttons based on tab
+                const singleDateWrapper = document.getElementById('singleDateWrapper');
+                const rangeDateWrapper = document.getElementById('rangeDateWrapper');
+                const viewToggleWrapper = document.getElementById('viewToggleWrapper');
+
+                if (target === 'view-calendar') {
+                    singleDateWrapper?.classList.remove('hidden');
+                    rangeDateWrapper?.classList.add('hidden');
+                    viewToggleWrapper?.classList.remove('hidden');
+                } else {
+                    singleDateWrapper?.classList.add('hidden');
+                    rangeDateWrapper?.classList.remove('hidden');
+                    viewToggleWrapper?.classList.add('hidden');
+                }
+
+                // Show target view
                 const viewEl = document.getElementById(target);
                 if (viewEl) {
                     viewEl.classList.remove('hidden');
@@ -1398,11 +1455,19 @@
                     }
 
                     if (target === 'view-details') {
-                        initAptDetailsTable();
+                        if (aptDetailsTable) {
+                            aptDetailsTable.ajax.reload();
+                        } else {
+                            initAptDetailsTable();
+                        }
                     }
 
                     if (target === 'view-capacity') {
-                        initAptCapacityTable();
+                        if (aptCapacityTable) {
+                            aptCapacityTable.ajax.reload();
+                        } else {
+                            initAptCapacityTable();
+                        }
                     }
                 }
             });
@@ -1418,9 +1483,9 @@
                 ajax: {
                     url: "{{ route('calendar.appointments-details-data') }}",
                     data: function (d) {
-                        const datePicker = document.getElementById('calDate');
-                        d.start = datePicker ? datePicker.value : "{{ date('Y-m-d') }}";
-                        d.end = d.start;
+                        const range = getCalendarDateRange();
+                        d.start = range.start;
+                        d.end = range.end;
                     }
                 },
                 columns: [
@@ -1550,9 +1615,9 @@
                 ajax: {
                     url: "{{ route('calendar.appointment-capacity-data') }}",
                     data: function (d) {
-                        const datePicker = document.getElementById('calDate');
-                        d.start = datePicker ? datePicker.value : "{{ date('Y-m-d') }}";
-                        d.end = d.start;
+                        const range = getCalendarDateRange();
+                        d.start = range.start;
+                        d.end = range.end;
                     }
                 },
                 columns: [

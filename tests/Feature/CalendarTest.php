@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\OdAdjustment;
 use App\Models\OdAppointment;
+use App\Models\OdProcedureLog;
 use App\Models\OdProvider;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CalendarTest extends TestCase
@@ -110,6 +113,50 @@ class CalendarTest extends TestCase
             ]);
     }
 
+    public function test_calendar_stats_production_equals_net_production_for_day(): void
+    {
+        // Completed procedure: 200.00 gross
+        OdProcedureLog::create([
+            'ProcNum' => 8881,
+            'PatNum' => 1,
+            'ProcFee' => '200.00',
+            'ProcStatus' => 'C',
+            'ProcDate' => '2026-07-14 00:00:00',
+        ]);
+
+        // Adjustment: -20.00
+        OdAdjustment::create([
+            'AdjNum' => 8881,
+            'PatNum' => 1,
+            'AdjAmt' => '-20.00',
+            'AdjDate' => '2026-07-14 00:00:00',
+        ]);
+
+        // WriteOff: 30.00
+        DB::table('od_claim_procs')->insert([
+            'ClaimProcNum' => 8881,
+            'ClaimNum' => 8881,
+            'PatNum' => 1,
+            'ProcNum' => 8881,
+            'ProcDate' => '2026-07-14 00:00:00',
+            'WriteOff' => 30.00,
+            'Status' => '1',
+            'ClaimPaymentNum' => 0,
+            'InsPayAmt' => 0,
+        ]);
+
+        // Net production = 200.00 + (-20.00) - 30.00 = 150.00
+        // Scheduled production = 200.00 gross
+        $response = $this->actingAs($this->user)
+            ->getJson(route('calendar.stats', ['date' => '2026-07-14']));
+
+        $response->assertOk()
+            ->assertJsonFragment([
+                'production' => 150.0,
+                'scheduled_production' => 200.0,
+            ]);
+    }
+
     public function test_calendar_scheduled_production_breakdown_endpoint_returns_data(): void
     {
         $provider = OdProvider::create([
@@ -157,5 +204,84 @@ class CalendarTest extends TestCase
                 '2026-07-04' => ['appointments', 'new_pts', 'sched', 'goal', 'prod'],
                 '2026-07-05' => ['appointments', 'new_pts', 'sched', 'goal', 'prod'],
             ]);
+    }
+
+    public function test_appointment_details_data_supports_date_range(): void
+    {
+        $provider = OdProvider::create([
+            'ProvNum' => 81,
+            'LName' => 'Elias',
+            'PName' => 'Kathy',
+            'Abbr' => 'ELIAS',
+        ]);
+
+        OdAppointment::create([
+            'AptNum' => 99994,
+            'PatNum' => 1,
+            'AptStatus' => 1,
+            'Pattern' => '//',
+            'Op' => 2,
+            'ProvNum' => $provider->ProvNum,
+            'AptDateTime' => '2026-07-10 10:00:00',
+        ]);
+
+        OdAppointment::create([
+            'AptNum' => 99995,
+            'PatNum' => 1,
+            'AptStatus' => 1,
+            'Pattern' => '//',
+            'Op' => 2,
+            'ProvNum' => $provider->ProvNum,
+            'AptDateTime' => '2026-07-15 10:00:00',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson(route('calendar.appointments-details-data', [
+                'start' => '2026-07-01',
+                'end' => '2026-07-20',
+            ]));
+
+        $response->assertOk()
+            ->assertJsonFragment(['appointment_date' => 'Jul 10, 2026'])
+            ->assertJsonFragment(['appointment_date' => 'Jul 15, 2026']);
+    }
+
+    public function test_appointment_capacity_data_supports_date_range(): void
+    {
+        $provider = OdProvider::create([
+            'ProvNum' => 81,
+            'LName' => 'Elias',
+            'PName' => 'Kathy',
+            'Abbr' => 'ELIAS',
+        ]);
+
+        OdAppointment::create([
+            'AptNum' => 99996,
+            'PatNum' => 1,
+            'AptStatus' => 1,
+            'Pattern' => '//',
+            'Op' => 2,
+            'ProvNum' => $provider->ProvNum,
+            'AptDateTime' => '2026-07-10 10:00:00',
+        ]);
+
+        OdAppointment::create([
+            'AptNum' => 99997,
+            'PatNum' => 1,
+            'AptStatus' => 1,
+            'Pattern' => '//',
+            'Op' => 2,
+            'ProvNum' => $provider->ProvNum,
+            'AptDateTime' => '2026-07-15 10:00:00',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson(route('calendar.appointment-capacity-data', [
+                'start' => '2026-07-01',
+                'end' => '2026-07-20',
+            ]));
+
+        $response->assertOk()
+            ->assertJsonFragment(['scheduled_appointments' => 2]);
     }
 }

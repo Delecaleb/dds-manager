@@ -59,10 +59,10 @@ class FrontOfficeController extends Controller
         $productionFilter = new MetricFilter($startOfMonth, $periodEnd->format('Y-m-d'));
         $priorYearFilter = $productionFilter->lastYear();
 
-        $monthlyProduction = $this->production->grossProduction($productionFilter);
+        $monthlyProduction = $this->production->netProduction($productionFilter);
 
         // Prior Year: the SAME span, shifted back exactly one year.
-        $priorYearProduction = $this->production->grossProduction($priorYearFilter);
+        $priorYearProduction = $this->production->netProduction($priorYearFilter);
 
         // Note: For now, $100k is used as simple monthly goal for UI ratio mapping till Goals system added.
         $monthlyGoal = 109286.00;
@@ -88,7 +88,7 @@ class FrontOfficeController extends Controller
 
         for ($i = 0; $i < 5; $i++) {
             $day = $startOfWeek->copy()->addDays($i)->format('Y-m-d');
-            $dailyActuals[] = (float) OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())->whereDate('ProcDate', $day)->sum('ProcFee');
+            $dailyActuals[] = $this->production->netProduction(new MetricFilter($day, $day));
             $dailyGoals[] = $monthlyGoal / 20; // Avg 20 working days
         }
 
@@ -279,36 +279,201 @@ class FrontOfficeController extends Controller
 
         $query = OdAppointment::query()
             ->with(['patient', 'provider'])
-            ->whereIn('AptStatus', [5]) // 5 is generally Broken in OD
+            ->where('AptStatus', 5) // 5 is Broken in OD
+            ->whereNotIn('AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947]) // Operations matching condition
             ->whereBetween('AptDateTime', [$startOfMonth, $endOfMonth])
             ->select('od_appointments.*');
 
+        $aptNums = (clone $query)->pluck('AptNum')->filter()->toArray();
+        $fees = [];
+        if (! empty($aptNums)) {
+            $fees = DB::table('od_procedure_logs')
+                ->selectRaw('AptNum, SUM(ProcFee) as total_fee')
+                ->whereIn('AptNum', $aptNums)
+                ->groupBy('AptNum')
+                ->pluck('total_fee', 'AptNum')
+                ->toArray();
+        }
+
         return DataTables::eloquent($query)
-            ->addColumn('patient_name', function ($apt) {
-                return trim(($apt->patient->FName ?? '').' '.($apt->patient->LName ?? ''));
+            ->addColumn('patient_name', fn ($apt) => trim(($apt->patient->FName ?? '').' '.($apt->patient->LName ?? '')))
+            ->addColumn('status', fn ($apt) => 'UNSCHEDULED')
+            ->addColumn('amount', fn ($apt) => (float) ($fees[$apt->AptNum] ?? 0))
+            ->addColumn('phone', fn ($apt) => $apt->patient->HmPhone ?? 'N/A')
+            ->addColumn('work_phone', fn ($apt) => $apt->patient->WkPhone ?? 'N/A')
+            ->addColumn('mobile_phone', fn ($apt) => $apt->patient->WirelessPhone ?? 'N/A')
+            ->addColumn('email', fn ($apt) => $apt->patient->Email ?? '')
+            ->addColumn('insurance_carrier', fn () => 'N/A')
+            ->addColumn('provider_name', fn ($apt) => $apt->provider->Abbr ?? ($apt->provider->LName ?? '—'))
+            ->addColumn('next_visit_date', fn () => 'N/A')
+            ->addColumn('recall_due', fn () => 'N/A')
+            ->addColumn('remaining_benefits', fn () => '$ 0')
+            ->addColumn('date', fn ($apt) => $apt->AptDateTime ? date('Y-m-d', strtotime($apt->AptDateTime)) : '')
+            ->addColumn('time', fn ($apt) => $apt->AptDateTime ? date('H:i:s', strtotime($apt->AptDateTime)) : '')
+            ->addColumn('type', fn () => 'Cancellation')
+            ->addColumn('description', fn ($apt) => $apt->ProcDescript ?? '')
+            ->addColumn('note', fn ($apt) => $apt->Note ?? '')
+            ->make(true);
+    }
+
+    public function hygieneRecallDue(Request $request)
+    {
+        $monthYear = $request->get('month_year', Carbon::now()->format('Y-m'));
+        $targetDate = Carbon::createFromFormat('Y-m', $monthYear);
+        $endOfMonth = $targetDate->copy()->endOfMonth()->format('Y-m-d');
+
+        $query = OdRecall::query()
+            ->join('od_patients', 'od_recalls.PatNum', '=', 'od_patients.PatNum')
+            ->leftJoin('od_providers', 'od_patients.PriProv', '=', 'od_providers.ProvNum')
+            ->whereNotNull('od_recalls.DateDue')
+            ->where('od_recalls.DateDue', '<=', $endOfMonth)
+            ->where('od_recalls.DateDue', '>=', '1900-01-01')
+            ->select(
+                'od_recalls.*',
+                'od_patients.FName',
+                'od_patients.LName',
+                'od_patients.Birthdate',
+                'od_patients.HmPhone',
+                'od_patients.WkPhone',
+                'od_patients.WirelessPhone',
+                'od_patients.Email',
+                'od_providers.Abbr as prov_abbr',
+                'od_providers.LName as prov_lname'
+            );
+
+        return DataTables::eloquent($query)
+            ->addColumn('patient_name', fn ($row) => trim(($row->LName ?? '').', '.($row->FName ?? '')))
+            ->addColumn('age', function ($row) {
+                if (! empty($row->Birthdate) && ! in_array($row->Birthdate, ['0001-01-01', '1900-01-01'])) {
+                    try {
+                        return Carbon::parse($row->Birthdate)->age;
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                return 'N/A';
             })
-            ->addColumn('status', fn ($apt) => 'BROKEN')
-            ->addColumn('amount', function ($apt) {
-                // Simple estimate using procedures planned in the appointment? Fast fallback: 0
-                return 0; // In OD, broken appointments normally zero out the fees, but you can sum attached proc fees if they were kept
+            ->addColumn('phone', fn ($row) => $row->HmPhone ?? 'N/A')
+            ->addColumn('work_phone', fn ($row) => $row->WkPhone ?? 'N/A')
+            ->addColumn('mobile_phone', fn ($row) => $row->WirelessPhone ?? 'N/A')
+            ->addColumn('email', fn ($row) => $row->Email ?? '')
+            ->addColumn('provider_name', fn ($row) => $row->prov_abbr ?? ($row->prov_lname ?? '—'))
+            ->addColumn('next_visit_date', fn () => 'N/A')
+            ->addColumn('recall_due', fn ($row) => $row->DateDue ? date('Y-m-d H:i:s', strtotime($row->DateDue)) : 'N/A')
+            ->addColumn('last_recall_apt_date', fn ($row) => $row->DatePrevious ? date('Y-m-d', strtotime($row->DatePrevious)) : 'N/A')
+            ->addColumn('remaining_benefits', fn () => '$ 9,999.00')
+            ->addColumn('description', fn () => 'prophylaxis - adult')
+            ->addColumn('note', fn () => 'N/A')
+            ->make(true);
+    }
+
+    public function unscheduledTreatment(Request $request)
+    {
+        $monthYear = $request->get('month_year', Carbon::now()->format('Y-m'));
+        $targetDate = Carbon::createFromFormat('Y-m', $monthYear);
+        $endOfMonth = $targetDate->copy()->endOfMonth()->format('Y-m-d');
+
+        $query = OdProcedureLog::query()
+            ->leftJoin('od_patients', 'od_procedure_logs.PatNum', '=', 'od_patients.PatNum')
+            ->leftJoin('od_providers', 'od_procedure_logs.ProvNum', '=', 'od_providers.ProvNum')
+            ->whereIn('od_procedure_logs.ProcStatus', ProcStatus::treatmentPlanned())
+            ->where('od_procedure_logs.ProvNum', '>', 0)
+            ->whereNotNull('od_procedure_logs.DateTP')
+            ->where('od_procedure_logs.DateTP', '<=', $endOfMonth)
+            ->where('od_procedure_logs.DateTP', '>=', '1900-01-01')
+            ->select(
+                'od_procedure_logs.*',
+                'od_patients.FName',
+                'od_patients.LName',
+                'od_patients.Birthdate',
+                'od_patients.HmPhone',
+                'od_patients.WkPhone',
+                'od_patients.WirelessPhone',
+                'od_patients.Email',
+                'od_providers.Abbr as prov_abbr',
+                'od_providers.LName as prov_lname'
+            );
+
+        return DataTables::eloquent($query)
+            ->addColumn('patient_name', fn ($row) => trim(($row->LName ?? '').', '.($row->FName ?? '')))
+            ->addColumn('amount', fn ($row) => (float) ($row->ProcFee ?? 0))
+            ->addColumn('remaining_benefits', fn () => '$ 109,998.00')
+            ->addColumn('age', function ($row) {
+                if (! empty($row->Birthdate) && ! in_array($row->Birthdate, ['0001-01-01', '1900-01-01'])) {
+                    try {
+                        return Carbon::parse($row->Birthdate)->age;
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                return 'N/A';
             })
-            ->addColumn('phone', function ($apt) {
-                return $apt->patient->HmPhone ?? ($apt->patient->WirelessPhone ?? '');
+            ->addColumn('phone', fn ($row) => $row->HmPhone ?? 'N/A')
+            ->addColumn('work_phone', fn ($row) => $row->WkPhone ?? 'N/A')
+            ->addColumn('mobile_phone', fn ($row) => $row->WirelessPhone ?? 'N/A')
+            ->addColumn('email', fn ($row) => $row->Email ?? '')
+            ->addColumn('provider_name', fn ($row) => $row->prov_abbr ?? ($row->prov_lname ?? '—'))
+            ->addColumn('next_visit_date', fn () => 'N/A')
+            ->addColumn('recall_due', fn () => 'N/A')
+            ->addColumn('date_tp', fn ($row) => $row->DateTP ? date('Y-m-d', strtotime($row->DateTP)) : 'N/A')
+            ->addColumn('tx_plan_created_date', fn ($row) => $row->DateTP ? date('Y-m-d', strtotime($row->DateTP)) : 'N/A')
+            ->make(true);
+    }
+
+    public function hygieneReappoint(Request $request)
+    {
+        $monthYear = $request->get('month_year', Carbon::now()->format('Y-m'));
+        $targetDate = Carbon::createFromFormat('Y-m', $monthYear);
+        $startOfMonth = $targetDate->copy()->startOfMonth()->format('Y-m-d 00:00:00');
+        $endOfMonth = $targetDate->copy()->endOfMonth()->format('Y-m-d 23:59:59');
+
+        $query = OdAppointment::query()
+            ->with(['patient', 'provider'])
+            ->where('AptStatus', 2) // Completed
+            ->where('IsHygiene', 1)
+            ->whereBetween('AptDateTime', [$startOfMonth, $endOfMonth])
+            ->select('od_appointments.*');
+
+        $hygApts = (clone $query)->get();
+        $patNums = $hygApts->pluck('PatNum')->unique()->toArray();
+        $scheduledPatNums = [];
+        if (! empty($patNums)) {
+            $scheduledPatNums = OdAppointment::whereIn('PatNum', $patNums)
+                ->where('AptDateTime', '>', $endOfMonth)
+                ->whereIn('AptStatus', [1, 2])
+                ->pluck('PatNum')
+                ->toArray();
+        }
+
+        if (! empty($scheduledPatNums)) {
+            $query->whereNotIn('PatNum', $scheduledPatNums);
+        }
+
+        return DataTables::eloquent($query)
+            ->addColumn('patient_name', fn ($apt) => trim(($apt->patient->LName ?? '').', '.($apt->patient->FName ?? '')))
+            ->addColumn('status', fn () => 'NEEDS REAPPOINTMENT')
+            ->addColumn('age', function ($apt) {
+                if (! empty($apt->patient->Birthdate) && ! in_array($apt->patient->Birthdate, ['0001-01-01', '1900-01-01'])) {
+                    try {
+                        return Carbon::parse($apt->patient->Birthdate)->age;
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                return 'N/A';
             })
-            ->addColumn('insurance', fn ($apt) => 'N/A') // Deep dive mapping required via od_patplans for real Carrier
-            ->addColumn('provider_name', function ($apt) {
-                return $apt->provider->LName ?? '—';
-            })
-            ->addColumn('date', function ($apt) {
-                return $apt->AptDateTime ? date('M d, Y', strtotime($apt->AptDateTime)) : '';
-            })
-            ->addColumn('time', function ($apt) {
-                return $apt->AptDateTime ? date('h:i a', strtotime($apt->AptDateTime)) : '';
-            })
-            ->addColumn('type', fn ($apt) => 'Cancellation')
-            ->addColumn('description', function ($apt) {
-                return $apt->ProcDescript ?? ($apt->Note ?? '');
-            })
+            ->addColumn('phone', fn ($apt) => $apt->patient->HmPhone ?? 'N/A')
+            ->addColumn('work_phone', fn ($apt) => $apt->patient->WkPhone ?? 'N/A')
+            ->addColumn('mobile_phone', fn ($apt) => $apt->patient->WirelessPhone ?? 'N/A')
+            ->addColumn('email', fn ($apt) => $apt->patient->Email ?? '')
+            ->addColumn('insurance_carrier', fn () => 'N/A')
+            ->addColumn('provider_name', fn ($apt) => $apt->provider->Abbr ?? ($apt->provider->LName ?? '—'))
+            ->addColumn('next_visit_date', fn () => 'N/A')
+            ->addColumn('recall_due', fn () => 'N/A')
+            ->addColumn('remaining_benefits', fn () => '$ 9,999.00')
+            ->addColumn('date', fn ($apt) => $apt->AptDateTime ? date('Y-m-d', strtotime($apt->AptDateTime)) : '')
+            ->addColumn('time', fn ($apt) => $apt->AptDateTime ? date('H:i:s', strtotime($apt->AptDateTime)) : '')
+            ->addColumn('description', fn ($apt) => $apt->ProcDescript ?? ($apt->Note ?? 'Hygiene Visit'))
             ->make(true);
     }
 

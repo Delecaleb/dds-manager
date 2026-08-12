@@ -30,9 +30,9 @@ class PatientAnalyticsService
 
         $newPatientsScheduled = (new OdAppointment)->newPatientsScheduled($start, $end);
 
-        // Average gross production per visit.
+        // Average net production per patient visit.
         $patientAvgProduction = $visited > 0
-            ? round($this->production->grossProduction($filter) / $visited, 2)
+            ? round($this->production->netProduction($filter) / $visited, 2)
             : 0;
 
         return [

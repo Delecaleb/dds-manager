@@ -268,55 +268,135 @@
 
     </section>
 
-    <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden p-5">
 
-        <div class="p-5 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
-            <div class="flex items-center gap-4">
-                <h2 class="text-lg font-bold text-gray-900">Broken Appointments</h2>
-                <div class="flex bg-gray-100 p-0.5 rounded-lg text-xs font-semibold">
-                    <button class="px-3 py-1.5 rounded-md hover:bg-white text-gray-600 transition-all">Top
-                        20%</button>
-                    <button class="px-3 py-1.5 rounded-md hover:bg-white text-gray-600 transition-all">Mid
-                        Tier</button>
-                    <button class="px-3 py-1.5 rounded-md bg-white text-red-600 shadow-sm">Bottom 20%</button>
-                </div>
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-gray-200">
+            <div class="flex items-center gap-2 overflow-x-auto">
+                <button data-tab="broken"
+                    class="schedule-subtab-btn px-4 py-2 text-sm font-semibold rounded-lg border border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm transition-all flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-calendar-xmark"></i> Broken Appointments
+                </button>
+                <button data-tab="hygiene-recall"
+                    class="schedule-subtab-btn px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Hygiene Recall Due
+                </button>
+                <button data-tab="unscheduled-tx"
+                    class="schedule-subtab-btn px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-tooth"></i> Unscheduled Treatment
+                </button>
+                <button data-tab="hygiene-reappoint"
+                    class="schedule-subtab-btn px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-user-clock"></i> Hygiene Reappoint
+                </button>
             </div>
 
             <div class="flex items-center gap-3">
                 <div class="relative">
-                    <input type="text" placeholder="Search..."
+                    <input type="text" id="scheduleTableSearch" placeholder="Search..."
                         class="bg-gray-50 border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 w-64">
                     <i class="fa-solid fa-magnifying-glass absolute right-3 top-2.5 text-gray-400 text-xs"></i>
                 </div>
-                <button
-                    class="bg-white hover:bg-gray-50 text-gray-700 font-medium text-sm px-4 py-1.5 border border-gray-300 rounded-lg flex items-center gap-2 transition-colors">
-                    <i class="fa-solid fa-file-csv text-emerald-600"></i> Export CSV
-                </button>
             </div>
         </div>
 
-        <div class="overflow-x-auto p-4 custom-table-scrollbar">
-            <table id="brokenAppointmentsTable" class="dds-table w-full text-left border-collapse table-auto min-w-[1200px]">
-                <thead>
-                    <tr
-                        class="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        <th class="p-4 w-10"><input type="checkbox"
-                                class="rounded text-emerald-600 focus:ring-emerald-500"></th>
-                        <th class="p-4">Patient</th>
-                        <th class="p-4">Status</th>
-                        <th class="p-4">Amount</th>
-                        <th class="p-4">Phone</th>
-                        <th class="p-4">Insurance Carrier</th>
-                        <th class="p-4">Provider</th>
-                        <th class="p-4">Appt Date</th>
-                        <th class="p-4">Appt Time</th>
-                        <th class="p-4">Type</th>
-                        <th class="p-4 max-w-[200px]">Appt Description</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200 text-sm font-medium text-gray-700">
-                </tbody>
-            </table>
+        <div id="scheduleSubtabPanels" class="mt-4">
+            <!-- 1. Broken Appointments -->
+            <div id="subtab-panel-broken" class="schedule-subtab-panel">
+                <x-data-table id="brokenAppointmentsTable" min-width="1800px">
+                    <x-slot:head>
+                        <tr>
+                            <th class="dt-col-sticky p-3">Patient</th>
+                            <th class="p-3">Status</th>
+                            <th class="p-3">Amount</th>
+                            <th class="p-3">Phone</th>
+                            <th class="p-3">Work Phone</th>
+                            <th class="p-3">Mobile Phone</th>
+                            <th class="p-3">Email</th>
+                            <th class="p-3">Insurance Carrier</th>
+                            <th class="p-3">Provider</th>
+                            <th class="p-3">Next Visit Date</th>
+                            <th class="p-3">Recall Due</th>
+                            <th class="p-3">Remaining Benefits</th>
+                            <th class="p-3">Appt Date</th>
+                            <th class="p-3">Appt Time</th>
+                            <th class="p-3">Type</th>
+                            <th class="p-3">Appt Description</th>
+                            <th class="p-3">Note</th>
+                        </tr>
+                    </x-slot:head>
+                </x-data-table>
+            </div>
+
+            <!-- 2. Hygiene Recall Due -->
+            <div id="subtab-panel-hygiene-recall" class="schedule-subtab-panel hidden">
+                <x-data-table id="hygieneRecallTable" min-width="1600px">
+                    <x-slot:head>
+                        <tr>
+                            <th class="dt-col-sticky p-3">Patient</th>
+                            <th class="p-3">Age</th>
+                            <th class="p-3">Phone</th>
+                            <th class="p-3">Work Phone</th>
+                            <th class="p-3">Mobile Phone</th>
+                            <th class="p-3">Email</th>
+                            <th class="p-3">Provider</th>
+                            <th class="p-3">Next Visit Date</th>
+                            <th class="p-3">Recall Due</th>
+                            <th class="p-3">Last Recall Apt Date</th>
+                            <th class="p-3">Remaining Benefits</th>
+                            <th class="p-3">Appt Description</th>
+                            <th class="p-3">Note</th>
+                        </tr>
+                    </x-slot:head>
+                </x-data-table>
+            </div>
+
+            <!-- 3. Unscheduled Treatment -->
+            <div id="subtab-panel-unscheduled-tx" class="schedule-subtab-panel hidden">
+                <x-data-table id="unscheduledTxTable" min-width="1600px">
+                    <x-slot:head>
+                        <tr>
+                            <th class="dt-col-sticky p-3">Patient</th>
+                            <th class="p-3">Pend. Tx $ USC</th>
+                            <th class="p-3">Remaining Benefits</th>
+                            <th class="p-3">Age</th>
+                            <th class="p-3">Phone</th>
+                            <th class="p-3">Work Phone</th>
+                            <th class="p-3">Mobile Phone</th>
+                            <th class="p-3">Email</th>
+                            <th class="p-3">Preferred Provider</th>
+                            <th class="p-3">Next Visit Date</th>
+                            <th class="p-3">Recall Due</th>
+                            <th class="p-3">Tx Planned Date</th>
+                            <th class="p-3">Tx Plan Created Date</th>
+                        </tr>
+                    </x-slot:head>
+                </x-data-table>
+            </div>
+
+            <!-- 4. Hygiene Reappoint -->
+            <div id="subtab-panel-hygiene-reappoint" class="schedule-subtab-panel hidden">
+                <x-data-table id="hygieneReappointTable" min-width="1700px">
+                    <x-slot:head>
+                        <tr>
+                            <th class="dt-col-sticky p-3">Patient</th>
+                            <th class="p-3">Status</th>
+                            <th class="p-3">Age</th>
+                            <th class="p-3">Phone</th>
+                            <th class="p-3">Work Phone</th>
+                            <th class="p-3">Mobile Phone</th>
+                            <th class="p-3">Email</th>
+                            <th class="p-3">Insurance Carrier</th>
+                            <th class="p-3">Provider</th>
+                            <th class="p-3">Next Visit Date</th>
+                            <th class="p-3">Recall Due</th>
+                            <th class="p-3">Benefits Remaining</th>
+                            <th class="p-3">Appt Date</th>
+                            <th class="p-3">Appt Time</th>
+                            <th class="p-3">Appt Description</th>
+                        </tr>
+                    </x-slot:head>
+                </x-data-table>
+            </div>
         </div>
 
     </section>
@@ -326,9 +406,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     $(document).ready(function () {
-        let brokenTable;
-
-        // Initialization Scripts
         let hygieneChart, unscheduledChart;
 
         const foSchedChartConfigA = {
@@ -375,9 +452,7 @@
         function hydrateDashboard() {
             let currentMonth = $('#frontOfficeMonth').val();
 
-            // 1. Fetch Stats API
             $.get("{{ route('front-office.stats') }}", { month_year: currentMonth }, function (data) {
-                // Monthly Production Update
                 $('#mo-actual').text('$' + data.monthly.actual.toLocaleString('en-US', { minimumFractionDigits: 2 }));
                 $('#mo-prior').text('$' + data.monthly.prior_year.toLocaleString('en-US', { minimumFractionDigits: 2 }));
 
@@ -395,12 +470,11 @@
                 $('#mo-progress-goal').text(`Goal ($${data.monthly.goal.toLocaleString('en-US', { minimumFractionDigits: 2 })})`);
                 $('#mo-progress-bar').css('width', `${Math.min(data.monthly.percent_goal, 100)}%`);
 
-                // 2. Render Daily Production Div Chart
                 let maxDaily = Math.max(...data.daily.actuals, ...data.daily.goals, 1);
                 let dailyDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
                 let dailyHtml = '';
                 for (let i = 0; i < 5; i++) {
-                    let hGoal = (data.daily.goals[i] / maxDaily) * 112; // 112px max height (~ h-28)
+                    let hGoal = (data.daily.goals[i] / maxDaily) * 112;
                     let hActual = (data.daily.actuals[i] / maxDaily) * 112;
 
                     dailyHtml += `
@@ -417,7 +491,6 @@
                 }
                 $('#daily-production-chart').html(dailyHtml);
 
-                // 3. Render Visits Chart DIV
                 let maxVisits = Math.max(...data.visits.new, ...data.visits.existing, 1);
                 let visitsHtml = '';
                 for (let i = 0; i < 5; i++) {
@@ -429,45 +502,39 @@
                                             <div class="opacity-0 group-hover:opacity-100 z-10 absolute -top-8 bg-gray-900 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap transition-opacity">
                                                 New: ${data.visits.new[i]} | Exist: ${data.visits.existing[i]}
                                             </div>
-                                            <div class="flex gap-1 items-end h-[100px]">
-                                                <div class="w-2.5 bg-emerald-300 rounded-t transition-all duration-1000" style="height: ${hNew}px"></div>
-                                                <div class="w-2.5 bg-purple-600 rounded-t transition-all duration-1000" style="height: ${hExist}px"></div>
+                                            <div class="flex gap-0.5 items-end h-[100px]">
+                                                <div class="w-3 bg-[#42cbf5] rounded-t transition-all duration-1000" style="height: ${hNew}px"></div>
+                                                <div class="w-3 bg-[#5ce6a1] rounded-t transition-all duration-1000" style="height: ${hExist}px"></div>
                                             </div>
                                             <span class="text-[10px] text-gray-400 mt-1">${dailyDays[i]}</span>
                                         </div>`;
                 }
                 $('#visits-chart').html(visitsHtml);
-                // --- OPPORTUNITIES SECTION MAPPING ---
 
-                // Schedule Opportunities
-                let opp = data.opportunities;
-                $('#opp-broken-total').text(opp.broken.total);
-                if (opp.broken.total > 0) {
-                    $('#opp-broken-bar-unscheduled').css('width', (opp.broken.unscheduled / opp.broken.total * 100) + '%').text(opp.broken.unscheduled);
-                    $('#opp-broken-bar-scheduled').css('width', (opp.broken.scheduled / opp.broken.total * 100) + '%').text(opp.broken.scheduled > 0 ? opp.broken.scheduled : '');
-                } else {
-                    $('#opp-broken-bar-unscheduled').css('width', '100%').text('0');
-                    $('#opp-broken-bar-scheduled').css('width', '0%').text('');
-                }
+                // 4. Update Opportunities Cards
+                $('#opp-broken-total').text(data.opportunities.broken.total);
+                $('#opp-broken-bar-unscheduled').text(data.opportunities.broken.unscheduled).css('width', `${data.opportunities.broken.total > 0 ? (data.opportunities.broken.unscheduled / data.opportunities.broken.total) * 100 : 100}%`);
+                $('#opp-broken-bar-scheduled').text(data.opportunities.broken.scheduled).css('width', `${data.opportunities.broken.total > 0 ? (data.opportunities.broken.scheduled / data.opportunities.broken.total) * 100 : 0}%`);
 
-                $('#opp-hyg-unsched').text(opp.hygiene.unscheduled);
-                $('#opp-hyg-rate').text(opp.hygiene.rate);
-                $('#opp-hyg-progress-val').text(opp.hygiene.unscheduled); // basic placeholder implementation matching UI
+                $('#opp-hyg-unsched').text(data.opportunities.hygiene.unscheduled);
+                $('#opp-hyg-rate').text(data.opportunities.hygiene.rate);
+                $('#opp-hyg-progress-val').text(`${data.opportunities.hygiene.scheduled} / ${data.opportunities.hygiene.total}`);
 
-                // Hygiene Recall charts
+                // 5. Update Charts
                 if (hygieneChart) {
                     hygieneChart.data.datasets[0].data = data.recall_due;
                     hygieneChart.update();
                 }
+
                 data.recall_due.forEach((val, i) => {
                     $(`#recall-lbl-${i}`).text(val);
                 });
 
-                // Unscheduled TX charts
                 if (unscheduledChart) {
                     unscheduledChart.data.datasets[0].data = data.unscheduled_tx.count;
                     unscheduledChart.update();
                 }
+
                 data.unscheduled_tx.count.forEach((count, i) => {
                     let amt = data.unscheduled_tx.amount[i];
                     $(`#tx-lbl-${i}`).text(`$ ${amt.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${count})`);
@@ -477,55 +544,178 @@
                 console.error('API Sync Error:', error);
             });
 
-            // Update Active DataTables AJAX query
-            if (brokenTable) {
-                brokenTable.ajax.reload();
+            // Update Active DataTables AJAX query for active subtab
+            if (dtInstances[activeSubtab]) {
+                dtInstances[activeSubtab].ajax.reload();
             }
         }
 
-        // 4. Broken Appointments DataTables Bind
-        brokenTable = DDS.dataTable(document.getElementById('brokenAppointmentsTable'), {
-            processing: true,
-            serverSide: true,
-            pageLength: 10,
-            layout: { topStart: null, topEnd: null, bottomStart: 'info', bottomEnd: 'paging' },
-            language: {
-                info: '<span class="flex items-center gap-2">Items per page _MENU_ <span class="text-gray-300 mx-1">|</span> _START_-_END_ of _TOTAL_ items</span>',
-                paginate: {
-                    previous: '<i class="fa-solid fa-chevron-left text-[10px]"></i>',
-                    next: '<i class="fa-solid fa-chevron-right text-[10px]"></i>'
+        // 4. DataTables Configuration & Logic for each Subtab
+        const dtInstances = {};
+        let activeSubtab = 'broken';
+
+        function initOrReloadSubtab(subtabKey) {
+            if (dtInstances[subtabKey]) {
+                dtInstances[subtabKey].ajax.reload();
+                return;
+            }
+
+            const dtOptions = {
+                processing: true,
+                serverSide: true,
+                pageLength: 10,
+                layout: { topStart: null, topEnd: null, bottomStart: 'info', bottomEnd: 'paging' },
+                language: {
+                    info: '<span class="flex items-center gap-2">Items per page _MENU_ <span class="text-gray-300 mx-1">|</span> _START_-_END_ of _TOTAL_ items</span>',
+                    paginate: {
+                        previous: '<i class="fa-solid fa-chevron-left text-[10px]"></i>',
+                        next: '<i class="fa-solid fa-chevron-right text-[10px]"></i>'
+                    }
+                },
+                drawCallback: function () {
+                    $('.dt-info').addClass('text-xs font-semibold text-gray-500 flex items-center');
+                    $('.dt-info select').addClass('border border-gray-300 rounded text-gray-700 py-1 px-2 text-xs focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none bg-white font-medium cursor-pointer');
+                    $('.dt-paging nav').addClass('flex items-center gap-1');
+                    $('.dt-paging').addClass('flex items-center');
+                    $('.dt-paging-button').addClass('px-2.5 py-1 text-xs font-bold border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 rounded cursor-pointer transition-colors shadow-sm select-none');
+                    $('.dt-paging-button.current').removeClass('bg-white text-gray-600 hover:bg-gray-50 border-gray-200').addClass('bg-emerald-50 text-emerald-700 border-emerald-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.2)]');
+                    $('.dt-paging-button.disabled').addClass('opacity-40 cursor-not-allowed hover:bg-white').removeClass('hover:bg-gray-50 cursor-pointer');
                 }
-            },
-            drawCallback: function () {
-                $('.dt-info').addClass('text-xs font-semibold text-gray-500 flex items-center');
-                $('.dt-info select').addClass('border border-gray-300 rounded text-gray-700 py-1 px-2 text-xs focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none bg-white font-medium cursor-pointer');
-                $('.dt-paging nav').addClass('flex items-center gap-1');
-                $('.dt-paging').addClass('flex items-center');
-                $('.dt-paging-button').addClass('px-2.5 py-1 text-xs font-bold border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 rounded cursor-pointer transition-colors shadow-sm select-none');
-                $('.dt-paging-button.current').removeClass('bg-white text-gray-600 hover:bg-gray-50 border-gray-200').addClass('bg-emerald-50 text-emerald-700 border-emerald-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.2)]');
-                $('.dt-paging-button.disabled').addClass('opacity-40 cursor-not-allowed hover:bg-white').removeClass('hover:bg-gray-50 cursor-pointer');
-            },
-            ajax: {
-                url: "{{ route('front-office.broken-appointments') }}",
-                data: function (d) {
-                    d.month_year = $('#frontOfficeMonth').val();
-                }
-            },
-            columns: [
-                { data: null, orderable: false, searchable: false, render: () => '<input type="checkbox" class="rounded text-emerald-600 focus:ring-emerald-500">' },
-                { data: 'patient_name', name: 'patient_name', className: 'font-semibold text-gray-900' },
-                { data: 'status', name: 'status', render: data => `<span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-bold tracking-wide">${data}</span>` },
-                { data: 'amount', name: 'amount', render: data => `<span class="text-amber-700 bg-amber-50/50 px-2 py-1 rounded font-semibold">$ ${Number(data).toFixed(2)}</span>` },
-                { data: 'phone', name: 'phone', className: 'text-gray-600 font-normal' },
-                { data: 'insurance', name: 'insurance', className: 'text-gray-500 font-normal' },
-                { data: 'provider_name', name: 'provider_name' },
-                { data: 'date', name: 'date', className: 'font-normal' },
-                { data: 'time', name: 'time', className: 'font-normal uppercase text-xs' },
-                { data: 'type', name: 'type', render: data => `<span class="text-xs font-semibold px-2 py-0.5 bg-red-50 text-red-600 rounded">${data}</span>` },
-                { data: 'description', name: 'description', className: 'text-gray-500 font-normal max-w-xs truncate' }
-            ],
-            order: [[7, 'desc']]
+            };
+
+            if (subtabKey === 'broken') {
+                dtInstances['broken'] = DDS.dataTable(document.getElementById('brokenAppointmentsTable'), {
+                    ...dtOptions,
+                    ajax: {
+                        url: "{{ route('front-office.broken-appointments') }}",
+                        data: d => { d.month_year = $('#frontOfficeMonth').val(); }
+                    },
+                    columns: [
+                        { data: 'patient_name', name: 'patient_name', className: 'dt-col-sticky font-semibold text-gray-900 bg-white' },
+                        { data: 'status', name: 'status', render: data => `<span class="px-2 py-0.5 bg-red-50 text-red-600 rounded text-xs font-bold tracking-wide">${data}</span>` },
+                        { data: 'amount', name: 'amount', render: data => `<span class="text-amber-700 font-semibold">$ ${Number(data).toFixed(2)}</span>` },
+                        { data: 'phone', name: 'phone', className: 'text-gray-600' },
+                        { data: 'work_phone', name: 'work_phone', className: 'text-gray-600' },
+                        { data: 'mobile_phone', name: 'mobile_phone', className: 'text-gray-600' },
+                        { data: 'email', name: 'email', className: 'text-gray-600' },
+                        { data: 'insurance_carrier', name: 'insurance_carrier', className: 'text-gray-500' },
+                        { data: 'provider_name', name: 'provider_name' },
+                        { data: 'next_visit_date', name: 'next_visit_date' },
+                        { data: 'recall_due', name: 'recall_due' },
+                        { data: 'remaining_benefits', name: 'remaining_benefits' },
+                        { data: 'date', name: 'date' },
+                        { data: 'time', name: 'time', className: 'uppercase text-xs' },
+                        { data: 'type', name: 'type', render: data => `<span class="text-xs font-semibold px-2 py-0.5 bg-gray-100 text-gray-600 rounded">${data}</span>` },
+                        { data: 'description', name: 'description', className: 'text-gray-500 max-w-xs truncate' },
+                        { data: 'note', name: 'note', className: 'text-gray-500 max-w-xs truncate' }
+                    ],
+                    order: [[12, 'desc']]
+                });
+            } else if (subtabKey === 'hygiene-recall') {
+                dtInstances['hygiene-recall'] = DDS.dataTable(document.getElementById('hygieneRecallTable'), {
+                    ...dtOptions,
+                    ajax: {
+                        url: "{{ route('front-office.hygiene-recall-due') }}",
+                        data: d => { d.month_year = $('#frontOfficeMonth').val(); }
+                    },
+                    columns: [
+                        { data: 'patient_name', name: 'patient_name', className: 'dt-col-sticky font-semibold text-gray-900 bg-white' },
+                        { data: 'age', name: 'age' },
+                        { data: 'phone', name: 'phone', className: 'text-gray-600' },
+                        { data: 'work_phone', name: 'work_phone', className: 'text-gray-600' },
+                        { data: 'mobile_phone', name: 'mobile_phone', className: 'text-gray-600' },
+                        { data: 'email', name: 'email', className: 'text-gray-600' },
+                        { data: 'provider_name', name: 'provider_name' },
+                        { data: 'next_visit_date', name: 'next_visit_date' },
+                        { data: 'recall_due', name: 'recall_due' },
+                        { data: 'last_recall_apt_date', name: 'last_recall_apt_date' },
+                        { data: 'remaining_benefits', name: 'remaining_benefits' },
+                        { data: 'description', name: 'description', className: 'text-gray-500 max-w-xs truncate' },
+                        { data: 'note', name: 'note', className: 'text-gray-500 max-w-xs truncate' }
+                    ],
+                    order: [[8, 'asc']]
+                });
+            } else if (subtabKey === 'unscheduled-tx') {
+                dtInstances['unscheduled-tx'] = DDS.dataTable(document.getElementById('unscheduledTxTable'), {
+                    ...dtOptions,
+                    ajax: {
+                        url: "{{ route('front-office.unscheduled-treatment') }}",
+                        data: d => { d.month_year = $('#frontOfficeMonth').val(); }
+                    },
+                    columns: [
+                        { data: 'patient_name', name: 'patient_name', className: 'dt-col-sticky font-semibold text-gray-900 bg-white' },
+                        { data: 'amount', name: 'amount', render: data => `<span class="text-emerald-700 font-semibold">$ ${Number(data).toFixed(2)}</span>` },
+                        { data: 'remaining_benefits', name: 'remaining_benefits' },
+                        { data: 'age', name: 'age' },
+                        { data: 'phone', name: 'phone', className: 'text-gray-600' },
+                        { data: 'work_phone', name: 'work_phone', className: 'text-gray-600' },
+                        { data: 'mobile_phone', name: 'mobile_phone', className: 'text-gray-600' },
+                        { data: 'email', name: 'email', className: 'text-gray-600' },
+                        { data: 'provider_name', name: 'provider_name' },
+                        { data: 'next_visit_date', name: 'next_visit_date' },
+                        { data: 'recall_due', name: 'recall_due' },
+                        { data: 'date_tp', name: 'date_tp' },
+                        { data: 'tx_plan_created_date', name: 'tx_plan_created_date' }
+                    ],
+                    order: [[11, 'desc']]
+                });
+            } else if (subtabKey === 'hygiene-reappoint') {
+                dtInstances['hygiene-reappoint'] = DDS.dataTable(document.getElementById('hygieneReappointTable'), {
+                    ...dtOptions,
+                    ajax: {
+                        url: "{{ route('front-office.hygiene-reappoint') }}",
+                        data: d => { d.month_year = $('#frontOfficeMonth').val(); }
+                    },
+                    columns: [
+                        { data: 'patient_name', name: 'patient_name', className: 'dt-col-sticky font-semibold text-gray-900 bg-white' },
+                        { data: 'status', name: 'status', render: data => `<span class="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-bold tracking-wide">${data}</span>` },
+                        { data: 'age', name: 'age' },
+                        { data: 'phone', name: 'phone', className: 'text-gray-600' },
+                        { data: 'work_phone', name: 'work_phone', className: 'text-gray-600' },
+                        { data: 'mobile_phone', name: 'mobile_phone', className: 'text-gray-600' },
+                        { data: 'email', name: 'email', className: 'text-gray-600' },
+                        { data: 'insurance_carrier', name: 'insurance_carrier', className: 'text-gray-500' },
+                        { data: 'provider_name', name: 'provider_name' },
+                        { data: 'next_visit_date', name: 'next_visit_date' },
+                        { data: 'recall_due', name: 'recall_due' },
+                        { data: 'remaining_benefits', name: 'remaining_benefits' },
+                        { data: 'date', name: 'date' },
+                        { data: 'time', name: 'time', className: 'uppercase text-xs' },
+                        { data: 'description', name: 'description', className: 'text-gray-500 max-w-xs truncate' }
+                    ],
+                    order: [[12, 'desc']]
+                });
+            }
+        }
+
+        function switchSubtab(subtabKey) {
+            activeSubtab = subtabKey;
+
+            $('.schedule-subtab-btn')
+                .removeClass('border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm')
+                .addClass('border-gray-200 text-gray-600 hover:bg-gray-50');
+            $(`.schedule-subtab-btn[data-tab="${subtabKey}"]`)
+                .removeClass('border-gray-200 text-gray-600 hover:bg-gray-50')
+                .addClass('border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm');
+
+            $('.schedule-subtab-panel').addClass('hidden');
+            $(`#subtab-panel-${subtabKey}`).removeClass('hidden');
+
+            initOrReloadSubtab(subtabKey);
+        }
+
+        $('.schedule-subtab-btn').on('click', function () {
+            switchSubtab($(this).data('tab'));
         });
+
+        $('#scheduleTableSearch').on('keyup', function () {
+            if (dtInstances[activeSubtab]) {
+                dtInstances[activeSubtab].search(this.value).draw();
+            }
+        });
+
+        // Initial Load
+        initOrReloadSubtab('broken');
 
         // Initial Hydration
         hydrateDashboard();

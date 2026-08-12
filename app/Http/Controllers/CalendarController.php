@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
 use App\Models\OdAdjustment;
 use App\Models\OdAppointment;
@@ -9,6 +10,7 @@ use App\Models\OdProcedureLog;
 use App\Services\OpenDental\CalendarService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Yajra\DataTables\Facades\DataTables;
 
@@ -16,6 +18,7 @@ class CalendarController extends Controller
 {
     public function __construct(
         private readonly ClinicRegistry $clinics,
+        private readonly ProductionService $production,
     ) {}
 
     public function index()
@@ -70,17 +73,14 @@ class CalendarController extends Controller
             ->selectRaw('COALESCE(SUM(CAST(AdjAmt AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
 
-        $produced = $gross - $adjustments;
-
-        $scheduled = (float) OdAppointment::query()
-            ->join('od_procedure_logs as pl', function ($join) {
-                $join->on('pl.AptNum', '=', 'od_appointments.AptNum')
-                    ->on('pl.office_id', '=', 'od_appointments.office_id');
-            })
-            ->where('od_appointments.AptStatus', '1')
-            ->whereRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) = ?", [$date])
-            ->selectRaw('COALESCE(SUM(CAST(pl.ProcFee AS DECIMAL(12,2))), 0) AS total')
+        $writeoffs = (float) DB::table('od_claim_procs as c')
+            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) = ?", [$date])
+            ->selectRaw('COALESCE(SUM(CAST(c.WriteOff AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
+
+        $produced = $this->production->netFrom($gross, $adjustments, $writeoffs);
+
+        $scheduled = $gross;
 
         // Fetch active providers today from appointments on this date
         $providerApts = OdAppointment::query()
@@ -435,6 +435,13 @@ class CalendarController extends Controller
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
 
+        // 3. Writeoffs per date
+        $woByDate = DB::table('od_claim_procs as c')
+            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->selectRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) as date_str, COALESCE(SUM(CAST(c.WriteOff AS DECIMAL(12,2))), 0) AS total")
+            ->groupBy('date_str')
+            ->pluck('total', 'date_str');
+
         // 3. Scheduled production per date
         $schedByDate = OdAppointment::query()
             ->join('od_procedure_logs as pl', 'pl.AptNum', '=', 'od_appointments.AptNum')
@@ -484,8 +491,9 @@ class CalendarController extends Controller
 
             $gross = (float) ($grossByDate[$dateStr] ?? 0);
             $adj = (float) ($adjByDate[$dateStr] ?? 0);
-            $prod = $gross - $adj;
-            $sched = (float) ($schedByDate[$dateStr] ?? 0);
+            $wo = (float) ($woByDate[$dateStr] ?? 0);
+            $prod = $this->production->netFrom($gross, $adj, $wo);
+            $sched = $gross;
 
             $aptRow = $aptsByDate[$dateStr] ?? null;
             $aptsCount = $aptRow ? (int) $aptRow->total_apts : 0;

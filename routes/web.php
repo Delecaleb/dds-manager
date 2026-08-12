@@ -106,6 +106,9 @@ Route::middleware('auth')->group(function () {
     Route::get('front-office', [FrontOfficeController::class, 'index'])->name('front-office.index');
     Route::get('front-office/stats', [FrontOfficeController::class, 'stats'])->name('front-office.stats');
     Route::get('front-office/broken-appointments', [FrontOfficeController::class, 'brokenAppointments'])->name('front-office.broken-appointments');
+    Route::get('front-office/hygiene-recall-due', [FrontOfficeController::class, 'hygieneRecallDue'])->name('front-office.hygiene-recall-due');
+    Route::get('front-office/unscheduled-treatment', [FrontOfficeController::class, 'unscheduledTreatment'])->name('front-office.unscheduled-treatment');
+    Route::get('front-office/hygiene-reappoint', [FrontOfficeController::class, 'hygieneReappoint'])->name('front-office.hygiene-reappoint');
     Route::get('front-office/tasks', [FrontOfficeController::class, 'tasks'])->name('front-office.tasks');
     Route::get('front-office/tasks-data', [FrontOfficeController::class, 'tasksData'])->name('front-office.tasks-data');
     Route::get('front-office/collections', [FrontOfficeController::class, 'collections'])->name('front-office.collections');
