@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
 use App\Models\OdAdjustment;
@@ -19,6 +20,7 @@ class CalendarController extends Controller
     public function __construct(
         private readonly ClinicRegistry $clinics,
         private readonly ProductionService $production,
+        private readonly PatientService $patients,
     ) {}
 
     public function index()
@@ -451,14 +453,29 @@ class CalendarController extends Controller
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
 
-        // 4. Appointments count & New Patients count per date
+        // 4. Appointments count per date
         $aptsByDate = OdAppointment::query()
             ->whereIn('AptStatus', [1, 2, 4, 5])
             ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
-            ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date_str, COUNT(*) as total_apts, SUM(CASE WHEN IsNewPatient IN (1, '1', 'true', true) THEN 1 ELSE 0 END) as new_pts")
+            ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date_str, COUNT(*) as total_apts")
             ->groupBy('date_str')
-            ->get()
-            ->keyBy('date_str');
+            ->pluck('total_apts', 'date_str');
+
+        // 5. New Patients (first completed procedure cohort) per date
+        $newPtsByDate = DB::table('od_procedure_logs as pl')
+            ->joinSub(
+                $this->patients->firstVisitCohort(),
+                'fv',
+                'pl.PatNum',
+                '=',
+                'fv.PatNum'
+            )
+            ->whereIn('pl.ProcStatus', ['C', '2'])
+            ->whereRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) = DATE(REPLACE(fv.first_date, 'T', ' '))")
+            ->whereRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->selectRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) as date_str, COUNT(DISTINCT pl.PatNum) as total")
+            ->groupBy('date_str')
+            ->pluck('total', 'date_str');
 
         $startDate = Carbon::parse($start);
         $endDate = Carbon::parse($end);
@@ -495,9 +512,8 @@ class CalendarController extends Controller
             $prod = $this->production->netFrom($gross, $adj, $wo);
             $sched = $gross;
 
-            $aptRow = $aptsByDate[$dateStr] ?? null;
-            $aptsCount = $aptRow ? (int) $aptRow->total_apts : 0;
-            $newPtsCount = $aptRow ? (int) $aptRow->new_pts : 0;
+            $aptsCount = (int) ($aptsByDate[$dateStr] ?? 0);
+            $newPtsCount = (int) ($newPtsByDate[$dateStr] ?? 0);
 
             $goal = $cursor->isWeekday() ? round(100000 / $weekdaysInMonth, 2) : 0.0;
 

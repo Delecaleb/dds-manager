@@ -262,7 +262,11 @@ class FinancialController extends Controller
 
     private function providerExpr(string $alias): string
     {
-        return "COALESCE(NULLIF({$alias}.Abbr, ''), {$alias}.LName, CAST({$alias}.ProvNum AS CHAR))";
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return "COALESCE(NULLIF({$alias}.Abbr, ''), {$alias}.LName, 'Detroit Dental Care, PC')";
+        }
+
+        return "COALESCE(NULLIF(TRIM(CONCAT(COALESCE({$alias}.LName, ''), CASE WHEN NULLIF({$alias}.PName, '') IS NOT NULL THEN CONCAT(', ', {$alias}.PName) ELSE '' END)), ''), {$alias}.Abbr, 'Detroit Dental Care, PC')";
     }
 
     private function scoreCardsProduction(string $start, string $end, string $provNum): array
@@ -278,20 +282,20 @@ class FinancialController extends Controller
 
         $rows = DB::select("
             SELECT
-                pr.ProvNum AS prov_num,
+                COALESCE(pr.ProvNum, 0) AS prov_num,
                 {$provExpr} AS provider,
                 pc.Descript AS service,
                 pc.ProcCode AS service_code,
                 COUNT(*)         AS cnt,
-                MAX(pl.ProcFee)  AS service_fee,
-                SUM(pl.ProcFee)  AS total_production
+                CAST(pl.ProcFee AS DECIMAL(12,2)) AS service_fee,
+                SUM(CAST(pl.ProcFee AS DECIMAL(12,2))) AS total_production
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            JOIN od_providers  pr ON pl.ProvNum  = pr.ProvNum
+            LEFT JOIN od_providers pr ON pl.ProvNum  = pr.ProvNum
             WHERE pl.ProcStatus IN ({$this->completedIn})
-              AND pl.ProcDate BETWEEN ? AND ?
+              AND DATE(REPLACE(pl.ProcDate, 'T', ' ')) BETWEEN ? AND ?
               {$provFilter}
-            GROUP BY pr.ProvNum, pr.Abbr, pr.LName, pr.PName, pc.CodeNum, pc.ProcCode, pc.Descript
+            GROUP BY pr.ProvNum, pr.Abbr, pr.LName, pr.PName, pc.CodeNum, pc.ProcCode, pc.Descript, CAST(pl.ProcFee AS DECIMAL(12,2))
             ORDER BY total_production DESC, cnt DESC
         ", $bindings);
 
@@ -310,16 +314,8 @@ class FinancialController extends Controller
         $totalCount = (int) array_sum(array_map(fn ($r) => $r->cnt, $rows));
         $totalProd = (float) array_sum(array_map(fn ($r) => $r->total_production, $rows));
 
-        $uniquePricedQuery = DB::table('od_procedure_logs as pl')
-            ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereBetween('pl.ProcDate', [$start, $end])
-            ->where('pl.ProcFee', '>', 0);
-
-        if ($provNum !== '') {
-            $uniquePricedQuery->where('pl.ProvNum', $provNum);
-        }
-
-        $uniquePriced = (int) $uniquePricedQuery->selectRaw('COUNT(DISTINCT pl.CodeNum) as cnt')->value('cnt');
+        // Unique Services By Pricing = total count of unique service-by-pricing rows in the table
+        $uniquePriced = count($rows);
 
         // Top-5 for charts
         $byCount = $rows;

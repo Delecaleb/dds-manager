@@ -114,8 +114,8 @@ class FinancialsScoreCardsTest extends TestCase
         $response->assertOk();
         $data = $response->json();
 
-        // 3 procedure instances across 2 providers, but only 2 unique procedure codes ('D0120' and 'D1110')
+        // 3 procedure instances across 2 distinct priced service combinations (Prov 1 D0120 $50, Prov 2 D0120 $50, Prov 1 D1110 $100)
         $this->assertEquals(3, $data['kpis']['total_count']);
-        $this->assertEquals(2, $data['kpis']['unique_by_pricing']);
+        $this->assertEquals(3, $data['kpis']['unique_by_pricing']);
     }
 }

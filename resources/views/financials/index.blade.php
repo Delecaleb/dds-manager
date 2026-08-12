@@ -1376,8 +1376,9 @@
     function scRenderKpis(kpis) {
       var html = '';
       if (_sc.tab === 'production') {
+        var uniqueCount = (_sc.filtered && _sc.filtered !== undefined) ? _sc.filtered.length : (kpis ? kpis.unique_by_pricing : 0);
         html = scKpiCard('Total Count', kpis.total_count, false) +
-          scKpiCard('Unique Services By Pricing', kpis.unique_by_pricing, false) +
+          scKpiCard('Unique Services By Pricing', uniqueCount, false) +
           scKpiCard('Total Production', kpis.total_production, true);
       } else {
         html = scKpiCard('Total Count', kpis.total_count, false) +
@@ -1489,6 +1490,7 @@
       }
       _sc.filtered = rows;
       _sc.page = 1;
+      scRenderKpis(_sc.data.kpis);
       scRenderTable();
     }
 
