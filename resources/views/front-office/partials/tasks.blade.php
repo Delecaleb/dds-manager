@@ -158,9 +158,9 @@
                 <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-2 text-gray-400 text-[10px]"></i>
             </div>
 
-            <button
-                class="text-[11px] font-bold text-emerald-700 bg-white border border-emerald-500 rounded px-3 py-1.5 hover:bg-emerald-50 tracking-wide shadow-sm">
-                Export CSV
+            <button id="exportTasksCsvBtn" type="button"
+                class="text-[11px] font-bold text-emerald-700 bg-white border border-emerald-500 rounded px-3 py-1.5 hover:bg-emerald-50 tracking-wide shadow-sm flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-download"></i> Export CSV
             </button>
         </div>
 
@@ -350,18 +350,20 @@
             processing: false, // Disabled default processing popup to let skeleton loader present cleanly
             serverSide: true,
             pageLength: 20,
-            layout: { topStart: null, topEnd: null, bottomStart: 'info', bottomEnd: 'paging' },
+            layout: { topStart: null, topEnd: null, bottomStart: ['pageLength', 'info'], bottomEnd: 'paging' },
             language: {
-                info: '<span class="flex items-center gap-2">Items per page _MENU_ <span class="text-gray-300 mx-1">|</span> _START_-_END_ of _TOTAL_ items</span>',
+                lengthMenu: 'Items per page _MENU_ <span class="text-gray-300 mx-2">|</span>',
+                info: '_START_-_END_ of _TOTAL_ items',
                 paginate: {
                     previous: '<i class="fa-solid fa-chevron-left text-[10px]"></i>',
                     next: '<i class="fa-solid fa-chevron-right text-[10px]"></i>'
                 }
             },
             drawCallback: function () {
-                // Style the Info & Select
+                // Style the Length & Info & Select
+                $('.dt-length').addClass('text-xs font-semibold text-gray-500 flex items-center gap-1.5');
+                $('.dt-length select').addClass('border border-gray-300 rounded text-gray-700 py-1 px-2 text-xs focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none bg-white font-medium cursor-pointer');
                 $('.dt-info').addClass('text-xs font-semibold text-gray-500 flex items-center');
-                $('.dt-info select').addClass('border border-gray-300 rounded text-gray-700 py-1 px-2 text-xs focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none bg-white font-medium cursor-pointer');
 
                 // Style Pagination Container
                 $('.dt-paging nav').addClass('flex items-center gap-1');
@@ -379,7 +381,11 @@
             ajax: {
                 url: "{{ route('front-office.tasks-data') }}",
                 data: function (d) {
-                    d.month = $('#frontOfficeMonth').val();
+                    if (window.getFoDateParams) {
+                        $.extend(d, window.getFoDateParams());
+                    } else {
+                        d.month = $('#frontOfficeMonth').val();
+                    }
                     d.filter = currentFilter;
                 }
             },
@@ -410,9 +416,14 @@
             tasksTable.ajax.reload();
         });
 
-        // Bind to the global Date Filter
-        $('#frontOfficeMonth').off('change.tasks').on('change.tasks', function () {
-            tasksTable.ajax.reload();
+        window.reloadFoTables = function () {
+            if (tasksTable) {
+                tasksTable.ajax.reload();
+            }
+        };
+
+        $('#exportTasksCsvBtn').on('click', function () {
+            exportTableToCSV($('#tasksTable'), (currentFilter || 'tasks') + '_export');
         });
     });
 </script>

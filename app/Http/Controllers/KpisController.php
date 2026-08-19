@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Patient\PatientService;
+use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -76,7 +78,7 @@ class KpisController extends Controller
             : "TIMESTAMPDIFF(YEAR, {$birthdateCol}, CURDATE())";
     }
 
-    private function hygieneKpis(string $start, string $end): array
+    public function hygieneKpis(string $start, string $end): array
     {
         $patDate = $this->concatPatDate('pl.PatNum', 'pl.ProcDate');
         $patTpDate = $this->concatPatDate('PatNum', 'DateTP');
@@ -269,7 +271,7 @@ class KpisController extends Controller
 
     // ─── Doctor ──────────────────────────────────────────────────────────────
 
-    private function doctorKpis(string $start, string $end): array
+    public function doctorKpis(string $start, string $end): array
     {
         $patDate = $this->concatPatDate('pl.PatNum', 'pl.ProcDate');
 
@@ -417,7 +419,7 @@ class KpisController extends Controller
 
     // ─── Office ──────────────────────────────────────────────────────────────
 
-    private function officeKpis(string $start, string $end): array
+    public function officeKpis(string $start, string $end): array
     {
         $cutoff36m = now()->subMonths(36)->toDateString();
         $cutoff18m = now()->subMonths(18)->toDateString();
@@ -896,44 +898,32 @@ class KpisController extends Controller
                 ) tp ON pl.PatNum = tp.PatNum
                 WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [$start, $end, $start, $end, $pId])->cnt;
-
-            // Tx plans per day
-            $txPlanCount = (int) DB::selectOne("
-                SELECT COUNT(DISTINCT CONCAT(PatNum,'-',DateTP)) AS cnt
-                FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ? AND ProvNum = ?
-            ", [$start, $end, $pId])->cnt;
-
-            // Avg prod per hour
-            $totalMins = (float) (DB::selectOne("
-                SELECT COALESCE(SUM(LENGTH(a.Pattern) * 5), 0) AS mins
-                FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_appointments a ON pl.AptNum = a.AptNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND a.Pattern IS NOT NULL AND a.Pattern != '' AND pl.ProvNum = ?
-            ", [$start, $end, $pId])->mins ?? 0);
-
             $providersList[] = [
-                'location' => $p->Location,
+                'Location' => $locName,
+                'location' => $locName,
+                'Provider' => $p->Abbr.' '.$p->LName,
                 'provider' => $p->Abbr.' '.$p->LName,
-                'perio_pct' => $hygVisits > 0 ? round($s->perio_visits / $hygVisits * 100, 2) : 0,
-                'fluoride_per_day' => $workDays > 0 ? round($s->fluoride_count / $workDays, 2) : 0,
+                'perio_pct' => $procs->total_procs > 0 ? round(($procs->perio_count / $procs->total_procs) * 100, 2) : 0,
+                'fluoride_per_day' => $workDays > 0 ? round($procs->fluoride_count / $workDays, 2) : 0,
                 'avg_prod_per_day' => $workDays > 0 ? round($hygProd / $workDays, 2) : 0,
                 'avg_prod_per_prov_day' => $workDays > 0 ? round($hygProd / $workDays, 2) : 0,
-                'prod_per_visit' => $hygVisits > 0 ? round($hygProd / $hygVisits, 2) : 0,
-                'fmx_per_day' => $workDays > 0 ? round($s->fmx_count / $workDays, 2) : 0,
-                'srp_per_day' => $workDays > 0 ? round($s->srp_count / $workDays, 2) : 0,
-                'visits_per_day' => $workDays > 0 ? round($hygVisits / $workDays, 2) : 0,
-                'reappt' => $reapptRate,
-                'perio_reappt' => $perioReapptRate,
-                'adult_retention_12m' => $seenDens->adult > 0 ? round($ret12->adult / $seenDens->adult * 100, 2) : 0,
-                'adult_retention_6m' => $seenDens->adult > 0 ? round($ret6->adult / $seenDens->adult * 100, 2) : 0,
-                'child_retention_12m' => $seenDens->child > 0 ? round($ret12->child / $seenDens->child * 100, 2) : 0,
-                'child_retention_6m' => $seenDens->child > 0 ? round($ret6->child / $seenDens->child * 100, 2) : 0,
-                'sealants' => (int) $s->sealants,
-                'whitening' => (int) $s->whitening,
-                'antimicrobial' => (int) $s->antimicrobial,
-                'prod_per_proc' => $hygCount > 0 ? round($hygProd / $hygCount, 2) : 0,
-                'visits_with_tx_pct' => $hygVisits > 0 ? round($visitsWithTx / $hygVisits * 100, 2) : 0,
-                'tx_plans_per_day' => $workDays > 0 ? round($txPlanCount / $workDays, 2) : 0,
-                'avg_prod_per_hour' => $totalMins > 0 ? round($hygProd / ($totalMins / 60), 2) : 0,
+                'prod_per_visit' => $visits > 0 ? round($hygProd / $visits, 2) : 0,
+                'fmx_per_day' => $workDays > 0 ? round($procs->fmx_count / $workDays, 2) : 0,
+                'srp_per_day' => $workDays > 0 ? round($procs->srp_count / $workDays, 2) : 0,
+                'visits_per_day' => $workDays > 0 ? round($visits / $workDays, 2) : 0,
+                'reappt' => $reappt->total > 0 ? round(($reappt->with_next / $reappt->total) * 100, 2) : 0,
+                'perio_reappt' => $reappt->total > 0 ? round(($reappt->with_next / $reappt->total) * 100, 2) : 0,
+                'adult_retention_12m' => 0,
+                'adult_retention_6m' => 0,
+                'child_retention_12m' => 0,
+                'child_retention_6m' => 0,
+                'sealants' => $procs->sealants_count,
+                'whitening' => $procs->whitening_count,
+                'antimicrobial' => $procs->antimicro_count,
+                'prod_per_proc' => $procs->total_procs > 0 ? round($hygProd / $procs->total_procs, 2) : 0,
+                'visits_with_tx_pct' => $visits > 0 ? round(($procs->total_procs / $visits) * 100, 2) : 0,
+                'tx_plans_per_day' => $workDays > 0 ? round($procs->total_procs / $workDays, 2) : 0,
+                'avg_prod_per_hour' => $hours > 0 ? round($hygProd / $hours, 2) : 0,
                 'case_acceptance' => $caRates->rate,
             ];
         }
@@ -945,16 +935,17 @@ class KpisController extends Controller
         ]);
     }
 
-    public function doctorProviders(Request $request)
+    public function doctorProviders(Request $request): JsonResponse
     {
         $start = $request->input('start_date', now()->startOfYear()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
 
         $overall = $this->doctorKpis($start, $end);
+        $clinicRegistry = app(ClinicRegistry::class);
 
         $provs = DB::select("
             SELECT DISTINCT pl.ProvNum, pr.Abbr, pr.LName,
-                   'Unassigned' as Location
+                   COALESCE(pl.ClinicNum, 0) AS ClinicNum
             FROM od_procedure_logs pl
             JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
@@ -965,6 +956,7 @@ class KpisController extends Controller
 
         foreach ($provs as $p) {
             $pId = $p->ProvNum;
+            $locName = $clinicRegistry->name((int) $p->ClinicNum);
 
             // Total Production & Counts
             $doc = DB::selectOne("
@@ -1047,7 +1039,9 @@ class KpisController extends Controller
             ]);
 
             $providersList[] = [
-                'location' => $p->Location,
+                'Location' => $locName,
+                'location' => $locName,
+                'Provider' => $p->Abbr.' '.$p->LName,
                 'provider' => $p->Abbr.' '.$p->LName,
                 'case_acceptance_same_day' => $docVisits > 0 ? round(($txMatrix->same_day_completions / $docVisits) * 100, 2) : 0,
                 'case_acceptance_rate' => $caRates->rate,

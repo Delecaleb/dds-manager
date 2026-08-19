@@ -152,17 +152,56 @@ class CalendarController extends Controller
         // Match by calendar date regardless of whether AptDateTime is a raw ISO
         // 'T' string or a normalized DATETIME (see AppointmentRepository).
         $query = OdAppointment::with(['patient', 'provider'])
+            ->select('od_appointments.*')
             ->withSum('procedureLogs as production_total', 'ProcFee')
+            ->whereIn('AptStatus', [1, 2, 4, 5])
             ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
 
         return DataTables::of($query)
+            ->orderColumn('location', 'od_appointments.ClinicNum $1')
+            ->orderColumn('patient_name', function ($query, $order) {
+                $query->leftJoin('od_patients as p_name', 'od_appointments.PatNum', '=', 'p_name.PatNum')
+                    ->orderBy('p_name.LName', $order)
+                    ->orderBy('p_name.FName', $order);
+            })
+            ->orderColumn('appointment_date', 'od_appointments.AptDateTime $1')
+            ->orderColumn('appointment_time', 'od_appointments.AptDateTime $1')
+            ->orderColumn('appointment_duration', 'LENGTH(od_appointments.Pattern) $1')
+            ->orderColumn('operatory_name', 'CAST(od_appointments.Op AS UNSIGNED) $1')
+            ->orderColumn('appointment_status', 'od_appointments.AptStatus $1')
+            ->orderColumn('patient_age', function ($query, $order) {
+                $query->leftJoin('od_patients as p_age', 'od_appointments.PatNum', '=', 'p_age.PatNum')
+                    ->orderBy('p_age.Birthdate', $order === 'asc' ? 'desc' : 'asc');
+            })
+            ->orderColumn('patient_phone', function ($query, $order) {
+                $query->leftJoin('od_patients as p_phone', 'od_appointments.PatNum', '=', 'p_phone.PatNum')
+                    ->orderBy('p_phone.WirelessPhone', $order);
+            })
+            ->orderColumn('email_address', function ($query, $order) {
+                $query->leftJoin('od_patients as p_email', 'od_appointments.PatNum', '=', 'p_email.PatNum')
+                    ->orderBy('p_email.Email', $order);
+            })
+            ->orderColumn('patient_type', 'od_appointments.IsNewPatient $1')
+            ->orderColumn('appointment_notes', 'od_appointments.Note $1')
+            ->orderColumn('confirmation_status', 'od_appointments.Confirmed $1')
+            ->orderColumn('provider_name', function ($query, $order) {
+                $query->leftJoin('od_providers as prov_sort', 'od_appointments.ProvNum', '=', 'prov_sort.ProvNum')
+                    ->orderBy('prov_sort.Abbr', $order);
+            })
+            ->orderColumn('procedure_codes', 'od_appointments.ProcDescript $1')
+            ->orderColumn('production', 'production_total $1')
+            ->orderColumn('primary_insurance', 'od_appointments.InsPlan1 $1')
+            ->orderColumn('secondary_insurance', 'od_appointments.InsPlan2 $1')
+            ->orderColumn('referral_source', 'od_appointments.AptNum $1')
+            ->orderColumn('unscheduled_tx', 'od_appointments.AptNum $1')
+            ->orderColumn('last_visit_date', 'od_appointments.AptNum $1')
             ->addColumn('location', fn ($row) => $this->clinics->name((int) ($row->ClinicNum ?? 0)))
             ->addColumn('patient_name', fn ($row) => trim(($row->patient?->FName ?? '').' '.($row->patient?->LName ?? '')))
             ->addColumn('appointment_date', fn ($row) => (new Carbon($row->AptDateTime))->format('M d, Y'))
             ->addColumn('appointment_time', fn ($row) => (new Carbon($row->AptDateTime))->format('h:i A'))
             ->addColumn('appointment_duration', function ($row) {
                 $pattern = $row->Pattern ?? '';
-                $minutes = strlen($pattern) > 0 ? strlen($pattern) * 10 : 60;
+                $minutes = strlen($pattern) > 0 ? strlen($pattern) * 5 : 60;
 
                 return "{$minutes}.00";
             })
@@ -218,7 +257,7 @@ class CalendarController extends Controller
         $providerCount = $appointments->pluck('ProvNum')->filter(fn ($p) => (int) $p > 0)->unique()->count();
 
         $bookedMinutes = $appointments->sum(function ($apt) {
-            return strlen($apt->Pattern ?? '') > 0 ? strlen($apt->Pattern) * 10 : 60;
+            return strlen($apt->Pattern ?? '') > 0 ? strlen($apt->Pattern) * 5 : 60;
         });
 
         // Compute Lead Time logic
@@ -334,7 +373,7 @@ class CalendarController extends Controller
             $aptDate = substr(str_replace('T', ' ', $apt->AptDateTime), 0, 10);
 
             $patternLen = strlen($apt->Pattern ?? '');
-            $durationHrs = number_format(($patternLen > 0 ? $patternLen * 10 : 60) / 60, 2);
+            $durationHrs = number_format(($patternLen > 0 ? $patternLen * 5 : 60) / 60, 2);
 
             $createdDt = new Carbon($apt->SecDateTEdit ?? $apt->DateTStamp ?? $apt->AptDateTime);
             $aptDt = new Carbon($apt->AptDateTime);

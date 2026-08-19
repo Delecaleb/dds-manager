@@ -183,12 +183,13 @@
             $('.kpi-progress-bar').css('width', '0%').attr('class', 'h-full rounded-full transition-all duration-1000 kpi-progress-bar w-0');
 
             const sections = ['office', 'doctor', 'hygiene'];
-            const month = $('#frontOfficeMonth').val() || '';
+            const dateParams = window.getFoDateParams ? window.getFoDateParams() : { month: $('#frontOfficeMonth').val() || '' };
 
             for (let section of sections) {
                 try {
                     // Request entire section data at once
-                    const response = await $.get(`{{ route('front-office.kpi-data') }}?section=${section}&month=${month}`);
+                    const params = $.extend({ section: section }, dateParams);
+                    const response = await $.get(`{{ route('front-office.kpi-data') }}`, params);
                     const items = response.data || [];
 
                     items.forEach(data => {
@@ -225,9 +226,8 @@
         // Start fetching sequentially on initial load
         executeQueue();
 
-        // Bind the global FrontOffice Date Filter properly
-        $('#frontOfficeMonth').off('change.kpis').on('change.kpis', function () {
+        window.reloadFoTables = function () {
             executeQueue();
-        });
+        };
     });
 </script>

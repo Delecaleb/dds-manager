@@ -366,12 +366,16 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
-                            <input type="text" placeholder="Search"
+                            <input type="text" id="detailsSearch" placeholder="Search"
                                 class="border border-slate-300 pl-9 pr-3 py-1.5 text-slate-700 w-64 focus:outline-emerald-500">
                         </div>
-                        <select class="border border-slate-300 px-3 py-1.5 text-slate-700 bg-white font-medium">
-                            <option>Export CSV</option>
-                        </select>
+                        <button id="exportDetailsCsvBtn" onclick="exportAppointmentDetailsCsv()"
+                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Export CSV
+                        </button>
                     </div>
                 </div>
 
@@ -542,48 +546,6 @@
                         </x-slot:foot>
                     </x-data-table>
                 </div>
-
-                {{-- Footer Pagination --}}
-                <div
-                    class="border-t border-slate-200 px-5 py-4 flex items-center justify-between text-sm text-slate-600 bg-white">
-                    <div class="flex items-center gap-2">
-                        <span class="font-medium">Items per location</span>
-                        <select class="border border-slate-300 rounded px-2 py-1 text-slate-700 bg-white">
-                            <option>20</option>
-                        </select>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <span class="font-medium">20 items of <span
-                                class="bg-emerald-500 text-white px-2 py-0.5 rounded font-bold ml-1 text-xs tracking-wide">Page
-                                Capacity 20</span> <span
-                                class="bg-cyan-500 text-white px-2 py-0.5 rounded font-bold ml-1 text-xs tracking-wide">Total
-                                Items 52</span></span>
-                        <div class="flex items-center gap-2">
-                            <select
-                                class="border border-slate-300 rounded px-2 py-1 text-slate-700 bg-white font-medium">
-                                <option>1</option>
-                            </select>
-                            <span class="font-medium">of 3 pages</span>
-                            <div class="flex border border-slate-300 bg-white">
-                                <button
-                                    class="px-3 py-1 hover:bg-slate-50 border-r border-slate-300 flex items-center justify-center">
-                                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                </button>
-                                <button class="px-3 py-1 hover:bg-slate-50 flex items-center justify-center">
-                                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -609,8 +571,11 @@
                             <input type="text" id="capacitySearch" placeholder="Search"
                                 class="border border-slate-300 pl-9 pr-3 py-1.5 rounded-sm text-slate-700 w-48 focus:outline-emerald-500">
                         </div>
-                        <button
-                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm">
+                        <button id="exportCapacityCsvBtn" onclick="exportAppointmentCapacityCsv()"
+                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
                             Export CSV
                         </button>
                     </div>
@@ -1503,25 +1468,25 @@
                 columns: [
                     { data: 'location', name: 'location' },
                     { data: 'patient_name', name: 'patient_name' },
-                    { data: 'appointment_date', name: 'appointment_date', orderable: false },
-                    { data: 'appointment_time', name: 'appointment_time', orderable: false },
-                    { data: 'appointment_duration', name: 'appointment_duration', orderable: false },
+                    { data: 'appointment_date', name: 'appointment_date' },
+                    { data: 'appointment_time', name: 'appointment_time' },
+                    { data: 'appointment_duration', name: 'appointment_duration' },
                     { data: 'operatory_name', name: 'operatory_name' },
                     { data: 'appointment_status', name: 'appointment_status' },
-                    { data: 'patient_age', name: 'patient_age', orderable: false },
-                    { data: 'patient_phone', name: 'patient_phone', orderable: false },
-                    { data: 'email_address', name: 'email_address', orderable: false },
-                    { data: 'patient_type', name: 'patient_type', orderable: false },
-                    { data: 'appointment_notes', name: 'appointment_notes', orderable: false },
-                    { data: 'confirmation_status', name: 'confirmation_status', orderable: false },
+                    { data: 'patient_age', name: 'patient_age' },
+                    { data: 'patient_phone', name: 'patient_phone' },
+                    { data: 'email_address', name: 'email_address' },
+                    { data: 'patient_type', name: 'patient_type' },
+                    { data: 'appointment_notes', name: 'appointment_notes' },
+                    { data: 'confirmation_status', name: 'confirmation_status' },
                     { data: 'provider_name', name: 'provider_name' },
-                    { data: 'procedure_codes', name: 'procedure_codes', orderable: false },
-                    { data: 'production', name: 'production', orderable: false },
-                    { data: 'primary_insurance', name: 'primary_insurance', orderable: false },
-                    { data: 'secondary_insurance', name: 'secondary_insurance', orderable: false },
-                    { data: 'referral_source', name: 'referral_source', orderable: false },
-                    { data: 'unscheduled_tx', name: 'unscheduled_tx', orderable: false },
-                    { data: 'last_visit_date', name: 'last_visit_date', orderable: false }
+                    { data: 'procedure_codes', name: 'procedure_codes' },
+                    { data: 'production', name: 'production' },
+                    { data: 'primary_insurance', name: 'primary_insurance' },
+                    { data: 'secondary_insurance', name: 'secondary_insurance' },
+                    { data: 'referral_source', name: 'referral_source' },
+                    { data: 'unscheduled_tx', name: 'unscheduled_tx' },
+                    { data: 'last_visit_date', name: 'last_visit_date' }
                 ],
                 dom: 'rt<"flex justify-between items-center px-4 py-3 border-t border-slate-200"ip>',
                 pagingType: 'simple_numbers',
@@ -1582,6 +1547,10 @@
 
             $('#calDate').on('change', function () {
                 if (aptDetailsTable) aptDetailsTable.ajax.reload();
+            });
+
+            $('#detailsSearch').on('keyup', function () {
+                if (aptDetailsTable) aptDetailsTable.search(this.value).draw();
             });
 
             // Notes hover cards
@@ -1691,6 +1660,147 @@
             $('#capacitySearch').on('keyup', function () {
                 if (aptCapacityTable) aptCapacityTable.search(this.value).draw();
             });
+        }
+
+        // ── CSV Export Helpers ───────────────────────────────────────────
+        function downloadCsv(filename, rows) {
+            const csvContent = rows.map(row =>
+                row.map(cell => {
+                    const str = (cell === null || cell === undefined) ? '' : String(cell);
+                    return '"' + str.replace(/"/g, '""') + '"';
+                }).join(',')
+            ).join('\r\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function exportAppointmentDetailsCsv() {
+            const btn = document.getElementById('exportDetailsCsvBtn');
+            const originalHtml = btn ? btn.innerHTML : 'Export CSV';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = 'Exporting...';
+            }
+
+            const range = getCalendarDateRange();
+            const url = `${baseUrl}/calendar/appointments-details-data?start=${range.start}&end=${range.end}&length=-1`;
+
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    const data = res.data || [];
+                    if (data.length === 0) {
+                        alert('No appointment details found for the selected date range.');
+                        return;
+                    }
+
+                    const headers = [
+                        "Location", "Patient Name", "Appointment Date", "Appointment Time",
+                        "Appointment Duration", "Operatory Name", "Appointment Status", "Patient Age",
+                        "Patient Phone", "Email Address", "Patient Type", "Appointment Notes",
+                        "Confirmation Status", "Provider Name", "Procedure Codes", "Production",
+                        "Primary Insurance Carrier", "Secondary Insurance Carrier", "Referral Source",
+                        "Unscheduled Tx $", "Last Visit Date"
+                    ];
+
+                    const rows = [headers];
+
+                    data.forEach(item => {
+                        rows.push([
+                            item.location || '',
+                            item.patient_name || '',
+                            item.appointment_date || '',
+                            item.appointment_time || '',
+                            item.appointment_duration || '',
+                            item.operatory_name || '',
+                            item.appointment_status || '',
+                            item.patient_age || '',
+                            item.patient_phone || '',
+                            item.email_address || '',
+                            item.patient_type || '',
+                            item.appointment_notes || '',
+                            item.confirmation_status || '',
+                            item.provider_name || '',
+                            item.procedure_codes || '',
+                            item.production || '',
+                            item.primary_insurance || '',
+                            item.secondary_insurance || '',
+                            item.referral_source || '',
+                            item.unscheduled_tx || '',
+                            item.last_visit_date || ''
+                        ]);
+                    });
+
+                    downloadCsv(`appointment-details-${range.start}-to-${range.end}.csv`, rows);
+                })
+                .catch(err => {
+                    console.error('Failed to export CSV:', err);
+                    alert('Failed to export CSV. Please try again.');
+                })
+                .finally(() => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }
+                });
+        }
+
+        function exportAppointmentCapacityCsv() {
+            const btn = document.getElementById('exportCapacityCsvBtn');
+            const originalHtml = btn ? btn.innerHTML : 'Export CSV';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = 'Exporting...';
+            }
+
+            const range = getCalendarDateRange();
+            const url = `${baseUrl}/calendar/appointment-capacity-data?start=${range.start}&end=${range.end}&length=-1`;
+
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    const data = res.data || [];
+                    if (data.length === 0) {
+                        alert('No capacity data found for the selected date range.');
+                        return;
+                    }
+
+                    const headers = [
+                        "Location", "Scheduled Appointments", "# of Providers", "Booked Hours",
+                        "Avg. Lead Time - All (days)", "Avg. Lead Time - New (days)", "Avg. Lead Time - Emergency (days)"
+                    ];
+
+                    const rows = [headers];
+                    data.forEach(item => {
+                        rows.push([
+                            item.location || '',
+                            item.scheduled_appointments || 0,
+                            item.provider_count || 0,
+                            item.booked_hours || 0,
+                            item.avg_lead_all || 0,
+                            item.avg_lead_new || 0,
+                            item.avg_lead_emerg || 0
+                        ]);
+                    });
+
+                    downloadCsv(`appointment-capacity-${range.start}-to-${range.end}.csv`, rows);
+                })
+                .catch(err => {
+                    console.error('Failed to export capacity CSV:', err);
+                    alert('Failed to export CSV. Please try again.');
+                })
+                .finally(() => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }
+                });
         }
 
         // ── Appointment Capacity Breakdown Modal ─────────────────────────

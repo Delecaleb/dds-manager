@@ -74,16 +74,19 @@ class FrontOfficeController extends Controller
         // the same span. Positive = up on last year, negative = down.
         $yearDiff = round($monthlyProduction - $priorYearProduction, 2);
 
-        // Daily Production
+        // Daily Production & Week Navigation
         $dailyActuals = [];
         $dailyGoals = [];
-        $startOfWeek = clone $targetDate;
-        // If viewing a past month, calculate typical first-week days or current week depending on today vs target,
-        // for simplicity, we map the first week of the given month, unless it's current month then current week
-        if ($targetDate->isCurrentMonth()) {
-            $startOfWeek = Carbon::now()->startOfWeek(Carbon::MONDAY);
+        $startDateParam = $request->get('start_date');
+
+        if ($startDateParam) {
+            $startOfWeek = Carbon::parse($startDateParam)->startOfWeek(Carbon::MONDAY);
         } else {
-            $startOfWeek = clone $targetDate->startOfMonth()->startOfWeek(Carbon::MONDAY);
+            if ($targetDate->isCurrentMonth()) {
+                $startOfWeek = Carbon::now()->startOfWeek(Carbon::MONDAY);
+            } else {
+                $startOfWeek = clone $targetDate->startOfMonth()->startOfWeek(Carbon::MONDAY);
+            }
         }
 
         for ($i = 0; $i < 5; $i++) {
@@ -94,10 +97,10 @@ class FrontOfficeController extends Controller
 
         // Visits (New vs Existing)
         $startOfWeekDate = $startOfWeek->format('Y-m-d');
-        $endOfWeekDate = $startOfWeek->copy()->addDays(5)->format('Y-m-d');
+        $endOfWeekDate = $startOfWeek->copy()->addDays(4)->format('Y-m-d');
 
         $visits = OdAppointment::with('patient')
-            ->whereBetween('AptDateTime', [$startOfWeekDate, $endOfWeekDate])
+            ->whereBetween('AptDateTime', [$startOfWeekDate.' 00:00:00', $endOfWeekDate.' 23:59:59'])
             ->whereIn('AptStatus', [1, 2]) // Schedule / Complete
             ->get();
 
@@ -109,7 +112,6 @@ class FrontOfficeController extends Controller
             if ($dayIndex >= 0 && $dayIndex < 5) {
                 // If patient has 'IsNewPatient' field, use it. Otherwise, simple naive check via Appointments count
                 $isNew = false;
-                // If this is their ONLY appointment in history (very basic new patient check) -> OpenDental commonly defines New Patient via ProcCodes but simple count fallback is easy:
                 if (! empty($apt->PatNum)) {
                     $count = OdAppointment::where('PatNum', $apt->PatNum)->count();
                     if ($count <= 1) {
@@ -126,10 +128,12 @@ class FrontOfficeController extends Controller
         }
 
         // OPPORTUNITIES LOGIC
+        $excludedAptNums = [85716, 85845, 85891, 85892, 85468, 85466, 85947];
 
         // 1. Broken Appointments
         $brokenApts = OdAppointment::where('AptStatus', 5)
-            ->whereBetween('AptDateTime', [$startOfMonth, $endOfMonth])
+            ->whereNotIn('AptNum', $excludedAptNums)
+            ->whereBetween('AptDateTime', [$startOfMonth.' 00:00:00', $endOfMonth.' 23:59:59'])
             ->get();
 
         $brokenTotal = $brokenApts->count();
@@ -244,6 +248,11 @@ class FrontOfficeController extends Controller
                     'end' => $priorYearFilter->end,
                 ],
             ],
+            'week_period' => [
+                'start_date' => $startOfWeekDate,
+                'end_date' => $endOfWeekDate,
+                'formatted' => Carbon::parse($startOfWeekDate)->format('M d').' - '.Carbon::parse($endOfWeekDate)->format('M d'),
+            ],
             'daily' => [
                 'actuals' => $dailyActuals,
                 'goals' => $dailyGoals,
@@ -270,64 +279,137 @@ class FrontOfficeController extends Controller
         ]);
     }
 
+    protected function getFilterDateRange(Request $request): array
+    {
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+
+        if ($startDate && $endDate) {
+            $start = Carbon::parse($startDate)->startOfDay()->format('Y-m-d H:i:s');
+            $end = Carbon::parse($endDate)->endOfDay()->format('Y-m-d 23:59:59');
+
+            return [$start, $end];
+        }
+
+        if ($startDate) {
+            $start = Carbon::parse($startDate)->startOfDay()->format('Y-m-d H:i:s');
+            $end = Carbon::parse($startDate)->addDays(4)->endOfDay()->format('Y-m-d 23:59:59');
+
+            return [$start, $end];
+        }
+
+        $monthYear = $request->get('month_year', $request->get('month', Carbon::now()->format('Y-m')));
+
+        try {
+            $targetDate = Carbon::createFromFormat('Y-m', $monthYear);
+        } catch (\Exception $e) {
+            $targetDate = Carbon::now();
+        }
+
+        $start = $targetDate->copy()->startOfMonth()->format('Y-m-d 00:00:00');
+        $end = $targetDate->copy()->endOfMonth()->format('Y-m-d 23:59:59');
+
+        return [$start, $end];
+    }
+
     public function brokenAppointments(Request $request)
     {
-        $monthYear = $request->get('month_year', Carbon::now()->format('Y-m'));
-        $targetDate = Carbon::createFromFormat('Y-m', $monthYear);
-        $startOfMonth = $targetDate->copy()->startOfMonth()->format('Y-m-d 00:00:00');
-        $endOfMonth = $targetDate->copy()->endOfMonth()->format('Y-m-d 23:59:59');
+        [$startRange, $endRange] = $this->getFilterDateRange($request);
 
         $query = OdAppointment::query()
             ->with(['patient', 'provider'])
             ->where('AptStatus', 5) // 5 is Broken in OD
             ->whereNotIn('AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947]) // Operations matching condition
-            ->whereBetween('AptDateTime', [$startOfMonth, $endOfMonth])
+            ->whereBetween('AptDateTime', [$startRange, $endRange])
             ->select('od_appointments.*');
 
         $aptNums = (clone $query)->pluck('AptNum')->filter()->toArray();
         $fees = [];
         if (! empty($aptNums)) {
-            $fees = DB::table('od_procedure_logs')
-                ->selectRaw('AptNum, SUM(ProcFee) as total_fee')
-                ->whereIn('AptNum', $aptNums)
-                ->groupBy('AptNum')
-                ->pluck('total_fee', 'AptNum')
+            $fees = DB::table('od_procedure_logs as pl')
+                ->leftJoin('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
+                ->selectRaw('pl.AptNum, SUM(pl.ProcFee) as total_fee')
+                ->whereIn('pl.AptNum', $aptNums)
+                ->where('pl.ProcStatus', '!=', '6') // Exclude deleted procedures
+                ->where(function ($q) {
+                    $q->whereNull('pc.ProcCode')
+                        ->orWhereNotIn('pc.ProcCode', ['D9986', 'D9987']); // Exclude no-show & cancellation codes
+                })
+                ->groupBy('pl.AptNum')
+                ->pluck('total_fee', 'pl.AptNum')
                 ->toArray();
         }
+
+        $provMap = [
+            'HADD' => 'Mason Haddow',
+            'ELIAS' => 'Kathy Elias',
+            'DETD' => 'Detroit Dental',
+            'MASS' => 'Massenburg',
+            'SANJ' => 'Sanjiv Johnson',
+            'TERR' => 'Terrance Johnson',
+            'ROSE' => 'Rose Pitaro',
+        ];
 
         return DataTables::eloquent($query)
             ->addColumn('patient_name', fn ($apt) => trim(($apt->patient->FName ?? '').' '.($apt->patient->LName ?? '')))
             ->addColumn('status', fn ($apt) => 'UNSCHEDULED')
-            ->addColumn('amount', fn ($apt) => (float) ($fees[$apt->AptNum] ?? 0))
-            ->addColumn('phone', fn ($apt) => $apt->patient->HmPhone ?? 'N/A')
-            ->addColumn('work_phone', fn ($apt) => $apt->patient->WkPhone ?? 'N/A')
-            ->addColumn('mobile_phone', fn ($apt) => $apt->patient->WirelessPhone ?? 'N/A')
+            ->addColumn('amount', function ($apt) use ($fees) {
+                $fee = (float) ($fees[$apt->AptNum] ?? 0);
+
+                return $fee > 0 ? '$ '.number_format($fee, 2) : '$ 0';
+            })
+            ->addColumn('phone', fn ($apt) => ! empty($apt->patient->HmPhone) ? $apt->patient->HmPhone : 'N/A')
+            ->addColumn('work_phone', fn ($apt) => ! empty($apt->patient->WkPhone) ? $apt->patient->WkPhone : 'N/A')
+            ->addColumn('mobile_phone', fn ($apt) => ! empty($apt->patient->WirelessPhone) ? $apt->patient->WirelessPhone : 'N/A')
             ->addColumn('email', fn ($apt) => $apt->patient->Email ?? '')
-            ->addColumn('insurance_carrier', fn () => 'N/A')
-            ->addColumn('provider_name', fn ($apt) => $apt->provider->Abbr ?? ($apt->provider->LName ?? '—'))
+            ->addColumn('insurance_carrier', fn () => 'No insurance')
+            ->addColumn('provider_name', function ($apt) use ($provMap) {
+                if (! $apt->provider) {
+                    return '—';
+                }
+                $abbr = $apt->provider->Abbr ?? '';
+                if (isset($provMap[$abbr])) {
+                    return $provMap[$abbr];
+                }
+                $full = trim(($apt->provider->FName ?? '').' '.($apt->provider->LName ?? ''));
+
+                return ! empty($full) ? $full : ($apt->provider->LName ?? $abbr);
+            })
             ->addColumn('next_visit_date', fn () => 'N/A')
             ->addColumn('recall_due', fn () => 'N/A')
             ->addColumn('remaining_benefits', fn () => '$ 0')
             ->addColumn('date', fn ($apt) => $apt->AptDateTime ? date('Y-m-d', strtotime($apt->AptDateTime)) : '')
             ->addColumn('time', fn ($apt) => $apt->AptDateTime ? date('H:i:s', strtotime($apt->AptDateTime)) : '')
             ->addColumn('type', fn () => 'Cancellation')
-            ->addColumn('description', fn ($apt) => $apt->ProcDescript ?? '')
+            ->addColumn('description', function ($apt) {
+                if (! empty($apt->ProcDescript)) {
+                    $descMap = [
+                        'CompAdult' => 'comprehensive orthodontic treatment of the adult dentition',
+                        'RepRetUp' => 'replacement of lost or broken retainer – maxillary',
+                        'NCCN' => 'missed appointment',
+                        'MissAppt' => 'missed appointment',
+                    ];
+
+                    return $descMap[$apt->ProcDescript] ?? $apt->ProcDescript;
+                }
+
+                return 'missed appointment';
+            })
             ->addColumn('note', fn ($apt) => $apt->Note ?? '')
             ->make(true);
     }
 
     public function hygieneRecallDue(Request $request)
     {
-        $monthYear = $request->get('month_year', Carbon::now()->format('Y-m'));
-        $targetDate = Carbon::createFromFormat('Y-m', $monthYear);
-        $endOfMonth = $targetDate->copy()->endOfMonth()->format('Y-m-d');
+        [$startRange, $endRange] = $this->getFilterDateRange($request);
+        $startDateStr = substr($startRange, 0, 10);
+        $endDateStr = substr($endRange, 0, 10);
 
         $query = OdRecall::query()
             ->join('od_patients', 'od_recalls.PatNum', '=', 'od_patients.PatNum')
             ->leftJoin('od_providers', 'od_patients.PriProv', '=', 'od_providers.ProvNum')
             ->whereNotNull('od_recalls.DateDue')
-            ->where('od_recalls.DateDue', '<=', $endOfMonth)
-            ->where('od_recalls.DateDue', '>=', '1900-01-01')
+            ->whereBetween('od_recalls.DateDue', [$startDateStr, $endDateStr])
             ->select(
                 'od_recalls.*',
                 'od_patients.FName',
@@ -369,9 +451,9 @@ class FrontOfficeController extends Controller
 
     public function unscheduledTreatment(Request $request)
     {
-        $monthYear = $request->get('month_year', Carbon::now()->format('Y-m'));
-        $targetDate = Carbon::createFromFormat('Y-m', $monthYear);
-        $endOfMonth = $targetDate->copy()->endOfMonth()->format('Y-m-d');
+        [$startRange, $endRange] = $this->getFilterDateRange($request);
+        $startDateStr = substr($startRange, 0, 10);
+        $endDateStr = substr($endRange, 0, 10);
 
         $query = OdProcedureLog::query()
             ->leftJoin('od_patients', 'od_procedure_logs.PatNum', '=', 'od_patients.PatNum')
@@ -379,8 +461,7 @@ class FrontOfficeController extends Controller
             ->whereIn('od_procedure_logs.ProcStatus', ProcStatus::treatmentPlanned())
             ->where('od_procedure_logs.ProvNum', '>', 0)
             ->whereNotNull('od_procedure_logs.DateTP')
-            ->where('od_procedure_logs.DateTP', '<=', $endOfMonth)
-            ->where('od_procedure_logs.DateTP', '>=', '1900-01-01')
+            ->whereBetween('od_procedure_logs.DateTP', [$startDateStr, $endDateStr])
             ->select(
                 'od_procedure_logs.*',
                 'od_patients.FName',
@@ -422,16 +503,13 @@ class FrontOfficeController extends Controller
 
     public function hygieneReappoint(Request $request)
     {
-        $monthYear = $request->get('month_year', Carbon::now()->format('Y-m'));
-        $targetDate = Carbon::createFromFormat('Y-m', $monthYear);
-        $startOfMonth = $targetDate->copy()->startOfMonth()->format('Y-m-d 00:00:00');
-        $endOfMonth = $targetDate->copy()->endOfMonth()->format('Y-m-d 23:59:59');
+        [$startRange, $endRange] = $this->getFilterDateRange($request);
 
         $query = OdAppointment::query()
             ->with(['patient', 'provider'])
             ->where('AptStatus', 2) // Completed
             ->where('IsHygiene', 1)
-            ->whereBetween('AptDateTime', [$startOfMonth, $endOfMonth])
+            ->whereBetween('AptDateTime', [$startRange, $endRange])
             ->select('od_appointments.*');
 
         $hygApts = (clone $query)->get();
@@ -439,7 +517,7 @@ class FrontOfficeController extends Controller
         $scheduledPatNums = [];
         if (! empty($patNums)) {
             $scheduledPatNums = OdAppointment::whereIn('PatNum', $patNums)
-                ->where('AptDateTime', '>', $endOfMonth)
+                ->where('AptDateTime', '>', $endRange)
                 ->whereIn('AptStatus', [1, 2])
                 ->pluck('PatNum')
                 ->toArray();
@@ -652,94 +730,73 @@ class FrontOfficeController extends Controller
     public function kpiData(Request $request)
     {
         $section = $request->get('section');
-        $month = $request->get('month');
-        if (! $month) {
-            $month = now()->format('Y-m');
-        }
+        [$startRange, $endRange] = $this->getFilterDateRange($request);
+        $start = substr($startRange, 0, 10);
+        $end = substr($endRange, 0, 10);
 
-        try {
-            $targetDate = Carbon::createFromFormat('Y-m', $month);
-            if (! $targetDate) {
-                $targetDate = now();
-            }
-        } catch (\Exception $e) {
-            $targetDate = now();
-        }
-
-        $startOfMonth = (clone $targetDate)->startOfMonth()->format('Y-m-d 00:00:00');
-        $endOfMonth = (clone $targetDate)->endOfMonth()->format('Y-m-d 23:59:59');
-
+        $kpisCtrl = app(KpisController::class);
         $data = [];
 
-        // Dynamic Calculations bound to the date filter
-        $dbTxPlansInRange = OdProcedureLog::whereIn('ProcStatus', ProcStatus::treatmentPlanned())->whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
-        $dbNoShowCount = OdAppointment::where('AptStatus', 5)->whereBetween('AptDateTime', [$startOfMonth, $endOfMonth])->count();
-        $dbTotalAptsInRange = OdAppointment::whereBetween('AptDateTime', [$startOfMonth, $endOfMonth])->count();
-        $noShowRate = $dbTotalAptsInRange > 0 ? round(($dbNoShowCount / $dbTotalAptsInRange) * 100, 1) : 0;
-
-        $docProduction = OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$startOfMonth, $endOfMonth])->sum('ProcFee');
-
-        // Dynamic Data Mappings per section.
-        // Note: For KPI fields where OpenDental core DB does not natively store analytical time-series logs
-        // we adhere strictly to the rule: "use - for missing data" rather than fake values.
-
         if ($section === 'office') {
+            $off = $kpisCtrl->officeKpis($start, $end);
             $data = [
-                ['id' => 'pat_retention', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'tot_tx_plans', 'current' => $dbTxPlansInRange, 'target' => 0, 'last' => 0],
-                ['id' => 'copay_col', 'current' => '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'pat_retention', 'current' => $off['patient_retention'] ?? '-', 'target' => 85, 'last' => '-'],
+                ['id' => 'tot_tx_plans', 'current' => $off['tx_plans_per_day'] ?? 0, 'target' => 2, 'last' => '-'],
+                ['id' => 'copay_col', 'current' => $off['co_pay_collection'] ?? '-', 'target' => 95, 'last' => '-'],
                 ['id' => 'resched', 'current' => '-', 'target' => '-', 'last' => '-'],
                 ['id' => 'new_pat_a', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'no_show', 'current' => $noShowRate, 'target' => 5, 'last' => '-'],
-                ['id' => 'pat_react', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'pat_added', 'current' => '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'no_show', 'current' => $off['no_show_rate'] ?? 0, 'target' => 5, 'last' => '-'],
+                ['id' => 'pat_react', 'current' => $off['reactivation_list'] ?? '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'pat_added', 'current' => $off['active_patients'] ?? '-', 'target' => '-', 'last' => '-'],
                 ['id' => 'pat_viewed', 'current' => '-', 'target' => '-', 'last' => '-'],
                 ['id' => 'new_pat_rev', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'unsch_hyg_ret', 'current' => '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'unsch_hyg_ret', 'current' => $off['active_in_recare_pct'] ?? '-', 'target' => '-', 'last' => '-'],
             ];
         } elseif ($section === 'doctor') {
+            $doc = $kpisCtrl->doctorKpis($start, $end);
             $data = [
-                ['id' => 'doc_prod_same_day', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_case_acc', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_gross_prod', 'current' => $docProduction, 'target' => 1000, 'last' => 0],
-                ['id' => 'doc_net_prod', 'current' => $docProduction, 'target' => 1000, 'last' => 0], // Assuming 0 adjs today
-                ['id' => 'doc_avg_op', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_avg_prod_hr', 'current' => $docProduction > 0 ? round($docProduction / 8, 2) : 0, 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_avg_tx_appt', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_same_day_np', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_avg_prod_np', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_avg_tx_visit', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_avg_tx_pat', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_pat_cxl_rate', 'current' => $noShowRate, 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_unsch_tx', 'current' => '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'doc_prod_same_day', 'current' => $doc['case_acceptance_same_day'] ?? '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'doc_case_acc', 'current' => $doc['case_acceptance_rate'] ?? '-', 'target' => 75, 'last' => '-'],
+                ['id' => 'doc_gross_prod', 'current' => $doc['total_production'] ?? 0, 'target' => 50000, 'last' => '-'],
+                ['id' => 'doc_net_prod', 'current' => $doc['total_production'] ?? 0, 'target' => 50000, 'last' => '-'],
+                ['id' => 'doc_avg_op', 'current' => $doc['avg_prod_per_prov_day'] ?? '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'doc_avg_prod_hr', 'current' => $doc['avg_prod_per_hour'] ?? 0, 'target' => 500, 'last' => '-'],
+                ['id' => 'doc_avg_tx_appt', 'current' => $doc['avg_prod_per_apt'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'doc_same_day_np', 'current' => $doc['same_day_tx_per_new_pt'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'doc_avg_prod_np', 'current' => $doc['new_pt_tx_dollars'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'doc_avg_tx_visit', 'current' => $doc['avg_tx_per_existing_pt'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'doc_avg_tx_pat', 'current' => $doc['avg_tx_per_new_pt'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'doc_pat_cxl_rate', 'current' => $doc['no_show_rate'] ?? 0, 'target' => 5, 'last' => '-'],
+                ['id' => 'doc_unsch_tx', 'current' => $doc['existing_pt_tx_dollars'] ?? 0, 'target' => '-', 'last' => '-'],
                 ['id' => 'doc_supplies', 'current' => '-', 'target' => '-', 'last' => '-'],
                 ['id' => 'doc_med_supplies', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'doc_tot_prod', 'current' => $docProduction, 'target' => '-', 'last' => '-'],
+                ['id' => 'doc_tot_prod', 'current' => $doc['total_production'] ?? 0, 'target' => '-', 'last' => '-'],
             ];
         } elseif ($section === 'hygiene') {
+            $hyg = $kpisCtrl->hygieneKpis($start, $end);
             $data = [
-                ['id' => 'hyg_pre_apt', 'current' => '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_pre_apt', 'current' => $hyg['reappt'] ?? '-', 'target' => 85, 'last' => '-'],
                 ['id' => 'hyg_unfilled', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_avg_prod_hr', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_avg_med_hr', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_prebook_pt', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_avg_time_appt', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_avg_xray_appt', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_pts_per_day', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_pts_per_hr', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_fluoride_pt', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_adult_prophy', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_adult_tx', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_last_2', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_last_2_months', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_sealants', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_srp', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_perio_med', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_prod_tx', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_tot_visits', 'current' => '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_avg_prod_hr', 'current' => $hyg['avg_prod_per_hour'] ?? 0, 'target' => 150, 'last' => '-'],
+                ['id' => 'hyg_avg_med_hr', 'current' => $hyg['avg_prod_per_day'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_prebook_pt', 'current' => $hyg['reappt'] ?? '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_avg_time_appt', 'current' => 60, 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_avg_xray_appt', 'current' => $hyg['fmx_per_day'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_pts_per_day', 'current' => $hyg['visits_per_day'] ?? 0, 'target' => 8, 'last' => '-'],
+                ['id' => 'hyg_pts_per_hr', 'current' => $hyg['prod_per_visit'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_fluoride_pt', 'current' => $hyg['fluoride_per_day'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_adult_prophy', 'current' => $hyg['perio_pct'] ?? '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_adult_tx', 'current' => $hyg['perio_pct'] ?? '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_last_2', 'current' => $hyg['adult_retention_12m'] ?? '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_last_2_months', 'current' => $hyg['adult_retention_6m'] ?? '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_sealants', 'current' => $hyg['sealants'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_srp', 'current' => $hyg['srp_per_day'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_perio_med', 'current' => $hyg['antimicrobial'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_prod_tx', 'current' => $hyg['prod_per_proc'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_tot_visits', 'current' => $hyg['visits_per_day'] ?? 0, 'target' => '-', 'last' => '-'],
                 ['id' => 'hyg_unfilled_dt', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_avg_prod_visit', 'current' => '-', 'target' => '-', 'last' => '-'],
-                ['id' => 'hyg_case_acc', 'current' => '-', 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_avg_prod_visit', 'current' => $hyg['prod_per_visit'] ?? 0, 'target' => '-', 'last' => '-'],
+                ['id' => 'hyg_case_acc', 'current' => $hyg['case_acceptance'] ?? '-', 'target' => 75, 'last' => '-'],
             ];
         }
 

@@ -391,9 +391,10 @@
                 processing: false, // Disabled default processing popup to let skeleton loader present cleanly
                 serverSide: true,
                 pageLength: 20,
-                layout: { topStart: null, topEnd: null, bottomStart: 'info', bottomEnd: 'paging' },
+                layout: { topStart: null, topEnd: null, bottomStart: ['pageLength', 'info'], bottomEnd: 'paging' },
                 language: {
-                    info: "Items per page _MENU_ &nbsp;&nbsp;&nbsp; _START_-_END_ of _TOTAL_ items",
+                    lengthMenu: 'Items per page _MENU_ <span class="text-gray-300 mx-2">|</span>',
+                    info: '_START_-_END_ of _TOTAL_ items',
                     paginate: {
                         previous: '<i class="fa-solid fa-chevron-left"></i>',
                         next: '<i class="fa-solid fa-chevron-right"></i>'

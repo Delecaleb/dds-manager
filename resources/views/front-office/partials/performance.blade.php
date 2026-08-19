@@ -44,9 +44,9 @@
                             class="bg-white border border-gray-300 text-gray-900 text-xs rounded pl-2 pr-7 py-1.5 focus:ring-emerald-500 focus:border-emerald-500 w-48 shadow-sm">
                         <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-2 text-gray-400 text-[10px]"></i>
                     </div>
-                    <button
-                        class="text-[11px] font-bold text-gray-800 bg-white border border-emerald-500 rounded px-3 py-1.5 hover:bg-emerald-50 shadow-sm uppercase">
-                        Export CSV
+                    <button id="exportRemindersCsvBtn" type="button"
+                        class="text-[11px] font-bold text-gray-800 bg-white border border-emerald-500 rounded px-3 py-1.5 hover:bg-emerald-50 shadow-sm uppercase flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-download"></i> Export CSV
                     </button>
                 </div>
             </div>
@@ -109,9 +109,9 @@
                             class="bg-white border border-gray-300 text-gray-900 text-xs rounded pl-2 pr-7 py-1.5 focus:ring-emerald-500 focus:border-emerald-500 w-48 shadow-sm">
                         <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-2 text-gray-400 text-[10px]"></i>
                     </div>
-                    <button
-                        class="text-[11px] font-bold text-gray-800 bg-white border border-emerald-500 rounded px-3 py-1.5 hover:bg-emerald-50 shadow-sm uppercase">
-                        Export CSV
+                    <button id="exportNonRemindersCsvBtn" type="button"
+                        class="text-[11px] font-bold text-gray-800 bg-white border border-emerald-500 rounded px-3 py-1.5 hover:bg-emerald-50 shadow-sm uppercase flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-download"></i> Export CSV
                     </button>
                 </div>
             </div>
@@ -169,9 +169,9 @@
                             class="bg-white border border-gray-300 text-gray-900 text-xs rounded pl-2 pr-7 py-1.5 focus:ring-emerald-500 focus:border-emerald-500 w-48 shadow-sm">
                         <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-2 text-gray-400 text-[10px]"></i>
                     </div>
-                    <button
-                        class="text-[11px] font-bold text-gray-800 bg-white border border-emerald-500 rounded px-3 py-1.5 hover:bg-emerald-50 shadow-sm uppercase">
-                        Export CSV
+                    <button id="exportTotalsCsvBtn" type="button"
+                        class="text-[11px] font-bold text-gray-800 bg-white border border-emerald-500 rounded px-3 py-1.5 hover:bg-emerald-50 shadow-sm uppercase flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-download"></i> Export CSV
                     </button>
                 </div>
             </div>
@@ -213,18 +213,20 @@
             processing: true,
             serverSide: true,
             pageLength: 10,
-            layout: { topStart: null, topEnd: null, bottomStart: 'info', bottomEnd: 'paging' },
+            layout: { topStart: null, topEnd: null, bottomStart: ['pageLength', 'info'], bottomEnd: 'paging' },
             language: {
                 emptyTable: '<div class="py-1 text-[11px] text-gray-600 font-medium text-center bg-gray-50 w-full border-y border-gray-100">No data</div>',
-                info: '<span class="flex items-center gap-2">Items per page _MENU_ <span class="text-gray-300 mx-1">|</span> _START_-_END_ of _TOTAL_ items</span>',
+                lengthMenu: 'Items per page _MENU_ <span class="text-gray-300 mx-2">|</span>',
+                info: '_START_-_END_ of _TOTAL_ items',
                 paginate: {
                     previous: '<i class="fa-solid fa-chevron-left text-[10px]"></i>',
                     next: '<i class="fa-solid fa-chevron-right text-[10px]"></i>'
                 }
             },
             drawCallback: function () {
+                $('.dt-length').addClass('text-[11px] font-semibold text-gray-600 flex items-center gap-1.5 p-3');
+                $('.dt-length select').addClass('border border-gray-300 rounded text-gray-700 py-1 px-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white cursor-pointer outline-none text-[11px]');
                 $('.dt-info').addClass('text-[11px] font-semibold text-gray-600 flex items-center p-3');
-                $('.dt-info select').addClass('border border-gray-300 rounded text-gray-700 py-1 px-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white cursor-pointer mx-1 outline-none text-[11px]');
                 $('.dt-paging nav').addClass('flex items-center gap-1');
                 $('.dt-paging').addClass('flex items-center p-3 border-l border-gray-100 h-full bg-white');
                 $('.dt-paging-button').addClass('px-2.5 py-1 text-[11px] font-bold border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 rounded transition-colors shadow-sm cursor-pointer');
@@ -233,12 +235,20 @@
             }
         };
 
+        const sendDateParams = d => {
+            if (window.getFoDateParams) {
+                $.extend(d, window.getFoDateParams());
+            } else {
+                d.month = $('#frontOfficeMonth').val() || '';
+            }
+        };
+
         // Init Reminders
         let remTable = DDS.dataTable(document.getElementById('remindersTable'), {
             ...dtConfig,
             ajax: {
                 url: "{{ route('front-office.performance-reminders-data') }}",
-                data: function (d) { d.month = $('#frontOfficeMonth').val() || ''; }
+                data: sendDateParams
             },
             columns: [
                 { data: 'name', name: 'name', className: 'text-[11px] text-gray-800' },
@@ -257,7 +267,7 @@
             ...dtConfig,
             ajax: {
                 url: "{{ route('front-office.performance-non-reminders-data') }}",
-                data: function (d) { d.month = $('#frontOfficeMonth').val() || ''; }
+                data: sendDateParams
             },
             columns: [
                 { data: 'name', name: 'name', className: 'text-[11px] text-gray-800' },
@@ -274,7 +284,7 @@
             ...dtConfig,
             ajax: {
                 url: "{{ route('front-office.performance-totals-data') }}",
-                data: function (d) { d.month = $('#frontOfficeMonth').val() || ''; }
+                data: sendDateParams
             },
             columns: [
                 { data: 'name', name: 'name', className: 'text-[11px] text-gray-800' },
@@ -286,16 +296,20 @@
             ]
         });
 
-        // Bind global Date Filter
-        $('#frontOfficeMonth').off('change.perf').on('change.perf', function () {
-            remTable.ajax.reload();
-            nonRemTable.ajax.reload();
-            totTable.ajax.reload();
-        });
+        window.reloadFoTables = function () {
+            if (remTable) remTable.ajax.reload();
+            if (nonRemTable) nonRemTable.ajax.reload();
+            if (totTable) totTable.ajax.reload();
+        };
 
         // Bind Custom Search Inputs
         $('#remSearch').off('keyup').on('keyup', function () { remTable.search(this.value).draw(); });
         $('#nonRemSearch').off('keyup').on('keyup', function () { nonRemTable.search(this.value).draw(); });
         $('#totSearch').off('keyup').on('keyup', function () { totTable.search(this.value).draw(); });
+
+        // Bind Export CSV Buttons
+        $('#exportRemindersCsvBtn').on('click', function () { exportTableToCSV($('#remindersTable'), 'reminders_export'); });
+        $('#exportNonRemindersCsvBtn').on('click', function () { exportTableToCSV($('#nonRemindersTable'), 'non_reminders_export'); });
+        $('#exportTotalsCsvBtn').on('click', function () { exportTableToCSV($('#totalsTable'), 'performance_totals_export'); });
     });
 </script>
