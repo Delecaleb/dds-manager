@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Services\Sync\SyncCarrierService;
-use App\Services\Sync\SyncDefinitionsService;
 use Illuminate\Console\Command;
 
 class SyncCarrierMap extends Command

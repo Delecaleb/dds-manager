@@ -4,49 +4,43 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('timeadjust', function (Blueprint $table) {
 
-Schema::create('timeadjust', function(Blueprint $table){
+            $table->integer('TimeAdjustNum');
 
-$table->integer('TimeAdjustNum');
+            $table->integer('EmployeeNum');
 
-$table->integer('EmployeeNum');
+            $table->date('TimeEntry');
 
-$table->date('TimeEntry');
+            $table->string('RegHours');
 
-$table->string('RegHours');
+            $table->string('OTimeHours');
 
-$table->string('OTimeHours');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->integer('IsAuto');
 
-$table->integer('IsAuto');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('PtoDefNum');
 
-$table->integer('PtoDefNum');
+            $table->string('PtoHours');
 
-$table->string('PtoHours');
+            $table->integer('IsUnpaidProtectedLeave');
 
-$table->integer('IsUnpaidProtectedLeave');
+            $table->integer('SecuUserNumEntry');
 
-$table->integer('SecuUserNumEntry');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('timeadjust');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('timeadjust');
+    }
 };

@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Services\Sync\PaySplitSyncService;
 use Illuminate\Console\Command;
 
-use App\Services\Sync\PaySplitSyncService;
 class SyncPaySplits extends Command
 {
     /**

@@ -4,47 +4,41 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('chartview', function (Blueprint $table) {
 
-Schema::create('chartview', function(Blueprint $table){
+            $table->integer('ChartViewNum');
 
-$table->integer('ChartViewNum');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->integer('ProcStatuses');
 
-$table->integer('ProcStatuses');
+            $table->integer('ObjectTypes');
 
-$table->integer('ObjectTypes');
+            $table->integer('ShowProcNotes');
 
-$table->integer('ShowProcNotes');
+            $table->integer('IsAudit');
 
-$table->integer('IsAudit');
+            $table->integer('SelectedTeethOnly');
 
-$table->integer('SelectedTeethOnly');
+            $table->integer('OrionStatusFlags');
 
-$table->integer('OrionStatusFlags');
+            $table->integer('DatesShowing');
 
-$table->integer('DatesShowing');
+            $table->integer('IsTpCharting');
 
-$table->integer('IsTpCharting');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('chartview');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('chartview');
+    }
 };

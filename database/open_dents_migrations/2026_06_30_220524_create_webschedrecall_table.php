@@ -4,59 +4,53 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('webschedrecall', function (Blueprint $table) {
 
-Schema::create('webschedrecall', function(Blueprint $table){
+            $table->integer('WebSchedRecallNum');
 
-$table->integer('WebSchedRecallNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('RecallNum');
 
-$table->integer('RecallNum');
+            $table->date('DateTimeEntry');
 
-$table->date('DateTimeEntry');
+            $table->date('DateDue');
 
-$table->date('DateDue');
+            $table->integer('ReminderCount');
 
-$table->integer('ReminderCount');
+            $table->date('DateTimeSent');
 
-$table->date('DateTimeSent');
+            $table->date('DateTimeSendFailed');
 
-$table->date('DateTimeSendFailed');
+            $table->integer('SendStatus');
 
-$table->integer('SendStatus');
+            $table->string('ShortGUID');
 
-$table->string('ShortGUID');
+            $table->text('ResponseDescript');
 
-$table->text('ResponseDescript');
+            $table->integer('Source');
 
-$table->integer('Source');
+            $table->integer('CommlogNum');
 
-$table->integer('CommlogNum');
+            $table->integer('MessageType');
 
-$table->integer('MessageType');
+            $table->integer('MessageFk');
 
-$table->integer('MessageFk');
+            $table->integer('ApptReminderRuleNum');
 
-$table->integer('ApptReminderRuleNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('webschedrecall');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('webschedrecall');
+    }
 };

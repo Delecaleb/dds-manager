@@ -4,29 +4,23 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('etransmessagetext', function (Blueprint $table) {
 
-Schema::create('etransmessagetext', function(Blueprint $table){
+            $table->integer('EtransMessageTextNum');
 
-$table->integer('EtransMessageTextNum');
+            $table->text('MessageText');
 
-$table->text('MessageText');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('etransmessagetext');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('etransmessagetext');
+    }
 };

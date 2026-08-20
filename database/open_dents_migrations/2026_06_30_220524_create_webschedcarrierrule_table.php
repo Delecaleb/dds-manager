@@ -4,37 +4,31 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('webschedcarrierrule', function (Blueprint $table) {
 
-Schema::create('webschedcarrierrule', function(Blueprint $table){
+            $table->integer('WebSchedCarrierRuleNum');
 
-$table->integer('WebSchedCarrierRuleNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->string('CarrierName');
 
-$table->string('CarrierName');
+            $table->string('DisplayName');
 
-$table->string('DisplayName');
+            $table->text('Message');
 
-$table->text('Message');
+            $table->integer('Rule');
 
-$table->integer('Rule');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('webschedcarrierrule');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('webschedcarrierrule');
+    }
 };

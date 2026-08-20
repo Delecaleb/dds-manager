@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('preference', function (Blueprint $table) {
 
-Schema::create('preference', function(Blueprint $table){
+            $table->string('PrefName');
 
-$table->string('PrefName');
+            $table->text('ValueString');
 
-$table->text('ValueString');
+            $table->integer('PrefNum');
 
-$table->integer('PrefNum');
+            $table->text('Comments');
 
-$table->text('Comments');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('preference');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('preference');
+    }
 };

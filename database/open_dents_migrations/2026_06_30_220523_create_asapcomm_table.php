@@ -4,73 +4,67 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('asapcomm', function (Blueprint $table) {
 
-Schema::create('asapcomm', function(Blueprint $table){
+            $table->integer('AsapCommNum');
 
-$table->integer('AsapCommNum');
+            $table->integer('FKey');
 
-$table->integer('FKey');
+            $table->integer('FKeyType');
 
-$table->integer('FKeyType');
+            $table->integer('ScheduleNum');
 
-$table->integer('ScheduleNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->string('ShortGUID');
 
-$table->string('ShortGUID');
+            $table->date('DateTimeEntry');
 
-$table->date('DateTimeEntry');
+            $table->date('DateTimeExpire');
 
-$table->date('DateTimeExpire');
+            $table->date('DateTimeSmsScheduled');
 
-$table->date('DateTimeSmsScheduled');
+            $table->integer('SmsSendStatus');
 
-$table->integer('SmsSendStatus');
+            $table->integer('EmailSendStatus');
 
-$table->integer('EmailSendStatus');
+            $table->date('DateTimeSmsSent');
 
-$table->date('DateTimeSmsSent');
+            $table->date('DateTimeEmailSent');
 
-$table->date('DateTimeEmailSent');
+            $table->integer('EmailMessageNum');
 
-$table->integer('EmailMessageNum');
+            $table->integer('ResponseStatus');
 
-$table->integer('ResponseStatus');
+            $table->date('DateTimeOrig');
 
-$table->date('DateTimeOrig');
+            $table->text('TemplateText');
 
-$table->text('TemplateText');
+            $table->text('TemplateEmail');
 
-$table->text('TemplateEmail');
+            $table->string('TemplateEmailSubj');
 
-$table->string('TemplateEmailSubj');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->text('GuidMessageToMobile');
 
-$table->text('GuidMessageToMobile');
+            $table->string('EmailTemplateType');
 
-$table->string('EmailTemplateType');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('asapcomm');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('asapcomm');
+    }
 };

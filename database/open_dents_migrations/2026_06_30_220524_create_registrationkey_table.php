@@ -4,59 +4,53 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('registrationkey', function (Blueprint $table) {
 
-Schema::create('registrationkey', function(Blueprint $table){
+            $table->integer('RegistrationKeyNum');
 
-$table->integer('RegistrationKeyNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->string('RegKey');
 
-$table->string('RegKey');
+            $table->string('Note');
 
-$table->string('Note');
+            $table->date('DateStarted');
 
-$table->date('DateStarted');
+            $table->date('DateDisabled');
 
-$table->date('DateDisabled');
+            $table->date('DateEnded');
 
-$table->date('DateEnded');
+            $table->integer('IsForeign');
 
-$table->integer('IsForeign');
+            $table->integer('UsesServerVersion');
 
-$table->integer('UsesServerVersion');
+            $table->integer('IsFreeVersion');
 
-$table->integer('IsFreeVersion');
+            $table->integer('IsOnlyForTesting');
 
-$table->integer('IsOnlyForTesting');
+            $table->integer('VotesAllotted');
 
-$table->integer('VotesAllotted');
+            $table->integer('IsResellerCustomer');
 
-$table->integer('IsResellerCustomer');
+            $table->integer('HasEarlyAccess');
 
-$table->integer('HasEarlyAccess');
+            $table->date('DateTBackupScheduled');
 
-$table->date('DateTBackupScheduled');
+            $table->string('BackupPassCode');
 
-$table->string('BackupPassCode');
+            $table->date('DateTClinicAccess');
 
-$table->date('DateTClinicAccess');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('registrationkey');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('registrationkey');
+    }
 };

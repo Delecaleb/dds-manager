@@ -4,31 +4,25 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('autocodecond', function (Blueprint $table) {
 
-Schema::create('autocodecond', function(Blueprint $table){
+            $table->integer('AutoCodeCondNum');
 
-$table->integer('AutoCodeCondNum');
+            $table->integer('AutoCodeItemNum');
 
-$table->integer('AutoCodeItemNum');
+            $table->integer('Cond');
 
-$table->integer('Cond');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('autocodecond');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('autocodecond');
+    }
 };

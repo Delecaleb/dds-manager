@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('dashboardar', function (Blueprint $table) {
 
-Schema::create('dashboardar', function(Blueprint $table){
+            $table->integer('DashboardARNum');
 
-$table->integer('DashboardARNum');
+            $table->date('DateCalc');
 
-$table->date('DateCalc');
+            $table->string('BalTotal');
 
-$table->string('BalTotal');
+            $table->string('InsEst');
 
-$table->string('InsEst');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('dashboardar');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('dashboardar');
+    }
 };

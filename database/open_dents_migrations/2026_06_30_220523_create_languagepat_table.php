@@ -4,35 +4,29 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('languagepat', function (Blueprint $table) {
 
-Schema::create('languagepat', function(Blueprint $table){
+            $table->integer('LanguagePatNum');
 
-$table->integer('LanguagePatNum');
+            $table->string('PrefName');
 
-$table->string('PrefName');
+            $table->string('Language');
 
-$table->string('Language');
+            $table->text('Translation');
 
-$table->text('Translation');
+            $table->integer('EFormFieldDefNum');
 
-$table->integer('EFormFieldDefNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('languagepat');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('languagepat');
+    }
 };

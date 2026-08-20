@@ -4,31 +4,25 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('taskancestor', function (Blueprint $table) {
 
-Schema::create('taskancestor', function(Blueprint $table){
+            $table->integer('TaskAncestorNum');
 
-$table->integer('TaskAncestorNum');
+            $table->integer('TaskNum');
 
-$table->integer('TaskNum');
+            $table->integer('TaskListNum');
 
-$table->integer('TaskListNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('taskancestor');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('taskancestor');
+    }
 };

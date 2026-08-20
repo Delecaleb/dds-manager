@@ -4,59 +4,53 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('medlabresult', function (Blueprint $table) {
 
-Schema::create('medlabresult', function(Blueprint $table){
+            $table->integer('MedLabResultNum');
 
-$table->integer('MedLabResultNum');
+            $table->integer('MedLabNum');
 
-$table->integer('MedLabNum');
+            $table->string('ObsID');
 
-$table->string('ObsID');
+            $table->string('ObsText');
 
-$table->string('ObsText');
+            $table->string('ObsLoinc');
 
-$table->string('ObsLoinc');
+            $table->string('ObsLoincText');
 
-$table->string('ObsLoincText');
+            $table->string('ObsIDSub');
 
-$table->string('ObsIDSub');
+            $table->text('ObsValue');
 
-$table->text('ObsValue');
+            $table->string('ObsSubType');
 
-$table->string('ObsSubType');
+            $table->string('ObsUnits');
 
-$table->string('ObsUnits');
+            $table->string('ReferenceRange');
 
-$table->string('ReferenceRange');
+            $table->string('AbnormalFlag');
 
-$table->string('AbnormalFlag');
+            $table->string('ResultStatus');
 
-$table->string('ResultStatus');
+            $table->date('DateTimeObs');
 
-$table->date('DateTimeObs');
+            $table->string('FacilityID');
 
-$table->string('FacilityID');
+            $table->integer('DocNum');
 
-$table->integer('DocNum');
+            $table->text('Note');
 
-$table->text('Note');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('medlabresult');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('medlabresult');
+    }
 };

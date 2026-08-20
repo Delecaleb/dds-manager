@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +26,7 @@ class ProviderPortalController extends Controller
     private readonly string $completedIn;
 
     public function __construct(
-        private readonly \App\Domain\Support\ClinicRegistry $clinics,
+        private readonly ClinicRegistry $clinics,
     ) {
         $this->completedIn = ProcStatus::inList(ProcStatus::completed());
     }
@@ -43,7 +44,7 @@ class ProviderPortalController extends Controller
             ->orderBy('PName')
             ->get(['ProvNum', 'LName', 'PName', 'Specialty']);
 
-        return response()->json($rows->map(fn($p) => [
+        return response()->json($rows->map(fn ($p) => [
             'id' => (int) $p->ProvNum,
             'name' => trim("{$p->LName}, {$p->PName}"),
             'type' => $this->specialtyMap[(int) $p->Specialty] ?? 'General',
@@ -65,7 +66,7 @@ class ProviderPortalController extends Controller
         $provFilter = '';
         $typeFilter = '';
 
-        if (!empty($provs)) {
+        if (! empty($provs)) {
             $ph = implode(',', array_fill(0, count($provs), '?'));
             $provFilter = "AND pl.ProvNum IN ({$ph})";
             array_push($bindings, ...$provs);
@@ -90,7 +91,7 @@ class ProviderPortalController extends Controller
             ORDER BY {$groupExpr}
         ", $bindings);
 
-        return response()->json(array_map(fn($r) => [
+        return response()->json(array_map(fn ($r) => [
             'label' => $r->label,
             'production' => round((float) $r->production, 2),
         ], $rows));
@@ -110,16 +111,16 @@ class ProviderPortalController extends Controller
         $provFilter = '';
         $typeFilter = '';
 
-        if (!empty($provs)) {
+        if (! empty($provs)) {
             $ph = implode(',', array_fill(0, count($provs), '?'));
             $provFilter = "AND pl.ProvNum IN ({$ph})";
             array_push($bindings, ...$provs);
         }
 
         if ($type === 'hygiene') {
-            $typeFilter = "AND p.Specialty = 8";
+            $typeFilter = 'AND p.Specialty = 8';
         } elseif ($type === 'doctor') {
-            $typeFilter = "AND p.Specialty != 8";
+            $typeFilter = 'AND p.Specialty != 8';
         }
 
         $rows = DB::select("
@@ -185,6 +186,7 @@ class ProviderPortalController extends Controller
     private function periodExprs(string $mode, string $alias): array
     {
         $d = "{$alias}.ProcDate";
+
         return match ($mode) {
             'weekly' => ["YEARWEEK({$d}, 1)", "DATE_FORMAT(MIN({$d}), '%Y-%m-%d')"],
             'monthly' => ["DATE_FORMAT({$d}, '%Y-%m')", "DATE_FORMAT({$d}, '%Y-%m')"],

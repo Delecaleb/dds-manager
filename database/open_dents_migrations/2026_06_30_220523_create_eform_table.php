@@ -4,55 +4,49 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('eform', function (Blueprint $table) {
 
-Schema::create('eform', function(Blueprint $table){
+            $table->integer('EFormNum');
 
-$table->integer('EFormNum');
+            $table->integer('FormType');
 
-$table->integer('FormType');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->date('DateTimeShown');
 
-$table->date('DateTimeShown');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->date('DateTEdited');
 
-$table->date('DateTEdited');
+            $table->integer('MaxWidth');
 
-$table->integer('MaxWidth');
+            $table->integer('EFormDefNum');
 
-$table->integer('EFormDefNum');
+            $table->integer('Status');
 
-$table->integer('Status');
+            $table->integer('RevID');
 
-$table->integer('RevID');
+            $table->integer('ShowLabelsBold');
 
-$table->integer('ShowLabelsBold');
+            $table->integer('SpaceBelowEachField');
 
-$table->integer('SpaceBelowEachField');
+            $table->integer('SpaceToRightEachField');
 
-$table->integer('SpaceToRightEachField');
+            $table->integer('SaveImageCategory');
 
-$table->integer('SaveImageCategory');
+            $table->date('DateTimeSubmitted');
 
-$table->date('DateTimeSubmitted');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('eform');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('eform');
+    }
 };

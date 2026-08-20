@@ -4,45 +4,39 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('reqstudent', function (Blueprint $table) {
 
-Schema::create('reqstudent', function(Blueprint $table){
+            $table->integer('ReqStudentNum');
 
-$table->integer('ReqStudentNum');
+            $table->integer('ReqNeededNum');
 
-$table->integer('ReqNeededNum');
+            $table->string('Descript');
 
-$table->string('Descript');
+            $table->integer('SchoolCourseNum');
 
-$table->integer('SchoolCourseNum');
+            $table->integer('ProvNum');
 
-$table->integer('ProvNum');
+            $table->integer('AptNum');
 
-$table->integer('AptNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('InstructorNum');
 
-$table->integer('InstructorNum');
+            $table->date('DateCompleted');
 
-$table->date('DateCompleted');
+            $table->integer('ProcNum');
 
-$table->integer('ProcNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('reqstudent');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('reqstudent');
+    }
 };

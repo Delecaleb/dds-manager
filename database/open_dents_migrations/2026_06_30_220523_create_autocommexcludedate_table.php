@@ -4,31 +4,25 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('autocommexcludedate', function (Blueprint $table) {
 
-Schema::create('autocommexcludedate', function(Blueprint $table){
+            $table->integer('AutoCommExcludeDateNum');
 
-$table->integer('AutoCommExcludeDateNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->date('DateExclude');
 
-$table->date('DateExclude');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('autocommexcludedate');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('autocommexcludedate');
+    }
 };

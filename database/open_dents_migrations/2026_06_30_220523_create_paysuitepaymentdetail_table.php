@@ -4,29 +4,23 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('paysuitepaymentdetail', function (Blueprint $table) {
 
-Schema::create('paysuitepaymentdetail', function(Blueprint $table){
+            $table->integer('PaySuitePaymentDetailNum');
 
-$table->integer('PaySuitePaymentDetailNum');
+            $table->text('DetailsJson');
 
-$table->text('DetailsJson');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('paysuitepaymentdetail');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('paysuitepaymentdetail');
+    }
 };

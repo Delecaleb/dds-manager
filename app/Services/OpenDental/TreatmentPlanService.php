@@ -4,16 +4,11 @@ namespace App\Services\OpenDental;
 
 use Illuminate\Support\Facades\Cache;
 
-
 class TreatmentPlanService
 {
-
     public function __construct(
         protected OpenDentalClient $client
-    ) {
-    }
-
-
+    ) {}
 
     public function all()
     {
@@ -24,7 +19,7 @@ class TreatmentPlanService
 
             now()->addHours(12),
 
-            fn() => $this->client->get(
+            fn () => $this->client->get(
                 'treatplans'
             )
 
@@ -36,9 +31,9 @@ class TreatmentPlanService
     {
 
         return $this->client->get(
-            "treatplans",
+            'treatplans',
             [
-                'PatNum' => $id
+                'PatNum' => $id,
             ]
         );
 
@@ -51,7 +46,7 @@ class TreatmentPlanService
             'treatplans',
 
             [
-                'TPStatus' => 'Active'
+                'TPStatus' => 'Active',
             ]
 
         );
@@ -64,10 +59,8 @@ class TreatmentPlanService
             'treatplanattaches',
 
             [
-                'TreatPlanNum' => $id
+                'TreatPlanNum' => $id,
             ]
         );
     }
-
-
 }

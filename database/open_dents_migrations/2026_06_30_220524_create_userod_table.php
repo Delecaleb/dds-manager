@@ -4,73 +4,67 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('userod', function (Blueprint $table) {
 
-Schema::create('userod', function(Blueprint $table){
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->string('UserName');
 
-$table->string('UserName');
+            $table->string('Password');
 
-$table->string('Password');
+            $table->integer('UserGroupNum');
 
-$table->integer('UserGroupNum');
+            $table->integer('EmployeeNum');
 
-$table->integer('EmployeeNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('ProvNum');
 
-$table->integer('ProvNum');
+            $table->integer('IsHidden');
 
-$table->integer('IsHidden');
+            $table->integer('TaskListInBox');
 
-$table->integer('TaskListInBox');
+            $table->integer('AnesthProvType');
 
-$table->integer('AnesthProvType');
+            $table->integer('DefaultHidePopups');
 
-$table->integer('DefaultHidePopups');
+            $table->integer('PasswordIsStrong');
 
-$table->integer('PasswordIsStrong');
+            $table->integer('ClinicIsRestricted');
 
-$table->integer('ClinicIsRestricted');
+            $table->integer('InboxHidePopups');
 
-$table->integer('InboxHidePopups');
+            $table->integer('UserNumCEMT');
 
-$table->integer('UserNumCEMT');
+            $table->date('DateTFail');
 
-$table->date('DateTFail');
+            $table->integer('FailedAttempts');
 
-$table->integer('FailedAttempts');
+            $table->string('DomainUser');
 
-$table->string('DomainUser');
+            $table->integer('IsPasswordResetRequired');
 
-$table->integer('IsPasswordResetRequired');
+            $table->string('MobileWebPin');
 
-$table->string('MobileWebPin');
+            $table->integer('MobileWebPinFailedAttempts');
 
-$table->integer('MobileWebPinFailedAttempts');
+            $table->date('DateTLastLogin');
 
-$table->date('DateTLastLogin');
+            $table->string('EClipboardClinicalPin');
 
-$table->string('EClipboardClinicalPin');
+            $table->string('BadgeId');
 
-$table->string('BadgeId');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('userod');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('userod');
+    }
 };

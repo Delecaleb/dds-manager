@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('chatreaction', function (Blueprint $table) {
 
-Schema::create('chatreaction', function(Blueprint $table){
+            $table->integer('ChatReactionNum');
 
-$table->integer('ChatReactionNum');
+            $table->integer('ChatMsgNum');
 
-$table->integer('ChatMsgNum');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->string('EmojiName');
 
-$table->string('EmojiName');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('chatreaction');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('chatreaction');
+    }
 };

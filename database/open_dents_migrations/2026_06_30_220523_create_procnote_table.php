@@ -4,47 +4,41 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('procnote', function (Blueprint $table) {
 
-Schema::create('procnote', function(Blueprint $table){
+            $table->integer('ProcNoteNum');
 
-$table->integer('ProcNoteNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('ProcNum');
 
-$table->integer('ProcNum');
+            $table->date('EntryDateTime');
 
-$table->date('EntryDateTime');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->integer('SigIsTopaz');
 
-$table->integer('SigIsTopaz');
+            $table->text('Signature');
 
-$table->text('Signature');
+            $table->integer('UserNum2');
 
-$table->integer('UserNum2');
+            $table->text('Signature2');
 
-$table->text('Signature2');
+            $table->integer('SigIsTopaz2');
 
-$table->integer('SigIsTopaz2');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('procnote');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('procnote');
+    }
 };

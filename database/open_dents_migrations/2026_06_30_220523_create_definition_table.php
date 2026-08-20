@@ -4,41 +4,35 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('definition', function (Blueprint $table) {
 
-Schema::create('definition', function(Blueprint $table){
+            $table->integer('DefNum');
 
-$table->integer('DefNum');
+            $table->integer('Category');
 
-$table->integer('Category');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->string('ItemName');
 
-$table->string('ItemName');
+            $table->string('ItemValue');
 
-$table->string('ItemValue');
+            $table->integer('ItemColor');
 
-$table->integer('ItemColor');
+            $table->integer('IsHidden');
 
-$table->integer('IsHidden');
+            $table->string('Supp');
 
-$table->string('Supp');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('definition');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('definition');
+    }
 };

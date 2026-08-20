@@ -2,22 +2,15 @@
 
 namespace App\Services\OpenDental;
 
-
 use Illuminate\Support\Facades\Cache;
-
 
 class AdjustmentService
 {
-
-
     public function __construct(
 
         protected OpenDentalClient $client
 
-    ) {
-    }
-
-
+    ) {}
 
     public function byDate($start, $end)
     {
@@ -28,7 +21,7 @@ class AdjustmentService
 
             now()->addHours(12),
 
-            fn() => $this->client->get(
+            fn () => $this->client->get(
 
                 'adjustments',
 
@@ -36,7 +29,7 @@ class AdjustmentService
 
                     'DateStart' => $start,
 
-                    'DateEnd' => $end
+                    'DateEnd' => $end,
 
                 ]
 
@@ -45,6 +38,4 @@ class AdjustmentService
         );
 
     }
-
-
 }

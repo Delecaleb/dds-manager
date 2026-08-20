@@ -2,8 +2,9 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Services\Sync\PaymentSyncService;
+use Illuminate\Console\Command;
+
 class SyncPayment extends Command
 {
     /**

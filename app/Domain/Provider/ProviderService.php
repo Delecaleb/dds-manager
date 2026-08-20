@@ -4,9 +4,9 @@ namespace App\Domain\Provider;
 
 use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
+use App\Domain\Support\MetricFilter;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use Illuminate\Support\Facades\DB;
-use App\Domain\Support\MetricFilter;
 
 /**
  * Per-provider composer. Owns NO metric formulas — it iterates providers and calls the

@@ -4,43 +4,37 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('displayfield', function (Blueprint $table) {
 
-Schema::create('displayfield', function(Blueprint $table){
+            $table->integer('DisplayFieldNum');
 
-$table->integer('DisplayFieldNum');
+            $table->string('InternalName');
 
-$table->string('InternalName');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->integer('ColumnWidth');
 
-$table->integer('ColumnWidth');
+            $table->integer('Category');
 
-$table->integer('Category');
+            $table->integer('ChartViewNum');
 
-$table->integer('ChartViewNum');
+            $table->text('PickList');
 
-$table->text('PickList');
+            $table->string('DescriptionOverride');
 
-$table->string('DescriptionOverride');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('displayfield');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('displayfield');
+    }
 };

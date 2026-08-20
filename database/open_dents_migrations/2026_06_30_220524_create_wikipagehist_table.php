@@ -4,37 +4,31 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('wikipagehist', function (Blueprint $table) {
 
-Schema::create('wikipagehist', function(Blueprint $table){
+            $table->integer('WikiPageNum');
 
-$table->integer('WikiPageNum');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->string('PageTitle');
 
-$table->string('PageTitle');
+            $table->text('PageContent');
 
-$table->text('PageContent');
+            $table->date('DateTimeSaved');
 
-$table->date('DateTimeSaved');
+            $table->integer('IsDeleted');
 
-$table->integer('IsDeleted');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('wikipagehist');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('wikipagehist');
+    }
 };

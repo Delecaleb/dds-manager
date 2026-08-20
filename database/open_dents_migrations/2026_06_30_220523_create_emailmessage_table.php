@@ -4,69 +4,63 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('emailmessage', function (Blueprint $table) {
 
-Schema::create('emailmessage', function(Blueprint $table){
+            $table->integer('EmailMessageNum');
 
-$table->integer('EmailMessageNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->text('ToAddress');
 
-$table->text('ToAddress');
+            $table->text('FromAddress');
 
-$table->text('FromAddress');
+            $table->text('Subject');
 
-$table->text('Subject');
+            $table->text('BodyText');
 
-$table->text('BodyText');
+            $table->date('MsgDateTime');
 
-$table->date('MsgDateTime');
+            $table->integer('SentOrReceived');
 
-$table->integer('SentOrReceived');
+            $table->string('RecipientAddress');
 
-$table->string('RecipientAddress');
+            $table->text('RawEmailIn');
 
-$table->text('RawEmailIn');
+            $table->integer('ProvNumWebMail');
 
-$table->integer('ProvNumWebMail');
+            $table->integer('PatNumSubj');
 
-$table->integer('PatNumSubj');
+            $table->text('CcAddress');
 
-$table->text('CcAddress');
+            $table->text('BccAddress');
 
-$table->text('BccAddress');
+            $table->integer('HideIn');
 
-$table->integer('HideIn');
+            $table->integer('AptNum');
 
-$table->integer('AptNum');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->integer('HtmlType');
 
-$table->integer('HtmlType');
+            $table->date('SecDateTEntry');
 
-$table->date('SecDateTEntry');
+            $table->string('SecDateTEdit');
 
-$table->string('SecDateTEdit');
+            $table->string('MsgType');
 
-$table->string('MsgType');
+            $table->text('FailReason');
 
-$table->text('FailReason');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('emailmessage');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('emailmessage');
+    }
 };

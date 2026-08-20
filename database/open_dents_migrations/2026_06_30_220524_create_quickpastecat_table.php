@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('quickpastecat', function (Blueprint $table) {
 
-Schema::create('quickpastecat', function(Blueprint $table){
+            $table->integer('QuickPasteCatNum');
 
-$table->integer('QuickPasteCatNum');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->text('DefaultForTypes');
 
-$table->text('DefaultForTypes');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('quickpastecat');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('quickpastecat');
+    }
 };

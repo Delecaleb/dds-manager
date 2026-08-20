@@ -4,51 +4,45 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('eclipboardsheetdef', function (Blueprint $table) {
 
-Schema::create('eclipboardsheetdef', function(Blueprint $table){
+            $table->integer('EClipboardSheetDefNum');
 
-$table->integer('EClipboardSheetDefNum');
+            $table->integer('SheetDefNum');
 
-$table->integer('SheetDefNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('ResubmitInterval');
 
-$table->integer('ResubmitInterval');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->integer('PrefillStatus');
 
-$table->integer('PrefillStatus');
+            $table->integer('MinAge');
 
-$table->integer('MinAge');
+            $table->integer('MaxAge');
 
-$table->integer('MaxAge');
+            $table->text('IgnoreSheetDefNums');
 
-$table->text('IgnoreSheetDefNums');
+            $table->integer('PrefillStatusOverride');
 
-$table->integer('PrefillStatusOverride');
+            $table->integer('EFormDefNum');
 
-$table->integer('EFormDefNum');
+            $table->integer('Frequency');
 
-$table->integer('Frequency');
+            $table->string('SheetDefNumsConsidered');
 
-$table->string('SheetDefNumsConsidered');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('eclipboardsheetdef');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('eclipboardsheetdef');
+    }
 };

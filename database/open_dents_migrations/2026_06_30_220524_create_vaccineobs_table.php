@@ -4,45 +4,39 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('vaccineobs', function (Blueprint $table) {
 
-Schema::create('vaccineobs', function(Blueprint $table){
+            $table->integer('VaccineObsNum');
 
-$table->integer('VaccineObsNum');
+            $table->integer('VaccinePatNum');
 
-$table->integer('VaccinePatNum');
+            $table->integer('ValType');
 
-$table->integer('ValType');
+            $table->integer('IdentifyingCode');
 
-$table->integer('IdentifyingCode');
+            $table->string('ValReported');
 
-$table->string('ValReported');
+            $table->integer('ValCodeSystem');
 
-$table->integer('ValCodeSystem');
+            $table->integer('VaccineObsNumGroup');
 
-$table->integer('VaccineObsNumGroup');
+            $table->string('UcumCode');
 
-$table->string('UcumCode');
+            $table->date('DateObs');
 
-$table->date('DateObs');
+            $table->string('MethodCode');
 
-$table->string('MethodCode');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('vaccineobs');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('vaccineobs');
+    }
 };

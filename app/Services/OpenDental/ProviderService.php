@@ -2,15 +2,11 @@
 
 namespace App\Services\OpenDental;
 
-
 class ProviderService
 {
-
     public function __construct(
         protected OpenDentalClient $client
-    ){}
-
-
+    ) {}
 
     public function all()
     {
@@ -33,19 +29,14 @@ class ProviderService
     public function findMany($ids)
     {
 
-
         return collect(
             $this->all()
         )
-        ->whereIn(
-            'ProvNum',
-            $ids
-        )
-        ->values();
-
+            ->whereIn(
+                'ProvNum',
+                $ids
+            )
+            ->values();
 
     }
-
-
-
 }

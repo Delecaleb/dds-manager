@@ -4,77 +4,71 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('payplan', function (Blueprint $table) {
 
-Schema::create('payplan', function(Blueprint $table){
+            $table->integer('PayPlanNum');
 
-$table->integer('PayPlanNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('Guarantor');
 
-$table->integer('Guarantor');
+            $table->date('PayPlanDate');
 
-$table->date('PayPlanDate');
+            $table->string('APR');
 
-$table->string('APR');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->integer('PlanNum');
 
-$table->integer('PlanNum');
+            $table->string('CompletedAmt');
 
-$table->string('CompletedAmt');
+            $table->integer('InsSubNum');
 
-$table->integer('InsSubNum');
+            $table->integer('PaySchedule');
 
-$table->integer('PaySchedule');
+            $table->integer('NumberOfPayments');
 
-$table->integer('NumberOfPayments');
+            $table->string('PayAmt');
 
-$table->string('PayAmt');
+            $table->string('DownPayment');
 
-$table->string('DownPayment');
+            $table->integer('IsClosed');
 
-$table->integer('IsClosed');
+            $table->text('Signature');
 
-$table->text('Signature');
+            $table->integer('SigIsTopaz');
 
-$table->integer('SigIsTopaz');
+            $table->integer('PlanCategory');
 
-$table->integer('PlanCategory');
+            $table->integer('IsDynamic');
 
-$table->integer('IsDynamic');
+            $table->integer('ChargeFrequency');
 
-$table->integer('ChargeFrequency');
+            $table->date('DatePayPlanStart');
 
-$table->date('DatePayPlanStart');
+            $table->integer('IsLocked');
 
-$table->integer('IsLocked');
+            $table->date('DateInterestStart');
 
-$table->date('DateInterestStart');
+            $table->integer('DynamicPayPlanTPOption');
 
-$table->integer('DynamicPayPlanTPOption');
+            $table->integer('MobileAppDeviceNum');
 
-$table->integer('MobileAppDeviceNum');
+            $table->string('SecurityHash');
 
-$table->string('SecurityHash');
+            $table->integer('SheetDefNum');
 
-$table->integer('SheetDefNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('payplan');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('payplan');
+    }
 };

@@ -4,55 +4,49 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('supply', function (Blueprint $table) {
 
-Schema::create('supply', function(Blueprint $table){
+            $table->integer('SupplyNum');
 
-$table->integer('SupplyNum');
+            $table->integer('SupplierNum');
 
-$table->integer('SupplierNum');
+            $table->string('CatalogNumber');
 
-$table->string('CatalogNumber');
+            $table->string('Descript');
 
-$table->string('Descript');
+            $table->integer('Category');
 
-$table->integer('Category');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->string('LevelDesired');
 
-$table->string('LevelDesired');
+            $table->integer('IsHidden');
 
-$table->integer('IsHidden');
+            $table->string('Price');
 
-$table->string('Price');
+            $table->string('BarCodeOrID');
 
-$table->string('BarCodeOrID');
+            $table->string('DispDefaultQuant');
 
-$table->string('DispDefaultQuant');
+            $table->integer('DispUnitsCount');
 
-$table->integer('DispUnitsCount');
+            $table->string('DispUnitDesc');
 
-$table->string('DispUnitDesc');
+            $table->string('LevelOnHand');
 
-$table->string('LevelOnHand');
+            $table->integer('OrderQty');
 
-$table->integer('OrderQty');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('supply');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('supply');
+    }
 };

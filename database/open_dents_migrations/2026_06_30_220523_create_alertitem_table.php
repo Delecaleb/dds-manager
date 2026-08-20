@@ -4,47 +4,41 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('alertitem', function (Blueprint $table) {
 
-Schema::create('alertitem', function(Blueprint $table){
+            $table->integer('AlertItemNum');
 
-$table->integer('AlertItemNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->integer('Type');
 
-$table->integer('Type');
+            $table->integer('Severity');
 
-$table->integer('Severity');
+            $table->integer('Actions');
 
-$table->integer('Actions');
+            $table->integer('FormToOpen');
 
-$table->integer('FormToOpen');
+            $table->integer('FKey');
 
-$table->integer('FKey');
+            $table->string('ItemValue');
 
-$table->string('ItemValue');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->date('SecDateTEntry');
 
-$table->date('SecDateTEntry');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('alertitem');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('alertitem');
+    }
 };

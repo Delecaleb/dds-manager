@@ -4,41 +4,35 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('electid', function (Blueprint $table) {
 
-Schema::create('electid', function(Blueprint $table){
+            $table->integer('ElectIDNum');
 
-$table->integer('ElectIDNum');
+            $table->string('PayorID');
 
-$table->string('PayorID');
+            $table->string('CarrierName');
 
-$table->string('CarrierName');
+            $table->integer('IsMedicaid');
 
-$table->integer('IsMedicaid');
+            $table->string('ProviderTypes');
 
-$table->string('ProviderTypes');
+            $table->text('Comments');
 
-$table->text('Comments');
+            $table->integer('CommBridge');
 
-$table->integer('CommBridge');
+            $table->string('Attributes');
 
-$table->string('Attributes');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('electid');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('electid');
+    }
 };

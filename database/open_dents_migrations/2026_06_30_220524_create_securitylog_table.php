@@ -4,49 +4,43 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('securitylog', function (Blueprint $table) {
 
-Schema::create('securitylog', function(Blueprint $table){
+            $table->integer('SecurityLogNum');
 
-$table->integer('SecurityLogNum');
+            $table->integer('PermType');
 
-$table->integer('PermType');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->date('LogDateTime');
 
-$table->date('LogDateTime');
+            $table->text('LogText');
 
-$table->text('LogText');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->string('CompName');
 
-$table->string('CompName');
+            $table->integer('FKey');
 
-$table->integer('FKey');
+            $table->integer('LogSource');
 
-$table->integer('LogSource');
+            $table->integer('DefNum');
 
-$table->integer('DefNum');
+            $table->integer('DefNumError');
 
-$table->integer('DefNumError');
+            $table->date('DateTPrevious');
 
-$table->date('DateTPrevious');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('securitylog');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('securitylog');
+    }
 };

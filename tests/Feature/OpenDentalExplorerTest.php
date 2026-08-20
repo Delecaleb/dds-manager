@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\OdAppointment;
+use App\Models\Office;
 use App\Models\User;
 use App\Services\OpenDental\QueryService;
 use Mockery\MockInterface;
@@ -244,6 +246,84 @@ class OpenDentalExplorerTest extends TestCase
             'ClaimProcNum' => 88888,
             'ProcDate' => '2026-08-01',
             'DateCP' => null,
+        ]);
+    }
+
+    public function test_reconcile_diff_identifies_orphans_and_prunes_them(): void
+    {
+        $user = User::factory()->create();
+        $office = Office::create([
+            'id' => 1,
+            'name' => 'Main Office',
+            'developer_key' => 'dev_test',
+            'customer_key' => 'cust_test',
+        ]);
+
+        // Create 2 appointments locally
+        OdAppointment::create([
+            'AptNum' => 5001,
+            'PatNum' => 101,
+            'AptDateTime' => '2026-08-10 10:00:00',
+            'AptStatus' => 1,
+            'office_id' => 1,
+        ]);
+
+        OdAppointment::create([
+            'AptNum' => 5002,
+            'PatNum' => 102,
+            'AptDateTime' => '2026-08-10 11:00:00',
+            'AptStatus' => 1,
+            'office_id' => 1,
+        ]);
+
+        // Mock QueryService to return only AptNum 5001 from Live OD (so 5002 is an orphan)
+        $mockQueryService = $this->mock(QueryService::class);
+        $mockQueryService->shouldReceive('forOffice')->andReturnSelf();
+        $mockQueryService->shouldReceive('shortQuery')->andReturn([
+            [
+                'AptNum' => 5001,
+                'PatNum' => 101,
+                'AptDateTime' => '2026-08-10 10:00:00',
+                'AptStatus' => 1,
+            ],
+        ]);
+
+        $res = $this->actingAs($user)->postJson('/open-dental-explorer/reconcile-diff', [
+            'table' => 'appointment',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-19',
+        ]);
+
+        $res->assertStatus(200);
+        $res->assertJson([
+            'success' => true,
+            'summary' => [
+                'live_count' => 1,
+                'local_count' => 2,
+                'matched_count' => 1,
+                'orphan_count' => 1,
+                'missing_count' => 0,
+            ],
+            'orphan_keys' => ['5002'],
+        ]);
+
+        // Now prune orphan 5002
+        $pruneRes = $this->actingAs($user)->postJson('/open-dental-explorer/prune-orphans', [
+            'table' => 'appointment',
+            'keys' => [5002],
+        ]);
+
+        $pruneRes->assertStatus(200);
+        $pruneRes->assertJson([
+            'success' => true,
+            'deleted_count' => 1,
+        ]);
+
+        $this->assertDatabaseMissing('od_appointments', [
+            'AptNum' => 5002,
+        ]);
+        $this->assertDatabaseHas('od_appointments', [
+            'AptNum' => 5001,
         ]);
     }
 }

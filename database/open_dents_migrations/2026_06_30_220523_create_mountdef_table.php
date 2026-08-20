@@ -4,49 +4,43 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('mountdef', function (Blueprint $table) {
 
-Schema::create('mountdef', function(Blueprint $table){
+            $table->integer('MountDefNum');
 
-$table->integer('MountDefNum');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->integer('Width');
 
-$table->integer('Width');
+            $table->integer('Height');
 
-$table->integer('Height');
+            $table->integer('ColorBack');
 
-$table->integer('ColorBack');
+            $table->integer('ColorFore');
 
-$table->integer('ColorFore');
+            $table->integer('ColorTextBack');
 
-$table->integer('ColorTextBack');
+            $table->string('ScaleValue');
 
-$table->string('ScaleValue');
+            $table->integer('DefaultCat');
 
-$table->integer('DefaultCat');
+            $table->integer('FlipOnAcquire');
 
-$table->integer('FlipOnAcquire');
+            $table->integer('AdjModeAfterSeries');
 
-$table->integer('AdjModeAfterSeries');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('mountdef');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('mountdef');
+    }
 };

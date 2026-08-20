@@ -4,93 +4,87 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('medlab', function (Blueprint $table) {
 
-Schema::create('medlab', function(Blueprint $table){
+            $table->integer('MedLabNum');
 
-$table->integer('MedLabNum');
+            $table->string('SendingApp');
 
-$table->string('SendingApp');
+            $table->string('SendingFacility');
 
-$table->string('SendingFacility');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('ProvNum');
 
-$table->integer('ProvNum');
+            $table->string('PatIDLab');
 
-$table->string('PatIDLab');
+            $table->string('PatIDAlt');
 
-$table->string('PatIDAlt');
+            $table->string('PatAge');
 
-$table->string('PatAge');
+            $table->string('PatAccountNum');
 
-$table->string('PatAccountNum');
+            $table->integer('PatFasting');
 
-$table->integer('PatFasting');
+            $table->string('SpecimenID');
 
-$table->string('SpecimenID');
+            $table->string('SpecimenIDFiller');
 
-$table->string('SpecimenIDFiller');
+            $table->string('ObsTestID');
 
-$table->string('ObsTestID');
+            $table->string('ObsTestDescript');
 
-$table->string('ObsTestDescript');
+            $table->string('ObsTestLoinc');
 
-$table->string('ObsTestLoinc');
+            $table->string('ObsTestLoincText');
 
-$table->string('ObsTestLoincText');
+            $table->date('DateTimeCollected');
 
-$table->date('DateTimeCollected');
+            $table->string('TotalVolume');
 
-$table->string('TotalVolume');
+            $table->string('ActionCode');
 
-$table->string('ActionCode');
+            $table->string('ClinicalInfo');
 
-$table->string('ClinicalInfo');
+            $table->date('DateTimeEntered');
 
-$table->date('DateTimeEntered');
+            $table->string('OrderingProvNPI');
 
-$table->string('OrderingProvNPI');
+            $table->string('OrderingProvLocalID');
 
-$table->string('OrderingProvLocalID');
+            $table->string('OrderingProvLName');
 
-$table->string('OrderingProvLName');
+            $table->string('OrderingProvFName');
 
-$table->string('OrderingProvFName');
+            $table->string('SpecimenIDAlt');
 
-$table->string('SpecimenIDAlt');
+            $table->date('DateTimeReported');
 
-$table->date('DateTimeReported');
+            $table->string('ResultStatus');
 
-$table->string('ResultStatus');
+            $table->string('ParentObsID');
 
-$table->string('ParentObsID');
+            $table->string('ParentObsTestID');
 
-$table->string('ParentObsTestID');
+            $table->text('NotePat');
 
-$table->text('NotePat');
+            $table->text('NoteLab');
 
-$table->text('NoteLab');
+            $table->string('FileName');
 
-$table->string('FileName');
+            $table->text('OriginalPIDSegment');
 
-$table->text('OriginalPIDSegment');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('medlab');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('medlab');
+    }
 };

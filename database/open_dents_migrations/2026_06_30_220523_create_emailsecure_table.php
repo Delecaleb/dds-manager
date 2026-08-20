@@ -4,41 +4,35 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('emailsecure', function (Blueprint $table) {
 
-Schema::create('emailsecure', function(Blueprint $table){
+            $table->integer('EmailSecureNum');
 
-$table->integer('EmailSecureNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('EmailMessageNum');
 
-$table->integer('EmailMessageNum');
+            $table->integer('EmailChainFK');
 
-$table->integer('EmailChainFK');
+            $table->integer('EmailFK');
 
-$table->integer('EmailFK');
+            $table->date('DateTEntry');
 
-$table->date('DateTEntry');
+            $table->string('SecDateTEdit');
 
-$table->string('SecDateTEdit');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('emailsecure');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('emailsecure');
+    }
 };

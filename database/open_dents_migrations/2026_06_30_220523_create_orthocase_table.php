@@ -4,59 +4,53 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('orthocase', function (Blueprint $table) {
 
-Schema::create('orthocase', function(Blueprint $table){
+            $table->integer('OrthoCaseNum');
 
-$table->integer('OrthoCaseNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('ProvNum');
 
-$table->integer('ProvNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->string('Fee');
 
-$table->string('Fee');
+            $table->string('FeeInsPrimary');
 
-$table->string('FeeInsPrimary');
+            $table->string('FeePat');
 
-$table->string('FeePat');
+            $table->date('BandingDate');
 
-$table->date('BandingDate');
+            $table->date('DebondDate');
 
-$table->date('DebondDate');
+            $table->date('DebondDateExpected');
 
-$table->date('DebondDateExpected');
+            $table->integer('IsTransfer');
 
-$table->integer('IsTransfer');
+            $table->integer('OrthoType');
 
-$table->integer('OrthoType');
+            $table->date('SecDateTEntry');
 
-$table->date('SecDateTEntry');
+            $table->integer('SecUserNumEntry');
 
-$table->integer('SecUserNumEntry');
+            $table->string('SecDateTEdit');
 
-$table->string('SecDateTEdit');
+            $table->integer('IsActive');
 
-$table->integer('IsActive');
+            $table->string('FeeInsSecondary');
 
-$table->string('FeeInsSecondary');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('orthocase');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('orthocase');
+    }
 };

@@ -19,7 +19,7 @@ class AppointmentRepository
         // the normalized DATE keeps the range correct in BOTH cases — REPLACE is
         // a harmless no-op once the column is a real DATETIME (no 'T' present).
         $startDate = substr($start, 0, 10);
-        $endDate   = substr($end, 0, 10);
+        $endDate = substr($end, 0, 10);
 
         $query = OdAppointment::query()
             ->with(['patient', 'provider'])

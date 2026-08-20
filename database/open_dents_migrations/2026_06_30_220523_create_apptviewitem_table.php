@@ -4,47 +4,41 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('apptviewitem', function (Blueprint $table) {
 
-Schema::create('apptviewitem', function(Blueprint $table){
+            $table->integer('ApptViewItemNum');
 
-$table->integer('ApptViewItemNum');
+            $table->integer('ApptViewNum');
 
-$table->integer('ApptViewNum');
+            $table->integer('OpNum');
 
-$table->integer('OpNum');
+            $table->integer('ProvNum');
 
-$table->integer('ProvNum');
+            $table->string('ElementDesc');
 
-$table->string('ElementDesc');
+            $table->integer('ElementOrder');
 
-$table->integer('ElementOrder');
+            $table->integer('ElementColor');
 
-$table->integer('ElementColor');
+            $table->integer('ElementAlignment');
 
-$table->integer('ElementAlignment');
+            $table->integer('ApptFieldDefNum');
 
-$table->integer('ApptFieldDefNum');
+            $table->integer('PatFieldDefNum');
 
-$table->integer('PatFieldDefNum');
+            $table->integer('IsMobile');
 
-$table->integer('IsMobile');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('apptviewitem');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('apptviewitem');
+    }
 };

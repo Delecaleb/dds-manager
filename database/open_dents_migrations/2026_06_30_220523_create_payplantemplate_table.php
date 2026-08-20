@@ -4,51 +4,45 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('payplantemplate', function (Blueprint $table) {
 
-Schema::create('payplantemplate', function(Blueprint $table){
+            $table->integer('PayPlanTemplateNum');
 
-$table->integer('PayPlanTemplateNum');
+            $table->string('PayPlanTemplateName');
 
-$table->string('PayPlanTemplateName');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->string('APR');
 
-$table->string('APR');
+            $table->integer('InterestDelay');
 
-$table->integer('InterestDelay');
+            $table->string('PayAmt');
 
-$table->string('PayAmt');
+            $table->integer('NumberOfPayments');
 
-$table->integer('NumberOfPayments');
+            $table->integer('ChargeFrequency');
 
-$table->integer('ChargeFrequency');
+            $table->string('DownPayment');
 
-$table->string('DownPayment');
+            $table->integer('DynamicPayPlanTPOption');
 
-$table->integer('DynamicPayPlanTPOption');
+            $table->string('Note');
 
-$table->string('Note');
+            $table->integer('IsHidden');
 
-$table->integer('IsHidden');
+            $table->integer('SheetDefNum');
 
-$table->integer('SheetDefNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('payplantemplate');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('payplantemplate');
+    }
 };

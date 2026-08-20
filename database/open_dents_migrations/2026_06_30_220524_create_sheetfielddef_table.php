@@ -4,83 +4,77 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('sheetfielddef', function (Blueprint $table) {
 
-Schema::create('sheetfielddef', function(Blueprint $table){
+            $table->integer('SheetFieldDefNum');
 
-$table->integer('SheetFieldDefNum');
+            $table->integer('SheetDefNum');
 
-$table->integer('SheetDefNum');
+            $table->integer('FieldType');
 
-$table->integer('FieldType');
+            $table->string('FieldName');
 
-$table->string('FieldName');
+            $table->text('FieldValue');
 
-$table->text('FieldValue');
+            $table->string('FontSize');
 
-$table->string('FontSize');
+            $table->string('FontName');
 
-$table->string('FontName');
+            $table->integer('FontIsBold');
 
-$table->integer('FontIsBold');
+            $table->integer('XPos');
 
-$table->integer('XPos');
+            $table->integer('YPos');
 
-$table->integer('YPos');
+            $table->integer('Width');
 
-$table->integer('Width');
+            $table->integer('Height');
 
-$table->integer('Height');
+            $table->integer('GrowthBehavior');
 
-$table->integer('GrowthBehavior');
+            $table->string('RadioButtonValue');
 
-$table->string('RadioButtonValue');
+            $table->string('RadioButtonGroup');
 
-$table->string('RadioButtonGroup');
+            $table->integer('IsRequired');
 
-$table->integer('IsRequired');
+            $table->integer('TabOrder');
 
-$table->integer('TabOrder');
+            $table->string('ReportableName');
 
-$table->string('ReportableName');
+            $table->integer('TextAlign');
 
-$table->integer('TextAlign');
+            $table->integer('IsPaymentOption');
 
-$table->integer('IsPaymentOption');
+            $table->integer('ItemColor');
 
-$table->integer('ItemColor');
+            $table->integer('IsLocked');
 
-$table->integer('IsLocked');
+            $table->integer('TabOrderMobile');
 
-$table->integer('TabOrderMobile');
+            $table->text('UiLabelMobile');
 
-$table->text('UiLabelMobile');
+            $table->text('UiLabelMobileRadioButton');
 
-$table->text('UiLabelMobileRadioButton');
+            $table->integer('LayoutMode');
 
-$table->integer('LayoutMode');
+            $table->string('Language');
 
-$table->string('Language');
+            $table->integer('CanElectronicallySign');
 
-$table->integer('CanElectronicallySign');
+            $table->integer('IsSigProvRestricted');
 
-$table->integer('IsSigProvRestricted');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('sheetfielddef');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('sheetfielddef');
+    }
 };

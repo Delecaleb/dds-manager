@@ -4,31 +4,25 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('recalltrigger', function (Blueprint $table) {
 
-Schema::create('recalltrigger', function(Blueprint $table){
+            $table->integer('RecallTriggerNum');
 
-$table->integer('RecallTriggerNum');
+            $table->integer('RecallTypeNum');
 
-$table->integer('RecallTypeNum');
+            $table->integer('CodeNum');
 
-$table->integer('CodeNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('recalltrigger');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('recalltrigger');
+    }
 };

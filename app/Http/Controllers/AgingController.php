@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ClinicRegistry;
 use App\Services\OpenDental\AgingCalculationService;
 use Illuminate\Http\Request;
 
@@ -9,7 +10,7 @@ class AgingController extends Controller
 {
     public function __construct(
         protected AgingCalculationService $agingCalculationService,
-        protected \App\Domain\Support\ClinicRegistry $clinics
+        protected ClinicRegistry $clinics
     ) {}
 
     public function index()

@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('commoptout', function (Blueprint $table) {
 
-Schema::create('commoptout', function(Blueprint $table){
+            $table->integer('CommOptOutNum');
 
-$table->integer('CommOptOutNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('OptOutSms');
 
-$table->integer('OptOutSms');
+            $table->integer('OptOutEmail');
 
-$table->integer('OptOutEmail');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('commoptout');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('commoptout');
+    }
 };

@@ -3,8 +3,6 @@
 namespace App\Services\Sync;
 
 use App\Models\OdDeposit;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 class DepositSyncService extends BaseQuerySyncService
 {

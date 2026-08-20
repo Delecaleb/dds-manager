@@ -4,47 +4,41 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('tasklist', function (Blueprint $table) {
 
-Schema::create('tasklist', function(Blueprint $table){
+            $table->integer('TaskListNum');
 
-$table->integer('TaskListNum');
+            $table->string('Descript');
 
-$table->string('Descript');
+            $table->integer('Parent');
 
-$table->integer('Parent');
+            $table->date('DateTL');
 
-$table->date('DateTL');
+            $table->integer('IsRepeating');
 
-$table->integer('IsRepeating');
+            $table->integer('DateType');
 
-$table->integer('DateType');
+            $table->integer('FromNum');
 
-$table->integer('FromNum');
+            $table->integer('ObjectType');
 
-$table->integer('ObjectType');
+            $table->date('DateTimeEntry');
 
-$table->date('DateTimeEntry');
+            $table->integer('GlobalTaskFilterType');
 
-$table->integer('GlobalTaskFilterType');
+            $table->integer('TaskListStatus');
 
-$table->integer('TaskListStatus');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('tasklist');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('tasklist');
+    }
 };

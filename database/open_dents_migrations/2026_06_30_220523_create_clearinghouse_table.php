@@ -4,89 +4,83 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('clearinghouse', function (Blueprint $table) {
 
-Schema::create('clearinghouse', function(Blueprint $table){
+            $table->integer('ClearinghouseNum');
 
-$table->integer('ClearinghouseNum');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->text('ExportPath');
 
-$table->text('ExportPath');
+            $table->text('Payors');
 
-$table->text('Payors');
+            $table->integer('Eformat');
 
-$table->integer('Eformat');
+            $table->string('ISA05');
 
-$table->string('ISA05');
+            $table->string('SenderTIN');
 
-$table->string('SenderTIN');
+            $table->string('ISA07');
 
-$table->string('ISA07');
+            $table->string('ISA08');
 
-$table->string('ISA08');
+            $table->string('ISA15');
 
-$table->string('ISA15');
+            $table->string('Password');
 
-$table->string('Password');
+            $table->string('ResponsePath');
 
-$table->string('ResponsePath');
+            $table->integer('CommBridge');
 
-$table->integer('CommBridge');
+            $table->string('ClientProgram');
 
-$table->string('ClientProgram');
+            $table->integer('LastBatchNumber');
 
-$table->integer('LastBatchNumber');
+            $table->integer('ModemPort');
 
-$table->integer('ModemPort');
+            $table->string('LoginID');
 
-$table->string('LoginID');
+            $table->string('SenderName');
 
-$table->string('SenderName');
+            $table->string('SenderTelephone');
 
-$table->string('SenderTelephone');
+            $table->string('GS03');
 
-$table->string('GS03');
+            $table->string('ISA02');
 
-$table->string('ISA02');
+            $table->string('ISA04');
 
-$table->string('ISA04');
+            $table->string('ISA16');
 
-$table->string('ISA16');
+            $table->string('SeparatorData');
 
-$table->string('SeparatorData');
+            $table->string('SeparatorSegment');
 
-$table->string('SeparatorSegment');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('HqClearinghouseNum');
 
-$table->integer('HqClearinghouseNum');
+            $table->integer('IsEraDownloadAllowed');
 
-$table->integer('IsEraDownloadAllowed');
+            $table->integer('IsClaimExportAllowed');
 
-$table->integer('IsClaimExportAllowed');
+            $table->integer('IsAttachmentSendAllowed');
 
-$table->integer('IsAttachmentSendAllowed');
+            $table->string('LocationID');
 
-$table->string('LocationID');
+            $table->integer('EnableXConnect');
 
-$table->integer('EnableXConnect');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('clearinghouse');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('clearinghouse');
+    }
 };

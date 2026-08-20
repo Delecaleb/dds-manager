@@ -4,39 +4,33 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('hl7msg', function (Blueprint $table) {
 
-Schema::create('hl7msg', function(Blueprint $table){
+            $table->integer('HL7MsgNum');
 
-$table->integer('HL7MsgNum');
+            $table->integer('HL7Status');
 
-$table->integer('HL7Status');
+            $table->text('MsgText');
 
-$table->text('MsgText');
+            $table->integer('AptNum');
 
-$table->integer('AptNum');
+            $table->string('DateTStamp');
 
-$table->string('DateTStamp');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->text('Note');
 
-$table->text('Note');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('hl7msg');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('hl7msg');
+    }
 };

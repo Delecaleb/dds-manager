@@ -2,8 +2,8 @@
 
 namespace App\Domain\Support;
 
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * The single source of truth for clinic (office) identity: ClinicNum -> display name.

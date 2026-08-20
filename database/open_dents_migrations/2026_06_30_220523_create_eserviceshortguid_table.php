@@ -4,41 +4,35 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('eserviceshortguid', function (Blueprint $table) {
 
-Schema::create('eserviceshortguid', function(Blueprint $table){
+            $table->integer('EServiceShortGuidNum');
 
-$table->integer('EServiceShortGuidNum');
+            $table->string('EServiceCode');
 
-$table->string('EServiceCode');
+            $table->string('ShortGuid');
 
-$table->string('ShortGuid');
+            $table->string('ShortURL');
 
-$table->string('ShortURL');
+            $table->integer('FKey');
 
-$table->integer('FKey');
+            $table->string('FKeyType');
 
-$table->string('FKeyType');
+            $table->date('DateTimeExpiration');
 
-$table->date('DateTimeExpiration');
+            $table->date('DateTEntry');
 
-$table->date('DateTEntry');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('eserviceshortguid');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('eserviceshortguid');
+    }
 };

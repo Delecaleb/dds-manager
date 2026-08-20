@@ -4,35 +4,29 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('scheduledprocess', function (Blueprint $table) {
 
-Schema::create('scheduledprocess', function(Blueprint $table){
+            $table->integer('ScheduledProcessNum');
 
-$table->integer('ScheduledProcessNum');
+            $table->string('ScheduledAction');
 
-$table->string('ScheduledAction');
+            $table->date('TimeToRun');
 
-$table->date('TimeToRun');
+            $table->string('FrequencyToRun');
 
-$table->string('FrequencyToRun');
+            $table->date('LastRanDateTime');
 
-$table->date('LastRanDateTime');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('scheduledprocess');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('scheduledprocess');
+    }
 };

@@ -4,39 +4,33 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('ehrquarterlykey', function (Blueprint $table) {
 
-Schema::create('ehrquarterlykey', function(Blueprint $table){
+            $table->integer('EhrQuarterlyKeyNum');
 
-$table->integer('EhrQuarterlyKeyNum');
+            $table->integer('YearValue');
 
-$table->integer('YearValue');
+            $table->integer('QuarterValue');
 
-$table->integer('QuarterValue');
+            $table->string('PracticeName');
 
-$table->string('PracticeName');
+            $table->string('KeyValue');
 
-$table->string('KeyValue');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->text('Notes');
 
-$table->text('Notes');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('ehrquarterlykey');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('ehrquarterlykey');
+    }
 };

@@ -1,966 +1,944 @@
 <x-app-layout>
-  <div class="p-6 space-y-6 max-w-[1600px] mx-auto">
+  <div class="p-6 space-y-5 max-w-[1600px] mx-auto text-slate-800">
+
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-      <div class="flex items-center gap-3.5">
-        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-emerald-600">
-          <i data-lucide="database" class="w-7 h-7"></i>
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+          <i data-lucide="database" class="w-5 h-5 text-slate-700"></i> OpenDental Realtime Data Explorer
+        </h1>
+      </div>
+    </div>
+
+    <!-- Top Action Card: Mode Selector & Contextual Filters -->
+    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+        
+        <!-- Mode Selector -->
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+          <label for="intentModeSelect" class="text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+            I want to:
+          </label>
+          <div class="relative">
+            <select id="intentModeSelect" class="bg-white border border-slate-300 text-slate-800 text-sm font-semibold rounded-lg px-3.5 py-2 pr-10 focus:ring-1 focus:ring-slate-400 focus:border-slate-400 focus:outline-none shadow-2xs cursor-pointer transition appearance-none">
+              <option value="compare_side_by_side" selected>Compare Side-by-Side (Diff & Reconcile)</option>
+              <option value="opendental_live">Check Live OpenDental</option>
+              <option value="local_db">Check Local Synced Database</option>
+              <option value="sync_checkpoints">Manage Sync Checkpoints & Dates</option>
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+              <i data-lucide="chevron-down" class="w-4 h-4"></i>
+            </div>
+          </div>
         </div>
+
+        <!-- Mode Status Badges & Action Button -->
+        <div class="flex items-center gap-3">
+          <span id="activeModeBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+            <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> Mode: Side-by-Side Reconciliation
+          </span>
+          <button id="primaryActionBtn" onclick="executeCurrentMode()" class="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition focus:outline-none cursor-pointer">
+            <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Run Comparison
+          </button>
+        </div>
+      </div>
+
+      <!-- Contextual Filter Controls (For Query & Compare Modes) -->
+      <div id="filterControlsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 items-end">
+        
+        <!-- 1. Table Select -->
         <div>
-          <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-            OpenDental Realtime Data Explorer
-            <span id="sourceLiveBadge" class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> OpenDental Live Connected
-            </span>
-          </h1>
-          <p class="text-sm text-slate-500 mt-0.5">
-            Interactively build queries, filter data with custom conditions (WHERE, AND, OR), inspect schema, and preview live records directly from OpenDental.
-          </p>
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Table</label>
+          <select id="activeTableSelect" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 focus:border-slate-400 shadow-2xs">
+            <optgroup label="📅 Appointments & Schedules">
+              <option value="appointment" selected>appointment (od_appointments)</option>
+              <option value="schedule">schedule (od_schedules)</option>
+              <option value="recall">recall (od_recalls)</option>
+              <option value="recalltype">recalltype (od_recall_types)</option>
+            </optgroup>
+            <optgroup label="🩺 Clinical & Procedures">
+              <option value="procedurelog">procedurelog (od_procedure_logs)</option>
+              <option value="procedurecode">procedurecode (od_procedures)</option>
+              <option value="treatmentplan">treatmentplan (treatment_plans)</option>
+            </optgroup>
+            <optgroup label="💳 Financials, Billing & Claims">
+              <option value="adjustment">adjustment (od_adjustments)</option>
+              <option value="payment">payment (od_payments)</option>
+              <option value="paysplit">paysplit (od_pay_splits)</option>
+              <option value="claimproc">claimproc (od_claim_procs)</option>
+              <option value="claim">claim (od_claims)</option>
+              <option value="claimpayment">claimpayment (od_claim_payments)</option>
+              <option value="payplan">payplan (od_pay_plans)</option>
+              <option value="payplancharge">payplancharge (od_pay_plan_charges)</option>
+              <option value="deposit">deposit (od_deposits)</option>
+            </optgroup>
+            <optgroup label="🏢 Practice & Patient Setup">
+              <option value="patient">patient (od_patients)</option>
+              <option value="provider">provider (od_providers)</option>
+              <option value="insplan">insplan (od_ins_plans)</option>
+              <option value="carrier">carrier (od_carriers)</option>
+              <option value="definition">definition (od_definitions)</option>
+              <option value="clinic">clinic (od_clinics)</option>
+              <option value="operatory">operatory (od_operatories)</option>
+              <option value="userod">userod (od_user_ods)</option>
+            </optgroup>
+          </select>
         </div>
+
+        <!-- 2. Start Date -->
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Start Date</label>
+          <input type="date" id="filterStartDate" value="2026-08-01" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 shadow-2xs">
+        </div>
+
+        <!-- 3. End Date -->
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">End Date</label>
+          <input type="date" id="filterEndDate" value="2026-08-19" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 shadow-2xs">
+        </div>
+
+        <!-- 4. Status Filter (Visible for appointments) -->
+        <div id="statusFilterWrapper">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Status</label>
+          <select id="filterStatusSelect" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 shadow-2xs">
+            <option value="1_2" selected>Scheduled & Complete (1, 2)</option>
+            <option value="all">All Statuses (No Filter)</option>
+            <option value="1">Scheduled Only (1)</option>
+            <option value="2">Complete Only (2)</option>
+            <option value="5">Broken / Cancelled (5)</option>
+          </select>
+        </div>
+
+        <!-- 5. Max Rows Limit -->
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Limit</label>
+          <select id="filterLimitSelect" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 shadow-2xs">
+            <option value="200">200 rows</option>
+            <option value="500" selected>500 rows</option>
+            <option value="1000">1,000 rows</option>
+            <option value="2000">2,000 rows</option>
+          </select>
+        </div>
+
       </div>
-      <div class="flex items-center gap-2.5">
-        <button id="resetBtn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition focus:outline-none">
-          <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset Builder
-        </button>
-        <button id="exportCsvBtn" disabled class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-slate-400 rounded-xl cursor-not-allowed transition shadow-sm focus:outline-none disabled:opacity-60">
-          <i data-lucide="download" class="w-4 h-4"></i> Export CSV
-        </button>
-        <button id="syncToLocalBtn" disabled class="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-slate-400 rounded-xl cursor-not-allowed transition shadow-sm focus:outline-none disabled:opacity-60" title="Sync fetched OpenDental records into local database table">
-          <i data-lucide="cloud-download" class="w-4 h-4"></i> Sync to Local DB
-        </button>
-        <button id="runQueryBtn" class="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-md shadow-emerald-500/20 transition focus:outline-none">
-          <i data-lucide="play" class="w-4 h-4 fill-current"></i> Fetch Realtime Data
-        </button>
+
+      <!-- Quick Preset Dates -->
+      <div id="quickDatePresetsWrapper" class="flex items-center gap-1.5 pt-1 border-t border-slate-100 text-xs flex-wrap">
+        <span class="text-slate-400 font-medium text-[11px] mr-1">Quick Dates:</span>
+        <button type="button" onclick="setDatePreset('aug_2026')" class="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition cursor-pointer">Aug 1–19, 2026 (Live Data)</button>
+        <button type="button" onclick="setDatePreset('this_month')" class="px-2.5 py-1 text-[11px] font-medium rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition cursor-pointer">This Month</button>
+        <button type="button" onclick="setDatePreset('last_month')" class="px-2.5 py-1 text-[11px] font-medium rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition cursor-pointer">Last Month</button>
+        <button type="button" onclick="setDatePreset('last_30_days')" class="px-2.5 py-1 text-[11px] font-medium rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition cursor-pointer">Last 30 Days</button>
+        <button type="button" onclick="setDatePreset('today')" class="px-2.5 py-1 text-[11px] font-medium rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition cursor-pointer">Today</button>
       </div>
+
     </div>
 
-    <!-- Navigation Tabs -->
-    <div class="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 rounded-xl shadow-xs">
-      <button id="tabQueryBuilderBtn" onclick="switchOdTab('queryBuilder')" class="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 transition">
-        <i data-lucide="sliders" class="w-4 h-4"></i> Realtime Query Builder
-      </button>
-      <button id="tabSyncCheckpointsBtn" onclick="switchOdTab('syncCheckpoints')" class="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition">
-        <i data-lucide="history" class="w-4 h-4"></i> Sync Checkpoints & Reset Start Date
-      </button>
-    </div>
-
-    <!-- Query Builder View (Tab 1) -->
-    <div id="tabQueryBuilderView">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- VIEW 1: SIDE-BY-SIDE RECONCILIATION CONTAINER -->
+    <div id="viewCompareContainer" class="space-y-5">
       
-      <!-- Query Builder Sidebar (Left Column) -->
-      <div class="lg:col-span-4 space-y-5">
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div class="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-            <span class="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-              <i data-lucide="sliders" class="w-4 h-4 text-emerald-600"></i> Query Builder Controls
-            </span>
-            <span id="schemaStatus" class="text-xs font-medium text-slate-500">Select a table</span>
-          </div>
-
-          <div class="p-5 space-y-5">
-            
-            <!-- 0. Data Source Selector Toggle -->
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">0. Database Source</label>
-              <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
-                <button type="button" id="srcLiveBtn" class="py-2 px-3 text-xs font-extrabold rounded-lg transition bg-white text-emerald-700 shadow-sm border border-slate-200 flex items-center justify-center gap-1.5">
-                  <span class="w-2 h-2 rounded-full bg-emerald-500"></span> OpenDental Live API
-                </button>
-                <button type="button" id="srcLocalBtn" class="py-2 px-3 text-xs font-semibold rounded-lg text-slate-600 transition hover:bg-white/60 flex items-center justify-center gap-1.5">
-                  <i data-lucide="database" class="w-3.5 h-3.5"></i> Local DB Snapshot
-                </button>
-              </div>
-            </div>
-
-            <!-- 1. Table Selection -->
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">1. Target OpenDental Table</label>
-              <div class="relative">
-                <select id="tableSelect" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 p-3 pr-10 font-semibold shadow-sm transition">
-                  <option value="" disabled selected>-- Select an OpenDental Table --</option>
-                  
-                  <optgroup label="⚡ OpenDental Native Live Tables">
-                    @foreach($openDentalTables as $tbl)
-                      <option value="{{ $tbl }}">{{ $tbl }}</option>
-                    @endforeach
-                  </optgroup>
-
-                  <optgroup label="💾 Local Synced Tables">
-                    @foreach($localTables as $tbl)
-                      <option value="{{ $tbl }}">{{ $tbl }}</option>
-                    @endforeach
-                  </optgroup>
-                </select>
-              </div>
-            </div>
-
-            <!-- 2. Column Selection -->
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">2. Selected Columns</label>
-                <div class="flex items-center gap-2 text-xs">
-                  <button type="button" id="selectAllColsBtn" class="text-emerald-600 hover:text-emerald-800 font-semibold hover:underline">Select All</button>
-                  <span class="text-slate-300">|</span>
-                  <button type="button" id="clearColsBtn" class="text-slate-500 hover:text-slate-700 font-semibold hover:underline">Clear</button>
-                </div>
-              </div>
-              <div id="columnsContainer" class="max-h-48 overflow-y-auto p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
-                <p class="text-slate-400 italic">Select a table first to inspect available columns.</p>
-              </div>
-            </div>
-
-            <!-- 3. Where Filter Conditions Builder -->
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">3. Filter Conditions (WHERE / AND / OR)</label>
-                <button type="button" id="addConditionBtn" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition border border-emerald-200">
-                  <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Condition
-                </button>
-              </div>
-              
-              <div id="conditionsList" class="space-y-2.5">
-                <div id="noConditionsMsg" class="p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-center text-xs text-slate-400">
-                  No filter conditions added. Showing all matching records.
-                </div>
-              </div>
-            </div>
-
-            <!-- 4. Ordering & Limit -->
-            <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-              <div>
-                <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Order By</label>
-                <select id="orderBySelect" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl p-2.5 font-medium focus:ring-emerald-500">
-                  <option value="">(Default Order)</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Direction</label>
-                <select id="orderDirSelect" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl p-2.5 font-medium focus:ring-emerald-500">
-                  <option value="asc">Ascending (ASC)</option>
-                  <option value="desc">Descending (DESC)</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Max Record Limit</label>
-              <select id="limitSelect" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl p-2.5 font-semibold focus:ring-emerald-500">
-                <option value="10">10 Records</option>
-                <option value="25">25 Records</option>
-                <option value="50" selected>50 Records</option>
-                <option value="100">100 Records</option>
-                <option value="250">250 Records</option>
-                <option value="500">500 Records</option>
-                <option value="1000">1,000 Records</option>
-              </select>
-            </div>
-
-          </div>
-        </div>
-      </div>
-
-      <!-- Results & Preview Panel (Right Column) -->
-      <div class="lg:col-span-8 space-y-5">
-        <!-- Stat Cards Bar -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-            <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-              <i data-lucide="rows-3" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Rows</p>
-              <p id="statRows" class="text-xl font-extrabold text-slate-900 tabular-nums">0</p>
-            </div>
-          </div>
-          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-            <div class="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
-              <i data-lucide="zap" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Query Time</p>
-              <p id="statTime" class="text-xl font-extrabold text-slate-900 tabular-nums">0 ms</p>
-            </div>
-          </div>
-          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-            <div class="p-2.5 bg-purple-50 text-purple-600 rounded-xl">
-              <i data-lucide="columns-3" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Columns</p>
-              <p id="statCols" class="text-xl font-extrabold text-slate-900 tabular-nums">0</p>
-            </div>
-          </div>
-          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-            <div class="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-              <i data-lucide="filter" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Source</p>
-              <p id="statSource" class="text-xs font-bold text-emerald-700 tracking-tight">OpenDental Live</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Fallback Notice Banner -->
-        <div id="noticeBanner" class="hidden p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-xs flex items-center gap-2">
-          <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 flex-shrink-0"></i>
-          <span id="noticeText">Notice details...</span>
-        </div>
-
-        <!-- Raw SQL Query Generated Preview (Collapsible) -->
-        <div class="bg-slate-900 rounded-2xl shadow-sm overflow-hidden text-slate-200 border border-slate-800">
-          <div class="px-5 py-3 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between cursor-pointer" onclick="document.getElementById('sqlDrawer').classList.toggle('hidden')">
-            <span class="text-xs font-mono font-bold text-emerald-400 flex items-center gap-2">
-              <i data-lucide="code-2" class="w-4 h-4"></i> Generated OpenDental SQL Statement
-            </span>
-            <span class="text-[11px] text-slate-500 flex items-center gap-1 font-mono">
-              Click to toggle SQL preview <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
-            </span>
-          </div>
-          <div id="sqlDrawer" class="p-4 font-mono text-xs overflow-x-auto text-emerald-400 bg-slate-900/90 whitespace-pre-wrap leading-relaxed">
-            SELECT * FROM [Select Table Above]
-          </div>
-        </div>
-
-        <!-- Data Results Table Card -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <!-- Table Toolbar -->
-          <div class="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-              <h2 id="tableTitle" class="text-base font-bold text-slate-800">Data Results Preview</h2>
-              <span id="loadingSpinner" class="hidden text-xs text-emerald-600 font-semibold flex items-center gap-1.5 ml-2">
-                <svg class="animate-spin w-4 h-4 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                </svg>
-                Fetching realtime data from OpenDental API...
-              </span>
-            </div>
-
-            <div class="relative min-w-[220px]">
-              <input type="text" id="quickFilterInput" placeholder="Quick search results..." class="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-sm">
-              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2"></i>
-            </div>
-          </div>
-
-          <!-- Table Content Container -->
-          <div class="overflow-x-auto overflow-y-auto max-h-[600px] min-h-[350px] relative">
-            <table class="dds-table dds-sortable w-full text-left text-xs border-collapse" id="resultsTable">
-              <thead class="bg-slate-100 sticky top-0 z-10 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider">
-                <tr id="resultsTheadTr">
-                  <th class="p-4 text-slate-400 italic font-normal">Select a table and click "Fetch Realtime Data" to query OpenDental.</th>
-                </tr>
-              </thead>
-              <tbody id="resultsTbody" class="divide-y divide-slate-100 text-slate-800">
-                <tr>
-                  <td class="p-12 text-center text-slate-400">
-                    <div class="flex flex-col items-center justify-center gap-2">
-                      <i data-lucide="database-backup" class="w-10 h-10 text-slate-300 stroke-1"></i>
-                      <p class="font-medium text-sm text-slate-500">No Realtime Query Executed Yet</p>
-                      <p class="text-xs text-slate-400 max-w-sm">Choose an OpenDental table from the left controls, select columns or filters, and click <strong class="text-emerald-600">Fetch Realtime Data</strong>.</p>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Footer / Pagination -->
-          <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span id="pageInfo">Showing 0 of 0 records</span>
-            <div class="flex items-center gap-2">
-              <button id="prevPageBtn" disabled class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-50">Previous</button>
-              <button id="nextPageBtn" disabled class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-50">Next</button>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </div>
-    <!-- End Query Builder View (Tab 1) -->
-
-    <!-- Sync Checkpoints Management View (Tab 2) -->
-    <div id="tabSyncCheckpointsView" class="hidden space-y-6">
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <!-- Metrics Grid -->
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
           <div>
-            <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <i data-lucide="refresh-cw" class="w-5 h-5 text-indigo-600"></i> OpenDental Sync Checkpoints & Start Date Reset
-            </h2>
-            <p class="text-xs text-slate-500 mt-1">
-              Reset or alter the sync start date (`last_synced_at`) and primary key watermark (`last_primary_key`) for any OpenDental sync module. When sync next executes, existing records will be updated and non-existent records will be inserted without duplicate rows being created.
-            </p>
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Live OpenDental</span>
+            <span id="statLiveCount" class="text-xl font-bold text-emerald-700 mt-0.5 block">0</span>
+            <span class="text-[11px] text-slate-400">Remote API rows</span>
           </div>
-          <div class="flex items-center gap-3">
-            <button onclick="loadSyncCheckpoints()" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition">
-              <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> Refresh List
-            </button>
-            <button onclick="resetAllCheckpoints()" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition">
-              <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Reset All Checkpoints to Start
-            </button>
+          <div class="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 border border-emerald-100">
+            <i data-lucide="cloud" class="w-4 h-4"></i>
           </div>
         </div>
 
-        <div class="overflow-x-auto border border-slate-200 rounded-xl">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-700 uppercase tracking-wider">
-                <th class="px-4 py-3">Module / Table</th>
-                <th class="px-4 py-3">Status</th>
-                <th class="px-4 py-3">Last Synced Date (`last_synced_at`)</th>
-                <th class="px-4 py-3">Last Primary Key (`last_primary_key`)</th>
-                <th class="px-4 py-3">Total Records Synced</th>
-                <th class="px-4 py-3 text-right">Action</th>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Local Synced DB</span>
+            <span id="statLocalCount" class="text-xl font-bold text-blue-700 mt-0.5 block">0</span>
+            <span class="text-[11px] text-slate-400">Local MySQL rows</span>
+          </div>
+          <div class="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 border border-blue-100">
+            <i data-lucide="database" class="w-4 h-4"></i>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span class="text-[11px] font-bold text-rose-700 uppercase tracking-wider block">Deleted in OD</span>
+            <span id="statOrphanCount" class="text-xl font-bold text-rose-600 mt-0.5 block">0</span>
+            <span class="text-[11px] text-slate-400">Orphans to Prune</span>
+          </div>
+          <div class="w-9 h-9 bg-rose-50 rounded-lg flex items-center justify-center text-rose-600 border border-rose-100">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span class="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">Missing Locally</span>
+            <span id="statMissingCount" class="text-xl font-bold text-amber-600 mt-0.5 block">0</span>
+            <span class="text-[11px] text-slate-400">Records to Sync</span>
+          </div>
+          <div class="w-9 h-9 bg-amber-50 rounded-lg flex items-center justify-center text-amber-600 border border-amber-100">
+            <i data-lucide="download-cloud" class="w-4 h-4"></i>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between col-span-2 md:col-span-1">
+          <div>
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Match Rate</span>
+            <span id="statMatchRate" class="text-xl font-bold text-slate-900 mt-0.5 block">100%</span>
+            <span id="statExecTime" class="text-[11px] text-slate-400">0 ms</span>
+          </div>
+          <div class="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 border border-slate-200">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diff Table Card -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        
+        <!-- Table Action Header -->
+        <div class="p-3.5 bg-slate-50/70 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          
+          <!-- Filter Buttons -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button type="button" id="pillAll" onclick="setDiffFilter('all')" class="px-3 py-1 text-xs font-bold rounded-lg bg-slate-900 text-white shadow-2xs transition cursor-pointer">
+              All (<span id="countPillAll">0</span>)
+            </button>
+            <button type="button" id="pillOrphan" onclick="setDiffFilter('orphan')" class="px-3 py-1 text-xs font-medium rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition cursor-pointer">
+              Deleted in OD (<span id="countPillOrphan">0</span>)
+            </button>
+            <button type="button" id="pillMissing" onclick="setDiffFilter('missing')" class="px-3 py-1 text-xs font-medium rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition cursor-pointer">
+              Missing Locally (<span id="countPillMissing">0</span>)
+            </button>
+            <button type="button" id="pillMatched" onclick="setDiffFilter('matched')" class="px-3 py-1 text-xs font-medium rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition cursor-pointer">
+              Matched (<span id="countPillMatched">0</span>)
+            </button>
+          </div>
+
+          <!-- Actions & Search -->
+          <div class="flex items-center gap-2">
+            <div class="relative w-52">
+              <input type="text" id="diffSearchInput" placeholder="Search rows..." class="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-3 py-1 text-xs font-medium text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-slate-400 shadow-2xs">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2"></i>
+            </div>
+
+            <button type="button" id="btnPruneAll" onclick="pruneAllOrphans()" disabled class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-slate-400 rounded-lg cursor-not-allowed transition shadow-2xs disabled:opacity-60">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Prune Orphans
+            </button>
+
+            <button type="button" id="btnSyncAll" onclick="syncAllMissing()" disabled class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-slate-400 rounded-lg cursor-not-allowed transition shadow-2xs disabled:opacity-60">
+              <i data-lucide="download-cloud" class="w-3.5 h-3.5"></i> Sync Missing
+            </button>
+
+            <button type="button" id="btnExportDiff" onclick="exportDiffCsv()" disabled class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition shadow-2xs disabled:opacity-60">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="sticky top-0 bg-slate-100 border-b border-slate-200 z-10 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+              <tr>
+                <th class="px-4 py-2.5">Status</th>
+                <th class="px-4 py-2.5">Primary Key</th>
+                <th class="px-4 py-2.5">Patient ID</th>
+                <th class="px-4 py-2.5">Date & Time</th>
+                <th class="px-4 py-2.5">Record Status</th>
+                <th class="px-4 py-2.5">Provider</th>
+                <th class="px-4 py-2.5">Notes / Details</th>
+                <th class="px-4 py-2.5 text-right">Action</th>
               </tr>
             </thead>
-            <tbody id="checkpointsTbody">
+            <tbody id="diffTableBody">
               <tr>
-                <td colspan="6" class="p-8 text-center text-slate-400 text-sm">Loading sync checkpoints...</td>
+                <td colspan="8" class="p-12 text-center text-slate-400">
+                  <div class="flex flex-col items-center justify-center gap-2">
+                    <svg class="animate-spin w-6 h-6 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+                    <p class="font-medium text-xs text-slate-600">Comparing OpenDental Live vs Local Database...</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- VIEW 2: SINGLE SOURCE QUERY CONTAINER (Live OD or Local DB) -->
+    <div id="viewSingleQueryContainer" class="hidden space-y-4">
+      <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="p-3.5 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span id="singleSourceTitle" class="text-xs font-bold uppercase tracking-wider text-slate-800">Results</span>
+            <span id="singleSourceCount" class="text-xs font-medium text-slate-500">(0 rows)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" id="btnSyncSingleLive" onclick="syncSingleQueryToLocal()" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition shadow-2xs cursor-pointer">
+              <i data-lucide="cloud-download" class="w-3.5 h-3.5"></i> Sync Fetched to Local DB
+            </button>
+            <button type="button" onclick="exportSingleQueryCsv()" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition shadow-2xs cursor-pointer">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="sticky top-0 bg-slate-100 border-b border-slate-200 z-10 font-bold text-slate-700 uppercase tracking-wider text-[11px]" id="singleQueryThead">
+              <tr>
+                <th class="p-4 text-slate-400 font-normal">Click "Run Query" to fetch data.</th>
+              </tr>
+            </thead>
+            <tbody id="singleQueryTbody">
+              <tr>
+                <td class="p-12 text-center text-slate-400 text-xs">No query executed yet.</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
+
+    <!-- VIEW 3: SYNC CHECKPOINTS CONTAINER -->
+    <div id="viewCheckpointsContainer" class="hidden space-y-4">
+      <div class="bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="refresh-cw" class="w-4 h-4 text-slate-600"></i> OpenDental Sync Watermarks & Start Dates
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Reset or update the sync checkpoint (`last_synced_at` and `last_primary_key`) for each module.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="loadSyncCheckpoints()" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer">
+              Refresh
+            </button>
+            <button onclick="resetAllCheckpoints()" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition cursor-pointer">
+              Reset All to Start
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto border border-slate-200 rounded-lg">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <th class="px-4 py-2.5">Module</th>
+                <th class="px-4 py-2.5">Status</th>
+                <th class="px-4 py-2.5">Last Synced Date (`last_synced_at`)</th>
+                <th class="px-4 py-2.5">Last Primary Key</th>
+                <th class="px-4 py-2.5">Records Synced</th>
+                <th class="px-4 py-2.5 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="checkpointsTbody">
+              <tr>
+                <td colspan="6" class="p-8 text-center text-slate-400 text-xs">Loading sync checkpoints...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <!-- Lucide & Dynamic JavaScript Engine -->
+  <!-- JavaScript Application Engine -->
   <script>
+    var _diffResult = null;
+    var _activeDiffFilter = 'all';
+    var _singleQueryResult = null;
+
     document.addEventListener('DOMContentLoaded', function () {
-      var _selectedSource = 'opendental_live';
-      var _availableColumns = [];
-      var _queryResultData = null;
+      var modeSelect = document.getElementById('intentModeSelect');
+      var tableSelect = document.getElementById('activeTableSelect');
 
-      var tableSelect = document.getElementById('tableSelect');
-      var columnsContainer = document.getElementById('columnsContainer');
-      var orderBySelect = document.getElementById('orderBySelect');
-      var orderDirSelect = document.getElementById('orderDirSelect');
-      var limitSelect = document.getElementById('limitSelect');
-      var conditionsList = document.getElementById('conditionsList');
-      var noConditionsMsg = document.getElementById('noConditionsMsg');
-      var addConditionBtn = document.getElementById('addConditionBtn');
-      var runQueryBtn = document.getElementById('runQueryBtn');
-      var resetBtn = document.getElementById('resetBtn');
-      var exportCsvBtn = document.getElementById('exportCsvBtn');
-      var syncToLocalBtn = document.getElementById('syncToLocalBtn');
-      var loadingSpinner = document.getElementById('loadingSpinner');
-      var quickFilterInput = document.getElementById('quickFilterInput');
-      var srcLiveBtn = document.getElementById('srcLiveBtn');
-      var srcLocalBtn = document.getElementById('srcLocalBtn');
-      var noticeBanner = document.getElementById('noticeBanner');
-      var noticeText = document.getElementById('noticeText');
-
-      // Source Toggle Buttons
-      srcLiveBtn.addEventListener('click', function () {
-        _selectedSource = 'opendental_live';
-        srcLiveBtn.className = 'py-2 px-3 text-xs font-extrabold rounded-lg transition bg-white text-emerald-700 shadow-sm border border-slate-200 flex items-center justify-center gap-1.5';
-        srcLocalBtn.className = 'py-2 px-3 text-xs font-semibold rounded-lg text-slate-600 transition hover:bg-white/60 flex items-center justify-center gap-1.5';
-        document.getElementById('statSource').textContent = 'OpenDental Live';
-        document.getElementById('statSource').className = 'text-xs font-bold text-emerald-700 tracking-tight';
+      modeSelect.addEventListener('change', function () {
+        handleModeChange(this.value);
       });
 
-      srcLocalBtn.addEventListener('click', function () {
-        _selectedSource = 'local_db';
-        srcLocalBtn.className = 'py-2 px-3 text-xs font-extrabold rounded-lg transition bg-white text-blue-700 shadow-sm border border-slate-200 flex items-center justify-center gap-1.5';
-        srcLiveBtn.className = 'py-2 px-3 text-xs font-semibold rounded-lg text-slate-600 transition hover:bg-white/60 flex items-center justify-center gap-1.5';
-        document.getElementById('statSource').textContent = 'Local DB Snapshot';
-        document.getElementById('statSource').className = 'text-xs font-bold text-blue-700 tracking-tight';
-      });
-
-      // Table Change Handler
       tableSelect.addEventListener('change', function () {
-        var table = this.value;
-        if (!table) return;
-
-        document.getElementById('schemaStatus').textContent = 'Loading schema...';
-        columnsContainer.innerHTML = '<p class="text-emerald-600 italic">Fetching columns for ' + table + '...</p>';
-
-        fetch('{{ url("/open-dental-explorer/columns") }}?table=' + encodeURIComponent(table))
-          .then(function (r) { return r.json(); })
-          .then(function (res) {
-            if (res.error) {
-              columnsContainer.innerHTML = '<p class="text-rose-600 font-semibold">' + res.error + '</p>';
-              document.getElementById('schemaStatus').textContent = 'Error';
-              return;
-            }
-            _availableColumns = res.columns || [];
-            document.getElementById('schemaStatus').textContent = _availableColumns.length + ' columns found';
-            renderColumnsCheckboxList();
-            renderOrderByOptions();
-            resetConditions();
-          })
-          .catch(function () {
-            columnsContainer.innerHTML = '<p class="text-rose-600 font-semibold">Failed to fetch columns schema.</p>';
-            document.getElementById('schemaStatus').textContent = 'Error';
-          });
+        var isApt = (this.value === 'appointment' || this.value === 'od_appointments');
+        var statusWrapper = document.getElementById('statusFilterWrapper');
+        if (statusWrapper) {
+          statusWrapper.style.display = isApt ? 'block' : 'none';
+        }
+        executeCurrentMode();
       });
 
-      function renderColumnsCheckboxList() {
-        if (!_availableColumns.length) {
-          columnsContainer.innerHTML = '<p class="text-slate-400 italic">No columns found.</p>';
-          return;
-        }
-
-        var html = '<div class="space-y-1.5">';
-        _availableColumns.forEach(function (col) {
-          html += '<label class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 rounded transition">';
-          html += '<input type="checkbox" class="col-checkbox rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" value="' + escHtml(col) + '" checked>';
-          html += '<span class="font-mono text-[11px] text-slate-700">' + escHtml(col) + '</span>';
-          html += '</label>';
-        });
-        html += '</div>';
-        columnsContainer.innerHTML = html;
-      }
-
-      function renderOrderByOptions() {
-        var html = '<option value="">(Default Order)</option>';
-        _availableColumns.forEach(function (col) {
-          html += '<option value="' + escHtml(col) + '">' + escHtml(col) + '</option>';
-        });
-        orderBySelect.innerHTML = html;
-      }
-
-      document.getElementById('selectAllColsBtn').addEventListener('click', function () {
-        document.querySelectorAll('.col-checkbox').forEach(function (cb) { cb.checked = true; });
-      });
-      document.getElementById('clearColsBtn').addEventListener('click', function () {
-        document.querySelectorAll('.col-checkbox').forEach(function (cb) { cb.checked = false; });
-      });
-
-      function resetConditions() {
-        conditionsList.innerHTML = '';
-        conditionsList.appendChild(noConditionsMsg);
-        noConditionsMsg.classList.remove('hidden');
-      }
-
-      addConditionBtn.addEventListener('click', function () {
-        if (!_availableColumns.length) {
-          alert('Please select a table first before adding filter conditions.');
-          return;
-        }
-        noConditionsMsg.classList.add('hidden');
-        var condId = 'cond_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
-        var isFirst = conditionsList.querySelectorAll('.condition-row').length === 0;
-
-        var div = document.createElement('div');
-        div.className = 'condition-row p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs relative group transition hover:border-slate-300';
-        div.dataset.id = condId;
-
-        var html = '<div class="flex items-center gap-2">';
-        if (!isFirst) {
-          html += '<select class="cond-logical bg-white border border-slate-300 text-slate-700 font-bold rounded-lg p-1 text-[11px] focus:ring-emerald-500">';
-          html += '<option value="and">AND</option>';
-          html += '<option value="or">OR</option>';
-          html += '</select>';
-        } else {
-          html += '<span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-1">WHERE</span>';
-        }
-
-        html += '<select class="cond-col flex-1 bg-white border border-slate-300 text-slate-800 font-medium rounded-lg p-1.5 text-xs focus:ring-emerald-500">';
-        _availableColumns.forEach(function (c) {
-          html += '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>';
-        });
-        html += '</select>';
-
-        html += '<button type="button" class="remove-cond-btn p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>';
-        html += '</div>';
-
-        html += '<div class="grid grid-cols-12 gap-2 items-center">';
-        html += '<div class="col-span-5">';
-        html += '<select class="cond-op w-full bg-white border border-slate-300 text-slate-800 font-semibold rounded-lg p-1.5 text-[11px] focus:ring-emerald-500">';
-        html += '<option value="=">= (Equals)</option>';
-        html += '<option value="!=">!= (Not Equal)</option>';
-        html += '<option value="LIKE">LIKE (Contains)</option>';
-        html += '<option value="NOT LIKE">NOT LIKE</option>';
-        html += '<option value=">">&gt; (Greater Than)</option>';
-        html += '<option value=">=">&gt;= (Greater or Equal)</option>';
-        html += '<option value="<">&lt; (Less Than)</option>';
-        html += '<option value="<=">&lt;= (Less or Equal)</option>';
-        html += '<option value="IN">IN (Comma separated)</option>';
-        html += '<option value="NOT IN">NOT IN</option>';
-        html += '<option value="IS NULL">IS NULL</option>';
-        html += '<option value="IS NOT NULL">IS NOT NULL</option>';
-        html += '<option value="BETWEEN">BETWEEN (val1, val2)</option>';
-        html += '</select>';
-        html += '</div>';
-
-        html += '<div class="col-span-7">';
-        html += '<input type="text" class="cond-val w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs font-medium text-slate-900 focus:ring-emerald-500 placeholder-slate-400" placeholder="Filter value...">';
-        html += '</div>';
-        html += '</div>';
-
-        div.innerHTML = html;
-        conditionsList.appendChild(div);
-        lucide.createIcons();
-
-        div.querySelector('.remove-cond-btn').addEventListener('click', function () {
-          div.remove();
-          if (conditionsList.querySelectorAll('.condition-row').length === 0) {
-            noConditionsMsg.classList.remove('hidden');
-          }
-        });
-
-        div.querySelector('.cond-op').addEventListener('change', function () {
-          var valInput = div.querySelector('.cond-val');
-          if (this.value === 'IS NULL' || this.value === 'IS NOT NULL') {
-            valInput.value = '';
-            valInput.disabled = true;
-            valInput.classList.add('bg-slate-100');
-          } else {
-            valInput.disabled = false;
-            valInput.classList.remove('bg-slate-100');
-          }
-        });
-      });
-
-      function buildPayload() {
-        var table = tableSelect.value;
-        if (!table) return null;
-
-        var selectedCols = [];
-        document.querySelectorAll('.col-checkbox:checked').forEach(function (cb) {
-          selectedCols.push(cb.value);
-        });
-
-        var conditions = [];
-        conditionsList.querySelectorAll('.condition-row').forEach(function (row) {
-          var col = row.querySelector('.cond-col').value;
-          var op = row.querySelector('.cond-op').value;
-          var val = row.querySelector('.cond-val').value;
-          var logicalEl = row.querySelector('.cond-logical');
-          var logical = logicalEl ? logicalEl.value : 'and';
-
-          if (col) {
-            conditions.push({
-              logical: logical,
-              column: col,
-              operator: op,
-              value: val
-            });
-          }
-        });
-
-        return {
-          source: _selectedSource,
-          table: table,
-          columns: selectedCols.length ? selectedCols : ['*'],
-          conditions: conditions,
-          order_by: orderBySelect.value || null,
-          order_direction: orderDirSelect.value || 'asc',
-          limit: parseInt(limitSelect.value, 10) || 50
-        };
-      }
-
-      runQueryBtn.addEventListener('click', function () {
-        var payload = buildPayload();
-        if (!payload) {
-          alert('Please select an OpenDental table to fetch data.');
-          return;
-        }
-
-        loadingSpinner.classList.remove('hidden');
-        runQueryBtn.disabled = true;
-        runQueryBtn.classList.add('opacity-75');
-
-        fetch('{{ url("/open-dental-explorer/query") }}', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-          },
-          body: JSON.stringify(payload)
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (res) {
-            loadingSpinner.classList.add('hidden');
-            runQueryBtn.disabled = false;
-            runQueryBtn.classList.remove('opacity-75');
-
-            if (res.error) {
-              alert('Error executing OpenDental query: ' + res.error);
-              return;
-            }
-
-            _queryResultData = res;
-            renderResults();
-          })
-          .catch(function (err) {
-            loadingSpinner.classList.add('hidden');
-            runQueryBtn.disabled = false;
-            runQueryBtn.classList.remove('opacity-75');
-            alert('Failed to fetch data: ' + err.message);
-          });
-      });
-
-      function renderResults() {
-        if (!_queryResultData) return;
-
-        document.getElementById('statRows').textContent = _queryResultData.count.toLocaleString();
-        document.getElementById('statTime').textContent = _queryResultData.execution_time_ms + ' ms';
-        document.getElementById('statCols').textContent = _queryResultData.columns.length;
-        document.getElementById('statSource').textContent = _queryResultData.source_type || 'OpenDental Live';
-
-        if (_queryResultData.notice) {
-          noticeText.textContent = _queryResultData.notice;
-          noticeBanner.classList.remove('hidden');
-        } else {
-          noticeBanner.classList.add('hidden');
-        }
-
-        var formattedSql = _queryResultData.sql;
-        if (_queryResultData.bindings && _queryResultData.bindings.length) {
-          formattedSql += '\n\n-- Bindings: ' + JSON.stringify(_queryResultData.bindings);
-        }
-        document.getElementById('sqlDrawer').textContent = formattedSql;
-
-        exportCsvBtn.disabled = _queryResultData.count === 0;
-        syncToLocalBtn.disabled = _queryResultData.count === 0;
-
-        if (_queryResultData.count > 0) {
-          exportCsvBtn.classList.remove('bg-slate-400', 'cursor-not-allowed');
-          exportCsvBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-md', 'shadow-emerald-500/20');
-          syncToLocalBtn.classList.remove('bg-slate-400', 'cursor-not-allowed');
-          syncToLocalBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700', 'shadow-md', 'shadow-indigo-500/20');
-        } else {
-          exportCsvBtn.classList.add('bg-slate-400', 'cursor-not-allowed');
-          exportCsvBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
-          syncToLocalBtn.classList.add('bg-slate-400', 'cursor-not-allowed');
-          syncToLocalBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-        }
-
-        document.getElementById('tableTitle').textContent = 'Results: ' + _queryResultData.table + ' (' + _queryResultData.count + ' rows)';
-
-        var cols = _queryResultData.columns;
-        var rows = _queryResultData.rows || [];
-
-        var q = (quickFilterInput.value || '').toLowerCase().trim();
-        if (q) {
-          rows = rows.filter(function (r) {
-            return Object.values(r).some(function (v) {
-              return String(v).toLowerCase().includes(q);
-            });
-          });
-        }
-
-        var thHtml = '';
-        cols.forEach(function (c) {
-          thHtml += '<th class="px-4 py-3 border-r border-slate-200 whitespace-nowrap bg-slate-100 font-bold text-[11px] text-slate-700">' + escHtml(c) + '</th>';
-        });
-        document.getElementById('resultsTheadTr').innerHTML = thHtml;
-
-        var tbHtml = '';
-        if (rows.length === 0) {
-          tbHtml = '<tr><td colspan="' + cols.length + '" class="p-8 text-center text-slate-400 font-medium">No matching records returned for this OpenDental query.</td></tr>';
-        } else {
-          rows.forEach(function (row) {
-            tbHtml += '<tr class="hover:bg-emerald-50/40 transition duration-150">';
-            cols.forEach(function (col) {
-              var val = row[col];
-              var displayVal = (val === null || val === undefined) ? '<span class="text-slate-300 italic">NULL</span>' : escHtml(String(val));
-              tbHtml += '<td class="px-4 py-2.5 border-r border-b border-slate-100 font-mono text-[11px] whitespace-nowrap overflow-hidden max-w-xs text-ellipsis" title="' + escHtml(String(val ?? '')) + '">' + displayVal + '</td>';
-            });
-            tbHtml += '</tr>';
-          });
-        }
-        document.getElementById('resultsTbody').innerHTML = tbHtml;
-
-        document.getElementById('pageInfo').textContent = 'Showing ' + rows.length.toLocaleString() + ' of ' + _queryResultData.count.toLocaleString() + ' fetched records';
-      }
-
-      quickFilterInput.addEventListener('input', function () {
-        renderResults();
-      });
-
-      exportCsvBtn.addEventListener('click', function () {
-        if (!_queryResultData || !_queryResultData.rows || !_queryResultData.rows.length) return;
-
-        var cols = _queryResultData.columns;
-        var rows = _queryResultData.rows;
-
-        var csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += cols.map(function(c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(",") + "\n";
-
-        rows.forEach(function(row) {
-          var rowStr = cols.map(function(col) {
-            var val = row[col];
-            if (val === null || val === undefined) return '""';
-            return '"' + String(val).replace(/"/g, '""') + '"';
-          }).join(",");
-          csvContent += rowStr + "\n";
-        });
-
-        var encodedUri = encodeURI(csvContent);
-        var link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", _queryResultData.table + "_opendental_export_" + new Date().toISOString().slice(0, 10) + ".csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      });
-
-      syncToLocalBtn.addEventListener('click', function () {
-        if (!_queryResultData || !_queryResultData.rows || !_queryResultData.rows.length) return;
-
-        syncToLocalBtn.disabled = true;
-        syncToLocalBtn.innerHTML = '<svg class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Syncing to Local DB...';
-
-        fetch('{{ url("/open-dental-explorer/sync-to-local") }}', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-          },
-          body: JSON.stringify({
-            table: _queryResultData.table,
-            rows: _queryResultData.rows
-          })
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (res) {
-            syncToLocalBtn.disabled = false;
-            syncToLocalBtn.innerHTML = '<i data-lucide="cloud-download" class="w-4 h-4"></i> Sync to Local DB';
-            lucide.createIcons();
-
-            if (res.error) {
-              alert('Error syncing to local database: ' + res.error);
-              return;
-            }
-
-            noticeText.textContent = '✅ ' + (res.message || ('Successfully synced ' + res.synced_count + ' record(s) into local table.'));
-            noticeBanner.className = 'p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs flex items-center gap-2 shadow-sm font-medium';
-            noticeBanner.classList.remove('hidden');
-          })
-          .catch(function (err) {
-            syncToLocalBtn.disabled = false;
-            syncToLocalBtn.innerHTML = '<i data-lucide="cloud-download" class="w-4 h-4"></i> Sync to Local DB';
-            lucide.createIcons();
-            alert('Failed to sync data: ' + err.message);
-          });
-      });
-
-      resetBtn.addEventListener('click', function () {
-        tableSelect.value = '';
-        columnsContainer.innerHTML = '<p class="text-slate-400 italic">Select a table first to inspect available columns.</p>';
-        orderBySelect.innerHTML = '<option value="">(Default Order)</option>';
-        orderDirSelect.value = 'asc';
-        limitSelect.value = '50';
-        resetConditions();
-        document.getElementById('schemaStatus').textContent = 'Select a table';
-        document.getElementById('statRows').textContent = '0';
-        document.getElementById('statTime').textContent = '0 ms';
-        document.getElementById('statCols').textContent = '0';
-        document.getElementById('sqlDrawer').textContent = 'SELECT * FROM [Select Table Above]';
-        document.getElementById('resultsTheadTr').innerHTML = '<th class="p-4 text-slate-400 italic font-normal">Select a table and click "Fetch Realtime Data" to query OpenDental.</th>';
-        document.getElementById('resultsTbody').innerHTML = '<tr><td class="p-12 text-center text-slate-400"><div class="flex flex-col items-center justify-center gap-2"><i data-lucide="database-backup" class="w-10 h-10 text-slate-300 stroke-1"></i><p class="font-medium text-sm text-slate-500">No Realtime Query Executed Yet</p></div></td></tr>';
-        exportCsvBtn.disabled = true;
-        exportCsvBtn.classList.add('bg-slate-400', 'cursor-not-allowed');
-        exportCsvBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
-        syncToLocalBtn.disabled = true;
-        syncToLocalBtn.classList.add('bg-slate-400', 'cursor-not-allowed');
-        syncToLocalBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-        noticeBanner.classList.add('hidden');
-        _queryResultData = null;
-        lucide.createIcons();
-      });
-
-      function escHtml(s) {
-        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-      }
+      // Initial run: compare side-by-side
+      executeCurrentMode();
     });
 
-    function switchOdTab(tab) {
-      var queryView = document.getElementById('tabQueryBuilderView');
-      var checkView = document.getElementById('tabSyncCheckpointsView');
-      var dateView = document.getElementById('tabDateSyncView');
+    function handleModeChange(mode) {
+      var viewCompare = document.getElementById('viewCompareContainer');
+      var viewSingle = document.getElementById('viewSingleQueryContainer');
+      var viewCheckpoints = document.getElementById('viewCheckpointsContainer');
+      var filterControls = document.getElementById('filterControlsContainer');
+      var quickDates = document.getElementById('quickDatePresetsWrapper');
+      var modeBadge = document.getElementById('activeModeBadge');
+      var primaryBtn = document.getElementById('primaryActionBtn');
 
-      var qBtn = document.getElementById('tabQueryBuilderBtn');
-      var cBtn = document.getElementById('tabSyncCheckpointsBtn');
-      var dBtn = document.getElementById('tabDateSyncBtn');
+      viewCompare.classList.add('hidden');
+      viewSingle.classList.add('hidden');
+      viewCheckpoints.classList.add('hidden');
 
-      queryView.classList.add('hidden');
-      checkView.classList.add('hidden');
-      dateView.classList.add('hidden');
-
-      qBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition';
-      cBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition';
-      dBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-100 transition';
-
-      if (tab === 'syncCheckpoints') {
-        checkView.classList.remove('hidden');
-        cBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 transition';
+      if (mode === 'compare_side_by_side') {
+        viewCompare.classList.remove('hidden');
+        filterControls.classList.remove('hidden');
+        quickDates.classList.remove('hidden');
+        modeBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200';
+        modeBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> Mode: Side-by-Side Reconciliation';
+        primaryBtn.className = 'inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition cursor-pointer';
+        primaryBtn.innerHTML = '<i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Run Comparison';
+        executeCompare();
+      } else if (mode === 'opendental_live' || mode === 'local_db') {
+        viewSingle.classList.remove('hidden');
+        filterControls.classList.remove('hidden');
+        quickDates.classList.remove('hidden');
+        var isLive = (mode === 'opendental_live');
+        modeBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200';
+        modeBadge.innerHTML = isLive
+          ? '<span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> Mode: Live OpenDental API'
+          : '<span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> Mode: Local MySQL Snapshot';
+        primaryBtn.className = 'inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition cursor-pointer';
+        primaryBtn.innerHTML = '<i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Fetch ' + (isLive ? 'Live OD' : 'Local DB');
+        document.getElementById('btnSyncSingleLive').style.display = isLive ? 'inline-flex' : 'none';
+        executeSingleQuery(mode);
+      } else if (mode === 'sync_checkpoints') {
+        viewCheckpoints.classList.remove('hidden');
+        filterControls.classList.add('hidden');
+        quickDates.classList.add('hidden');
+        modeBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200';
+        modeBadge.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-600"></i> Mode: Sync Checkpoints';
+        primaryBtn.className = 'inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition cursor-pointer';
+        primaryBtn.innerHTML = '<i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> Refresh Checkpoints';
         loadSyncCheckpoints();
-      } else if (tab === 'dateSync') {
-        dateView.classList.remove('hidden');
-        dBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-amber-50 text-amber-700 border border-amber-200 transition';
-        loadDateSyncRequests();
-      } else {
-        queryView.classList.remove('hidden');
-        qBtn.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 transition';
       }
+
       if (window.lucide) lucide.createIcons();
     }
 
-    function loadDateSyncRequests() {
-      var tbody = document.getElementById('syncRequestsTbody');
-      if (!tbody) return;
-
-      fetch('{{ url("/open-dental-explorer/sync-requests") }}')
-        .then(function (r) { return r.json(); })
-        .then(function (res) {
-          if (!res.requests || !res.requests.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 text-sm">No server-to-server sync requests logged yet.</td></tr>';
-            return;
-          }
-
-          var hasActiveJobs = false;
-
-          var html = res.requests.map(function (req) {
-            var statusBadge = '';
-            if (req.status === 'pending') {
-              hasActiveJobs = true;
-              statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200"><span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span> Pending</span>';
-            } else if (req.status === 'running') {
-              hasActiveJobs = true;
-              statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200"><svg class="animate-spin w-3 h-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Running</span>';
-            } else if (req.status === 'completed') {
-              statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">✓ Completed</span>';
-            } else if (req.status === 'failed') {
-              statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200" title="' + escHtml(req.error_message || '') + '">✕ Failed</span>';
-            } else {
-              statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">Cancelled</span>';
-            }
-
-            var windowStr = (req.start_date || 'All past') + ' → ' + (req.end_date || 'Today');
-            var pruneStr = req.prune_deleted ? '<span class="text-amber-600 font-bold">Yes</span>' : '<span class="text-slate-400">No</span>';
-            var startedStr = req.started_at ? new Date(req.started_at).toLocaleString() : '—';
-            var completedStr = req.completed_at ? new Date(req.completed_at).toLocaleString() : '—';
-
-            var cancelBtn = (req.status === 'pending' || req.status === 'running')
-              ? '<button onclick="cancelSyncReq(' + req.id + ')" class="px-2.5 py-1 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition">Cancel</button>'
-              : '—';
-
-            var errHtml = req.error_message ? '<div class="text-[11px] text-red-600 mt-1 max-w-md truncate" title="' + escHtml(req.error_message) + '">' + escHtml(req.error_message) + '</div>' : '';
-
-            return '<tr>' +
-              '<td class="px-4 py-3 font-bold text-slate-800">#' + req.id + '</td>' +
-              '<td class="px-4 py-3 font-extrabold text-slate-900">' + escHtml(req.module) + '</td>' +
-              '<td class="px-4 py-3 text-xs text-slate-600">' + windowStr + '</td>' +
-              '<td class="px-4 py-3 text-xs">' + pruneStr + '</td>' +
-              '<td class="px-4 py-3">' + statusBadge + errHtml + '</td>' +
-              '<td class="px-4 py-3 text-xs text-slate-500">' + startedStr + '</td>' +
-              '<td class="px-4 py-3 text-xs text-slate-500">' + completedStr + '</td>' +
-              '<td class="px-4 py-3 text-right">' + cancelBtn + '</td>' +
-              '</tr>';
-          }).join('');
-
-          tbody.innerHTML = html;
-
-          if (hasActiveJobs) {
-            setTimeout(loadDateSyncRequests, 4000);
-          }
-        });
+    function executeCurrentMode() {
+      var mode = document.getElementById('intentModeSelect').value;
+      if (mode === 'compare_side_by_side') {
+        executeCompare();
+      } else if (mode === 'opendental_live' || mode === 'local_db') {
+        executeSingleQuery(mode);
+      } else if (mode === 'sync_checkpoints') {
+        loadSyncCheckpoints();
+      }
     }
 
-    function submitDateSyncForm(e) {
-      e.preventDefault();
-      var btn = document.getElementById('submitSyncReqBtn');
-      btn.disabled = true;
-      btn.innerHTML = '<svg class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Launching...';
+    function setDatePreset(preset) {
+      var s = document.getElementById('filterStartDate');
+      var e = document.getElementById('filterEndDate');
+      var now = new Date();
+      var y = now.getFullYear();
+      var m = String(now.getMonth() + 1).padStart(2, '0');
+      var d = String(now.getDate()).padStart(2, '0');
 
-      fetch('{{ url("/open-dental-explorer/trigger-date-sync") }}', {
+      if (preset === 'aug_2026') {
+        s.value = '2026-08-01';
+        e.value = '2026-08-19';
+      } else if (preset === 'this_month') {
+        s.value = y + '-' + m + '-01';
+        e.value = y + '-' + m + '-' + d;
+      } else if (preset === 'last_month') {
+        var prevM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        var lastPrev = new Date(now.getFullYear(), now.getMonth(), 0);
+        s.value = prevM.toISOString().slice(0, 7) + '-01';
+        e.value = lastPrev.toISOString().slice(0, 10);
+      } else if (preset === 'last_30_days') {
+        var past30 = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+        s.value = past30.toISOString().slice(0, 10);
+        e.value = y + '-' + m + '-' + d;
+      } else if (preset === 'today') {
+        s.value = y + '-' + m + '-' + d;
+        e.value = y + '-' + m + '-' + d;
+      }
+      executeCurrentMode();
+    }
+
+    // ─── 1. SIDE-BY-SIDE RECONCILIATION ENGINE ─────────────────────────────────
+    function executeCompare() {
+      var table = document.getElementById('activeTableSelect').value;
+      var startDate = document.getElementById('filterStartDate').value;
+      var endDate = document.getElementById('filterEndDate').value;
+      var statusVal = document.getElementById('filterStatusSelect').value;
+      var limit = parseInt(document.getElementById('filterLimitSelect').value, 10) || 500;
+      var btn = document.getElementById('primaryActionBtn');
+
+      btn.disabled = true;
+      btn.innerHTML = '<svg class="animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Comparing...';
+
+      var conditions = [];
+      if (table === 'appointment' || table === 'od_appointments') {
+        if (statusVal === '1_2') conditions.push({ column: 'AptStatus', operator: 'IN', value: '1, 2' });
+        else if (statusVal === '1') conditions.push({ column: 'AptStatus', operator: '=', value: '1' });
+        else if (statusVal === '2') conditions.push({ column: 'AptStatus', operator: '=', value: '2' });
+        else if (statusVal === '5') conditions.push({ column: 'AptStatus', operator: '=', value: '5' });
+      }
+
+      var tbody = document.getElementById('diffTableBody');
+      tbody.innerHTML = '<tr><td colspan="8" class="p-12 text-center text-slate-400"><div class="flex flex-col items-center justify-center gap-2"><svg class="animate-spin w-6 h-6 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg><p class="font-medium text-xs text-slate-600">Comparing OpenDental Live vs Local Database...</p></div></td></tr>';
+
+      fetch('{{ url("/open-dental-explorer/reconcile-diff") }}', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRF-TOKEN': '{{ csrf_token() }}'
         },
         body: JSON.stringify({
-          module: document.getElementById('syncModuleSelect').value,
-          start_date: document.getElementById('syncStartDate').value || null,
-          end_date: document.getElementById('syncEndDate').value || null,
-          prune_deleted: document.getElementById('syncPruneDeleted').checked
+          table: table,
+          start_date: startDate || null,
+          end_date: endDate || null,
+          limit: limit,
+          conditions: conditions
         })
       })
         .then(function (r) { return r.json(); })
         .then(function (res) {
           btn.disabled = false;
-          btn.innerHTML = '<i data-lucide="zap" class="w-4 h-4 fill-current"></i> Launch Server-to-Server Sync';
+          btn.innerHTML = '<i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Run Comparison';
           if (window.lucide) lucide.createIcons();
 
           if (res.error) {
-            alert('Error: ' + res.error);
+            tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-600 font-semibold text-xs">Error: ' + escHtml(res.error) + '</td></tr>';
             return;
           }
-          alert(res.message || 'Server-to-server sync launched successfully.');
-          loadDateSyncRequests();
+
+          _diffResult = res;
+          renderCompareMetrics();
+          renderCompareTable();
         })
         .catch(function (err) {
           btn.disabled = false;
-          btn.innerHTML = '<i data-lucide="zap" class="w-4 h-4 fill-current"></i> Launch Server-to-Server Sync';
+          btn.innerHTML = '<i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Run Comparison';
           if (window.lucide) lucide.createIcons();
-          alert('Failed to launch sync: ' + err.message);
+          tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-600 font-semibold text-xs">Failed: ' + escHtml(err.message) + '</td></tr>';
         });
     }
 
-    function cancelSyncReq(id) {
-      if (!confirm('Are you sure you want to cancel sync request #' + id + '?')) return;
+    function renderCompareMetrics() {
+      if (!_diffResult) return;
+      var sum = _diffResult.summary || {};
+      document.getElementById('statLiveCount').textContent = Number(sum.live_count || 0).toLocaleString();
+      document.getElementById('statLocalCount').textContent = Number(sum.local_count || 0).toLocaleString();
+      document.getElementById('statOrphanCount').textContent = Number(sum.orphan_count || 0).toLocaleString();
+      document.getElementById('statMissingCount').textContent = Number(sum.missing_count || 0).toLocaleString();
+      document.getElementById('statMatchRate').textContent = (sum.match_rate_pct || 100) + '%';
+      document.getElementById('statExecTime').textContent = (_diffResult.execution_time_ms || 0) + ' ms';
 
-      fetch('{{ url("/open-dental-explorer/cancel-sync-request") }}', {
+      document.getElementById('countPillAll').textContent = (_diffResult.diff_rows || []).length;
+      document.getElementById('countPillOrphan').textContent = (sum.orphan_count || 0);
+      document.getElementById('countPillMissing').textContent = (sum.missing_count || 0);
+      document.getElementById('countPillMatched').textContent = (sum.matched_count || 0);
+
+      var pruneBtn = document.getElementById('btnPruneAll');
+      var syncBtn = document.getElementById('btnSyncAll');
+      var exportBtn = document.getElementById('btnExportDiff');
+
+      if ((sum.orphan_count || 0) > 0) {
+        pruneBtn.disabled = false;
+        pruneBtn.innerHTML = '<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Prune Orphans';
+        pruneBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-2xs transition cursor-pointer';
+      } else {
+        pruneBtn.disabled = true;
+        pruneBtn.innerHTML = '<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Prune Orphans';
+        pruneBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-slate-400 rounded-lg cursor-not-allowed transition shadow-2xs disabled:opacity-60';
+      }
+
+      if ((sum.missing_count || 0) > 0) {
+        syncBtn.disabled = false;
+        syncBtn.innerHTML = '<i data-lucide="download-cloud" class="w-3.5 h-3.5"></i> Sync Missing';
+        syncBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-2xs transition cursor-pointer';
+      } else {
+        syncBtn.disabled = true;
+        syncBtn.innerHTML = '<i data-lucide="download-cloud" class="w-3.5 h-3.5"></i> Sync Missing';
+        syncBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-slate-400 rounded-lg cursor-not-allowed transition shadow-2xs disabled:opacity-60';
+      }
+
+      exportBtn.disabled = false;
+      exportBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition shadow-2xs cursor-pointer';
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function setDiffFilter(status) {
+      _activeDiffFilter = status;
+      var pills = {
+        all: document.getElementById('pillAll'),
+        orphan: document.getElementById('pillOrphan'),
+        missing: document.getElementById('pillMissing'),
+        matched: document.getElementById('pillMatched')
+      };
+
+      pills.all.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition cursor-pointer';
+      pills.orphan.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 transition cursor-pointer';
+      pills.missing.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-amber-200 text-amber-800 hover:bg-amber-50 transition cursor-pointer';
+      pills.matched.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-emerald-200 text-emerald-800 hover:bg-emerald-50 transition cursor-pointer';
+
+      if (status === 'orphan') pills.orphan.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-rose-600 text-white shadow-2xs transition cursor-pointer';
+      else if (status === 'missing') pills.missing.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-amber-600 text-white shadow-2xs transition cursor-pointer';
+      else if (status === 'matched') pills.matched.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-emerald-600 text-white shadow-2xs transition cursor-pointer';
+      else pills.all.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-slate-900 text-white shadow-2xs transition cursor-pointer';
+
+      renderCompareTable();
+    }
+
+    function renderCompareTable() {
+      var tbody = document.getElementById('diffTableBody');
+      if (!_diffResult || !_diffResult.diff_rows || !_diffResult.diff_rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 text-xs">No records found matching criteria.</td></tr>';
+        return;
+      }
+
+      var searchVal = (document.getElementById('diffSearchInput').value || '').toLowerCase().trim();
+      var rows = _diffResult.diff_rows;
+
+      if (_activeDiffFilter !== 'all') {
+        rows = rows.filter(function (r) { return r.status === _activeDiffFilter; });
+      }
+
+      if (searchVal) {
+        rows = rows.filter(function (r) {
+          return JSON.stringify(r).toLowerCase().indexOf(searchVal) !== -1;
+        });
+      }
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 text-xs">No rows found matching active filter/search.</td></tr>';
+        return;
+      }
+
+      var html = rows.map(function (item) {
+        var d = item.data || {};
+        var statusBadge = '';
+        var actionBtn = '';
+
+        if (item.status === 'orphan') {
+          statusBadge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">🔴 Deleted in OD</span>';
+          actionBtn = '<button onclick="pruneSingleOrphan(' + item.pk + ')" class="px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition cursor-pointer" title="Delete from local database">Prune</button>';
+        } else if (item.status === 'missing') {
+          statusBadge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">🟡 Missing Locally</span>';
+          actionBtn = '<button onclick="syncSingleMissing(' + item.pk + ')" class="px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition cursor-pointer" title="Sync into local database">Sync</button>';
+        } else {
+          statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200">🟢 Matched</span>';
+          actionBtn = '<span class="text-slate-400 text-[11px]">Synced</span>';
+        }
+
+        var patId = d.PatNum || d.patient_id || d.PatientNum || '—';
+        var dateVal = d.AptDateTime || d.ProcDate || d.AdjDate || d.DatePay || d.PayDate || d.DateTP || d.DateDue || '—';
+        var statusVal = (d.AptStatus !== undefined) ? 'Status ' + d.AptStatus : (d.ProcStatus || d.ProcCode || '—');
+        var provVal = d.ProvNum ? 'Prov #' + d.ProvNum : '—';
+        var descVal = d.Note || d.ProcDescript || d.Descript || d.ToothNum || '—';
+
+        return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
+          '<td class="px-4 py-2.5">' + statusBadge + '</td>' +
+          '<td class="px-4 py-2.5 font-mono font-bold text-slate-900">' + escHtml(item.pk) + '</td>' +
+          '<td class="px-4 py-2.5 font-medium text-slate-700">' + escHtml(patId) + '</td>' +
+          '<td class="px-4 py-2.5 font-mono text-[11px] text-slate-600">' + escHtml(dateVal) + '</td>' +
+          '<td class="px-4 py-2.5 font-medium text-slate-700">' + escHtml(statusVal) + '</td>' +
+          '<td class="px-4 py-2.5 text-slate-600">' + escHtml(provVal) + '</td>' +
+          '<td class="px-4 py-2.5 text-slate-500 max-w-xs truncate" title="' + escHtml(descVal) + '">' + escHtml(descVal) + '</td>' +
+          '<td class="px-4 py-2.5 text-right">' + actionBtn + '</td>' +
+          '</tr>';
+      }).join('');
+
+      tbody.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    document.getElementById('diffSearchInput').addEventListener('input', renderCompareTable);
+
+    function pruneAllOrphans() {
+      if (!_diffResult || !_diffResult.orphan_keys || !_diffResult.orphan_keys.length) return;
+      var count = _diffResult.orphan_keys.length;
+      if (!confirm('Delete all ' + count + ' orphan record(s) from your local table "' + _diffResult.local_table + '"?')) return;
+
+      var btn = document.getElementById('btnPruneAll');
+      btn.disabled = true;
+      btn.innerHTML = '<svg class="animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Pruning...';
+
+      fetch('{{ url("/open-dental-explorer/prune-orphans") }}', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({ id: id })
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ table: _diffResult.table, keys: _diffResult.orphan_keys })
       })
         .then(function (r) { return r.json(); })
         .then(function (res) {
+          if (res.error) alert('Error: ' + res.error);
+          else alert(res.message || 'Successfully pruned orphan records.');
+          executeCompare();
+        })
+        .catch(function (err) {
+          alert('Prune failed: ' + err.message);
+          executeCompare();
+        });
+    }
+
+    function pruneSingleOrphan(pk) {
+      if (!confirm('Delete orphan record #' + pk + ' from local DB?')) return;
+      fetch('{{ url("/open-dental-explorer/prune-orphans") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ table: _diffResult.table, keys: [pk] })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function () { executeCompare(); });
+    }
+
+    function syncAllMissing() {
+      if (!_diffResult || !_diffResult.missing_keys || !_diffResult.missing_keys.length) return;
+      var missingRows = _diffResult.diff_rows
+        .filter(function (r) { return r.status === 'missing'; })
+        .map(function (r) { return r.data; });
+
+      if (!confirm('Sync ' + missingRows.length + ' missing records from OpenDental into local DB?')) return;
+      var btn = document.getElementById('btnSyncAll');
+      btn.disabled = true;
+      btn.innerHTML = '<svg class="animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Syncing...';
+
+      fetch('{{ url("/open-dental-explorer/sync-to-local") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ table: _diffResult.table, rows: missingRows })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.error) alert('Error: ' + res.error);
+          else alert(res.message || 'Successfully synced records.');
+          executeCompare();
+        })
+        .catch(function (err) {
+          alert('Sync failed: ' + err.message);
+          executeCompare();
+        });
+    }
+
+    function syncSingleMissing(pk) {
+      if (!_diffResult) return;
+      var match = _diffResult.diff_rows.find(function (r) { return r.pk == pk && r.status === 'missing'; });
+      if (!match || !match.data) return;
+
+      fetch('{{ url("/open-dental-explorer/sync-to-local") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ table: _diffResult.table, rows: [match.data] })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function () { executeCompare(); });
+    }
+
+    function exportDiffCsv() {
+      if (!_diffResult || !_diffResult.diff_rows) return;
+      var rows = _diffResult.diff_rows;
+      if (_activeDiffFilter !== 'all') {
+        rows = rows.filter(function (r) { return r.status === _activeDiffFilter; });
+      }
+
+      var csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += '"Status","Primary Key","Data Source","JSON Payload"\r\n';
+      rows.forEach(function (r) {
+        csvContent += '"' + r.status_label + '","' + r.pk + '","' + r.source + '","' + JSON.stringify(r.data || {}).replace(/"/g, '""') + '"\r\n';
+      });
+
+      var link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csvContent));
+      link.setAttribute("download", "opendental_diff_" + _diffResult.table + "_" + new Date().toISOString().slice(0, 10) + ".csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // ─── 2. SINGLE SOURCE QUERY ENGINE (LIVE OD / LOCAL DB) ───────────────────
+    function executeSingleQuery(source) {
+      var table = document.getElementById('activeTableSelect').value;
+      var startDate = document.getElementById('filterStartDate').value;
+      var endDate = document.getElementById('filterEndDate').value;
+      var statusVal = document.getElementById('filterStatusSelect').value;
+      var limit = parseInt(document.getElementById('filterLimitSelect').value, 10) || 50;
+      var btn = document.getElementById('primaryActionBtn');
+
+      btn.disabled = true;
+      btn.innerHTML = '<svg class="animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Fetching...';
+
+      var conditions = [];
+      if (startDate && endDate) {
+        var dateCol = (table.indexOf('appointment') !== -1) ? 'AptDateTime' : 'ProcDate';
+        conditions.push({ column: dateCol, operator: 'BETWEEN', value: startDate + ' 00:00:00, ' + endDate + ' 23:59:59' });
+      }
+
+      if (table === 'appointment' || table === 'od_appointments') {
+        if (statusVal === '1_2') conditions.push({ column: 'AptStatus', operator: 'IN', value: '1, 2' });
+        else if (statusVal === '1') conditions.push({ column: 'AptStatus', operator: '=', value: '1' });
+        else if (statusVal === '2') conditions.push({ column: 'AptStatus', operator: '=', value: '2' });
+        else if (statusVal === '5') conditions.push({ column: 'AptStatus', operator: '=', value: '5' });
+      }
+
+      fetch('{{ url("/open-dental-explorer/query") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({
+          source: source,
+          table: table,
+          columns: ['*'],
+          conditions: conditions,
+          limit: limit
+        })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Fetch Data';
+          if (window.lucide) lucide.createIcons();
+
           if (res.error) {
             alert('Error: ' + res.error);
             return;
           }
-          loadDateSyncRequests();
+
+          _singleQueryResult = res;
+          renderSingleQueryResults();
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Fetch Data';
+          if (window.lucide) lucide.createIcons();
+          alert('Fetch error: ' + err.message);
         });
     }
 
+    function renderSingleQueryResults() {
+      if (!_singleQueryResult) return;
+      var count = _singleQueryResult.count || 0;
+      var cols = _singleQueryResult.columns || [];
+      var rows = _singleQueryResult.rows || [];
+
+      document.getElementById('singleSourceCount').textContent = '(' + count.toLocaleString() + ' rows - ' + (_singleQueryResult.execution_time_ms || 0) + ' ms)';
+
+      var theadTr = document.getElementById('singleQueryThead');
+      var tbody = document.getElementById('singleQueryTbody');
+
+      if (!rows.length) {
+        theadTr.innerHTML = '<tr><th class="p-4 text-slate-400 font-normal text-xs">No records found.</th></tr>';
+        tbody.innerHTML = '<tr><td class="p-12 text-center text-slate-400 text-xs">No records returned from this query.</td></tr>';
+        return;
+      }
+
+      var thHtml = '<tr>' + cols.map(function (c) {
+        return '<th class="px-4 py-2.5 whitespace-nowrap">' + escHtml(c) + '</th>';
+      }).join('') + '</tr>';
+      theadTr.innerHTML = thHtml;
+
+      var tbodyHtml = rows.map(function (row) {
+        return '<tr class="hover:bg-slate-50 transition border-b border-slate-100">' + cols.map(function (c) {
+          var val = (row[c] !== undefined && row[c] !== null) ? String(row[c]) : '';
+          return '<td class="px-4 py-2 max-w-xs truncate text-slate-700" title="' + escHtml(val) + '">' + escHtml(val) + '</td>';
+        }).join('') + '</tr>';
+      }).join('');
+
+      tbody.innerHTML = tbodyHtml;
+    }
+
+    function syncSingleQueryToLocal() {
+      if (!_singleQueryResult || !_singleQueryResult.rows || !_singleQueryResult.rows.length) return;
+      if (!confirm('Sync ' + _singleQueryResult.rows.length + ' live records into local database?')) return;
+
+      var btn = document.getElementById('btnSyncSingleLive');
+      btn.disabled = true;
+      btn.textContent = 'Syncing...';
+
+      fetch('{{ url("/open-dental-explorer/sync-to-local") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({
+          table: _singleQueryResult.table,
+          rows: _singleQueryResult.rows
+        })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="cloud-download" class="w-3.5 h-3.5"></i> Sync Fetched to Local DB';
+          if (window.lucide) lucide.createIcons();
+          if (res.error) alert('Error: ' + res.error);
+          else alert(res.message || 'Synced successfully.');
+        });
+    }
+
+    function exportSingleQueryCsv() {
+      if (!_singleQueryResult || !_singleQueryResult.rows || !_singleQueryResult.rows.length) return;
+      var cols = _singleQueryResult.columns || Object.keys(_singleQueryResult.rows[0]);
+      var rows = _singleQueryResult.rows;
+
+      var csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += cols.map(function (c) { return '"' + c + '"'; }).join(',') + "\r\n";
+
+      rows.forEach(function (r) {
+        csvContent += cols.map(function (c) {
+          var v = (r[c] !== undefined && r[c] !== null) ? String(r[c]) : '';
+          return '"' + v.replace(/"/g, '""') + '"';
+        }).join(',') + "\r\n";
+      });
+
+      var link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csvContent));
+      link.setAttribute("download", "opendental_export_" + (_singleQueryResult.table || 'query') + ".csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // ─── 3. SYNC CHECKPOINTS ENGINE ───────────────────────────────────────────
     function loadSyncCheckpoints() {
       var tbody = document.getElementById('checkpointsTbody');
       if (!tbody) return;
-      tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 text-sm">Loading sync checkpoints...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 text-xs">Loading sync checkpoints...</td></tr>';
 
       fetch('{{ url("/open-dental-explorer/sync-checkpoints") }}')
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var logs = data.logs || [];
           if (!logs.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 text-sm">No sync logs recorded in sync_logs table yet.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 text-xs">No sync logs recorded yet.</td></tr>';
             return;
           }
-          var html = '';
-          logs.forEach(function (log) {
-            var statusBadge = '<span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full uppercase bg-slate-100 text-slate-700 border border-slate-200">' + escHtml(log.status) + '</span>';
-            if (log.status === 'completed') statusBadge = '<span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">Completed</span>';
-            if (log.status === 'running') statusBadge = '<span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full uppercase bg-blue-100 text-blue-800 border border-blue-200 animate-pulse">Running</span>';
-            if (log.status === 'failed') statusBadge = '<span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full uppercase bg-rose-100 text-rose-800 border border-rose-200">Failed</span>';
+          var html = logs.map(function (log) {
+            var statusBadge = '<span class="px-2 py-0.5 text-[11px] font-medium rounded-md bg-slate-100 text-slate-700 border border-slate-200">' + escHtml(log.status) + '</span>';
+            if (log.status === 'completed') statusBadge = '<span class="px-2 py-0.5 text-[11px] font-medium rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">Completed</span>';
+            if (log.status === 'running') statusBadge = '<span class="px-2 py-0.5 text-[11px] font-medium rounded-md bg-blue-50 text-blue-800 border border-blue-200 animate-pulse">Running</span>';
+            if (log.status === 'failed') statusBadge = '<span class="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-rose-50 text-rose-700 border border-rose-200">Failed</span>';
+
+            var errorHtml = '';
+            if (log.last_error) {
+              errorHtml = '<div class="mt-1 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded p-1.5 font-mono break-words max-w-xs leading-tight">' +
+                '<span class="font-bold">Error:</span> ' + escHtml(log.last_error) +
+                '</div>';
+            }
 
             var escMod = escHtml(log.module);
             var dateVal = log.last_synced_at ? String(log.last_synced_at).replace(' ', 'T').slice(0, 16) : '';
 
-            html += '<tr class="border-b border-slate-100 hover:bg-slate-50/70 transition text-xs" data-module="' + escMod + '">';
-            html += '<td class="px-4 py-3 font-bold text-slate-900">' + escMod + '</td>';
-            html += '<td class="px-4 py-3">' + statusBadge + '</td>';
-            html += '<td class="px-4 py-3"><input type="datetime-local" class="cp-date bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:ring-indigo-500 shadow-2xs" value="' + dateVal + '"></td>';
-            html += '<td class="px-4 py-3"><input type="number" class="cp-pk w-28 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:ring-indigo-500 shadow-2xs" value="' + (log.last_primary_key || 0) + '"></td>';
-            html += '<td class="px-4 py-3 font-mono font-semibold text-slate-700">' + Number(log.total_processed || 0).toLocaleString() + '</td>';
-            html += '<td class="px-4 py-3 text-right"><button onclick="saveCheckpointRow(\'' + escMod + '\', this)" class="px-3.5 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition shadow-xs">Save / Reset Date</button></td>';
-            html += '</tr>';
-          });
+            return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">' +
+              '<td class="px-4 py-2.5 font-bold text-slate-900">' + escMod + '</td>' +
+              '<td class="px-4 py-2.5">' + statusBadge + errorHtml + '</td>' +
+              '<td class="px-4 py-2.5"><input type="datetime-local" class="cp-date bg-white border border-slate-300 rounded-md px-2 py-1 text-xs text-slate-800 focus:ring-slate-400 shadow-2xs" value="' + dateVal + '"></td>' +
+              '<td class="px-4 py-2.5"><input type="number" class="cp-pk w-28 bg-white border border-slate-300 rounded-md px-2 py-1 text-xs text-slate-800 focus:ring-slate-400 shadow-2xs" value="' + (log.last_primary_key || 0) + '"></td>' +
+              '<td class="px-4 py-2.5 font-mono font-semibold text-slate-700">' + Number(log.total_processed || 0).toLocaleString() + '</td>' +
+              '<td class="px-4 py-2.5 text-right"><button onclick="saveCheckpointRow(\'' + escMod + '\', this)" class="px-3 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-md transition shadow-2xs cursor-pointer">Reset Date</button></td>' +
+              '</tr>';
+          }).join('');
           tbody.innerHTML = html;
-          if (window.lucide) lucide.createIcons();
-        })
-        .catch(function (err) {
-          tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-rose-500 text-sm">Failed to load sync checkpoints: ' + escHtml(err.message) + '</td></tr>';
         });
     }
 
@@ -968,16 +946,12 @@
       var tr = btn.closest('tr');
       var dateVal = tr.querySelector('.cp-date').value;
       var pkVal = tr.querySelector('.cp-pk').value;
-
       btn.disabled = true;
       btn.textContent = 'Saving...';
 
       fetch('{{ url("/open-dental-explorer/reset-sync-checkpoint") }}', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
         body: JSON.stringify({
           module: module,
           last_synced_at: dateVal ? dateVal.replace('T', ' ') : null,
@@ -987,48 +961,34 @@
         .then(function (r) { return r.json(); })
         .then(function (res) {
           btn.disabled = false;
-          btn.textContent = 'Save / Reset Date';
-          if (res.error) {
-            alert('Error: ' + res.error);
-            return;
-          }
-          alert(res.message || 'Successfully updated sync checkpoint.');
+          btn.textContent = 'Reset Date';
+          if (res.error) alert('Error: ' + res.error);
+          else alert(res.message || 'Saved.');
           loadSyncCheckpoints();
         })
         .catch(function (err) {
           btn.disabled = false;
-          btn.textContent = 'Save / Reset Date';
-          alert('Failed to save checkpoint: ' + err.message);
+          btn.textContent = 'Reset Date';
+          alert('Failed: ' + err.message);
         });
     }
 
     function resetAllCheckpoints() {
-      if (!confirm('Are you sure you want to reset ALL sync checkpoints? This will cause all modules to restart sync from the beginning on their next execution, updating existing rows and inserting new ones without duplicates.')) return;
-
+      if (!confirm('Reset ALL sync checkpoints?')) return;
       fetch('{{ url("/open-dental-explorer/reset-sync-checkpoint") }}', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({
-          module: 'all',
-          last_synced_at: null,
-          last_primary_key: 0
-        })
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ module: 'all', last_synced_at: null, last_primary_key: 0 })
       })
         .then(function (r) { return r.json(); })
-        .then(function (res) {
-          if (res.error) {
-            alert('Error: ' + res.error);
-            return;
-          }
-          alert(res.message || 'Successfully reset all sync checkpoints.');
+        .then(function () {
+          alert('All checkpoints reset.');
           loadSyncCheckpoints();
-        })
-        .catch(function (err) {
-          alert('Failed to reset all checkpoints: ' + err.message);
         });
+    }
+
+    function escHtml(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
   </script>
 </x-app-layout>

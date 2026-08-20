@@ -4,16 +4,11 @@ namespace App\Services\OpenDental;
 
 use Illuminate\Support\Facades\Cache;
 
-
 class LedgerService
 {
-
     public function __construct(
         protected OpenDentalClient $client
-    ) {
-    }
-
-
+    ) {}
 
     /**
      * Get all ledger transactions
@@ -27,7 +22,7 @@ class LedgerService
 
             now()->addHours(12),
 
-            fn() => $this->client->get(
+            fn () => $this->client->get(
                 'ledgers'
             )
 
@@ -35,25 +30,19 @@ class LedgerService
 
     }
 
-
-
-
     /**
      * Get ledger transactions by date range
      */
     public function byDate($start, $end)
     {
 
-
         $key = "od_ledger_{$start}_{$end}";
-
 
         return Cache::remember(
 
             $key,
 
             now()->addHours(12),
-
 
             function () use ($start, $end) {
 
@@ -65,7 +54,7 @@ class LedgerService
 
                         'dateStart' => $start,
 
-                        'dateEnd' => $end
+                        'dateEnd' => $end,
 
                     ]
 
@@ -75,11 +64,7 @@ class LedgerService
 
         );
 
-
     }
-
-
-
 
     /**
      * Get ledger for one patient
@@ -93,13 +78,11 @@ class LedgerService
 
             [
 
-                'PatNum' => $patientId
+                'PatNum' => $patientId,
 
             ]
 
         );
 
     }
-
-
 }

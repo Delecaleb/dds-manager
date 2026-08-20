@@ -4,37 +4,31 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('eobattach', function (Blueprint $table) {
 
-Schema::create('eobattach', function(Blueprint $table){
+            $table->integer('EobAttachNum');
 
-$table->integer('EobAttachNum');
+            $table->integer('ClaimPaymentNum');
 
-$table->integer('ClaimPaymentNum');
+            $table->date('DateTCreated');
 
-$table->date('DateTCreated');
+            $table->string('FileName');
 
-$table->string('FileName');
+            $table->text('RawBase64');
 
-$table->text('RawBase64');
+            $table->integer('ClaimNumPreAuth');
 
-$table->integer('ClaimNumPreAuth');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('eobattach');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('eobattach');
+    }
 };

@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenDental;
 
+use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +34,7 @@ use Illuminate\Support\Facades\DB;
 class AgingCalculationService
 {
     public function __construct(
-        private readonly \App\Domain\Support\ClinicRegistry $clinics,
+        private readonly ClinicRegistry $clinics,
     ) {}
 
     /**

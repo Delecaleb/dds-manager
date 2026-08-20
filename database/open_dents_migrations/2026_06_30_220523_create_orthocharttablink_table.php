@@ -4,35 +4,29 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('orthocharttablink', function (Blueprint $table) {
 
-Schema::create('orthocharttablink', function(Blueprint $table){
+            $table->integer('OrthoChartTabLinkNum');
 
-$table->integer('OrthoChartTabLinkNum');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->integer('OrthoChartTabNum');
 
-$table->integer('OrthoChartTabNum');
+            $table->integer('DisplayFieldNum');
 
-$table->integer('DisplayFieldNum');
+            $table->integer('ColumnWidthOverride');
 
-$table->integer('ColumnWidthOverride');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('orthocharttablink');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('orthocharttablink');
+    }
 };

@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Services\Sync\DepositSyncService;
+use Illuminate\Console\Command;
 
 class DepositSync extends Command
 {

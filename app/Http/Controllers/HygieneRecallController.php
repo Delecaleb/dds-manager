@@ -63,14 +63,14 @@ class HygieneRecallController extends Controller
             $recallRate = $totalOverdueCount > 0 ? ($patientRecalledCount / $totalOverdueCount) * 100 : 0;
 
             return [
-                'provider_name' => trim(($prov->LName ?? '') . ', ' . ($prov->FName ?? '')),
-                'provider_id' => $prov->ProvNum . ' - ' . substr($prov->Abbr ?? 'PRV', 0, 4),
+                'provider_name' => trim(($prov->LName ?? '').', '.($prov->FName ?? '')),
+                'provider_id' => $prov->ProvNum.' - '.substr($prov->Abbr ?? 'PRV', 0, 4),
                 'office' => $this->clinics->name(0),
                 'missed_recall' => $missedRecallCount,
                 'patient_recalled' => $patientRecalledCount,
                 'future_appointments' => $futureAptCount,
                 'patients_recalled_dollars' => $productionDollars,
-                'patient_recall_rate' => number_format($recallRate, 2) . '%',
+                'patient_recall_rate' => number_format($recallRate, 2).'%',
             ];
         });
 
@@ -105,7 +105,7 @@ class HygieneRecallController extends Controller
 
         return DataTables::of(collect($filteredData->values()))
             ->editColumn('patients_recalled_dollars', function ($row) {
-                return '$ ' . number_format($row['patients_recalled_dollars'], 2);
+                return '$ '.number_format($row['patients_recalled_dollars'], 2);
             })
             ->make(true);
     }

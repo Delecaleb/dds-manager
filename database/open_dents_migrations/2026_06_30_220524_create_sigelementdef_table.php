@@ -4,39 +4,33 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('sigelementdef', function (Blueprint $table) {
 
-Schema::create('sigelementdef', function(Blueprint $table){
+            $table->integer('SigElementDefNum');
 
-$table->integer('SigElementDefNum');
+            $table->integer('LightRow');
 
-$table->integer('LightRow');
+            $table->integer('LightColor');
 
-$table->integer('LightColor');
+            $table->integer('SigElementType');
 
-$table->integer('SigElementType');
+            $table->string('SigText');
 
-$table->string('SigText');
+            $table->text('Sound');
 
-$table->text('Sound');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('sigelementdef');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('sigelementdef');
+    }
 };

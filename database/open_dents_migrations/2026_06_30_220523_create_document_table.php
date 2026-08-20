@@ -4,91 +4,85 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('document', function (Blueprint $table) {
 
-Schema::create('document', function(Blueprint $table){
+            $table->integer('DocNum');
 
-$table->integer('DocNum');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->date('DateCreated');
 
-$table->date('DateCreated');
+            $table->integer('DocCategory');
 
-$table->integer('DocCategory');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->string('FileName');
 
-$table->string('FileName');
+            $table->integer('ImgType');
 
-$table->integer('ImgType');
+            $table->integer('IsFlipped');
 
-$table->integer('IsFlipped');
+            $table->string('DegreesRotated');
 
-$table->string('DegreesRotated');
+            $table->string('ToothNumbers');
 
-$table->string('ToothNumbers');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->integer('SigIsTopaz');
 
-$table->integer('SigIsTopaz');
+            $table->text('Signature');
 
-$table->text('Signature');
+            $table->integer('CropX');
 
-$table->integer('CropX');
+            $table->integer('CropY');
 
-$table->integer('CropY');
+            $table->integer('CropW');
 
-$table->integer('CropW');
+            $table->integer('CropH');
 
-$table->integer('CropH');
+            $table->integer('WindowingMin');
 
-$table->integer('WindowingMin');
+            $table->integer('WindowingMax');
 
-$table->integer('WindowingMax');
+            $table->integer('MountItemNum');
 
-$table->integer('MountItemNum');
+            $table->string('DateTStamp');
 
-$table->string('DateTStamp');
+            $table->text('RawBase64');
 
-$table->text('RawBase64');
+            $table->text('Thumbnail');
 
-$table->text('Thumbnail');
+            $table->string('ExternalGUID');
 
-$table->string('ExternalGUID');
+            $table->string('ExternalSource');
 
-$table->string('ExternalSource');
+            $table->integer('ProvNum');
 
-$table->integer('ProvNum');
+            $table->integer('IsCropOld');
 
-$table->integer('IsCropOld');
+            $table->text('OcrResponseData');
 
-$table->text('OcrResponseData');
+            $table->integer('ImageCaptureType');
 
-$table->integer('ImageCaptureType');
+            $table->integer('PrintHeading');
 
-$table->integer('PrintHeading');
+            $table->integer('ChartLetterStatus');
 
-$table->integer('ChartLetterStatus');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->string('ChartLetterHash');
 
-$table->string('ChartLetterHash');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('document');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('document');
+    }
 };

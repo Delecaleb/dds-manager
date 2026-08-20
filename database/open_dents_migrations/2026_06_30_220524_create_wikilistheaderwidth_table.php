@@ -4,37 +4,31 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('wikilistheaderwidth', function (Blueprint $table) {
 
-Schema::create('wikilistheaderwidth', function(Blueprint $table){
+            $table->integer('WikiListHeaderWidthNum');
 
-$table->integer('WikiListHeaderWidthNum');
+            $table->string('ListName');
 
-$table->string('ListName');
+            $table->string('ColName');
 
-$table->string('ColName');
+            $table->integer('ColWidth');
 
-$table->integer('ColWidth');
+            $table->text('PickList');
 
-$table->text('PickList');
+            $table->integer('IsHidden');
 
-$table->integer('IsHidden');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('wikilistheaderwidth');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('wikilistheaderwidth');
+    }
 };

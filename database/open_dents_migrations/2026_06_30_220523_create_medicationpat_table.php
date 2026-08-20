@@ -4,49 +4,43 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('medicationpat', function (Blueprint $table) {
 
-Schema::create('medicationpat', function(Blueprint $table){
+            $table->integer('MedicationPatNum');
 
-$table->integer('MedicationPatNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('MedicationNum');
 
-$table->integer('MedicationNum');
+            $table->text('PatNote');
 
-$table->text('PatNote');
+            $table->string('DateTStamp');
 
-$table->string('DateTStamp');
+            $table->date('DateStart');
 
-$table->date('DateStart');
+            $table->date('DateStop');
 
-$table->date('DateStop');
+            $table->integer('ProvNum');
 
-$table->integer('ProvNum');
+            $table->string('MedDescript');
 
-$table->string('MedDescript');
+            $table->integer('RxCui');
 
-$table->integer('RxCui');
+            $table->string('ErxGuid');
 
-$table->string('ErxGuid');
+            $table->integer('IsCpoe');
 
-$table->integer('IsCpoe');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('medicationpat');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('medicationpat');
+    }
 };

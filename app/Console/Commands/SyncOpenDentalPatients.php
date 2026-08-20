@@ -26,7 +26,7 @@ class SyncOpenDentalPatients extends Command
      */
     public function handle()
     {
-        //call sync service
+        // call sync service
         $syncService = app(PatientSyncService::class);
         $syncService->sync();
     }

@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('cdcrec', function (Blueprint $table) {
 
-Schema::create('cdcrec', function(Blueprint $table){
+            $table->integer('CdcrecNum');
 
-$table->integer('CdcrecNum');
+            $table->string('CdcrecCode');
 
-$table->string('CdcrecCode');
+            $table->string('HeirarchicalCode');
 
-$table->string('HeirarchicalCode');
+            $table->string('Description');
 
-$table->string('Description');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('cdcrec');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('cdcrec');
+    }
 };
