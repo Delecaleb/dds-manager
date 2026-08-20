@@ -662,23 +662,44 @@ class FinancialController extends Controller
     }
 
     // ── New Patient Visits ────────────────────────────────────────────────────
+    /**
+     * New Patient Visits breakdown report (matching JarvisAnalytics logic).
+     *
+     * Rules:
+     * 1. Cohort: Identifies patients whose first-ever completed procedure date falls within [$start, $end].
+     * 2. First-Visit Scoping: Strictly aggregates service codes and production completed ON that exact
+     *    first visit date (ProcDate = first_date). Procedures from subsequent appointments later in the month
+     *    are excluded so they do not inflate the initial new-patient visit production.
+     */
     private function bkNewPatientVisits(string $start, string $end): array
     {
         $rows = DB::select("
             SELECT
-                p.PatNum                                                        AS patient_id,
-                CONCAT(p.LName, ', ', p.FName)                                 AS patient_name,
-                MIN(pl.ProcDate)                                                AS dates,
+                p.PatNum                                                                AS patient_id,
+                CONCAT(p.LName, ', ', p.FName)                                         AS patient_name,
+                fv.first_date                                                           AS dates,
                 GROUP_CONCAT(DISTINCT pc.ProcCode ORDER BY pc.ProcCode SEPARATOR ', ') AS service_codes,
-                SUM(pl.ProcFee)                                                 AS amount
-            FROM od_procedure_logs pl
-            JOIN od_patients   p  ON pl.PatNum  = p.PatNum
+                COALESCE(SUM(pl.ProcFee), 0)                                           AS amount
+            FROM (
+                -- Identify the patient's first-ever completed visit date across history
+                SELECT
+                    PatNum,
+                    MIN(ProcDate) AS first_date
+                FROM od_procedure_logs
+                WHERE ProcStatus IN ({$this->completedIn})
+                  AND CodeNum != 626
+                GROUP BY PatNum
+                HAVING MIN(ProcDate) BETWEEN ? AND ?
+            ) fv
+            JOIN od_patients p ON fv.PatNum = p.PatNum
+            -- Join only procedures completed on that specific first visit date
+            JOIN od_procedure_logs pl ON fv.PatNum = pl.PatNum
+                AND pl.ProcDate = fv.first_date
+                AND pl.ProcStatus IN ({$this->completedIn})
+                AND pl.CodeNum != 626
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus IN ({$this->completedIn})
-              AND pl.CodeNum != 626
-            GROUP BY p.PatNum, p.LName, p.FName
-            HAVING MIN(pl.ProcDate) BETWEEN ? AND ?
-            ORDER BY dates, p.LName
+            GROUP BY p.PatNum, p.LName, p.FName, fv.first_date
+            ORDER BY fv.first_date, p.LName
         ", [$start, $end]);
 
         return array_map(fn ($r) => [
