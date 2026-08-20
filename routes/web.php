@@ -111,6 +111,7 @@ Route::middleware('auth')->group(function () {
     Route::get('front-office/hygiene-reappoint', [FrontOfficeController::class, 'hygieneReappoint'])->name('front-office.hygiene-reappoint');
     Route::get('front-office/tasks', [FrontOfficeController::class, 'tasks'])->name('front-office.tasks');
     Route::get('front-office/tasks-data', [FrontOfficeController::class, 'tasksData'])->name('front-office.tasks-data');
+    Route::get('front-office/tasks-stats', [FrontOfficeController::class, 'tasksStats'])->name('front-office.tasks-stats');
     Route::get('front-office/collections', [FrontOfficeController::class, 'collections'])->name('front-office.collections');
     Route::get('front-office/collections-data', [FrontOfficeController::class, 'collectionsData'])->name('front-office.collections-data');
     Route::get('front-office/collections-stats', [FrontOfficeController::class, 'collectionsStats'])->name('front-office.collections-stats');

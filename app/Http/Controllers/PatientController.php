@@ -208,69 +208,15 @@ class PatientController extends Controller
 
         usort($ledgerItems, fn ($a, $b) => $b['timestamp'] <=> $a['timestamp']);
 
-        $planNums = TreatmentPlan::where('PatNum', $id)->pluck('TreatPlanNum');
-        $attachedProcNums = OdTreatmentPlanAttachments::whereIn('TreatPlanNum', $planNums)->pluck('ProcNum')->filter()->unique();
+        $provMap = OdProvider::all()->mapWithKeys(function ($p) {
+            $name = trim(($p->LName ?? '').($p->FName ? ', '.$p->FName : ''));
 
-        $txProcedures = $patientProcedures->filter(function ($proc) use ($attachedProcNums) {
-            return in_array($proc->ProcStatus ?? '', ProcStatus::TREATMENT_PLANNED)
-                || ($attachedProcNums->isNotEmpty() && $attachedProcNums->contains($proc->ProcNum));
-        });
+            return [$p->ProvNum => $name ?: ($p->Abbr ?? '—')];
+        })->toArray();
 
-        $txplansItems = [];
-        foreach ($txProcedures as $proc) {
-            $provNum = $proc->ProvNum ?? null;
-            $provName = $provNum && isset($provMap[$provNum]) ? $provMap[$provNum] : '—';
+        $codeMap = OdProcedure::all()->keyBy('CodeNum');
 
-            $codeRecord = isset($proc->CodeNum) ? $codeMap->get($proc->CodeNum) : null;
-            $codeStr = $codeRecord->ProcCode ?? ($proc->OldCode ?? ($proc->ProcCode ?? '—'));
-            $descStr = $codeRecord->Descript ?? ($proc->Descript ?? 'Procedure');
-
-            $rawStatus = $proc->ProcStatus ?? '';
-            $statusText = 'Unscheduled';
-            if ($rawStatus === 'C' || $rawStatus === '2') {
-                $statusText = 'Completed';
-            } elseif (in_array($rawStatus, ProcStatus::TREATMENT_PLANNED)) {
-                $statusText = ($proc->AptNum ?? 0) > 0 ? 'Scheduled' : 'Unscheduled';
-            } elseif ($rawStatus === 'D' || $rawStatus === '6') {
-                $statusText = 'Deleted';
-            }
-
-            $datePlanned = isset($proc->DateTP) && $proc->DateTP !== '0001-01-01'
-                ? date('M d, Y', strtotime($proc->DateTP))
-                : '—';
-
-            $dateScheduled = '—';
-            if (($proc->AptNum ?? 0) > 0) {
-                $apt = OdAppointment::where('AptNum', $proc->AptNum)->first();
-                if ($apt) {
-                    $dateScheduled = date('M d, Y', strtotime($apt->AptDateTime));
-                }
-            }
-
-            $dateCompleted = ($rawStatus === 'C' || $rawStatus === '2') && isset($proc->ProcDate)
-                ? date('M d, Y', strtotime($proc->ProcDate))
-                : '—';
-            $dateCreated = isset($proc->SecDateEntry)
-                ? date('M d, Y', strtotime($proc->SecDateEntry))
-                : (isset($proc->DateEntryC) ? date('M d, Y', strtotime($proc->DateEntryC)) : '—');
-
-            $txplansItems[] = [
-                'code' => $codeStr,
-                'description' => $descStr,
-                'tooth' => $proc->ToothNum ?? '',
-                'surface' => $proc->Surf ?? '',
-                'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
-                'provider' => $provName,
-                'provider_id' => $provNum,
-                'status' => $statusText,
-                'planned' => $datePlanned,
-                'scheduled' => $dateScheduled,
-                'completed' => $dateCompleted,
-                'date_created' => $dateCreated,
-                'timestamp' => strtotime($proc->ProcDate ?? ''),
-            ];
-        }
-        usort($txplansItems, fn ($a, $b) => $b['timestamp'] <=> $a['timestamp']);
+        $txplansItems = $this->getPatientTxPlans($id, $patientProcedures, $patientAppointments, $provMap, $codeMap);
 
         $notes = $patient->AddrNote ?? 'No activities or notes available.';
 
@@ -330,44 +276,89 @@ class PatientController extends Controller
 
     public function showTreatment($patientId)
     {
-        $planNums = TreatmentPlan::where('PatNum', $patientId)->pluck('TreatPlanNum');
+        $items = $this->getPatientTxPlans($patientId);
 
+        return response()->json($items);
+    }
+
+    private function getPatientTxPlans($patientId, $procedures = null, $appointments = null, $provMap = null, $codeMap = null): array
+    {
+        $planNums = TreatmentPlan::where('PatNum', $patientId)->pluck('TreatPlanNum');
         $attachedProcNums = OdTreatmentPlanAttachments::whereIn('TreatPlanNum', $planNums)
             ->pluck('ProcNum')
             ->filter()
             ->unique();
 
-        $procedures = OdProcedureLog::where('PatNum', $patientId)
-            ->where(function ($query) use ($attachedProcNums) {
-                $query->whereIn('ProcStatus', ProcStatus::TREATMENT_PLANNED);
-                if ($attachedProcNums->isNotEmpty()) {
-                    $query->orWhereIn('ProcNum', $attachedProcNums);
-                }
-            })
-            ->get();
+        if ($procedures === null) {
+            $procedures = OdProcedureLog::where('PatNum', $patientId)
+                ->where(function ($query) use ($attachedProcNums) {
+                    $query->whereIn('ProcStatus', ProcStatus::TREATMENT_PLANNED)
+                        ->orWhere(function ($q) {
+                            $q->whereNotNull('DateTP')
+                                ->where('DateTP', '!=', '0001-01-01');
+                        });
+                    if ($attachedProcNums->isNotEmpty()) {
+                        $query->orWhereIn('ProcNum', $attachedProcNums);
+                    }
+                })
+                ->get();
+        } else {
+            $procedures = $procedures->filter(function ($proc) use ($attachedProcNums) {
+                return in_array($proc->ProcStatus ?? '', ProcStatus::TREATMENT_PLANNED)
+                    || (! empty($proc->DateTP) && $proc->DateTP !== '0001-01-01')
+                    || ($attachedProcNums->isNotEmpty() && $attachedProcNums->contains($proc->ProcNum));
+            });
+        }
 
-        $provMap = OdProvider::all()->pluck('LName', 'ProvNum')->toArray();
-        $codeMap = OdProcedure::all()->keyBy('CodeNum');
+        if ($provMap === null) {
+            $provMap = OdProvider::all()->mapWithKeys(function ($p) {
+                $name = trim(($p->LName ?? '').($p->FName ? ', '.$p->FName : ''));
 
-        $aptNums = $procedures->pluck('AptNum')->filter(fn ($aptNum) => ($aptNum ?? 0) > 0)->unique();
-        $appointments = OdAppointment::whereIn('AptNum', $aptNums)->get()->keyBy('AptNum');
+                return [$p->ProvNum => $name ?: ($p->Abbr ?? '—')];
+            })->toArray();
+        }
 
-        $items = $procedures->map(function ($proc) use ($provMap, $codeMap, $appointments) {
+        if ($codeMap === null) {
+            $codeMap = OdProcedure::all()->keyBy('CodeNum');
+        }
+
+        if ($appointments === null) {
+            $aptNums = $procedures->pluck('AptNum')->filter(fn ($aptNum) => ($aptNum ?? 0) > 0)->unique();
+            $appointments = OdAppointment::whereIn('AptNum', $aptNums)->get()->keyBy('AptNum');
+        }
+
+        $firstTp = TreatmentPlan::where('PatNum', $patientId)->orderBy('DateTP')->first();
+        $masterTpDate = ($firstTp && ! empty($firstTp->DateTP) && $firstTp->DateTP !== '0001-01-01')
+            ? date('M d, Y', strtotime($firstTp->DateTP))
+            : null;
+
+        $items = $procedures->map(function ($proc) use ($provMap, $codeMap, $appointments, $masterTpDate) {
             $provNum = $proc->ProvNum ?? null;
             $provName = $provNum && isset($provMap[$provNum]) ? $provMap[$provNum] : '—';
 
-            $codeRecord = $codeMap->get($proc->CodeNum);
-            $code = $codeRecord->ProcCode ?? ($proc->OldCode ?? '—');
-            $description = $codeRecord->Descript ?? 'Procedure';
+            $codeRecord = isset($proc->CodeNum) ? $codeMap->get($proc->CodeNum) : null;
+            $code = $codeRecord->ProcCode ?? ($proc->OldCode ?? ($proc->ProcCode ?? '—'));
+            $description = $codeRecord->Descript ?? ($proc->Descript ?? 'Procedure');
 
             $rawStatus = $proc->ProcStatus ?? '';
+            $apt = ($proc->AptNum ?? 0) > 0 ? $appointments->get($proc->AptNum) : null;
             $statusText = 'Unscheduled';
+
             if ($rawStatus === 'C' || $rawStatus === '2') {
                 $statusText = 'Completed';
-            } elseif (in_array($rawStatus, ProcStatus::TREATMENT_PLANNED)) {
-                $statusText = ($proc->AptNum ?? 0) > 0 ? 'Scheduled' : 'Unscheduled';
             } elseif ($rawStatus === 'D' || $rawStatus === '6') {
                 $statusText = 'Deleted';
+            } elseif ($apt) {
+                $aptStatus = (string) ($apt->AptStatus ?? '');
+                if ($aptStatus === '5' || strtolower($aptStatus) === 'broken') {
+                    $statusText = 'Broken';
+                } elseif ($aptStatus === '2' || strtolower($aptStatus) === 'complete' || strtolower($aptStatus) === 'completed') {
+                    $statusText = 'Completed';
+                } else {
+                    $statusText = 'Scheduled';
+                }
+            } elseif (in_array($rawStatus, ProcStatus::TREATMENT_PLANNED)) {
+                $statusText = 'Unscheduled';
             }
 
             $datePlanned = isset($proc->DateTP) && $proc->DateTP !== '0001-01-01'
@@ -375,17 +366,36 @@ class PatientController extends Controller
                 : '—';
 
             $dateScheduled = '—';
-            if (($proc->AptNum ?? 0) > 0 && $appointments->has($proc->AptNum)) {
-                $dateScheduled = date('M d, Y', strtotime($appointments[$proc->AptNum]->AptDateTime));
+            if (($proc->AptNum ?? 0) > 0 && $apt && ! empty($apt->AptDateTime) && $apt->AptDateTime !== '0001-01-01 00:00:00') {
+                $dateScheduled = date('M d, Y', strtotime($apt->AptDateTime));
             }
 
-            $dateCompleted = ($rawStatus === 'C' || $rawStatus === '2') && isset($proc->ProcDate)
+            $dateCompleted = ($rawStatus === 'C' || $rawStatus === '2') && isset($proc->ProcDate) && $proc->ProcDate !== '0001-01-01'
                 ? date('M d, Y', strtotime($proc->ProcDate))
                 : '—';
 
-            $dateCreated = isset($proc->SecDateEntry)
-                ? date('M d, Y', strtotime($proc->SecDateEntry))
-                : (isset($proc->DateEntryC) ? date('M d, Y', strtotime($proc->DateEntryC)) : '—');
+            if ($statusText === 'Completed') {
+                $dateCreated = '—';
+            } elseif ($masterTpDate) {
+                $dateCreated = $masterTpDate;
+            } elseif (isset($proc->SecDateEntry) && $proc->SecDateEntry !== '0001-01-01') {
+                $dateCreated = date('M d, Y', strtotime($proc->SecDateEntry));
+            } elseif (isset($proc->DateEntryC) && $proc->DateEntryC !== '0001-01-01') {
+                $dateCreated = date('M d, Y', strtotime($proc->DateEntryC));
+            } elseif (isset($proc->DateTP) && $proc->DateTP !== '0001-01-01') {
+                $dateCreated = date('M d, Y', strtotime($proc->DateTP));
+            } else {
+                $dateCreated = '—';
+            }
+
+            $sortTimestamp = 0;
+            if ($statusText === 'Completed' && ! empty($proc->ProcDate) && $proc->ProcDate !== '0001-01-01') {
+                $sortTimestamp = strtotime($proc->ProcDate);
+            } elseif ($apt && ! empty($apt->AptDateTime) && $apt->AptDateTime !== '0001-01-01 00:00:00') {
+                $sortTimestamp = strtotime($apt->AptDateTime);
+            } elseif (! empty($proc->DateTP) && $proc->DateTP !== '0001-01-01') {
+                $sortTimestamp = strtotime($proc->DateTP);
+            }
 
             return [
                 'code' => $code,
@@ -394,19 +404,31 @@ class PatientController extends Controller
                 'surface' => $proc->Surf ?? '',
                 'amount' => '$ '.number_format(floatval($proc->ProcFee ?? 0), 2),
                 'provider' => $provName,
+                'provider_id' => $provNum,
                 'status' => $statusText,
+                'planned' => $datePlanned,
+                'scheduled' => $dateScheduled,
+                'completed' => $dateCompleted,
                 'date_planned' => $datePlanned,
                 'date_scheduled' => $dateScheduled,
                 'date_completed' => $dateCompleted,
                 'date_created' => $dateCreated,
-                'timestamp' => strtotime($proc->ProcDate ?? ''),
+                'is_active' => $statusText === 'Unscheduled' ? 0 : 1,
+                'timestamp' => $sortTimestamp,
             ];
         })
-            ->sortByDesc('timestamp')
-            ->values()
-            ->map(fn ($item) => collect($item)->except('timestamp')->all());
+            ->sort(function ($a, $b) {
+                if ($a['is_active'] !== $b['is_active']) {
+                    return $b['is_active'] <=> $a['is_active'];
+                }
 
-        return response()->json($items);
+                return $b['timestamp'] <=> $a['timestamp'];
+            })
+            ->values()
+            ->map(fn ($item) => collect($item)->except(['timestamp', 'is_active'])->all())
+            ->all();
+
+        return $items;
     }
 
     public function showFamily($patientId)

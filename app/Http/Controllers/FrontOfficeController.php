@@ -130,8 +130,9 @@ class FrontOfficeController extends Controller
         // OPPORTUNITIES LOGIC
         $excludedAptNums = [85716, 85845, 85891, 85892, 85468, 85466, 85947];
 
-        // 1. Broken Appointments
+        // 1. Broken Appointments (Existing Recall Patients)
         $brokenApts = OdAppointment::where('AptStatus', 5)
+            ->where('IsNewPatient', 0) // Existing patients (New Patient consults are tracked separately in New Patient pipeline)
             ->whereNotIn('AptNum', $excludedAptNums)
             ->whereBetween('AptDateTime', [$startOfMonth.' 00:00:00', $endOfMonth.' 23:59:59'])
             ->get();
@@ -316,12 +317,32 @@ class FrontOfficeController extends Controller
     {
         [$startRange, $endRange] = $this->getFilterDateRange($request);
 
+        // 1. In Jarvis / dental front office workflow, the Broken Appointments table
+        // tracks Existing Patient recall appointments (IsNewPatient = 0) that need to be re-booked.
+        // New patient leads/consults that broke are tracked separately under New Patient Opportunities.
         $query = OdAppointment::query()
             ->with(['patient', 'provider'])
-            ->where('AptStatus', 5) // 5 is Broken in OD
-            ->whereNotIn('AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947]) // Operations matching condition
+            ->where('AptStatus', 5) // 5 = Broken / Cancelled in OpenDental
+            ->where('IsNewPatient', 0) // Focus on existing recall patients needing rescheduling
+            ->whereNotIn('AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947])
             ->whereBetween('AptDateTime', [$startRange, $endRange])
             ->select('od_appointments.*');
+
+        // 2. Identify patients who have ALREADY re-booked a future active appointment.
+        // If a patient already rescheduled, they are resolved and excluded from this UNSCHEDULED action list.
+        $brokenPatNums = (clone $query)->pluck('PatNum')->unique()->filter()->toArray();
+        if (! empty($brokenPatNums)) {
+            $rescheduledPatNums = OdAppointment::whereIn('PatNum', $brokenPatNums)
+                ->where('AptDateTime', '>', $endRange)
+                ->whereIn('AptStatus', [1, 2])
+                ->pluck('PatNum')
+                ->unique()
+                ->toArray();
+
+            if (! empty($rescheduledPatNums)) {
+                $query->whereNotIn('PatNum', $rescheduledPatNums);
+            }
+        }
 
         $aptNums = (clone $query)->pluck('AptNum')->filter()->toArray();
         $fees = [];
@@ -348,6 +369,9 @@ class FrontOfficeController extends Controller
             'SANJ' => 'Sanjiv Johnson',
             'TERR' => 'Terrance Johnson',
             'ROSE' => 'Rose Pitaro',
+            'ZEIT' => 'Ali Zeitoun',
+            'Zeitoun' => 'Ali Zeitoun',
+            'HELL' => 'Heller',
         ];
 
         return DataTables::eloquent($query)
@@ -567,39 +591,22 @@ class FrontOfficeController extends Controller
     public function tasksData(Request $request)
     {
         $filter = $request->get('filter', 'unconfirmed');
-        $month = $request->get('month');
-        if (! $month) {
-            $month = now()->format('Y-m');
-        }
-
-        try {
-            $targetDate = Carbon::createFromFormat('Y-m', $month);
-            if (! $targetDate) {
-                $targetDate = now();
-            }
-        } catch (\Exception $e) {
-            $targetDate = now();
-        }
-
-        $startOfMonth = (clone $targetDate)->startOfMonth()->format('Y-m-d 00:00:00');
-        $endOfMonth = (clone $targetDate)->endOfMonth()->format('Y-m-d 23:59:59');
+        [$startRange, $endRange] = $this->getFilterDateRange($request);
 
         $query = OdAppointment::query()
             ->with(['patient', 'provider'])
-            ->whereBetween('AptDateTime', [$startOfMonth, $endOfMonth])
+            ->whereBetween('AptDateTime', [$startRange, $endRange])
             ->select('od_appointments.*')
             ->orderBy('AptDateTime', 'asc');
 
-        // Note: For now mapping basic Scheduled (1) appointments until robust confirmation/insurance def joins are bridged.
         if ($filter === 'unconfirmed') {
             $query->whereIn('AptStatus', [1, 4]); // Scheduled or ASAP
         } elseif ($filter === 'no_insurance') {
-            // Mock filter for new functionality
-            $query->whereIn('AptStatus', [1]);
+            $query->whereIn('AptStatus', [1, 4])->where('IsNewPatient', 1);
         } elseif ($filter === 'missing_data') {
-            $query->whereIn('AptStatus', [1]);
+            $query->whereIn('AptStatus', [1, 4]);
         } elseif ($filter === 'reminders') {
-            $query->whereIn('AptStatus', [1]);
+            $query->whereIn('AptStatus', [1, 4]);
         }
 
         return DataTables::eloquent($query)
@@ -638,6 +645,78 @@ class FrontOfficeController extends Controller
             })
             ->rawColumns(['action'])
             ->make(true);
+    }
+
+    public function tasksStats(Request $request)
+    {
+        [$startRange, $endRange] = $this->getFilterDateRange($request);
+
+        $apts = OdAppointment::query()
+            ->with(['patient'])
+            ->whereBetween('AptDateTime', [$startRange, $endRange])
+            ->whereIn('AptStatus', [1, 4])
+            ->get();
+
+        $unconfirmedCount = $apts->count();
+        $noInsuranceCount = $apts->where('IsNewPatient', 1)->count();
+        $missingDataCount = $apts->filter(function ($apt) {
+            $p = $apt->patient;
+            if (! $p) {
+                return true;
+            }
+
+            return (empty($p->WirelessPhone) && empty($p->HmPhone)) || empty($p->Email) || (float) ($p->BalTotal ?? 0) > 0;
+        })->count();
+        $remindersCount = 0;
+
+        // Build daily timeline
+        $labels = [];
+        $unconfirmedTimeline = [];
+        $noInsTimeline = [];
+        $missingDataTimeline = [];
+        $remindersTimeline = [];
+
+        $start = Carbon::parse($startRange);
+        $end = Carbon::parse($endRange);
+        $diffDays = $start->diffInDays($end);
+
+        // If period is large, bucket appropriately, otherwise daily
+        $current = $start->copy();
+        while ($current->lte($end)) {
+            $dayStr = $current->format('Y-m-d');
+            $labels[] = $current->format('M d');
+
+            $dayApts = $apts->filter(fn ($a) => substr($a->AptDateTime, 0, 10) === $dayStr);
+            $unconfirmedTimeline[] = $dayApts->count();
+            $noInsTimeline[] = $dayApts->where('IsNewPatient', 1)->count();
+            $missingDataTimeline[] = $dayApts->filter(function ($apt) {
+                $p = $apt->patient;
+                if (! $p) {
+                    return true;
+                }
+
+                return (empty($p->WirelessPhone) && empty($p->HmPhone)) || empty($p->Email) || (float) ($p->BalTotal ?? 0) > 0;
+            })->count();
+            $remindersTimeline[] = 0;
+
+            $current->addDay();
+        }
+
+        return response()->json([
+            'summary' => [
+                'unconfirmed' => $unconfirmedCount,
+                'no_insurance' => $noInsuranceCount,
+                'missing_data' => $missingDataCount,
+                'reminders' => $remindersCount,
+            ],
+            'chart' => [
+                'labels' => $labels,
+                'unconfirmed' => $unconfirmedTimeline,
+                'no_insurance' => $noInsTimeline,
+                'missing_data' => $missingDataTimeline,
+                'reminders' => $remindersTimeline,
+            ],
+        ]);
     }
 
     public function collectionsData(Request $request)

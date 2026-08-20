@@ -285,9 +285,10 @@
             processing: true,
             serverSide: true,
             pageLength: 20,
+            lengthChange: true,
+            lengthMenu: [10, 20, 50, 100],
             layout: { topStart: null, topEnd: null, bottomStart: ['pageLength', 'info'], bottomEnd: 'paging' },
             language: {
-                lengthMenu: 'Items per page _MENU_ <span class="text-gray-300 mx-2">|</span>',
                 info: '_START_-_END_ of _TOTAL_ items',
                 paginate: {
                     previous: '<i class="fa-solid fa-chevron-left text-[10px]"></i>',

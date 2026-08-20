@@ -391,6 +391,8 @@
                 processing: false, // Disabled default processing popup to let skeleton loader present cleanly
                 serverSide: true,
                 pageLength: 20,
+                lengthChange: true,
+                lengthMenu: [10, 20, 50, 100],
                 layout: { topStart: null, topEnd: null, bottomStart: ['pageLength', 'info'], bottomEnd: 'paging' },
                 language: {
                     lengthMenu: 'Items per page _MENU_ <span class="text-gray-300 mx-2">|</span>',

@@ -166,7 +166,8 @@
         return $el.DataTable(Object.assign({
             paging: true,
             pageLength: 10,
-            lengthChange: false,
+            lengthChange: true,
+            lengthMenu: [10, 20, 50, 100],
             searching: true,
             ordering: true,          // every column sortable
             info: true,
@@ -176,6 +177,7 @@
                 search: '',
                 searchPlaceholder: 'Search…',
                 emptyTable: 'No records found.',
+                lengthMenu: '_MENU_',
                 paginate: {
                     first: '«',
                     previous: '‹',

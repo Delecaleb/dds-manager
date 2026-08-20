@@ -1,18 +1,15 @@
 <main class="p-6 space-y-4 max-w-[1600px] mx-auto bg-gray-50 min-h-screen">
 
     <div class="flex justify-end mb-2">
-        <div class="flex rounded-md shadow-sm bg-white" role="group">
-            <button type="button"
-                class="px-4 py-1.5 text-xs font-medium text-gray-500 bg-white border-y border-l border-gray-200 rounded-l-md hover:bg-gray-50">Today</button>
-            <button type="button"
-                class="px-4 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 hover:bg-gray-50">2
-                Days</button>
-            <button type="button"
-                class="px-4 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.2)]">7
-                Days</button>
-            <button type="button"
-                class="px-4 py-1.5 text-xs font-medium text-gray-500 bg-white border-y border-r border-gray-200 rounded-r-md hover:bg-gray-50">30
-                Days</button>
+        <div class="flex rounded-md shadow-sm bg-white" role="group" id="taskRangeGroup">
+            <button type="button" data-days="0"
+                class="task-range-btn px-4 py-1.5 text-xs font-medium text-gray-500 bg-white border-y border-l border-gray-200 rounded-l-md hover:bg-gray-50">Today</button>
+            <button type="button" data-days="2"
+                class="task-range-btn px-4 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 hover:bg-gray-50">2 Days</button>
+            <button type="button" data-days="7"
+                class="task-range-btn px-4 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.2)]">7 Days</button>
+            <button type="button" data-days="30"
+                class="task-range-btn px-4 py-1.5 text-xs font-medium text-gray-500 bg-white border-y border-r border-gray-200 rounded-r-md hover:bg-gray-50">30 Days</button>
         </div>
     </div>
 
@@ -23,20 +20,14 @@
             class="col-span-2 bg-white rounded-md border border-gray-200 shadow-sm flex flex-col overflow-hidden relative min-h-[300px] p-5">
             <div class="h-1 w-full bg-[#5ce6a1] absolute top-0 left-0"></div>
 
-            <!-- Chart Legend Absolute (Matching screenshot overlay style vaguely) -->
-            <!-- We will rely on ChartJS legend or custom HTML below chart -->
-
             <div class="flex-1 flex justify-center w-full relative">
                 <canvas id="tasksChart"></canvas>
             </div>
 
             <div class="flex items-center justify-center gap-4 text-[10px] font-bold text-gray-700 mt-2">
-                <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#5ce6a1]"></span> Unconfirmed Apts
-                </div>
-                <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#a85cf0]"></span> Unverified Ins
-                </div>
-                <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#42cbf5]"></span> Missing Data or
-                    Balance</div>
+                <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#5ce6a1]"></span> Unconfirmed Apts</div>
+                <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#a85cf0]"></span> Unverified Ins</div>
+                <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#42cbf5]"></span> Missing Data or Balance</div>
                 <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#ffd166]"></span> Reminders</div>
             </div>
         </div>
@@ -54,7 +45,7 @@
                         <button class="text-gray-400 hover:text-gray-600"><i
                                 class="fa-regular fa-circle-info text-[10px]"></i></button>
                     </div>
-                    <div class="text-3xl font-bold text-gray-900 mt-1 mb-2">38</div>
+                    <div id="taskUnconfirmedCount" class="text-3xl font-bold text-gray-900 mt-1 mb-2">0</div>
                 </div>
                 <div class="flex justify-between items-end border-t border-gray-100 pt-3 mt-1">
                     <p class="text-[10px] text-gray-400 w-3/4 leading-tight">Patient with unconfirmed apts</p>
@@ -72,7 +63,7 @@
                         <button class="text-gray-400 hover:text-gray-600"><i
                                 class="fa-regular fa-circle-info text-[10px]"></i></button>
                     </div>
-                    <div class="text-3xl font-bold text-gray-900 mt-1 mb-2">13</div>
+                    <div id="taskNoInsuranceCount" class="text-3xl font-bold text-gray-900 mt-1 mb-2">0</div>
                 </div>
                 <div class="flex justify-between items-end border-t border-gray-100 pt-3 mt-1">
                     <p class="text-[10px] text-gray-400 w-3/4 leading-tight">Patients with unverified insurance</p>
@@ -90,11 +81,10 @@
                         <button class="text-gray-400 hover:text-gray-600"><i
                                 class="fa-regular fa-circle-info text-[10px]"></i></button>
                     </div>
-                    <div class="text-3xl font-bold text-gray-900 mt-1 mb-2">53</div>
+                    <div id="taskMissingDataCount" class="text-3xl font-bold text-gray-900 mt-1 mb-2">0</div>
                 </div>
                 <div class="flex justify-between items-end border-t border-gray-100 pt-3 mt-1">
-                    <p class="text-[10px] text-gray-400 w-3/4 leading-tight">Patient missing key data or has Balance
-                        on their account</p>
+                    <p class="text-[10px] text-gray-400 w-3/4 leading-tight">Patient missing key data or has Balance on their account</p>
                     <i class="fa-regular fa-arrow-up-right-from-square text-gray-300 text-xs"></i>
                 </div>
             </div>
@@ -109,7 +99,7 @@
                         <button class="text-gray-400 hover:text-gray-600"><i
                                 class="fa-regular fa-circle-info text-[10px]"></i></button>
                     </div>
-                    <div class="text-3xl font-bold text-gray-900 mt-1 mb-2">0</div>
+                    <div id="taskRemindersCount" class="text-3xl font-bold text-gray-900 mt-1 mb-2">0</div>
                 </div>
                 <div class="flex justify-between items-end border-t border-gray-100 pt-3 mt-1">
                     <p class="text-[10px] text-gray-400 w-3/4 leading-tight">Patient Reminders</p>
@@ -126,14 +116,11 @@
         <div class="border-b border-gray-100 bg-gray-50/50">
             <nav class="flex text-xs font-semibold" id="taskTabs">
                 <button data-filter="unconfirmed"
-                    class="task-tab border-t-2 border-transparent bg-white text-gray-900 px-6 py-4 shadow-[inset_0_2px_0_rgba(16,185,129,1)] hover:bg-gray-50 border-r border-gray-200">Unconfirmed
-                    Appointments</button>
+                    class="task-tab border-t-2 border-transparent bg-white text-gray-900 px-6 py-4 shadow-[inset_0_2px_0_rgba(16,185,129,1)] hover:bg-gray-50 border-r border-gray-200">Unconfirmed Appointments</button>
                 <button data-filter="no_insurance"
-                    class="task-tab border-t-2 border-transparent text-gray-500 hover:text-gray-700 px-6 py-4 hover:bg-gray-50">New
-                    Patients No Insurance</button>
+                    class="task-tab border-t-2 border-transparent text-gray-500 hover:text-gray-700 px-6 py-4 hover:bg-gray-50">New Patients No Insurance</button>
                 <button data-filter="missing_data"
-                    class="task-tab border-t-2 border-transparent text-gray-500 hover:text-gray-700 px-6 py-4 hover:bg-gray-50">Missing
-                    Data Or Balance</button>
+                    class="task-tab border-t-2 border-transparent text-gray-500 hover:text-gray-700 px-6 py-4 hover:bg-gray-50">Missing Data Or Balance</button>
                 <button data-filter="reminders"
                     class="task-tab border-t-2 border-transparent text-gray-500 hover:text-gray-700 px-6 py-4 hover:bg-gray-50">Reminders</button>
             </nav>
@@ -153,7 +140,7 @@
             </div>
 
             <div class="relative">
-                <input type="text" placeholder="Search"
+                <input id="tasksSearchInput" type="text" placeholder="Search"
                     class="bg-white border border-gray-300 text-gray-900 text-xs rounded pl-2 pr-7 py-1.5 focus:ring-emerald-500 focus:border-emerald-500 w-48 shadow-sm">
                 <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-2 text-gray-400 text-[10px]"></i>
             </div>
@@ -255,50 +242,51 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     $(document).ready(function () {
+        let tasksChartInstance = null;
+        let currentFilter = 'unconfirmed';
+        let customDateParams = null;
 
         // 1. Line Chart Initialization
         const ctx = document.getElementById('tasksChart').getContext('2d');
-
-        // Note: Colors based on mock: Unconfirmed (Teal), Unverified Ins (Purple), Missing Data (Blue), Reminders (Yellow)
-        new Chart(ctx, {
+        tasksChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: ['Jul 07', 'Jul 08', 'Jul 09', 'Jul 10', 'Jul 11', 'Jul 12', 'Jul 13', 'Jul 14'],
+                labels: [],
                 datasets: [
                     {
                         label: 'Unconfirmed Apts',
-                        data: [0, 0, 0, 0, 0, 1, 3, 5],
+                        data: [],
                         borderColor: '#5ce6a1',
                         backgroundColor: 'rgba(92, 230, 161, 0.4)',
                         fill: true,
-                        tension: 0.1,
+                        tension: 0.2,
                         pointRadius: 2,
                     },
                     {
                         label: 'Unverified Ins',
-                        data: [0, 0, 0, 0, 0, 0, 2, 12],
+                        data: [],
                         borderColor: '#a85cf0',
                         backgroundColor: 'rgba(168, 92, 240, 0.2)',
                         fill: true,
-                        tension: 0.1,
+                        tension: 0.2,
                         pointRadius: 2,
                     },
                     {
                         label: 'Missing Data',
-                        data: [0, 0, 0, 0, 0, 0, 0, 53],
+                        data: [],
                         borderColor: '#42cbf5',
-                        backgroundColor: 'rgba(66, 203, 245, 0.8)', // Primary solid spike in screenshot
+                        backgroundColor: 'rgba(66, 203, 245, 0.8)',
                         fill: true,
-                        tension: 0.1,
+                        tension: 0.2,
                         pointRadius: 2,
                     },
                     {
                         label: 'Reminders',
-                        data: [0, 0, 0, 0, 0, 0, 0, 0],
+                        data: [],
                         borderColor: '#ffd166',
                         backgroundColor: 'rgba(255, 209, 102, 0.4)',
                         fill: true,
-                        tension: 0.1,
+                        tension: 0.2,
                         pointRadius: 0,
                     }
                 ]
@@ -312,8 +300,7 @@
                 scales: {
                     y: {
                         beginAtZero: true,
-                        max: 60,
-                        ticks: { font: { size: 9 }, stepSize: 20 },
+                        ticks: { font: { size: 9 }, stepSize: 10 },
                         border: { display: false },
                         grid: { color: '#f3f4f6' }
                     },
@@ -326,10 +313,63 @@
             }
         });
 
-        // 2. DataTables Configuration
-        let currentFilter = 'unconfirmed';
+        // 2. Hydrate Stats & Chart Data by Date
+        function hydrateTasksStats() {
+            let params = {};
+            if (customDateParams) {
+                params = customDateParams;
+            } else if (window.getFoDateParams) {
+                params = window.getFoDateParams();
+            } else {
+                params = { month: $('#frontOfficeMonth').val() || '' };
+            }
 
-        // Pre-XHR event handler to render skeleton screens inside tbody
+            $.get("{{ route('front-office.tasks-stats') }}", params, function (res) {
+                if (res && res.summary) {
+                    $('#taskUnconfirmedCount').text(res.summary.unconfirmed || 0);
+                    $('#taskNoInsuranceCount').text(res.summary.no_insurance || 0);
+                    $('#taskMissingDataCount').text(res.summary.missing_data || 0);
+                    $('#taskRemindersCount').text(res.summary.reminders || 0);
+                }
+
+                if (res && res.chart && tasksChartInstance) {
+                    tasksChartInstance.data.labels = res.chart.labels || [];
+                    tasksChartInstance.data.datasets[0].data = res.chart.unconfirmed || [];
+                    tasksChartInstance.data.datasets[1].data = res.chart.no_insurance || [];
+                    tasksChartInstance.data.datasets[2].data = res.chart.missing_data || [];
+                    tasksChartInstance.data.datasets[3].data = res.chart.reminders || [];
+                    tasksChartInstance.update();
+                }
+            });
+        }
+
+        // 3. Preset Date Range Buttons (Today, 2 Days, 7 Days, 30 Days)
+        $('.task-range-btn').on('click', function () {
+            $('.task-range-btn')
+                .removeClass('text-emerald-700 bg-emerald-50 border-emerald-200 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.2)]')
+                .addClass('text-gray-500 bg-white border-gray-200 hover:bg-gray-50');
+
+            $(this)
+                .removeClass('text-gray-500 bg-white border-gray-200 hover:bg-gray-50')
+                .addClass('text-emerald-700 bg-emerald-50 border-emerald-200 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.2)]');
+
+            let days = parseInt($(this).data('days'), 10);
+            let today = new Date();
+            let start = today.toISOString().slice(0, 10);
+            let endDate = new Date(today);
+            endDate.setDate(today.getDate() + (days > 0 ? days - 1 : 0));
+            let end = endDate.toISOString().slice(0, 10);
+
+            customDateParams = {
+                start_date: start,
+                end_date: end
+            };
+
+            tasksTable.ajax.reload();
+            hydrateTasksStats();
+        });
+
+        // 4. DataTables Configuration
         $('#tasksTable').on('preXhr.dt', function (e, settings, data) {
             var colsCount = $('#tasksTable thead th').length;
             var skeletonRows = '';
@@ -347,12 +387,13 @@
         });
 
         let tasksTable = DDS.dataTable(document.getElementById('tasksTable'), {
-            processing: false, // Disabled default processing popup to let skeleton loader present cleanly
+            processing: false,
             serverSide: true,
             pageLength: 20,
+            lengthChange: true,
+            lengthMenu: [10, 20, 50, 100],
             layout: { topStart: null, topEnd: null, bottomStart: ['pageLength', 'info'], bottomEnd: 'paging' },
             language: {
-                lengthMenu: 'Items per page _MENU_ <span class="text-gray-300 mx-2">|</span>',
                 info: '_START_-_END_ of _TOTAL_ items',
                 paginate: {
                     previous: '<i class="fa-solid fa-chevron-left text-[10px]"></i>',
@@ -360,28 +401,21 @@
                 }
             },
             drawCallback: function () {
-                // Style the Length & Info & Select
                 $('.dt-length').addClass('text-xs font-semibold text-gray-500 flex items-center gap-1.5');
                 $('.dt-length select').addClass('border border-gray-300 rounded text-gray-700 py-1 px-2 text-xs focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none bg-white font-medium cursor-pointer');
                 $('.dt-info').addClass('text-xs font-semibold text-gray-500 flex items-center');
-
-                // Style Pagination Container
                 $('.dt-paging nav').addClass('flex items-center gap-1');
                 $('.dt-paging').addClass('flex items-center');
-
-                // Style Pagination Buttons
                 $('.dt-paging-button').addClass('px-2.5 py-1 text-xs font-bold border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 rounded cursor-pointer transition-colors shadow-sm select-none');
-
-                // Active Current Page
                 $('.dt-paging-button.current').removeClass('bg-white text-gray-600 hover:bg-gray-50 border-gray-200').addClass('bg-emerald-50 text-emerald-700 border-emerald-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.2)]');
-
-                // Disabled Prev/Next
                 $('.dt-paging-button.disabled').addClass('opacity-40 cursor-not-allowed hover:bg-white').removeClass('hover:bg-gray-50 cursor-pointer');
             },
             ajax: {
                 url: "{{ route('front-office.tasks-data') }}",
                 data: function (d) {
-                    if (window.getFoDateParams) {
+                    if (customDateParams) {
+                        $.extend(d, customDateParams);
+                    } else if (window.getFoDateParams) {
                         $.extend(d, window.getFoDateParams());
                     } else {
                         d.month = $('#frontOfficeMonth').val();
@@ -404,6 +438,11 @@
             ]
         });
 
+        // Search Input filter
+        $('#tasksSearchInput').on('keyup', function () {
+            tasksTable.search(this.value).draw();
+        });
+
         // Tab switching logic
         $('.task-tab').click(function () {
             $('.task-tab').removeClass('bg-white text-gray-900 shadow-[inset_0_2px_0_rgba(16,185,129,1)] border-r border-gray-200')
@@ -416,14 +455,25 @@
             tasksTable.ajax.reload();
         });
 
+        // Listen for parent Front Office date change
+        $('#frontOfficeMonth').off('change.tasks').on('change.tasks', function () {
+            customDateParams = null;
+            tasksTable.ajax.reload();
+            hydrateTasksStats();
+        });
+
         window.reloadFoTables = function () {
             if (tasksTable) {
                 tasksTable.ajax.reload();
             }
+            hydrateTasksStats();
         };
 
         $('#exportTasksCsvBtn').on('click', function () {
             exportTableToCSV($('#tasksTable'), (currentFilter || 'tasks') + '_export');
         });
+
+        // Initial Load
+        hydrateTasksStats();
     });
 </script>
