@@ -661,8 +661,9 @@ class FinancialController extends Controller
      * Rules:
      * 1. Cohort: Identifies patients whose first-ever completed clinical procedure date falls within [$start, $end].
      * 2. Exclude Prior Completed Visits: Excludes patients who already completed an appointment prior to this visit date (e.g. completed in an earlier month).
-     * 3. Exclude Existing Patient Appointments: Excludes patients whose appointment on the visit date was explicitly marked
-     *    as an existing patient (IsNewPatient = 0), ensuring returning patients from prior years are not falsely treated as new patients.
+     * 3. Exclude Returning Patients: Excludes patients whose appointment on the visit date was flagged as an existing patient
+     *    (IsNewPatient = 0) AND who already had prior appointments before the current date range. Brand new patients with zero prior history
+     *    are retained even if front-desk scheduling left IsNewPatient = 0.
      * 4. First-Visit Scoping: Strictly aggregates service codes and production completed ON that exact first visit
      *    date (pl.ProcDate = fv.first_date), excluding subsequent appointments later in the month.
      */
@@ -700,16 +701,23 @@ class FinancialController extends Controller
                   AND a_prev.AptStatus IN (2, 'Complete', 'Completed')
                   AND DATE(a_prev.AptDateTime) < fv.first_date
             )
-            -- Filter 2: Exclude patients whose appointment on the visit date was explicitly marked IsNewPatient = 0 (Existing Patient)
-            AND NOT EXISTS (
-                SELECT 1 FROM od_appointments a_curr
-                WHERE a_curr.PatNum = fv.PatNum
-                  AND DATE(a_curr.AptDateTime) = fv.first_date
-                  AND a_curr.IsNewPatient = 0
+            -- Filter 2: Exclude returning patients whose visit was IsNewPatient = 0 AND who had appointments prior to this date range
+            AND NOT (
+                EXISTS (
+                    SELECT 1 FROM od_appointments a_curr
+                    WHERE a_curr.PatNum = fv.PatNum
+                      AND DATE(a_curr.AptDateTime) = fv.first_date
+                      AND a_curr.IsNewPatient = 0
+                )
+                AND EXISTS (
+                    SELECT 1 FROM od_appointments a_old
+                    WHERE a_old.PatNum = fv.PatNum
+                      AND DATE(a_old.AptDateTime) < ?
+                )
             )
             GROUP BY fv.PatNum, p.LName, p.FName, fv.first_date
             ORDER BY fv.first_date, p.LName
-        ", [$start, $end]);
+        ", [$start, $end, $start]);
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
