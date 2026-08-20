@@ -130,9 +130,9 @@
                             class="bg-white border border-gray-300 text-gray-900 text-xs rounded pl-2 pr-7 py-1.5 focus:ring-emerald-500 focus:border-emerald-500 w-48 shadow-sm">
                         <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-2 text-gray-400 text-[10px]"></i>
                     </div>
-                    <button
-                        class="text-[11px] font-bold text-gray-800 bg-white border border-emerald-500 rounded px-3 py-1.5 hover:bg-emerald-50 shadow-sm uppercase">
-                        Export CSV
+                    <button id="exportCollectionsCsvBtn" type="button"
+                        class="text-[11px] font-bold text-gray-800 bg-white border border-emerald-500 rounded px-3 py-1.5 hover:bg-emerald-50 shadow-sm uppercase flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-download"></i> Export CSV
                     </button>
                 </div>
             </div>
@@ -248,8 +248,8 @@
 
         // Hydrate Stats
         function hydrateCollections() {
-            let month = $('#frontOfficeMonth').val() || '';
-            $.get(`{{ route('front-office.collections-stats') }}?month=${month}`, function (data) {
+            let params = window.getFoDateParams ? window.getFoDateParams() : { month: $('#frontOfficeMonth').val() };
+            $.get(`{{ route('front-office.collections-stats') }}`, params, function (data) {
                 $('#bal-lbl-curr').text('$ ' + data.balances.current.toLocaleString('en-US', { minimumFractionDigits: 2 }));
                 $('#bal-lbl-30').text('$ ' + data.balances.over_30.toLocaleString('en-US', { minimumFractionDigits: 2 }));
                 $('#bal-lbl-60').text('$ ' + data.balances.over_60.toLocaleString('en-US', { minimumFractionDigits: 2 }));
@@ -285,9 +285,10 @@
             processing: true,
             serverSide: true,
             pageLength: 20,
-            layout: { topStart: null, topEnd: null, bottomStart: 'info', bottomEnd: 'paging' },
+            layout: { topStart: null, topEnd: null, bottomStart: ['pageLength', 'info'], bottomEnd: 'paging' },
             language: {
-                info: '<span class="flex items-center gap-2">Items per page _MENU_ <span class="text-gray-300 mx-1">|</span> _START_-_END_ of _TOTAL_ items</span>',
+                lengthMenu: 'Items per page _MENU_ <span class="text-gray-300 mx-2">|</span>',
+                info: '_START_-_END_ of _TOTAL_ items',
                 paginate: {
                     previous: '<i class="fa-solid fa-chevron-left text-[10px]"></i>',
                     next: '<i class="fa-solid fa-chevron-right text-[10px]"></i>'
@@ -296,7 +297,11 @@
             ajax: {
                 url: "{{ route('front-office.collections-data') }}",
                 data: function (d) {
-                    d.month = $('#frontOfficeMonth').val() || '';
+                    if (window.getFoDateParams) {
+                        $.extend(d, window.getFoDateParams());
+                    } else {
+                        d.month = $('#frontOfficeMonth').val() || '';
+                    }
                 }
             },
             columns: [
@@ -329,8 +334,9 @@
             ],
             order: [[6, 'desc']],
             drawCallback: function () {
-                $('.dt-info').addClass('text-[11px] font-semibold text-gray-600 flex items-center pr-4');
-                $('.dt-info select').addClass('border border-gray-300 rounded text-gray-700 py-1 px-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white cursor-pointer mx-1 outline-none text-[11px]');
+                $('.dt-length').addClass('text-[11px] font-semibold text-gray-600 flex items-center gap-1.5 p-3');
+                $('.dt-length select').addClass('border border-gray-300 rounded text-gray-700 py-1 px-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white cursor-pointer outline-none text-[11px]');
+                $('.dt-info').addClass('text-[11px] font-semibold text-gray-600 flex items-center p-3');
                 $('.dt-paging nav').addClass('flex items-center gap-1');
                 $('.dt-paging').addClass('flex items-center pl-4 border-l border-gray-200 h-full');
                 $('.dt-paging-button').addClass('px-2.5 py-1 text-[11px] font-bold border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 rounded transition-colors shadow-sm cursor-pointer');
@@ -344,6 +350,15 @@
             }
         });
 
-        // Adjust specific row coloring based on screenshot examples (mock representations via classes)
+        window.reloadFoTables = function () {
+            if (colTable) {
+                colTable.ajax.reload();
+            }
+            hydrateCollections();
+        };
+
+        $('#exportCollectionsCsvBtn').on('click', function () {
+            exportTableToCSV($('#patientBalancesTable'), 'collections_export');
+        });
     });
 </script>

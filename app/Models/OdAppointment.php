@@ -131,6 +131,6 @@ class OdAppointment extends Model
     {
         $pattern = $this->Pattern ?? '';
 
-        return strlen($pattern) > 0 ? strlen($pattern) * 10 : 60;
+        return strlen($pattern) > 0 ? strlen($pattern) * 5 : 60;
     }
 }

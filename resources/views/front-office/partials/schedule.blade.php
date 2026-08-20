@@ -1,8 +1,44 @@
-<main class="p-6 space-y-8 max-w-[1600px] mx-auto">
-
     <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
+            <!-- Skeleton Loader -->
+            <div class="card-skeleton absolute inset-0 bg-white p-5 z-20 flex flex-col justify-between animate-pulse hidden">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="h-4 w-36 bg-gray-200 rounded"></div>
+                        <div class="h-4 w-24 bg-gray-200 rounded"></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <div class="h-3 w-12 bg-gray-200 rounded mb-2"></div>
+                            <div class="h-6 w-28 bg-gray-200 rounded"></div>
+                        </div>
+                        <div>
+                            <div class="h-3 w-20 bg-gray-200 rounded mb-2"></div>
+                            <div class="h-6 w-16 bg-gray-200 rounded"></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100">
+                        <div>
+                            <div class="h-3 w-24 bg-gray-200 rounded mb-2"></div>
+                            <div class="h-6 w-24 bg-gray-200 rounded"></div>
+                            <div class="h-3 w-20 bg-gray-200 rounded mt-2"></div>
+                        </div>
+                        <div>
+                            <div class="h-3 w-16 bg-gray-200 rounded mb-2"></div>
+                            <div class="h-6 w-24 bg-gray-200 rounded"></div>
+                            <div class="h-3 w-20 bg-gray-200 rounded mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <div class="flex justify-between mb-2">
+                        <div class="h-3 w-24 bg-gray-200 rounded"></div>
+                        <div class="h-3 w-20 bg-gray-200 rounded"></div>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-4"></div>
+                </div>
+            </div>
             <div>
                 <div class="flex items-center justify-between mb-2">
                     <h3 class="font-bold text-gray-900">Monthly Production</h3>
@@ -44,14 +80,42 @@
             </div>
         </div>
 
-        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
+            <!-- Skeleton Loader -->
+            <div class="card-skeleton absolute inset-0 bg-white p-5 z-20 flex flex-col justify-between animate-pulse hidden">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="h-4 w-32 bg-gray-200 rounded"></div>
+                        <div class="h-6 w-28 bg-gray-200 rounded"></div>
+                    </div>
+                    <div class="h-44 pt-6 flex items-end justify-between gap-3">
+                        <div class="w-full bg-gray-200 rounded-t h-24"></div>
+                        <div class="w-full bg-gray-200 rounded-t h-36"></div>
+                        <div class="w-full bg-gray-200 rounded-t h-28"></div>
+                        <div class="w-full bg-gray-200 rounded-t h-40"></div>
+                        <div class="w-full bg-gray-200 rounded-t h-32"></div>
+                    </div>
+                </div>
+                <div class="flex justify-center gap-4 mt-4 pt-2 border-t border-gray-50">
+                    <div class="h-3 w-12 bg-gray-200 rounded"></div>
+                    <div class="h-3 w-12 bg-gray-200 rounded"></div>
+                </div>
+            </div>
             <div>
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-bold text-gray-900">Daily Production</h3>
-                    <span class="text-xs text-gray-500">Jun 21 - Jun 27</span>
+                    <div class="flex items-center gap-1 text-xs text-gray-600 font-medium bg-gray-50 border border-gray-200 px-2 py-1 rounded-lg">
+                        <button type="button" class="fo-prev-week hover:text-emerald-600 p-0.5 transition-colors cursor-pointer" title="Previous Week">
+                            <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                        </button>
+                        <span class="fo-week-date-range text-[11px] font-semibold text-gray-700 min-w-[95px] text-center">Mon - Fri</span>
+                        <button type="button" class="fo-next-week hover:text-emerald-600 p-0.5 transition-colors cursor-pointer" title="Next Week">
+                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="h-36 flex items-end justify-between gap-2 pt-4 px-2" id="daily-production-chart">
-                    <!-- Chart generated via JS -->
+                <div class="h-44 relative w-full">
+                    <canvas id="dailyProductionChartCanvas"></canvas>
                 </div>
             </div>
             <div class="flex justify-center gap-4 text-xs font-semibold mt-4 pt-2 border-t border-gray-50">
@@ -62,21 +126,49 @@
             </div>
         </div>
 
-        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
+            <!-- Skeleton Loader -->
+            <div class="card-skeleton absolute inset-0 bg-white p-5 z-20 flex flex-col justify-between animate-pulse hidden">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="h-4 w-20 bg-gray-200 rounded"></div>
+                        <div class="h-6 w-28 bg-gray-200 rounded"></div>
+                    </div>
+                    <div class="h-44 pt-6 flex items-end justify-between gap-3">
+                        <div class="w-full bg-gray-200 rounded-t h-28"></div>
+                        <div class="w-full bg-gray-200 rounded-t h-20"></div>
+                        <div class="w-full bg-gray-200 rounded-t h-36"></div>
+                        <div class="w-full bg-gray-200 rounded-t h-32"></div>
+                        <div class="w-full bg-gray-200 rounded-t h-24"></div>
+                    </div>
+                </div>
+                <div class="flex justify-center gap-4 mt-4 pt-2 border-t border-gray-50">
+                    <div class="h-3 w-20 bg-gray-200 rounded"></div>
+                    <div class="h-3 w-24 bg-gray-200 rounded"></div>
+                </div>
+            </div>
             <div>
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-bold text-gray-900">Visits</h3>
-                    <span class="text-xs text-gray-500">Jun 21 - Jun 27</span>
+                    <div class="flex items-center gap-1 text-xs text-gray-600 font-medium bg-gray-50 border border-gray-200 px-2 py-1 rounded-lg">
+                        <button type="button" class="fo-prev-week hover:text-emerald-600 p-0.5 transition-colors cursor-pointer" title="Previous Week">
+                            <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                        </button>
+                        <span class="fo-week-date-range text-[11px] font-semibold text-gray-700 min-w-[95px] text-center">Mon - Fri</span>
+                        <button type="button" class="fo-next-week hover:text-emerald-600 p-0.5 transition-colors cursor-pointer" title="Next Week">
+                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="h-36 flex items-end justify-between gap-1 pt-4" id="visits-chart">
-                    <!-- Chart generated via JS -->
+                <div class="h-44 relative w-full">
+                    <canvas id="visitsChartCanvas"></canvas>
                 </div>
             </div>
             <div
                 class="flex flex-wrap justify-center gap-3 text-[11px] font-semibold mt-4 pt-2 border-t border-gray-50">
-                <span class="flex items-center gap-1"><span class="w-2 h-2 bg-emerald-300 rounded-sm"></span> New
+                <span class="flex items-center gap-1"><span class="w-2 h-2 bg-emerald-400 rounded-sm"></span> New
                     Patients</span>
-                <span class="flex items-center gap-1"><span class="w-2 h-2 bg-purple-600 rounded-sm"></span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 bg-purple-500 rounded-sm"></span>
                     Existing Patients</span>
             </div>
         </div>
@@ -88,6 +180,18 @@
 
         <!-- Schedule Opportunities -->
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden relative">
+            <!-- Skeleton Loader -->
+            <div class="card-skeleton absolute inset-0 bg-white p-5 z-20 flex flex-col justify-between animate-pulse hidden">
+                <div class="space-y-4">
+                    <div class="h-5 w-44 bg-gray-200 rounded"></div>
+                    <div class="h-8 w-16 bg-gray-200 rounded"></div>
+                    <div class="h-5 w-full bg-gray-200 rounded"></div>
+                    <div class="h-px w-full bg-gray-100 my-4"></div>
+                    <div class="h-5 w-40 bg-gray-200 rounded"></div>
+                    <div class="h-8 w-16 bg-gray-200 rounded"></div>
+                    <div class="h-2 w-full bg-gray-200 rounded"></div>
+                </div>
+            </div>
             <div class="h-1.5 w-full bg-blue-500 absolute top-0 left-0"></div>
             <div class="p-5 flex-1 mt-1">
                 <div class="flex items-center justify-between mb-4">
@@ -162,6 +266,23 @@
 
         <!-- Hygiene Recall Due -->
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden relative">
+            <!-- Skeleton Loader -->
+            <div class="card-skeleton absolute inset-0 bg-white p-5 z-20 flex flex-col justify-between animate-pulse hidden">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="h-5 w-40 bg-gray-200 rounded"></div>
+                        <div class="h-4 w-4 bg-gray-200 rounded-full"></div>
+                    </div>
+                    <div class="flex justify-center items-center h-48">
+                        <div class="w-32 h-32 rounded-full border-8 border-gray-200"></div>
+                    </div>
+                    <div class="space-y-2 mt-4">
+                        <div class="h-3 w-full bg-gray-200 rounded"></div>
+                        <div class="h-3 w-full bg-gray-200 rounded"></div>
+                        <div class="h-3 w-full bg-gray-200 rounded"></div>
+                    </div>
+                </div>
+            </div>
             <div class="h-1.5 w-full bg-blue-500 absolute top-0 left-0"></div>
             <div class="p-5 flex-1 mt-1">
                 <div class="flex items-center justify-between mb-4">
@@ -215,6 +336,23 @@
 
         <!-- Unscheduled Treatment -->
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden relative">
+            <!-- Skeleton Loader -->
+            <div class="card-skeleton absolute inset-0 bg-white p-5 z-20 flex flex-col justify-between animate-pulse hidden">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="h-5 w-44 bg-gray-200 rounded"></div>
+                        <div class="h-4 w-4 bg-gray-200 rounded-full"></div>
+                    </div>
+                    <div class="flex justify-center items-center h-48">
+                        <div class="w-32 h-32 rounded-full border-8 border-gray-200"></div>
+                    </div>
+                    <div class="space-y-2 mt-4">
+                        <div class="h-3 w-full bg-gray-200 rounded"></div>
+                        <div class="h-3 w-full bg-gray-200 rounded"></div>
+                        <div class="h-3 w-full bg-gray-200 rounded"></div>
+                    </div>
+                </div>
+            </div>
             <div class="h-1.5 w-full bg-blue-500 absolute top-0 left-0"></div>
             <div class="p-5 flex-1 mt-1">
                 <div class="flex items-center justify-between mb-4">
@@ -296,6 +434,10 @@
                         class="bg-gray-50 border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 w-64">
                     <i class="fa-solid fa-magnifying-glass absolute right-3 top-2.5 text-gray-400 text-xs"></i>
                 </div>
+                <button id="exportScheduleCsvBtn" type="button"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer">
+                    <i class="fa-solid fa-download"></i> Export CSV
+                </button>
             </div>
         </div>
 
@@ -406,7 +548,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     $(document).ready(function () {
-        let hygieneChart, unscheduledChart;
+        let hygieneChart, unscheduledChart, dailyProductionChartInstance, visitsChartInstance;
+        let currentWeekStartDate = null;
 
         const foSchedChartConfigA = {
             type: 'doughnut',
@@ -449,10 +592,26 @@
             console.warn('Charts failed to initialize', e);
         }
 
-        function hydrateDashboard() {
-            let currentMonth = $('#frontOfficeMonth').val();
+        function shiftDateStr(dateStr, days) {
+            let d = new Date(dateStr + 'T00:00:00');
+            d.setDate(d.getDate() + days);
+            let yr = d.getFullYear();
+            let mo = String(d.getMonth() + 1).padStart(2, '0');
+            let da = String(d.getDate()).padStart(2, '0');
+            return `${yr}-${mo}-${da}`;
+        }
 
-            $.get("{{ route('front-office.stats') }}", { month_year: currentMonth }, function (data) {
+        function hydrateDashboard(startDateOverride) {
+            let params = window.getFoDateParams ? window.getFoDateParams() : { month_year: $('#frontOfficeMonth').val() };
+            if (startDateOverride) {
+                params.start_date = startDateOverride;
+            } else if (currentWeekStartDate) {
+                params.start_date = currentWeekStartDate;
+            }
+
+            $('.card-skeleton').removeClass('hidden');
+
+            $.get("{{ route('front-office.stats') }}", params, function (data) {
                 $('#mo-actual').text('$' + data.monthly.actual.toLocaleString('en-US', { minimumFractionDigits: 2 }));
                 $('#mo-prior').text('$' + data.monthly.prior_year.toLocaleString('en-US', { minimumFractionDigits: 2 }));
 
@@ -470,46 +629,157 @@
                 $('#mo-progress-goal').text(`Goal ($${data.monthly.goal.toLocaleString('en-US', { minimumFractionDigits: 2 })})`);
                 $('#mo-progress-bar').css('width', `${Math.min(data.monthly.percent_goal, 100)}%`);
 
-                let maxDaily = Math.max(...data.daily.actuals, ...data.daily.goals, 1);
+                if (data.week_period) {
+                    currentWeekStartDate = data.week_period.start_date;
+                    $('.fo-week-date-range').text(data.week_period.formatted);
+                }
+
                 let dailyDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-                let dailyHtml = '';
-                for (let i = 0; i < 5; i++) {
-                    let hGoal = (data.daily.goals[i] / maxDaily) * 112;
-                    let hActual = (data.daily.actuals[i] / maxDaily) * 112;
 
-                    dailyHtml += `
-                                        <div class="w-full flex flex-col items-center gap-1 group relative">
-                                            <div class="opacity-0 group-hover:opacity-100 absolute -top-8 bg-gray-900 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap transition-opacity">
-                                                A: $${data.daily.actuals[i].toLocaleString()}<br>G: $${data.daily.goals[i].toLocaleString()}
-                                            </div>
-                                            <div class="flex gap-0.5 items-end h-[112px]">
-                                                <div class="w-3 bg-emerald-400 rounded-t transition-all duration-1000" style="height: ${hGoal}px"></div>
-                                                <div class="w-3 bg-amber-400 rounded-t transition-all duration-1000" style="height: ${hActual}px"></div>
-                                            </div>
-                                            <span class="text-[10px] text-gray-400">${dailyDays[i]}</span>
-                                        </div>`;
+                // 1. Daily Production Chart
+                if (dailyProductionChartInstance) {
+                    dailyProductionChartInstance.data.labels = dailyDays;
+                    dailyProductionChartInstance.data.datasets[0].data = data.daily.goals;
+                    dailyProductionChartInstance.data.datasets[1].data = data.daily.actuals;
+                    dailyProductionChartInstance.update();
+                } else {
+                    const ctxDP = document.getElementById('dailyProductionChartCanvas');
+                    if (ctxDP) {
+                        dailyProductionChartInstance = new Chart(ctxDP.getContext('2d'), {
+                            type: 'bar',
+                            data: {
+                                labels: dailyDays,
+                                datasets: [
+                                    {
+                                        label: 'Goal',
+                                        data: data.daily.goals,
+                                        backgroundColor: '#34d399',
+                                        borderRadius: 4,
+                                        barPercentage: 0.7,
+                                        categoryPercentage: 0.6
+                                    },
+                                    {
+                                        label: 'Actual',
+                                        data: data.daily.actuals,
+                                        backgroundColor: '#fbbf24',
+                                        borderRadius: 4,
+                                        barPercentage: 0.7,
+                                        categoryPercentage: 0.6
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function (context) {
+                                                let label = context.dataset.label || '';
+                                                if (label) label += ': ';
+                                                if (context.parsed.y !== null) {
+                                                    label += '$' + Number(context.parsed.y).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                }
+                                                return label;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        grid: { display: false },
+                                        ticks: { font: { size: 11 } }
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        grid: { color: 'rgba(243, 244, 246, 1)' },
+                                        ticks: {
+                                            font: { size: 10 },
+                                            callback: function (value) {
+                                                if (value >= 1000) {
+                                                    return '$' + (value / 1000).toLocaleString('en-US') + 'k';
+                                                }
+                                                return '$' + Number(value).toLocaleString('en-US');
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
                 }
-                $('#daily-production-chart').html(dailyHtml);
 
-                let maxVisits = Math.max(...data.visits.new, ...data.visits.existing, 1);
-                let visitsHtml = '';
-                for (let i = 0; i < 5; i++) {
-                    let hNew = (data.visits.new[i] / maxVisits) * 100;
-                    let hExist = (data.visits.existing[i] / maxVisits) * 100;
-
-                    visitsHtml += `
-                                        <div class="w-full flex flex-col items-center group relative">
-                                            <div class="opacity-0 group-hover:opacity-100 z-10 absolute -top-8 bg-gray-900 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap transition-opacity">
-                                                New: ${data.visits.new[i]} | Exist: ${data.visits.existing[i]}
-                                            </div>
-                                            <div class="flex gap-0.5 items-end h-[100px]">
-                                                <div class="w-3 bg-[#42cbf5] rounded-t transition-all duration-1000" style="height: ${hNew}px"></div>
-                                                <div class="w-3 bg-[#5ce6a1] rounded-t transition-all duration-1000" style="height: ${hExist}px"></div>
-                                            </div>
-                                            <span class="text-[10px] text-gray-400 mt-1">${dailyDays[i]}</span>
-                                        </div>`;
+                // 2. Visits Chart
+                if (visitsChartInstance) {
+                    visitsChartInstance.data.labels = dailyDays;
+                    visitsChartInstance.data.datasets[0].data = data.visits.new;
+                    visitsChartInstance.data.datasets[1].data = data.visits.existing;
+                    visitsChartInstance.update();
+                } else {
+                    const ctxV = document.getElementById('visitsChartCanvas');
+                    if (ctxV) {
+                        visitsChartInstance = new Chart(ctxV.getContext('2d'), {
+                            type: 'bar',
+                            data: {
+                                labels: dailyDays,
+                                datasets: [
+                                    {
+                                        label: 'New Patients',
+                                        data: data.visits.new,
+                                        backgroundColor: '#34d399',
+                                        borderRadius: 4,
+                                        barPercentage: 0.7,
+                                        categoryPercentage: 0.6
+                                    },
+                                    {
+                                        label: 'Existing Patients',
+                                        data: data.visits.existing,
+                                        backgroundColor: '#a85cf0',
+                                        borderRadius: 4,
+                                        barPercentage: 0.7,
+                                        categoryPercentage: 0.6
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function (context) {
+                                                let label = context.dataset.label || '';
+                                                if (label) label += ': ';
+                                                if (context.parsed.y !== null) {
+                                                    label += '$' + Number(context.parsed.y).toLocaleString('en-US');
+                                                }
+                                                return label;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        grid: { display: false },
+                                        ticks: { font: { size: 11 } }
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        grid: { color: 'rgba(243, 244, 246, 1)' },
+                                        ticks: {
+                                            font: { size: 10 },
+                                            callback: function (value) {
+                                                return '$' + Number(value).toLocaleString('en-US');
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
                 }
-                $('#visits-chart').html(visitsHtml);
 
                 // 4. Update Opportunities Cards
                 $('#opp-broken-total').text(data.opportunities.broken.total);
@@ -542,13 +812,24 @@
 
             }).fail(function (error) {
                 console.error('API Sync Error:', error);
+            }).always(function () {
+                $('.card-skeleton').addClass('hidden');
             });
-
-            // Update Active DataTables AJAX query for active subtab
-            if (dtInstances[activeSubtab]) {
-                dtInstances[activeSubtab].ajax.reload();
-            }
         }
+
+        $(document).on('click', '.fo-prev-week', function (e) {
+            e.preventDefault();
+            if (!currentWeekStartDate) return;
+            let prevWeek = shiftDateStr(currentWeekStartDate, -7);
+            hydrateDashboard(prevWeek);
+        });
+
+        $(document).on('click', '.fo-next-week', function (e) {
+            e.preventDefault();
+            if (!currentWeekStartDate) return;
+            let nextWeek = shiftDateStr(currentWeekStartDate, 7);
+            hydrateDashboard(nextWeek);
+        });
 
         // 4. DataTables Configuration & Logic for each Subtab
         const dtInstances = {};
@@ -564,17 +845,19 @@
                 processing: true,
                 serverSide: true,
                 pageLength: 10,
-                layout: { topStart: null, topEnd: null, bottomStart: 'info', bottomEnd: 'paging' },
+                layout: { topStart: null, topEnd: null, bottomStart: ['pageLength', 'info'], bottomEnd: 'paging' },
                 language: {
-                    info: '<span class="flex items-center gap-2">Items per page _MENU_ <span class="text-gray-300 mx-1">|</span> _START_-_END_ of _TOTAL_ items</span>',
+                    lengthMenu: 'Items per page _MENU_ <span class="text-gray-300 mx-2">|</span>',
+                    info: '_START_-_END_ of _TOTAL_ items',
                     paginate: {
                         previous: '<i class="fa-solid fa-chevron-left text-[10px]"></i>',
                         next: '<i class="fa-solid fa-chevron-right text-[10px]"></i>'
                     }
                 },
                 drawCallback: function () {
+                    $('.dt-length').addClass('text-xs font-semibold text-gray-500 flex items-center gap-1.5');
+                    $('.dt-length select').addClass('border border-gray-300 rounded text-gray-700 py-1 px-2 text-xs focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none bg-white font-medium cursor-pointer');
                     $('.dt-info').addClass('text-xs font-semibold text-gray-500 flex items-center');
-                    $('.dt-info select').addClass('border border-gray-300 rounded text-gray-700 py-1 px-2 text-xs focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none bg-white font-medium cursor-pointer');
                     $('.dt-paging nav').addClass('flex items-center gap-1');
                     $('.dt-paging').addClass('flex items-center');
                     $('.dt-paging-button').addClass('px-2.5 py-1 text-xs font-bold border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 rounded cursor-pointer transition-colors shadow-sm select-none');
@@ -583,12 +866,20 @@
                 }
             };
 
+            const sendDateParams = d => {
+                if (window.getFoDateParams) {
+                    $.extend(d, window.getFoDateParams());
+                } else {
+                    d.month_year = $('#frontOfficeMonth').val();
+                }
+            };
+
             if (subtabKey === 'broken') {
                 dtInstances['broken'] = DDS.dataTable(document.getElementById('brokenAppointmentsTable'), {
                     ...dtOptions,
                     ajax: {
                         url: "{{ route('front-office.broken-appointments') }}",
-                        data: d => { d.month_year = $('#frontOfficeMonth').val(); }
+                        data: sendDateParams
                     },
                     columns: [
                         { data: 'patient_name', name: 'patient_name', className: 'dt-col-sticky font-semibold text-gray-900 bg-white' },
@@ -616,7 +907,7 @@
                     ...dtOptions,
                     ajax: {
                         url: "{{ route('front-office.hygiene-recall-due') }}",
-                        data: d => { d.month_year = $('#frontOfficeMonth').val(); }
+                        data: sendDateParams
                     },
                     columns: [
                         { data: 'patient_name', name: 'patient_name', className: 'dt-col-sticky font-semibold text-gray-900 bg-white' },
@@ -640,7 +931,7 @@
                     ...dtOptions,
                     ajax: {
                         url: "{{ route('front-office.unscheduled-treatment') }}",
-                        data: d => { d.month_year = $('#frontOfficeMonth').val(); }
+                        data: sendDateParams
                     },
                     columns: [
                         { data: 'patient_name', name: 'patient_name', className: 'dt-col-sticky font-semibold text-gray-900 bg-white' },
@@ -664,7 +955,7 @@
                     ...dtOptions,
                     ajax: {
                         url: "{{ route('front-office.hygiene-reappoint') }}",
-                        data: d => { d.month_year = $('#frontOfficeMonth').val(); }
+                        data: sendDateParams
                     },
                     columns: [
                         { data: 'patient_name', name: 'patient_name', className: 'dt-col-sticky font-semibold text-gray-900 bg-white' },
@@ -714,19 +1005,28 @@
             }
         });
 
+        $('#exportScheduleCsvBtn').on('click', function () {
+            let activeTableIdMap = {
+                'broken': 'brokenAppointmentsTable',
+                'hygiene-recall': 'hygieneRecallTable',
+                'unscheduled-tx': 'unscheduledTxTable',
+                'hygiene-reappoint': 'hygieneReappointTable'
+            };
+            let targetTableId = activeTableIdMap[activeSubtab] || 'brokenAppointmentsTable';
+            exportTableToCSV($('#' + targetTableId), activeSubtab + '_export');
+        });
+
+        window.hydrateDashboard = hydrateDashboard;
+        window.reloadFoTables = function () {
+            if (dtInstances[activeSubtab]) {
+                dtInstances[activeSubtab].ajax.reload();
+            }
+        };
+
         // Initial Load
         initOrReloadSubtab('broken');
 
         // Initial Hydration
         hydrateDashboard();
-
-        // Bind Update Actions
-        $('#updateStatsBtn').click(function () {
-            hydrateDashboard();
-        });
-
-        $('#frontOfficeMonth').on('change', function () {
-            hydrateDashboard();
-        });
     });
 </script>

@@ -284,4 +284,45 @@ class CalendarTest extends TestCase
         $response->assertOk()
             ->assertJsonFragment(['scheduled_appointments' => 2]);
     }
+
+    public function test_appointment_details_data_calculates_5min_duration_and_supports_sorting(): void
+    {
+        $provider = OdProvider::create([
+            'ProvNum' => 81,
+            'LName' => 'Elias',
+            'PName' => 'Kathy',
+            'Abbr' => 'ELIAS',
+        ]);
+
+        // Pattern of length 12 -> 12 * 5 = 60 minutes ("60.00")
+        OdAppointment::create([
+            'AptNum' => 99998,
+            'PatNum' => 1,
+            'AptStatus' => 1,
+            'Pattern' => 'XXXXXXXXXXXX',
+            'Op' => 1,
+            'ProvNum' => $provider->ProvNum,
+            'AptDateTime' => '2026-07-14 10:00:00',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson(route('calendar.appointments-details-data', [
+                'draw' => 1,
+                'start' => '2026-07-14',
+                'end' => '2026-07-14',
+                'columns' => [
+                    ['data' => 'location', 'name' => 'location'],
+                    ['data' => 'patient_name', 'name' => 'patient_name'],
+                    ['data' => 'appointment_date', 'name' => 'appointment_date'],
+                    ['data' => 'appointment_time', 'name' => 'appointment_time'],
+                    ['data' => 'appointment_duration', 'name' => 'appointment_duration'],
+                ],
+                'order' => [
+                    ['column' => 4, 'dir' => 'desc'],
+                ],
+            ]));
+
+        $response->assertOk()
+            ->assertJsonFragment(['appointment_duration' => '60.00']);
+    }
 }

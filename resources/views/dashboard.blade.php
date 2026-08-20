@@ -502,16 +502,7 @@
     }
 
     function fmtMoneyCompact(v) {
-      var n = Number(v ?? 0);
-      var neg = n < 0;
-      var abs = Math.abs(n);
-      var str;
-      if (abs >= 1000) {
-        str = '$' + (abs / 1000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + 'K';
-      } else {
-        str = '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      }
-      return neg ? '(' + str + ')' : str;
+      return fmtMoney(v);
     }
 
     var AVATAR_COLORS = [
@@ -641,7 +632,7 @@
       $('#tot-gross').text(fmtMoney(totals.gross));
       $('#tot-net').text(fmtMoney(totals.net));
       $('#tot-coll').text(fmtMoney(totals.coll));
-      $('#tot-adj').text(fmtMoneyCompact(totals.adj));
+      $('#tot-adj').text(fmtMoney(totals.adj));
 
       if (!data.length) {
         $('#providerList').html('<p class="px-5 py-8 text-xs text-slate-400 text-center">No providers match your search.</p>');
@@ -654,7 +645,7 @@
         var initStr = initials(row);
         var name = escHtml(row.LName || '') + (row.PName ? ', ' + escHtml(row.PName) : '');
         var adjVal = Number(row.adjustments || 0);
-        var adjFmt = fmtMoneyCompact(adjVal);
+        var adjFmt = fmtMoney(adjVal);
         var adjColor = adjVal < 0 ? 'text-red-500' : 'text-slate-900';
 
         html += '<div class="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/70 transition-colors">';

@@ -234,45 +234,50 @@
         data-subtab="hygiene">Hygiene</button>
     </div>
 
-    <!-- Controls -->
-    <div class="flex justify-between items-center mt-4">
-      <div class="flex">
-        <button class="px-4 py-1.5 text-sm font-medium bg-green-200 text-green-900">Top 20%</button>
-        <button class="px-4 py-1.5 text-sm font-medium bg-yellow-100 text-yellow-800">Mid Tier</button>
-        <button class="px-4 py-1.5 text-sm font-medium bg-red-200 text-red-900">Bottom 20%</button>
+    <!-- Controls & Tier Legend -->
+    <div class="mb-4 sm:flex sm:items-center sm:justify-between gap-4 bg-white p-3 rounded-md border border-gray-200 shadow-sm">
+      <div class="sm:flex-1">
+        <ul class="inline-flex items-center gap-1.5">
+          <li class="text-xs"><span class="px-3 py-1.5 rounded text-xs font-semibold bg-[#E6F7ED] text-[#047857] border border-[#A7F3D0]">Top 20%</span></li>
+          <li class="text-xs"><span class="px-3 py-1.5 rounded text-xs font-semibold bg-[#FEFCE8] text-[#854D0E] border border-[#FEF08A]">Mid Tier</span></li>
+          <li class="text-xs"><span class="px-3 py-1.5 rounded text-xs font-semibold bg-[#FEE2E2] text-[#991B1B] border border-[#FCA5A5]">Bottom 20%</span></li>
+        </ul>
       </div>
-      <div class="flex gap-2">
-        <div class="relative">
-          <input type="text" placeholder="Search"
-            class="pl-3 pr-8 py-1.5 border border-gray-300 rounded text-sm focus:outline-none">
-          <i class="fa fa-search absolute right-3 top-1.5 text-gray-400" style="margin-top:2px;"></i>
+      <div class="mt-4 sm:flex sm:items-center sm:mt-0 gap-2">
+        <div class="relative block">
+          <input type="search" id="providerSearchInput" autocomplete="off" placeholder="Search"
+            class="appearance-none bg-white border border-gray-300 rounded-md py-1.5 pl-3 pr-8 text-xs focus:outline-none focus:border-emerald-500 w-full sm:w-48 shadow-sm">
+          <svg class="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
         </div>
-        <button
-          class="border border-emerald-500 text-emerald-800 font-bold px-3 py-1.5 rounded text-sm hover:bg-emerald-50">Export
-          CSV</button>
+        <div>
+          <button type="button" id="exportProviderCsvBtn"
+            class="appearance-none flex items-center justify-center select-none font-bold focus:outline-none rounded-md border border-emerald-500 py-1.5 px-3 bg-white text-emerald-700 hover:bg-emerald-50 text-xs shadow-sm cursor-pointer gap-1.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Export CSV</span>
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Table Container -->
-    <div class="overflow-x-auto ring-1 ring-gray-200 shadow rounded-sm mt-4">
-      <table class="dds-table dds-sortable min-w-full divide-y divide-gray-200 text-sm" id="providers-table">
-        <thead class="bg-white">
-          <tr id="providers-thead-tr">
+    <div id="csv-table-container" class="overflow-x-auto border border-gray-200 rounded-md shadow-sm bg-white" style="max-height: 550px;">
+      <table class="w-full text-xs text-left border-collapse" id="providers-table">
+        <thead class="bg-white sticky top-0 z-30 shadow-sm">
+          <tr id="providers-thead-tr" class="bg-white border-b border-gray-200">
             <!-- Headers injected via JS -->
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200" id="providers-tbody">
+        <tbody class="bg-white divide-y divide-gray-100" id="providers-tbody">
           <!-- Rows will be injected here -->
         </tbody>
-        <tfoot class="bg-gray-100 font-bold" id="providers-tfoot">
-          <tr>
-            <td colspan="2" class="p-4 text-right">Avg:</td>
-            <!-- Avg injected via JS -->
-          </tr>
-          <tr>
-            <td colspan="2" class="p-4 text-right text-gray-600">Total:</td>
-            <!-- Total injected via JS -->
-          </tr>
+        <tfoot class="bg-gray-100 font-bold border-t-2 border-gray-300 sticky bottom-0 z-20" id="providers-tfoot">
+          <!-- Footers injected via JS -->
         </tfoot>
       </table>
     </div>
@@ -738,23 +743,18 @@
       var $tr = document.getElementById('providers-thead-tr');
       if (!$tr) return;
 
-      var thHtml = '<th class="px-4 py-5 text-left font-bold text-gray-900 border-r border-gray-100 bg-white sticky left-0 z-10 w-32 border-b" style="min-width: 150px; box-shadow: 2px 0 5px rgba(0,0,0,0.03);">Location</th>';
-      thHtml += '<th class="px-4 py-5 text-left font-bold text-gray-900 border-r border-gray-100 bg-white sticky left-[150px] z-10 w-48 border-b" style="min-width: 150px; box-shadow: 2px 0 5px rgba(0,0,0,0.03);">Provider</th>';
+      var thHtml = '<th role="columnheader" class="py-3 px-4 text-xs font-bold text-left bg-white border-t border-r border-b border-gray-200 sticky left-0 z-30 w-36 min-w-[144px] shadow-[2px_0_5px_rgba(0,0,0,0.03)]"><strong>Location</strong></th>';
+      thHtml += '<th role="columnheader" class="py-3 px-4 text-xs font-bold text-left bg-white border-t border-r border-b border-gray-200 sticky left-[144px] z-30 w-52 min-w-[208px] shadow-[2px_0_5px_rgba(0,0,0,0.03)]"><strong>Provider</strong></th>';
 
-      cards.forEach(function (card, idx) {
-        var isFirstCard = idx === 0;
-        var pl = isFirstCard ? 'padding-left: 1.5rem;' : '';
-        thHtml += '<th class="px-4 py-5 text-center font-bold text-gray-800 border-r border-gray-100 align-top" style="vertical-align: top; ' + pl + ' max-width: 180px; min-width: 140px;">';
-        thHtml += '<div class="flex items-center justify-center gap-1.5 mb-1 h-full h-12 overflow-hidden">';
-        thHtml += '<span class="text-xs break-words whitespace-normal leading-tight text-center">' + escHtml(card.label) + '</span>';
-
-        // Tooltip
-        thHtml += '<span class="kpi-tip-wrap inline-flex items-center" style="transform: translateY(1px);">';
-        thHtml += '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cursor-default"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
-        thHtml += '<div class="tip-box font-normal text-left" style="width: 260px; left: 50%; transform: translateX(-50%); top: 100%; margin-top: 8px;">' + escHtml(card.tip) + '</div>';
+      cards.forEach(function (card) {
+        thHtml += '<th role="columnheader" class="py-3 px-4 text-xs font-bold text-left bg-white border-t border-r border-b border-gray-200 sticky top-0 z-10 w-48 min-w-[192px] max-w-[192px] hover:text-gray-600 select-none">';
+        thHtml += '<span class="flex items-center justify-between gap-1">';
+        thHtml += '<span class="text-left font-bold text-gray-800 break-words leading-tight">' + escHtml(card.label) + '</span>';
+        thHtml += '<span class="kpi-tip-wrap ml-1 flex-shrink-0">';
+        thHtml += '<svg height="14" width="14" fill="none" viewBox="0 0 15 15" class="inline-block text-gray-400 cursor-help"><path fill-rule="evenodd" clip-rule="evenodd" d="M15 7.5a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0zm-14 0a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0z" fill="currentColor"></path><path d="M8 12V7H7v5h1z" fill="currentColor"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M7.5 5a.5.5 0 100-1 .5.5 0 000 1z" fill="currentColor" stroke="currentColor" stroke-width=".5"></path></svg>';
+        thHtml += '<div class="tip-box font-normal text-xs text-left" style="width: 220px; left: 50%; transform: translateX(-50%); top: 100%; margin-top: 6px;">' + escHtml(card.tip) + '</div>';
         thHtml += '</span>';
-
-        thHtml += '</div>';
+        thHtml += '</span>';
         thHtml += '</th>';
       });
       $tr.innerHTML = thHtml;
@@ -766,49 +766,86 @@
       if (!dataCache) {
         $tbody.innerHTML = '<tr><td colspan="100%" class="p-8 text-center text-gray-400">Loading data...</td></tr>';
 
-        var avgTrL = '<td colspan="2" class="p-3 pr-4 text-right border-r border-white font-bold bg-gray-200 sticky left-0 z-10 box-shadow-none">Avg:</td>';
-        var totTrL = '<td colspan="2" class="p-3 pr-4 text-right border-r border-white font-bold text-gray-500 bg-gray-200 sticky left-0 z-10 box-shadow-none">Total:</td>';
+        var avgTrL = '<td class="py-2.5 px-4 align-middle bg-gray-100 text-xs border-r border-gray-200 sticky left-0 z-20 w-36 min-w-[144px]"></td>';
+        avgTrL += '<td class="py-2.5 px-4 align-middle border-r border-gray-200 text-xs text-right sticky left-[144px] z-20 bg-gray-100 font-bold w-52 min-w-[208px]"><strong class="mr-2 text-gray-500">Avg:</strong></td>';
         cards.forEach(function () {
-          avgTrL += '<td class="p-3 border-r border-white"></td>';
-          totTrL += '<td class="p-3 border-r border-white"></td>';
+          avgTrL += '<td class="py-2.5 px-4 align-middle border-r border-gray-200 text-xs bg-gray-100 w-48 min-w-[192px]"></td>';
         });
+
+        var totTrL = '<td class="py-2.5 px-4 align-middle bg-gray-100 text-xs border-r border-gray-200 sticky left-0 z-20 w-36 min-w-[144px]"></td>';
+        totTrL += '<td class="py-2.5 px-4 align-middle border-r border-gray-200 text-xs text-right sticky left-[144px] z-20 bg-gray-100 font-bold w-52 min-w-[208px]"><strong class="mr-2 text-gray-500">Total:</strong></td>';
+        cards.forEach(function () {
+          totTrL += '<td class="py-2.5 px-4 align-middle border-r border-gray-200 text-xs bg-gray-100 w-48 min-w-[192px]"></td>';
+        });
+
         $tfoot.innerHTML = '<tr>' + avgTrL + '</tr><tr>' + totTrL + '</tr>';
         return;
       }
 
+      // Pre-calculate Column Quantiles / Tiers for all providers
+      var provs = dataCache.providers || [];
+      var columnValues = {};
+      cards.forEach(function (card) {
+        var vals = provs.map(function (p) { return parseFloat(p[card.k]) || 0; }).sort(function (a, b) { return a - b; });
+        columnValues[card.k] = vals;
+      });
+
+      function getTierStyle(val, sortedVals) {
+        if (!sortedVals || sortedVals.length < 2 || val === null || val === undefined) {
+          return 'bg-white text-gray-900';
+        }
+        var num = parseFloat(val) || 0;
+        var idx = sortedVals.indexOf(num);
+        var rankPct = (idx + 1) / sortedVals.length;
+
+        if (rankPct >= 0.8) return 'bg-[#E6F7ED] text-[#047857]'; // Top 20%
+        if (rankPct <= 0.2) return 'bg-[#FEE2E2] text-[#991B1B]'; // Bottom 20%
+        return 'bg-[#FEFCE8] text-[#854D0E]'; // Mid Tier
+      }
+
       var rowsHtml = '';
-      if (dataCache.providers && dataCache.providers.length > 0) {
-        dataCache.providers.forEach(function (prov) {
-          var tr = '<tr class="group hover:bg-gray-50">';
-          tr += '<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 border-r border-gray-100 bg-white sticky left-0 z-[5] group-hover:bg-gray-50" style="box-shadow: 2px 0 5px rgba(0,0,0,0.03);">' + escHtml(prov.location) + '</td>';
-          tr += '<td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 border-r border-gray-100 bg-white sticky left-[150px] z-[5] group-hover:bg-gray-50" style="box-shadow: 2px 0 5px rgba(0,0,0,0.03);">' + escHtml(prov.provider) + '</td>';
-          cards.forEach(function (card, idx) {
-            var isFirstCard = idx === 0;
-            var pl = isFirstCard ? 'padding-left: 1.5rem;' : '';
+      if (provs.length > 0) {
+        provs.forEach(function (prov) {
+          var tr = '<tr class="provider-row odd:bg-gray-50/50 hover:bg-gray-100/60 transition-colors">';
+          var loc = prov.location || prov.Location || 'Unassigned';
+          var provName = prov.provider || prov.Provider || '—';
+
+          tr += '<td class="py-2.5 px-4 text-xs align-middle border-b border-r border-gray-200 sticky left-0 z-20 bg-white font-medium text-gray-700 w-36 min-w-[144px] shadow-[2px_0_5px_rgba(0,0,0,0.03)]">' + escHtml(loc) + '</td>';
+          tr += '<td class="py-2.5 px-4 text-xs align-middle border-b border-r border-gray-200 sticky left-[144px] z-20 bg-white font-semibold text-gray-900 w-52 min-w-[208px] shadow-[2px_0_5px_rgba(0,0,0,0.03)]">';
+          tr += '<span class="flex justify-between items-center text-xs"><span class="flex-1 break-words whitespace-normal">' + escHtml(provName) + '</span><a class="hover:text-emerald-600 text-xs text-gray-400 ml-1" href="javascript:void(0)"><svg height="12" width="12" fill="none" viewBox="0 0 15 15"><path opacity=".8" fill-rule="evenodd" clip-rule="evenodd" d="M1 1h13v13H2.457L8.25 8.207v4.15h1V6.5H3.393v1h4.15l-6.5 6.5H1V1zM0 0h15v15H0V0z" fill="currentColor"></path></svg></a></span></td>';
+
+          cards.forEach(function (card) {
             var val = prov[card.k];
-            rowsHtml += '<td class="px-4 py-3 text-center whitespace-nowrap text-sm text-gray-700 border-r border-gray-100 bg-transparent" style="' + pl + '">' + fmtKpi(val, card.fmt) + '</td>';
+            var tierClass = getTierStyle(val, columnValues[card.k]);
+            tr += '<td class="py-2.5 px-4 text-xs align-middle border-b border-r border-gray-200 w-48 min-w-[192px] max-w-[192px] ' + tierClass + '">';
+            tr += '<span class="flex justify-between items-center whitespace-nowrap font-medium">';
+            tr += '<span>' + fmtKpi(val, card.fmt) + '</span>';
+            tr += '<a class="hover:text-emerald-600 text-xs text-gray-400 opacity-60 hover:opacity-100 ml-1" href="javascript:void(0)"><svg height="10" width="10" fill="none" viewBox="0 0 15 15"><path opacity=".8" fill-rule="evenodd" clip-rule="evenodd" d="M1 1h13v13H2.457L8.25 8.207v4.15h1V6.5H3.393v1h4.15l-6.5 6.5H1V1zM0 0h15v15H0V0z" fill="currentColor"></path></svg></a>';
+            tr += '</span></td>';
           });
-          rowsHtml += '</tr>';
+          tr += '</tr>';
+          rowsHtml += tr;
         });
       } else {
         rowsHtml = '<tr><td colspan="100%" class="p-8 text-center text-gray-500">No providers found in this date range.</td></tr>';
       }
       $tbody.innerHTML = rowsHtml;
 
-      var vAvgRow = '<td colspan="2" class="p-3 pr-4 text-right border-r border-white font-bold bg-gray-200 sticky left-0 z-10" style="box-shadow: 2px 0 5px rgba(0,0,0,0.03);">Avg:</td>';
-      var vTotRow = '<td colspan="2" class="p-3 pr-4 text-right border-r border-white font-bold text-gray-500 bg-gray-200 sticky left-0 z-10" style="box-shadow: 2px 0 5px rgba(0,0,0,0.03);">Total:</td>';
+      var vAvgRow = '<td class="py-2.5 px-4 align-middle bg-gray-100 text-xs border-r border-gray-200 sticky left-0 z-20 w-36 min-w-[144px] shadow-[2px_0_5px_rgba(0,0,0,0.03)]"></td>';
+      vAvgRow += '<td class="py-2.5 px-4 align-middle border-r border-gray-200 text-xs text-right sticky left-[144px] z-20 bg-gray-100 font-bold w-52 min-w-[208px] shadow-[2px_0_5px_rgba(0,0,0,0.03)]"><strong class="mr-2 text-gray-700">Avg:</strong></td>';
 
-      cards.forEach(function (card, idx) {
-        var isFirstCard = idx === 0;
-        var pl = isFirstCard ? 'padding-left: 1.5rem;' : '';
+      var vTotRow = '<td class="py-2.5 px-4 align-middle bg-gray-100 text-xs border-r border-gray-200 sticky left-0 z-20 w-36 min-w-[144px] shadow-[2px_0_5px_rgba(0,0,0,0.03)]"></td>';
+      vTotRow += '<td class="py-2.5 px-4 align-middle border-r border-gray-200 text-xs text-right sticky left-[144px] z-20 bg-gray-100 font-bold w-52 min-w-[208px] shadow-[2px_0_5px_rgba(0,0,0,0.03)]"><strong class="mr-2 text-gray-500">Total:</strong></td>';
+
+      cards.forEach(function (card) {
         var vAvg = dataCache.avg ? dataCache.avg[card.k] : null;
         var vTot = dataCache.total ? dataCache.total[card.k] : null;
 
-        vAvgRow += '<td class="p-3 text-center border-r border-white" style="' + pl + '">' + fmtKpi(vAvg, card.fmt) + '</td>';
+        vAvgRow += '<td class="py-2.5 px-4 align-middle border-r border-gray-200 text-xs bg-gray-100 font-bold text-gray-900 w-48 min-w-[192px] max-w-[192px]">' + fmtKpi(vAvg, card.fmt) + '</td>';
         if (card.fmt === 'pct' || card.fmt === 'dec2' || card.fmt === 'dec1') {
-          vTotRow += '<td class="p-3 text-center border-r border-white text-gray-500" style="' + pl + '">--</td>';
+          vTotRow += '<td class="py-2.5 px-4 align-middle border-r border-gray-200 text-xs bg-gray-100 font-bold text-gray-500 w-48 min-w-[192px] max-w-[192px]">--</td>';
         } else {
-          vTotRow += '<td class="p-3 text-center border-r border-white text-gray-500" style="' + pl + '">' + fmtKpi(vTot, card.fmt) + '</td>';
+          vTotRow += '<td class="py-2.5 px-4 align-middle border-r border-gray-200 text-xs bg-gray-100 font-bold text-gray-700 w-48 min-w-[192px] max-w-[192px]">' + fmtKpi(vTot, card.fmt) + '</td>';
         }
       });
       $tfoot.innerHTML = '<tr>' + vAvgRow + '</tr><tr>' + vTotRow + '</tr>';
@@ -849,6 +886,74 @@
           renderProvidersTable();
         });
       });
+
+      // Search Provider Input Handler
+      var searchInput = document.getElementById('providerSearchInput');
+      if (searchInput) {
+        searchInput.addEventListener('keyup', function () {
+          var q = (this.value || '').toLowerCase().trim();
+          var rows = document.querySelectorAll('#providers-tbody tr.provider-row');
+          rows.forEach(function (tr) {
+            var text = tr.innerText.toLowerCase();
+            if (!q || text.indexOf(q) !== -1) {
+              tr.style.display = '';
+            } else {
+              tr.style.display = 'none';
+            }
+          });
+        });
+      }
+
+      // Export Provider CSV Handler
+      var exportBtn = document.getElementById('exportProviderCsvBtn');
+      if (exportBtn) {
+        exportBtn.addEventListener('click', function () {
+          var cards = currentProviderSubtab === 'doctor' ? DOCTOR_CARDS : HYGIENE_CARDS;
+          var dataCache = _kpiProvidersData[currentProviderSubtab];
+          if (!dataCache || !dataCache.providers) return;
+
+          var csvRows = [];
+          var headerRow = ['Location', 'Provider'];
+          cards.forEach(function (card) { headerRow.push(card.label); });
+          csvRows.push(headerRow.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','));
+
+          dataCache.providers.forEach(function (prov) {
+            var row = [prov.location, prov.provider];
+            cards.forEach(function (card) {
+              row.push(fmtKpi(prov[card.k], card.fmt));
+            });
+            csvRows.push(row.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','));
+          });
+
+          // Footer Avg
+          var avgRow = ['-', 'Avg:'];
+          cards.forEach(function (card) {
+            avgRow.push(fmtKpi(dataCache.avg ? dataCache.avg[card.k] : null, card.fmt));
+          });
+          csvRows.push(avgRow.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','));
+
+          // Footer Total
+          var totRow = ['-', 'Total:'];
+          cards.forEach(function (card) {
+            if (card.fmt === 'pct' || card.fmt === 'dec2' || card.fmt === 'dec1') {
+              totRow.push('--');
+            } else {
+              totRow.push(fmtKpi(dataCache.total ? dataCache.total[card.k] : null, card.fmt));
+            }
+          });
+          csvRows.push(totRow.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','));
+
+          var csvString = csvRows.join('\n');
+          var blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+          var url = URL.createObjectURL(blob);
+          var link = document.createElement('a');
+          link.setAttribute('href', url);
+          link.setAttribute('download', currentProviderSubtab + '_providers_kpi.csv');
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
+      }
 
       // Update button reads current daterangepicker selection
       document.getElementById('kpiUpdateBtn').addEventListener('click', function () {
