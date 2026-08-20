@@ -656,13 +656,13 @@ class FinancialController extends Controller
 
     // ── New Patient Visits ────────────────────────────────────────────────────
     /**
-     * New Patient Visits breakdown report.
+     * New Patient Visits breakdown report (matching JarvisAnalytics logic).
      *
-     * Logic:
+     * Rules:
      * 1. Cohort: Identifies patients whose first-ever completed clinical procedure date falls within [$start, $end].
-     * 2. Exclude Broken Appointments: Excludes patients who had any previously broken appointment (AptStatus = 5)
-     *    prior to their first visit date, preventing past broken/no-show patients from inflating new patient visits.
-     * 3. Exclude Prior Completed Visits: Excludes patients who already completed an appointment prior to this visit date.
+     * 2. Exclude Prior Completed Visits: Excludes patients who already completed an appointment prior to this visit date (e.g. completed in an earlier month).
+     * 3. Exclude Existing Patient Appointments: Excludes patients whose appointment on the visit date was explicitly marked
+     *    as an existing patient (IsNewPatient = 0), ensuring returning patients from prior years are not falsely treated as new patients.
      * 4. First-Visit Scoping: Strictly aggregates service codes and production completed ON that exact first visit
      *    date (pl.ProcDate = fv.first_date), excluding subsequent appointments later in the month.
      */
@@ -700,12 +700,12 @@ class FinancialController extends Controller
                   AND a_prev.AptStatus IN (2, 'Complete', 'Completed')
                   AND DATE(a_prev.AptDateTime) < fv.first_date
             )
-            -- Filter 2: Exclude patients who had a previously broken appointment prior to this visit date
+            -- Filter 2: Exclude patients whose appointment on the visit date was explicitly marked IsNewPatient = 0 (Existing Patient)
             AND NOT EXISTS (
-                SELECT 1 FROM od_appointments a_broken
-                WHERE a_broken.PatNum = fv.PatNum
-                  AND a_broken.AptStatus IN (5, '5', 'Broken')
-                  AND DATE(a_broken.AptDateTime) < fv.first_date
+                SELECT 1 FROM od_appointments a_curr
+                WHERE a_curr.PatNum = fv.PatNum
+                  AND DATE(a_curr.AptDateTime) = fv.first_date
+                  AND a_curr.IsNewPatient = 0
             )
             GROUP BY fv.PatNum, p.LName, p.FName, fv.first_date
             ORDER BY fv.first_date, p.LName
