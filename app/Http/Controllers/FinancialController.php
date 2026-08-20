@@ -55,9 +55,12 @@ class FinancialController extends Controller
         }
 
         if (in_array($section, ['all', 'patient-kpis'])) {
+            $patientKpis = $this->patientAnalytics->getPatientAnalytics($start, $end);
+            // Ensure summary KPI count matches the breakdown drilldown list count 100%
+            $patientKpis['new_patient_visit'] = count($this->bkNewPatientVisits($start, $end));
             $response = array_merge(
                 $response,
-                $this->patientAnalytics->getPatientAnalytics($start, $end)
+                $patientKpis
             );
         }
 
@@ -201,19 +204,9 @@ class FinancialController extends Controller
                 ->groupBy('fa.first_apt')
                 ->pluck('cnt', 'date');
 
-            $dailyNewVisits = DB::table(function ($query) {
-                $query->from('od_procedure_logs')
-                    ->whereIn('ProcStatus', ProcStatus::completed())
-                    ->where('CodeNum', '!=', 626)
-                    ->select('PatNum')
-                    ->selectRaw('MIN(DATE(ProcDate)) as first_visit')
-                    ->groupBy('PatNum');
-            }, 'first_visits')
-                ->whereBetween('first_visit', [$start, $end])
-                ->select('first_visit as date')
-                ->selectRaw('COUNT(*) as cnt')
-                ->groupBy('first_visit')
-                ->pluck('cnt', 'date');
+            $dailyNewVisits = collect($this->bkNewPatientVisits($start, $end))
+                ->groupBy('dates')
+                ->map(fn ($group) => $group->count());
 
             $dailyCancelled = DB::table('od_procedure_logs as pl')
                 ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
