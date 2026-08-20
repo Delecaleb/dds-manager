@@ -666,17 +666,22 @@ class FinancialController extends Controller
      * New Patient Visits breakdown report (matching JarvisAnalytics logic).
      *
      * Rules:
-     * 1. Cohort: Identifies patients whose first-ever completed procedure date falls within [$start, $end].
-     * 2. First-Visit Scoping: Strictly aggregates service codes and production completed ON that exact
-     *    first visit date (ProcDate = first_date). Procedures from subsequent appointments later in the month
-     *    are excluded so they do not inflate the initial new-patient visit production.
+     * 1. Cohort & Prior History:
+     *    - Identifies patients whose first-ever completed clinical procedure date falls within [$start, $end].
+     *    - Excludes patients who already completed an appointment in a prior period.
+     *    - Excludes returning patients from prior years/periods whose appointment on the visit date was flagged
+     *      as an existing patient (IsNewPatient = 0) with old appointments on record.
+     * 2. First-Visit Scoping:
+     *    - Strictly aggregates service codes and production completed ON that exact first visit date
+     *      (pl.ProcDate = fv.first_date). Subsequent treatment visits later in the month are excluded
+     *      so they do not inflate the initial new-patient visit production.
      */
     private function bkNewPatientVisits(string $start, string $end): array
     {
         $rows = DB::select("
             SELECT
-                p.PatNum                                                                AS patient_id,
-                CONCAT(p.LName, ', ', p.FName)                                         AS patient_name,
+                fv.PatNum                                                              AS patient_id,
+                COALESCE(CONCAT(p.LName, ', ', p.FName), '')                           AS patient_name,
                 fv.first_date                                                           AS dates,
                 GROUP_CONCAT(DISTINCT pc.ProcCode ORDER BY pc.ProcCode SEPARATOR ', ') AS service_codes,
                 COALESCE(SUM(pl.ProcFee), 0)                                           AS amount
@@ -691,14 +696,35 @@ class FinancialController extends Controller
                 GROUP BY PatNum
                 HAVING MIN(ProcDate) BETWEEN ? AND ?
             ) fv
-            JOIN od_patients p ON fv.PatNum = p.PatNum
+            LEFT JOIN od_patients p ON fv.PatNum = p.PatNum
             -- Join only procedures completed on that specific first visit date
             JOIN od_procedure_logs pl ON fv.PatNum = pl.PatNum
                 AND pl.ProcDate = fv.first_date
                 AND pl.ProcStatus IN ({$this->completedIn})
                 AND pl.CodeNum != 626
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            GROUP BY p.PatNum, p.LName, p.FName, fv.first_date
+            -- Filter 1: Exclude patients who already had a completed appointment before this first_date
+            WHERE NOT EXISTS (
+                SELECT 1 FROM od_appointments a_prev
+                WHERE a_prev.PatNum = fv.PatNum
+                  AND a_prev.AptStatus IN (2, 'Complete', 'Completed')
+                  AND DATE(a_prev.AptDateTime) < fv.first_date
+            )
+            -- Filter 2: Exclude returning patients whose visit was booked as IsNewPatient = 0 with prior history > 60 days old
+            AND NOT (
+                EXISTS (
+                    SELECT 1 FROM od_appointments a_curr
+                    WHERE a_curr.PatNum = fv.PatNum
+                      AND DATE(a_curr.AptDateTime) = fv.first_date
+                      AND a_curr.IsNewPatient = 0
+                )
+                AND EXISTS (
+                    SELECT 1 FROM od_appointments a_old
+                    WHERE a_old.PatNum = fv.PatNum
+                      AND DATE(a_old.AptDateTime) < DATE_SUB(fv.first_date, INTERVAL 60 DAY)
+                )
+            )
+            GROUP BY fv.PatNum, p.LName, p.FName, fv.first_date
             ORDER BY fv.first_date, p.LName
         ", [$start, $end]);
 
