@@ -56,8 +56,9 @@ class FinancialController extends Controller
 
         if (in_array($section, ['all', 'patient-kpis'])) {
             $patientKpis = $this->patientAnalytics->getPatientAnalytics($start, $end);
-            // Ensure summary KPI count matches the breakdown drilldown list count 100%
+            // Ensure summary KPI counts match the breakdown drilldown list counts 100%
             $patientKpis['new_patient_visit'] = count($this->bkNewPatientVisits($start, $end));
+            $patientKpis['new_patients_scheduled'] = count($this->bkNewPatientsScheduled($start, $end));
             $response = array_merge(
                 $response,
                 $patientKpis
@@ -183,26 +184,9 @@ class FinancialController extends Controller
                 ->groupByRaw("DATE(REPLACE(AptDateTime, 'T', ' '))")
                 ->pluck('cnt', 'date');
 
-            $dailyNewScheduled = DB::table(function ($query) {
-                $query->from('od_appointments')
-                    ->whereIn('AptStatus', [1, 2])
-                    ->select('PatNum')
-                    ->selectRaw("MIN(DATE(REPLACE(AptDateTime, 'T', ' '))) as first_apt")
-                    ->groupBy('PatNum');
-            }, 'fa')
-                ->join('od_patients as p', 'fa.PatNum', '=', 'p.PatNum')
-                ->whereBetween('fa.first_apt', [$start, $end])
-                ->whereNotIn('p.PatNum', function ($query) use ($start) {
-                    $query->select('PatNum')
-                        ->from('od_procedure_logs')
-                        ->where('ProcDate', '<', $start)
-                        ->whereIn('ProcStatus', ['C', '2', 'D']);
-                })
-                ->whereNotIn('p.PatNum', [21216, 21231, 21254])
-                ->select('fa.first_apt as date')
-                ->selectRaw('COUNT(*) as cnt')
-                ->groupBy('fa.first_apt')
-                ->pluck('cnt', 'date');
+            $dailyNewScheduled = collect($this->bkNewPatientsScheduled($start, $end))
+                ->groupBy('dates')
+                ->map(fn ($group) => $group->count());
 
             $dailyNewVisits = collect($this->bkNewPatientVisits($start, $end))
                 ->groupBy('dates')
@@ -766,6 +750,7 @@ class FinancialController extends Controller
                 SELECT PatNum, MIN(AptDateTime) AS first_apt
                 FROM od_appointments
                 WHERE AptStatus IN (1, 2)
+                  AND IsNewPatient = 1
                 GROUP BY PatNum
             ) fa
             LEFT JOIN od_patients p ON fa.PatNum = p.PatNum
