@@ -733,15 +733,15 @@ class FinancialController extends Controller
     {
         $rows = DB::select("
             SELECT
-                p.PatNum                         AS patient_id,
-                CONCAT(p.LName, ', ', p.FName)   AS patient_name,
+                a.PatNum                                                              AS patient_id,
+                COALESCE(CONCAT(p.LName, ', ', p.FName), '')                         AS patient_name,
                 GROUP_CONCAT(DISTINCT DATE_FORMAT(a.AptDateTime, '%Y-%m-%d') ORDER BY a.AptDateTime SEPARATOR ', ') AS dates,
-                COUNT(DISTINCT DATE(a.AptDateTime)) AS count
+                COUNT(DISTINCT DATE(a.AptDateTime))                                   AS count
             FROM od_appointments a
-            JOIN od_patients p ON a.PatNum = p.PatNum
+            LEFT JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
               AND a.AptStatus IN (1, 2)
-            GROUP BY p.PatNum, p.LName, p.FName
+            GROUP BY a.PatNum, p.LName, p.FName
             ORDER BY count DESC, p.LName
         ", [$start, $end]);
 
@@ -758,25 +758,25 @@ class FinancialController extends Controller
     {
         $rows = DB::select("
             SELECT
-                p.PatNum                         AS patient_id,
-                CONCAT(p.LName, ', ', p.FName)   AS patient_name,
-                DATE_FORMAT(fa.first_apt, '%Y-%m-%d') AS dates,
-                1                                AS count
-            FROM od_patients p
-            JOIN (
+                fa.PatNum                                            AS patient_id,
+                COALESCE(CONCAT(p.LName, ', ', p.FName), '')        AS patient_name,
+                DATE_FORMAT(fa.first_apt, '%Y-%m-%d')                AS dates,
+                1                                                   AS count
+            FROM (
                 SELECT PatNum, MIN(AptDateTime) AS first_apt
                 FROM od_appointments
                 WHERE AptStatus IN (1, 2)
                 GROUP BY PatNum
-            ) fa ON p.PatNum = fa.PatNum
+            ) fa
+            LEFT JOIN od_patients p ON fa.PatNum = p.PatNum
             WHERE fa.first_apt BETWEEN ? AND ?
-              AND p.PatNum NOT IN (
+              AND fa.PatNum NOT IN (
                   SELECT DISTINCT PatNum
                   FROM od_procedure_logs
                   WHERE ProcDate < ?
                     AND ProcStatus IN ('C', '2', 'D')
               )
-              AND p.PatNum NOT IN (21216, 21231, 21254)
+              AND fa.PatNum NOT IN (21216, 21231, 21254)
             ORDER BY p.LName
         ", [$start.' 00:00:00', $end.' 23:59:59', $start]);
 
