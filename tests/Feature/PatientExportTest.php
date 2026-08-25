@@ -158,4 +158,48 @@ class PatientExportTest extends TestCase
         $this->assertStringContainsString('ripley@weyland.com', $content);
         $this->assertStringContainsString('2026-08-20', $content);
     }
+
+    public function test_export_data_endpoint_prioritizes_sec_date_entry_over_created_at(): void
+    {
+        $user = User::factory()->create();
+
+        // Patient entered in Open Dental on 2026-08-05, but synced locally today
+        $p1 = OdPatient::create([
+            'office_id' => 1,
+            'PatNum' => 5010,
+            'FName' => 'Marcus',
+            'LName' => 'Wright',
+            'Email' => 'marcus@example.com',
+            'SecDateEntry' => '2026-08-05',
+            'DateTStamp' => '2026-08-05 14:00:00',
+            'PatStatus' => 0,
+        ]);
+
+        // Patient entered in Open Dental on 2026-01-10, synced locally today
+        $p2 = OdPatient::create([
+            'office_id' => 1,
+            'PatNum' => 5011,
+            'FName' => 'John',
+            'LName' => 'Connor',
+            'Email' => 'john.connor@example.com',
+            'SecDateEntry' => '2026-01-10',
+            'DateTStamp' => '2026-01-10 09:00:00',
+            'PatStatus' => 0,
+        ]);
+
+        // Filter for August 2026
+        $response = $this->actingAs($user)->getJson(route('patients.export-data', [
+            'date_mode' => 'custom',
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-31',
+            'columns' => ['patient_id', 'first_name', 'last_name', 'date_added'],
+        ]));
+
+        $response->assertOk();
+        $data = $response->json();
+
+        $this->assertEquals(1, $data['total']);
+        $this->assertEquals('Marcus', $data['data'][0]['first_name']);
+        $this->assertEquals('2026-08-05', $data['data'][0]['date_added']);
+    }
 }

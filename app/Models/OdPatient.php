@@ -80,6 +80,13 @@ class OdPatient extends Model
         'EmploymentNote',
         'County',
         'GradeLevel',
+        'DateTStamp',
+        'SecDateEntry',
+        'SecUserNumEntry',
+        'DateFirstVisit',
+        'ClinicNum',
+        'HasIns',
+        'Urgency',
     ];
 
     protected $primaryKey = 'PatNum';

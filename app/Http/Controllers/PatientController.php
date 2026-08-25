@@ -684,10 +684,10 @@ class PatientController extends Controller
         }
 
         if (! empty($dateFrom)) {
-            $query->whereRaw('DATE(od_patients.created_at) >= ?', [$dateFrom]);
+            $query->whereRaw("COALESCE(NULLIF(od_patients.SecDateEntry, '0001-01-01'), NULLIF(od_patients.DateFirstVisit, '0001-01-01'), DATE(od_patients.created_at)) >= ?", [$dateFrom]);
         }
         if (! empty($dateTo)) {
-            $query->whereRaw('DATE(od_patients.created_at) <= ?', [$dateTo]);
+            $query->whereRaw("COALESCE(NULLIF(od_patients.SecDateEntry, '0001-01-01'), NULLIF(od_patients.DateFirstVisit, '0001-01-01'), DATE(od_patients.created_at)) <= ?", [$dateTo]);
         }
 
         return $query;
@@ -832,8 +832,16 @@ class PatientController extends Controller
         $statusRaw = $patient->PatStatus ?? '';
         $status = is_numeric($statusRaw) ? ($statusMap[intval($statusRaw)] ?? 'Active') : ($statusRaw ?: 'Active');
 
-        $dateAdded = $patient->created_at ? $patient->created_at->format('Y-m-d') : '';
-        $dateAddedFormatted = $dateAdded ?: '';
+        $dateAddedFormatted = '';
+        if (! empty($patient->SecDateEntry) && $patient->SecDateEntry !== '0001-01-01') {
+            $dateAddedFormatted = date('Y-m-d', strtotime($patient->SecDateEntry));
+        } elseif (! empty($patient->DateFirstVisit) && $patient->DateFirstVisit !== '0001-01-01') {
+            $dateAddedFormatted = date('Y-m-d', strtotime($patient->DateFirstVisit));
+        } elseif (! empty($patient->created_at)) {
+            $dateAddedFormatted = is_string($patient->created_at)
+                ? date('Y-m-d', strtotime($patient->created_at))
+                : $patient->created_at->format('Y-m-d');
+        }
 
         $allValues = [
             'patient_id' => $patient->PatNum,
