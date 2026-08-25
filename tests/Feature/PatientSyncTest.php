@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Office;
+use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
 use App\Services\Sync\PatientSyncService;
 use Mockery\MockInterface;
@@ -100,6 +101,51 @@ class PatientSyncTest extends TestCase
             'FName' => 'John',
             'SecDateEntry' => '2025-02-15',
             'DateTStamp' => '2025-02-15 09:00:00',
+        ]);
+    }
+
+    public function test_sync_patients_with_fresh_flag_resets_cursor_and_runs_full_sync(): void
+    {
+        $office = Office::create(['name' => 'Main Clinic', 'is_active' => true]);
+
+        // Pre-create a SyncLog with last_synced_at to simulate an existing incremental cursor
+        SyncLog::create([
+            'office_id' => $office->id,
+            'module' => 'office_'.$office->id.':patient',
+            'last_synced_at' => '2026-08-01 00:00:00',
+            'status' => 'completed',
+        ]);
+
+        $this->mock(QueryService::class, function (MockInterface $mock) {
+            $mock->shouldReceive('forOffice')->andReturnSelf();
+            // Fresh flag causes an initial sync from ID 0 without DateTStamp > filter
+            $mock->shouldReceive('shortQuery')
+                ->withArgs(function ($sql) {
+                    return str_contains($sql, 'PatNum > 0') && ! str_contains($sql, 'DateTStamp >');
+                })
+                ->once()
+                ->andReturn([
+                    [
+                        'PatNum' => 8003,
+                        'LName' => 'Vance',
+                        'FName' => 'Bob',
+                        'Email' => 'bob@vancerefrigeration.com',
+                        'Birthdate' => '1970-01-01',
+                        'PatStatus' => 0,
+                        'SecDateEntry' => '2020-05-10',
+                        'DateTStamp' => '2020-05-10 10:00:00',
+                    ],
+                ])
+                ->shouldReceive('shortQuery')
+                ->andReturn([]);
+        });
+
+        $this->artisan('sync:patients', ['--fresh' => true])->assertSuccessful();
+
+        $this->assertDatabaseHas('od_patients', [
+            'PatNum' => 8003,
+            'LName' => 'Vance',
+            'SecDateEntry' => '2020-05-10',
         ]);
     }
 }

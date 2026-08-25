@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\SyncLog;
 use App\Services\Sync\PatientSyncService;
 use Illuminate\Console\Command;
 
@@ -12,7 +13,8 @@ class SyncOpenDentalPatients extends Command
      *
      * @var string
      */
-    protected $signature = 'sync:patients';
+    protected $signature = 'sync:patients
+                            {--fresh : Reset the sync cursor and backfill all patient records from Open Dental}';
 
     /**
      * The console command description.
@@ -24,10 +26,19 @@ class SyncOpenDentalPatients extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
+        if ($this->option('fresh')) {
+            SyncLog::where('module', 'like', '%:patient')->delete();
+            $this->info('Reset sync cursor for patients. Running full backfill...');
+        }
+
         // call sync service
         $syncService = app(PatientSyncService::class);
         $syncService->sync();
+
+        $this->info('Patient sync complete.');
+
+        return self::SUCCESS;
     }
 }
