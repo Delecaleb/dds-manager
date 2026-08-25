@@ -3,6 +3,7 @@
 namespace App\Services\OpenDental;
 
 use App\Domain\Patient\PatientService;
+use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\MetricFilter;
 use App\Models\OdAppointment;
@@ -12,6 +13,7 @@ class PatientAnalyticsService
     public function __construct(
         private readonly PatientService $patients,
         private readonly ProductionService $production,
+        private readonly PatientVisitService $patientVisits,
     ) {}
 
     public function getPatientAnalytics($start, $end)
@@ -20,13 +22,11 @@ class PatientAnalyticsService
 
         $scheduled = (new OdAppointment)->scheduledPatients($start, $end);
 
-        // Patient visits = distinct patient-per-day among completed procedures (blueprint D7,
-        // visit-events). Single source of truth uses ['C','2'] so status encoding can't hide
-        // a visit.
-        $visited = $this->production->patientVisits($filter);
+        // Patient visits = distinct patient-per-day among completed procedures
+        $visited = $this->patientVisits->patientVisits($start, $end);
 
-        // New patients: first COMPLETED procedure in period (blueprint D8, ['C','2']).
-        $newPatientVisit = $this->patients->newPatientCount($filter);
+        // New patients: single source of truth from PatientVisitService
+        $newPatientVisit = $this->patientVisits->newPatientCount($start, $end);
 
         $newPatientsScheduled = (new OdAppointment)->newPatientsScheduled($start, $end);
 

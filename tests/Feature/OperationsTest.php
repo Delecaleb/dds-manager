@@ -255,4 +255,70 @@ class OperationsTest extends TestCase
         $total = $spec['total'];
         $this->assertEquals(1000.00, $total['gross']);
     }
+
+    public function test_payors_tab_rolls_up_subplans_into_single_carrier_row_and_deduplicates_visits(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Seed carrier & plans
+        DB::table('od_carriers')->insert([
+            'CarrierNum' => 1029,
+            'CarrierName' => 'Delta Dental of MI',
+        ]);
+        DB::table('od_insplans')->insert([
+            ['PlanNum' => 101, 'CarrierNum' => 1029, 'GroupName' => 'Group A'],
+            ['PlanNum' => 102, 'CarrierNum' => 1029, 'GroupName' => 'Group B'],
+        ]);
+
+        // Map patients to claim procs
+        DB::table('od_claim_procs')->insert([
+            ['ClaimProcNum' => 1, 'Status' => 1, 'ClaimPaymentNum' => 0, 'FeeBilled' => 0, 'InsPayAmt' => 0, 'PatNum' => 301, 'PlanNum' => 101, 'ClinicNum' => 1, 'ProcDate' => '2026-07-05', 'WriteOff' => 0],
+            ['ClaimProcNum' => 2, 'Status' => 1, 'ClaimPaymentNum' => 0, 'FeeBilled' => 0, 'InsPayAmt' => 0, 'PatNum' => 302, 'PlanNum' => 102, 'ClinicNum' => 1, 'ProcDate' => '2026-07-05', 'WriteOff' => 0],
+        ]);
+
+        // Both procedures completed on the same date for the same clinic under different plans
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 301,
+                'PatNum' => 301,
+                'ClinicNum' => 1,
+                'ProcFee' => 300.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-07-05',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            [
+                'ProcNum' => 302,
+                'PatNum' => 302,
+                'ClinicNum' => 1,
+                'ProcFee' => 200.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-07-05',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+        ]);
+
+        $response = $this->get(route('operations.data', [
+            'tab' => 'payors',
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-07-15',
+        ]));
+
+        $response->assertOk();
+        $spec = $response->original->getData()['spec'] ?? null;
+        $this->assertNotNull($spec);
+
+        $rows = $spec['rows'];
+        // Ensure both sub-plans are rolled up into ONE single row for Delta Dental
+        $this->assertCount(1, $rows);
+        $this->assertEquals('Delta Dental of MI - 1029', $rows[0]['payor']);
+        $this->assertEquals(500.00, $rows[0]['gross']);
+        $this->assertEquals(500.00, $rows[0]['net']);
+        $this->assertEquals(2, $rows[0]['pts_visits']);
+        $this->assertEquals(1, $rows[0]['working_days']);
+        $this->assertEquals(2, $rows[0]['procedures']);
+    }
 }

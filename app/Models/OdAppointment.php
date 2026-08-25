@@ -74,10 +74,10 @@ class OdAppointment extends Model
 
     public function scopeInDateRange($query, $start, $end)
     {
-        $startDate = substr($start, 0, 10);
-        $endDate = substr($end, 0, 10);
+        $startDate = substr($start, 0, 10).' 00:00:00';
+        $endDate = substr($end, 0, 10).' 23:59:59';
 
-        return $query->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$startDate, $endDate]);
+        return $query->whereBetween('AptDateTime', [$startDate, $endDate]);
     }
 
     public function scheduledPatients($start, $end)
@@ -94,22 +94,28 @@ class OdAppointment extends Model
         $endDate = substr($end, 0, 10).' 23:59:59';
         $startDay = substr($start, 0, 10);
 
-        $firstApts = DB::table('od_appointments')
-            ->select('PatNum', DB::raw('MIN(AptDateTime) as first_apt'))
-            ->whereIn('AptStatus', [1, 2])
-            ->groupBy('PatNum');
-
-        return (int) DB::table('od_patients as p')
-            ->joinSub($firstApts, 'fa', 'p.PatNum', '=', 'fa.PatNum')
-            ->whereBetween('fa.first_apt', [$startDate, $endDate])
-            ->whereNotIn('p.PatNum', function ($query) use ($startDay) {
-                $query->select('PatNum')
-                    ->from('od_procedure_logs')
-                    ->where('ProcDate', '<', $startDay)
-                    ->whereIn('ProcStatus', ['C', '2', 'D']);
+        return (int) DB::table('od_appointments as a')
+            ->whereBetween('a.AptDateTime', [$startDate, $endDate])
+            ->whereIn('a.AptStatus', [1, 2])
+            ->whereIn('a.IsNewPatient', [1, '1', true, 'true'])
+            ->whereNotIn('a.PatNum', [21216, 21231, 21254])
+            ->whereNotExists(function ($query) use ($startDate) {
+                $query->select(DB::raw(1))
+                    ->from('od_appointments as a_old')
+                    ->whereColumn('a_old.PatNum', 'a.PatNum')
+                    ->whereIn('a_old.AptStatus', [1, 2])
+                    ->whereIn('a_old.IsNewPatient', [1, '1', true, 'true'])
+                    ->where('a_old.AptDateTime', '<', $startDate);
             })
-            ->whereNotIn('p.PatNum', [21216, 21231, 21254])
-            ->count('p.PatNum');
+            ->whereNotExists(function ($query) use ($startDay) {
+                $query->select(DB::raw(1))
+                    ->from('od_procedure_logs as pl')
+                    ->whereColumn('pl.PatNum', 'a.PatNum')
+                    ->where('pl.ProcDate', '<', $startDay)
+                    ->whereIn('pl.ProcStatus', ['C', '2', 'D']);
+            })
+            ->distinct()
+            ->count('a.PatNum');
     }
 
     public function patient()

@@ -71,7 +71,7 @@ class PayorService
     }
 
     /** @return array<int,string> PlanNum => label, cached for a day. */
-    private function planLabelMap(): array
+    public function planLabelMap(): array
     {
         return Cache::remember('od_carrier_string_map', 86400, function () {
             try {
@@ -92,8 +92,34 @@ class PayorService
                         : ($p['GroupName'] ?? 'Unknown Plan').' - Plan '.$p['PlanNum'];
                 }
 
+                if (! empty($pMap)) {
+                    return $pMap;
+                }
+            } catch (\Throwable $e) {
+                // Fall back to database tables if API call fails
+            }
+
+            try {
+                $cMap = DB::table('od_carriers')
+                    ->whereNotNull('CarrierName')
+                    ->where('CarrierName', '!=', '')
+                    ->pluck('CarrierName', 'CarrierNum')
+                    ->toArray();
+
+                $pMap = [];
+                $plans = DB::table('od_insplans')
+                    ->select('PlanNum', 'CarrierNum', 'GroupName')
+                    ->get();
+
+                foreach ($plans as $p) {
+                    $cNum = (int) ($p->CarrierNum ?? 0);
+                    $pMap[$p->PlanNum] = $cNum > 0
+                        ? ($cMap[$cNum] ?? 'Unknown Carrier').' - '.$cNum
+                        : ($p->GroupName ? $p->GroupName.' - Plan '.$p->PlanNum : 'Plan '.$p->PlanNum);
+                }
+
                 return $pMap;
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 return [];
             }
         });

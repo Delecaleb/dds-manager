@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Patient\PatientVisitService;
+use App\Domain\Production\ProductionService;
+use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
 use App\Models\OdAppointment;
-use App\Models\OdProcedureLog;
 use App\Services\OpenDental\FinancialAnalyticsService;
 use App\Services\OpenDental\PatientAnalyticsService;
 use Carbon\CarbonPeriod;
@@ -19,7 +21,9 @@ class FinancialController extends Controller
 
     public function __construct(
         protected FinancialAnalyticsService $financialAnalytics,
-        protected PatientAnalyticsService $patientAnalytics
+        protected PatientAnalyticsService $patientAnalytics,
+        protected ProductionService $production,
+        protected PatientVisitService $patientVisits
     ) {
         $this->completedIn = ProcStatus::inList(ProcStatus::completed());
     }
@@ -55,13 +59,23 @@ class FinancialController extends Controller
         }
 
         if (in_array($section, ['all', 'patient-kpis'])) {
-            $patientKpis = $this->patientAnalytics->getPatientAnalytics($start, $end);
-            // Ensure summary KPI counts match the breakdown drilldown list counts 100%
-            $patientKpis['new_patient_visit'] = count($this->bkNewPatientVisits($start, $end));
-            $patientKpis['new_patients_scheduled'] = count($this->bkNewPatientsScheduled($start, $end));
+            $filter = new MetricFilter($start, $end);
+            $scheduled = (new OdAppointment)->scheduledPatients($start, $end);
+            $visited = $this->patientVisits->patientVisits($start, $end);
+            $netProduction = $this->production->netProduction($filter);
+            $patientAvgProduction = $visited > 0 ? round($netProduction / $visited, 2) : 0;
+            $newPatientVisits = $this->patientVisits->newPatientCount($start, $end);
+            $newPatientsScheduled = count($this->bkNewPatientsScheduled($start, $end));
+
             $response = array_merge(
                 $response,
-                $patientKpis
+                [
+                    'patient_scheduled' => $scheduled,
+                    'patient_visits' => $visited,
+                    'patient_avg_production' => $patientAvgProduction,
+                    'new_patient_visit' => $newPatientVisits,
+                    'new_patients_scheduled' => $newPatientsScheduled,
+                ]
             );
         }
 
@@ -171,24 +185,17 @@ class FinancialController extends Controller
 
         // Daily Patient Statistics
         if (in_array($section, ['all', 'daily-patient-chart'])) {
-            $dailyVisits = OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())
-                ->where('CodeNum', '!=', 626)
-                ->whereBetween('ProcDate', [$start, $end])
-                ->selectRaw('DATE(ProcDate) as date, '.MetricDefinitions::patientVisits('cnt'))
-                ->groupByRaw('DATE(ProcDate)')
-                ->pluck('cnt', 'date');
+            $visitStats = $this->patientVisits->dailyStats($start, $end);
+            $dailyVisits = $visitStats['daily_visits'];
+            $dailyNewVisits = $visitStats['daily_new_visits'];
 
-            $dailyScheduled = OdAppointment::whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            $dailyScheduled = OdAppointment::whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59'])
                 ->scheduled()
-                ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date, ".MetricDefinitions::scheduledPatients('cnt'))
-                ->groupByRaw("DATE(REPLACE(AptDateTime, 'T', ' '))")
+                ->selectRaw('DATE(AptDateTime) as date, '.MetricDefinitions::scheduledPatients('cnt'))
+                ->groupByRaw('DATE(AptDateTime)')
                 ->pluck('cnt', 'date');
 
             $dailyNewScheduled = collect($this->bkNewPatientsScheduled($start, $end))
-                ->groupBy('dates')
-                ->map(fn ($group) => $group->count());
-
-            $dailyNewVisits = collect($this->bkNewPatientVisits($start, $end))
                 ->groupBy('dates')
                 ->map(fn ($group) => $group->count());
 
@@ -615,119 +622,41 @@ class FinancialController extends Controller
     // ── Patient Visits ────────────────────────────────────────────────────────
     private function bkPatientVisits(string $start, string $end): array
     {
-        $rows = DB::select("
-            SELECT
-                p.PatNum                         AS patient_id,
-                CONCAT(p.LName, ', ', p.FName)   AS patient_name,
-                GROUP_CONCAT(DISTINCT DATE_FORMAT(pl.ProcDate, '%Y-%m-%d') ORDER BY pl.ProcDate SEPARATOR ', ') AS dates,
-                COUNT(DISTINCT DATE(pl.ProcDate)) AS count
-            FROM od_procedure_logs pl
-            JOIN od_patients p ON pl.PatNum = p.PatNum
-            WHERE pl.ProcStatus IN ({$this->completedIn})
-              AND pl.CodeNum != 626
-              AND pl.ProcDate BETWEEN ? AND ?
-            GROUP BY p.PatNum, p.LName, p.FName
-            ORDER BY count DESC, p.LName
-        ", [$start, $end]);
-
-        return array_map(fn ($r) => [
-            'patient_id' => $r->patient_id,
-            'patient_name' => $r->patient_name,
-            'dates' => $r->dates,
-            'count' => (int) $r->count,
-        ], $rows);
+        return $this->patientVisits->patientVisitsBreakdown($start, $end);
     }
 
     // ── New Patient Visits ────────────────────────────────────────────────────
-    /**
-     * New Patient Visits breakdown report (matching JarvisAnalytics logic).
-     *
-     * Rules:
-     * 1. Cohort: Identifies patients whose first-ever completed clinical procedure date falls within [$start, $end].
-     * 2. Exclude Prior Completed Visits: Excludes patients who already completed an appointment prior to this visit date (e.g. completed in an earlier month).
-     * 3. Exclude Returning Patients: Excludes patients whose appointment on the visit date was flagged as an existing patient
-     *    (IsNewPatient = 0) AND who already had prior appointments before the current date range. Brand new patients with zero prior history
-     *    are retained even if front-desk scheduling left IsNewPatient = 0.
-     * 4. First-Visit Scoping: Strictly aggregates service codes and production completed ON that exact first visit
-     *    date (pl.ProcDate = fv.first_date), excluding subsequent appointments later in the month.
-     */
     private function bkNewPatientVisits(string $start, string $end): array
     {
-        $rows = DB::select("
-            SELECT
-                fv.PatNum                                                              AS patient_id,
-                COALESCE(CONCAT(p.LName, ', ', p.FName), '')                           AS patient_name,
-                fv.first_date                                                           AS dates,
-                GROUP_CONCAT(DISTINCT pc.ProcCode ORDER BY pc.ProcCode SEPARATOR ', ') AS service_codes,
-                COALESCE(SUM(pl.ProcFee), 0)                                           AS amount
-            FROM (
-                -- Identify the patient's first-ever completed visit date across history
-                SELECT
-                    PatNum,
-                    MIN(ProcDate) AS first_date
-                FROM od_procedure_logs
-                WHERE ProcStatus IN ({$this->completedIn})
-                  AND CodeNum != 626
-                GROUP BY PatNum
-                HAVING MIN(ProcDate) BETWEEN ? AND ?
-            ) fv
-            LEFT JOIN od_patients p ON fv.PatNum = p.PatNum
-            -- Join only procedures completed on that specific first visit date
-            JOIN od_procedure_logs pl ON fv.PatNum = pl.PatNum
-                AND pl.ProcDate = fv.first_date
-                AND pl.ProcStatus IN ({$this->completedIn})
-                AND pl.CodeNum != 626
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            -- Filter 1: Exclude patients who already had a completed appointment before this visit date
-            WHERE NOT EXISTS (
-                SELECT 1 FROM od_appointments a_prev
-                WHERE a_prev.PatNum = fv.PatNum
-                  AND a_prev.AptStatus IN (2, 'Complete', 'Completed')
-                  AND DATE(a_prev.AptDateTime) < fv.first_date
-            )
-            -- Filter 2: Exclude returning patients whose visit was IsNewPatient = 0 AND who had appointments prior to this date range
-            AND NOT (
-                EXISTS (
-                    SELECT 1 FROM od_appointments a_curr
-                    WHERE a_curr.PatNum = fv.PatNum
-                      AND DATE(a_curr.AptDateTime) = fv.first_date
-                      AND a_curr.IsNewPatient = 0
-                )
-                AND EXISTS (
-                    SELECT 1 FROM od_appointments a_old
-                    WHERE a_old.PatNum = fv.PatNum
-                      AND DATE(a_old.AptDateTime) < ?
-                )
-            )
-            GROUP BY fv.PatNum, p.LName, p.FName, fv.first_date
-            ORDER BY fv.first_date, p.LName
-        ", [$start, $end, $start]);
-
-        return array_map(fn ($r) => [
-            'patient_id' => $r->patient_id,
-            'patient_name' => $r->patient_name,
-            'dates' => $r->dates,
-            'service_codes' => $r->service_codes,
-            'amount' => round((float) $r->amount, 2),
-        ], $rows);
+        return $this->patientVisits->newPatientVisits($start, $end);
     }
 
     // ── Patients Scheduled ────────────────────────────────────────────────────
     private function bkPatientsScheduled(string $start, string $end): array
     {
+        $startDate = substr($start, 0, 10).' 00:00:00';
+        $endDate = substr($end, 0, 10).' 23:59:59';
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $dateConcat = $isSqlite
+            ? "GROUP_CONCAT(DISTINCT strftime('%Y-%m-%d', a.AptDateTime))"
+            : "GROUP_CONCAT(DISTINCT DATE_FORMAT(a.AptDateTime, '%Y-%m-%d') ORDER BY a.AptDateTime SEPARATOR ', ')";
+        $nameExpr = $isSqlite
+            ? "COALESCE(p.LName || ', ' || p.FName, '')"
+            : "COALESCE(CONCAT(p.LName, ', ', p.FName), '')";
+
         $rows = DB::select("
             SELECT
                 a.PatNum                                                              AS patient_id,
-                COALESCE(CONCAT(p.LName, ', ', p.FName), '')                         AS patient_name,
-                GROUP_CONCAT(DISTINCT DATE_FORMAT(a.AptDateTime, '%Y-%m-%d') ORDER BY a.AptDateTime SEPARATOR ', ') AS dates,
+                {$nameExpr}                                                          AS patient_name,
+                {$dateConcat}                                                         AS dates,
                 COUNT(DISTINCT DATE(a.AptDateTime))                                   AS count
             FROM od_appointments a
             LEFT JOIN od_patients p ON a.PatNum = p.PatNum
-            WHERE DATE(a.AptDateTime) BETWEEN ? AND ?
+            WHERE a.AptDateTime BETWEEN ? AND ?
               AND a.AptStatus IN (1, 2)
             GROUP BY a.PatNum, p.LName, p.FName
             ORDER BY count DESC, p.LName
-        ", [$start, $end]);
+        ", [$startDate, $endDate]);
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
@@ -740,30 +669,42 @@ class FinancialController extends Controller
     // ── New Patients Scheduled ────────────────────────────────────────────────
     private function bkNewPatientsScheduled(string $start, string $end): array
     {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $nameExpr = $isSqlite
+            ? "COALESCE(p.LName || ', ' || p.FName, '')"
+            : "COALESCE(CONCAT(p.LName, ', ', p.FName), '')";
+        $dateExpr = $isSqlite
+            ? "strftime('%Y-%m-%d', MIN(a.AptDateTime))"
+            : "DATE_FORMAT(MIN(a.AptDateTime), '%Y-%m-%d')";
+
         $rows = DB::select("
             SELECT
-                fa.PatNum                                            AS patient_id,
-                COALESCE(CONCAT(p.LName, ', ', p.FName), '')        AS patient_name,
-                DATE_FORMAT(fa.first_apt, '%Y-%m-%d')                AS dates,
+                a.PatNum                                             AS patient_id,
+                {$nameExpr}                                          AS patient_name,
+                {$dateExpr}                                          AS dates,
                 1                                                   AS count
-            FROM (
-                SELECT PatNum, MIN(AptDateTime) AS first_apt
-                FROM od_appointments
-                WHERE AptStatus IN (1, 2)
-                  AND IsNewPatient = 1
-                GROUP BY PatNum
-            ) fa
-            LEFT JOIN od_patients p ON fa.PatNum = p.PatNum
-            WHERE fa.first_apt BETWEEN ? AND ?
-              AND fa.PatNum NOT IN (
-                  SELECT DISTINCT PatNum
-                  FROM od_procedure_logs
-                  WHERE ProcDate < ?
-                    AND ProcStatus IN ('C', '2', 'D')
+            FROM od_appointments a
+            LEFT JOIN od_patients p ON a.PatNum = p.PatNum
+            WHERE a.AptDateTime BETWEEN ? AND ?
+              AND a.AptStatus IN (1, 2)
+              AND a.IsNewPatient IN (1, '1', true, 'true')
+              AND a.PatNum NOT IN (21216, 21231, 21254)
+              AND NOT EXISTS (
+                  SELECT 1 FROM od_appointments a_old
+                  WHERE a_old.PatNum = a.PatNum
+                    AND a_old.AptStatus IN (1, 2)
+                    AND a_old.IsNewPatient IN (1, '1', true, 'true')
+                    AND a_old.AptDateTime < ?
               )
-              AND fa.PatNum NOT IN (21216, 21231, 21254)
+              AND NOT EXISTS (
+                  SELECT 1 FROM od_procedure_logs pl_old
+                  WHERE pl_old.PatNum = a.PatNum
+                    AND pl_old.ProcDate < ?
+                    AND pl_old.ProcStatus IN ('C', '2', 'D')
+              )
+            GROUP BY a.PatNum, p.LName, p.FName
             ORDER BY p.LName
-        ", [$start.' 00:00:00', $end.' 23:59:59', $start]);
+        ", [$start.' 00:00:00', $end.' 23:59:59', $start.' 00:00:00', $start]);
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,

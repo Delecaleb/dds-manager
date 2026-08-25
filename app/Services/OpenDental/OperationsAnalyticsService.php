@@ -4,6 +4,7 @@ namespace App\Services\OpenDental;
 
 use App\Domain\Insurance\PayorService;
 use App\Domain\Patient\PatientService;
+use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
@@ -45,6 +46,7 @@ class OperationsAnalyticsService
         private readonly PatientService $patients,
         private readonly ClinicRegistry $clinics,
         private readonly PayorService $payors,
+        private readonly PatientVisitService $patientVisits,
     ) {
         $this->clinicNames = $this->clinics->all();
     }
@@ -306,65 +308,96 @@ class OperationsAnalyticsService
         // Map patients to their highest PlanNum from claim_procs
         $latestClaim = $this->payors->planForPatientSubquery();
 
-        $concat = $this->concatPatNumProcDate('pl');
-
         // 1. Gross production, visits, working days, procedures mapped by PlanNum
         $prodQ = DB::table('od_procedure_logs as pl')
             ->leftJoinSub($latestClaim, 'cp', 'pl.PatNum', '=', 'cp.PatNum')
-            ->selectRaw("
+            ->selectRaw('
                 COALESCE(cp.PlanNum, 0) AS PlanNum,
                 pl.ClinicNum,
-                SUM(pl.ProcFee) AS gross,
-                COUNT(*) AS procedures,
-                COUNT(DISTINCT {$concat}) AS pts_visits,
-                COUNT(DISTINCT SUBSTR(pl.ProcDate, 1, 10)) AS working_days
-            ")
+                pl.PatNum,
+                DATE(pl.ProcDate) AS proc_date,
+                pl.ProcFee AS gross
+            ')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereRaw('COALESCE(pl.CodeNum, 0) != 626')
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
             $prodQ->whereIn('pl.ClinicNum', $clinics);
         }
-        $prod = $prodQ->groupBy('PlanNum', 'pl.ClinicNum')->get();
+
+        $prodByPayorClinic = [];
+        $visitsByPayorClinic = [];
+        $daysByPayorClinic = [];
+
+        foreach ($prodQ->get() as $row) {
+            $payor = $this->payorLabel($row->PlanNum);
+            $key = $payor.'|'.$row->ClinicNum;
+
+            if (! isset($prodByPayorClinic[$key])) {
+                $prodByPayorClinic[$key] = [
+                    'payor' => $payor,
+                    'clinic_num' => (int) $row->ClinicNum,
+                    'gross' => 0.0,
+                    'procedures' => 0,
+                ];
+                $visitsByPayorClinic[$key] = [];
+                $daysByPayorClinic[$key] = [];
+            }
+
+            $prodByPayorClinic[$key]['gross'] += (float) $row->gross;
+            $prodByPayorClinic[$key]['procedures']++;
+            $visitsByPayorClinic[$key][$row->PatNum.'|'.$row->proc_date] = true;
+            $daysByPayorClinic[$key][$row->proc_date] = true;
+        }
 
         // 2. Adjustments mapped by PlanNum
         $adjQ = DB::table('od_adjustments as a')
             ->leftJoinSub($latestClaim, 'cp', 'a.PatNum', '=', 'cp.PatNum')
-            ->selectRaw('COALESCE(cp.PlanNum, 0) AS PlanNum, a.ClinicNum, SUM(a.AdjAmt) AS adjustment')
+            ->selectRaw('COALESCE(cp.PlanNum, 0) AS PlanNum, a.ClinicNum, a.AdjAmt')
             ->whereBetween('a.AdjDate', [$start, $end]);
         if ($clinics) {
             $adjQ->whereIn('a.ClinicNum', $clinics);
         }
-        $adj = $adjQ->groupBy('PlanNum', 'a.ClinicNum')->get()->keyBy(function ($x) {
-            return $x->PlanNum.'|'.$x->ClinicNum;
-        });
+
+        $adjByPayorClinic = [];
+        foreach ($adjQ->get() as $row) {
+            $payor = $this->payorLabel($row->PlanNum);
+            $key = $payor.'|'.$row->ClinicNum;
+            $adjByPayorClinic[$key] = ($adjByPayorClinic[$key] ?? 0.0) + (float) $row->AdjAmt;
+        }
 
         // 3. Collections mapped by PlanNum
         $colQ = DB::table('od_pay_splits as p')
             ->leftJoinSub($latestClaim, 'cp', 'p.PatNum', '=', 'cp.PatNum')
-            ->selectRaw('COALESCE(cp.PlanNum, 0) AS PlanNum, p.ClinicNum, SUM(p.SplitAmt) AS collection')
+            ->selectRaw('COALESCE(cp.PlanNum, 0) AS PlanNum, p.ClinicNum, p.SplitAmt')
             ->whereBetween('p.DatePay', [$start, $end]);
         if ($clinics) {
             $colQ->whereIn('p.ClinicNum', $clinics);
         }
-        $col = $colQ->groupBy('PlanNum', 'p.ClinicNum')->get()->keyBy(function ($x) {
-            return $x->PlanNum.'|'.$x->ClinicNum;
-        });
+
+        $colByPayorClinic = [];
+        foreach ($colQ->get() as $row) {
+            $payor = $this->payorLabel($row->PlanNum);
+            $key = $payor.'|'.$row->ClinicNum;
+            $colByPayorClinic[$key] = ($colByPayorClinic[$key] ?? 0.0) + (float) $row->SplitAmt;
+        }
 
         // 4. WriteOffs mapped by PlanNum
         $woQ = DB::table('od_claim_procs')
-            ->selectRaw('COALESCE(PlanNum, 0) AS PlanNum, ClinicNum, SUM(WriteOff) AS writeoff')
+            ->selectRaw('COALESCE(PlanNum, 0) AS PlanNum, ClinicNum, WriteOff')
             ->whereBetween('ProcDate', [$start, $end]);
         if ($clinics) {
             $woQ->whereIn('ClinicNum', $clinics);
         }
-        $wo = $woQ->groupBy('PlanNum', 'ClinicNum')->get()->keyBy(function ($x) {
-            return $x->PlanNum.'|'.$x->ClinicNum;
-        });
+
+        $woByPayorClinic = [];
+        foreach ($woQ->get() as $row) {
+            $payor = $this->payorLabel($row->PlanNum);
+            $key = $payor.'|'.$row->ClinicNum;
+            $woByPayorClinic[$key] = ($woByPayorClinic[$key] ?? 0.0) + (float) $row->WriteOff;
+        }
 
         // 5. Case-acceptance components ($ presented vs $ completed/scheduled) mapped by PlanNum.
-        //    Components are aggregated here (grouped by payor); the RATE itself is computed by
-        //    TreatmentAcceptanceService (single source of truth, blueprint D4-A). Status codes
-        //    come from ProcStatus so "completed"/"treatment-planned" are defined in one place.
         $tpSum = ProcStatus::sumWhereTreatmentPlanned('pl.ProcFee', 'pl');
         $completedSum = ProcStatus::sumWhereCompleted('pl.ProcFee', 'pl');
         $tpList = ProcStatus::inList(ProcStatus::TREATMENT_PLANNED);
@@ -381,60 +414,77 @@ class OperationsAnalyticsService
                          THEN pl.ProcFee ELSE 0 END) AS accepted
             ")
             ->whereIn('pl.ProcStatus', $caStatuses)
+            ->whereRaw('COALESCE(pl.CodeNum, 0) != 626')
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
             $caQ->whereIn('pl.ClinicNum', $clinics);
         }
-        $ca = $caQ->groupBy('PlanNum', 'pl.ClinicNum')->get()->keyBy(function ($x) {
-            return $x->PlanNum.'|'.$x->ClinicNum;
-        });
+
+        $caByPayorClinic = [];
+        foreach ($caQ->groupBy('PlanNum', 'pl.ClinicNum')->get() as $row) {
+            $payor = $this->payorLabel($row->PlanNum);
+            $key = $payor.'|'.$row->ClinicNum;
+
+            if (! isset($caByPayorClinic[$key])) {
+                $caByPayorClinic[$key] = [
+                    'proposed' => 0.0,
+                    'completed' => 0.0,
+                    'accepted' => 0.0,
+                ];
+            }
+            $caByPayorClinic[$key]['proposed'] += (float) $row->proposed;
+            $caByPayorClinic[$key]['completed'] += (float) $row->completed;
+            $caByPayorClinic[$key]['accepted'] += (float) $row->accepted;
+        }
 
         $npt = $this->newPatientsByPayor($start, $end, $clinics);
 
         // Aggregate across combined active payors
         $activeKeys = array_unique(array_merge(
-            $prod->map(function ($x) {
-                return $x->PlanNum.'|'.$x->ClinicNum;
-            })->toArray(),
-            $adj->keys()->toArray(),
-            $col->keys()->toArray(),
-            $wo->keys()->toArray(),
-            $ca->keys()->toArray()
+            array_keys($prodByPayorClinic),
+            array_keys($adjByPayorClinic),
+            array_keys($colByPayorClinic),
+            array_keys($woByPayorClinic),
+            array_keys($caByPayorClinic),
+            array_keys($npt)
         ));
 
         $staged = [];
         $totalNet = 0.0;
 
         foreach ($activeKeys as $key) {
-            [$planNum, $clinicNum] = explode('|', $key);
-            $p = $prod->first(function ($x) use ($planNum, $clinicNum) {
-                return $x->PlanNum == $planNum && $x->ClinicNum == $clinicNum;
-            });
+            [$payor, $clinicNum] = explode('|', $key, 2);
+            $clinicNum = (int) $clinicNum;
 
-            $gross = (float) ($p->gross ?? 0);
-            $adjustment = (float) ($adj[$key]->adjustment ?? 0);
-            $writeoff = (float) ($wo[$key]->writeoff ?? 0);
-            $collection = (float) ($col[$key]->collection ?? 0);
+            $gross = (float) ($prodByPayorClinic[$key]['gross'] ?? 0);
+            $adjustment = (float) ($adjByPayorClinic[$key] ?? 0);
+            $writeoff = (float) ($woByPayorClinic[$key] ?? 0);
+            $collection = (float) ($colByPayorClinic[$key] ?? 0);
             $net = $this->production->netFrom($gross, $adjustment, $writeoff);
 
             $totalNet += $net;
 
-            $caProposed = (float) ($ca[$key]->proposed ?? 0);
-            $caCompleted = (float) ($ca[$key]->completed ?? 0);
-            $caAccepted = (float) ($ca[$key]->accepted ?? 0);
+            $caProposed = (float) ($caByPayorClinic[$key]['proposed'] ?? 0);
+            $caCompleted = (float) ($caByPayorClinic[$key]['completed'] ?? 0);
+            $caAccepted = (float) ($caByPayorClinic[$key]['accepted'] ?? 0);
+
+            $workingDays = count($daysByPayorClinic[$key] ?? []);
+            $ptsVisits = count($visitsByPayorClinic[$key] ?? []);
+            $procedures = (int) ($prodByPayorClinic[$key]['procedures'] ?? 0);
+            $nptVisit = (int) ($npt[$key] ?? 0);
 
             $staged[] = [
-                'PlanNum' => $planNum,
-                'ClinicNum' => $clinicNum,
+                'payor' => $payor,
+                'clinic_num' => $clinicNum,
                 'gross' => $gross,
                 'adjustment' => $adjustment,
                 'writeoff' => $writeoff,
                 'net' => $net,
                 'collection' => $collection,
-                'working_days' => (int) ($p->working_days ?? 0),
-                'pts_visits' => (int) ($p->pts_visits ?? 0),
-                'procedures' => (int) ($p->procedures ?? 0),
-                'npt_visit' => (int) ($npt[$key] ?? 0),
+                'working_days' => $workingDays,
+                'pts_visits' => $ptsVisits,
+                'procedures' => $procedures,
+                'npt_visit' => $nptVisit,
                 'ca_proposed' => $caProposed,
                 'ca_completed' => $caCompleted,
                 'ca_accepted' => $caAccepted,
@@ -451,10 +501,9 @@ class OperationsAnalyticsService
             $net = $stg['net'];
 
             $rows[] = [
-                'plan_num' => (int) $stg['PlanNum'],
-                'clinic_num' => (int) $stg['ClinicNum'],
-                'payor' => $this->payorLabel($stg['PlanNum']),
-                'location' => $this->clinicNames[(int) $stg['ClinicNum']] ?? ('Location '.$stg['ClinicNum']),
+                'payor' => $stg['payor'],
+                'clinic_num' => (int) $stg['clinic_num'],
+                'location' => $this->clinicNames[(int) $stg['clinic_num']] ?? ('Location '.$stg['clinic_num']),
                 'gross' => round($stg['gross'], 2),
                 'net' => round($net, 2),
                 'pct_ttl' => $totalNet != 0 ? round($net / $totalNet * 100, 2) : 0,
@@ -485,25 +534,36 @@ class OperationsAnalyticsService
     /** New patients (first-ever procedure) mapped to Payor. */
     private function newPatientsByPayor(string $start, string $end, array $clinics): array
     {
+        $newVisits = $this->patientVisits->newPatientVisits($start, $end, $clinics);
+        $newPatIds = array_column($newVisits, 'patient_id');
+
+        if (empty($newPatIds)) {
+            return [];
+        }
+
         $latestClaim = $this->payors->planForPatientSubquery();
 
-        $firstVisit = $this->patients->firstVisitCohort();
-
         $q = DB::table('od_procedure_logs as pl')
-            ->joinSub($firstVisit, 'fc', 'pl.PatNum', '=', 'fc.PatNum')
             ->leftJoinSub($latestClaim, 'cp', 'pl.PatNum', '=', 'cp.PatNum')
-            ->selectRaw('COALESCE(cp.PlanNum, 0) AS PlanNum, pl.ClinicNum, COUNT(DISTINCT pl.PatNum) AS npt')
+            ->selectRaw('COALESCE(cp.PlanNum, 0) AS PlanNum, pl.ClinicNum, pl.PatNum')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->whereBetween('pl.ProcDate', [$start, $end])
-            ->whereBetween('fc.first_date', [$start, $end]);
+            ->whereIn('pl.PatNum', $newPatIds);
 
         if ($clinics) {
             $q->whereIn('pl.ClinicNum', $clinics);
         }
 
         $out = [];
-        foreach ($q->groupBy('PlanNum', 'pl.ClinicNum')->get() as $r) {
-            $out[$r->PlanNum.'|'.$r->ClinicNum] = (int) $r->npt;
+        $seen = [];
+        foreach ($q->get() as $r) {
+            $payor = $this->payorLabel($r->PlanNum);
+            $key = $payor.'|'.$r->ClinicNum;
+            if (! isset($seen[$key][$r->PatNum])) {
+                $seen[$key][$r->PatNum] = true;
+                $out[$key] = ($out[$key] ?? 0) + 1;
+            }
         }
 
         return $out;
@@ -694,6 +754,7 @@ class OperationsAnalyticsService
                 COUNT(DISTINCT {$concat}) AS pts_visits,
                 COUNT(DISTINCT ProcDate)                      AS working_days")
             ->whereIn('ProcStatus', ProcStatus::completed())
+            ->whereRaw('COALESCE(CodeNum, 0) != 626')
             ->whereBetween('ProcDate', [$start, $end]);
 
         $groupCols = ['ClinicNum'];
@@ -748,14 +809,19 @@ class OperationsAnalyticsService
     /** New-patient visits grouped by the active dimensions. Keyed by composite. */
     private function pdGroupedNewPatients(string $start, string $end, array $dims, array $clinics): array
     {
-        $firstVisit = $this->patients->firstVisitCohort();
+        $newVisits = $this->patientVisits->newPatientVisits($start, $end, $clinics);
+        $newPatIds = array_column($newVisits, 'patient_id');
+
+        if (empty($newPatIds)) {
+            return [];
+        }
 
         $q = DB::table('od_procedure_logs as pl')
-            ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
             ->selectRaw('pl.ClinicNum, COUNT(DISTINCT pl.PatNum) AS npt')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->whereBetween('pl.ProcDate', [$start, $end])
-            ->whereBetween('fv.first_date', [$start, $end]);
+            ->whereIn('pl.PatNum', $newPatIds);
 
         $groupCols = ['pl.ClinicNum'];
         if (in_array('provider', $dims, true)) {
@@ -763,8 +829,7 @@ class OperationsAnalyticsService
             $groupCols[] = 'pl.ProvNum';
         }
         if (in_array('date', $dims, true)) {
-            // Count a new patient on their first visit date only.
-            $q->whereColumn('pl.ProcDate', 'fv.first_date')->selectRaw('pl.ProcDate AS grp_date');
+            $q->selectRaw('pl.ProcDate AS grp_date');
             $groupCols[] = 'pl.ProcDate';
         }
         if ($clinics) {
@@ -863,59 +928,50 @@ class OperationsAnalyticsService
         }
         $actualCol = $colQuery->groupBy('DatePay')->pluck('total', 'd');
 
-        $firstVisit = $this->patients->firstVisitCohort();
-        $nptQuery = DB::table('od_procedure_logs as pl')
-            ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
-            ->selectRaw('pl.ProcDate as d, COUNT(DISTINCT pl.PatNum) as npt')
-            ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereColumn('pl.ProcDate', 'fv.first_date')
-            ->whereBetween('pl.ProcDate', [$start, $end]);
-        if ($clinics) {
-            $nptQuery->whereIn('pl.ClinicNum', $clinics);
-        }
-        $actualNpt = $nptQuery->groupBy('pl.ProcDate')->pluck('npt', 'd');
+        $newVisits = $this->patientVisits->newPatientVisits($start, $end, $clinics);
+        $actualNpt = collect($newVisits)->groupBy('dates')->map(fn ($g) => $g->count());
 
         // --- SCHEDULE METRICS ---
         $schedApptsQuery = DB::table('od_appointments')
-            ->selectRaw('LEFT(AptDateTime, 10) as d, COUNT(*) as total')
+            ->selectRaw('DATE(AptDateTime) as d, COUNT(*) as total')
             ->whereIn('AptStatus', [1, 2]) // Scheduled & Complete
-            ->whereRaw('LEFT(AptDateTime, 10) BETWEEN ? AND ?', [$start, $end]);
+            ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
         if ($clinics) {
             $schedApptsQuery->whereIn('ClinicNum', $clinics);
         }
-        $schedAppts = $schedApptsQuery->groupBy(DB::raw('LEFT(AptDateTime, 10)'))->pluck('total', 'd');
+        $schedAppts = $schedApptsQuery->groupByRaw('DATE(AptDateTime)')->pluck('total', 'd');
 
         $schedNptQuery = DB::table('od_appointments')
-            ->selectRaw('LEFT(AptDateTime, 10) as d, COUNT(*) as total')
+            ->selectRaw('DATE(AptDateTime) as d, COUNT(*) as total')
             ->whereIn('AptStatus', [1, 2])
             ->where('IsNewPatient', 1)
-            ->whereRaw('LEFT(AptDateTime, 10) BETWEEN ? AND ?', [$start, $end]);
+            ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
         if ($clinics) {
             $schedNptQuery->whereIn('ClinicNum', $clinics);
         }
-        $schedNpt = $schedNptQuery->groupBy(DB::raw('LEFT(AptDateTime, 10)'))->pluck('total', 'd');
+        $schedNpt = $schedNptQuery->groupByRaw('DATE(AptDateTime)')->pluck('total', 'd');
 
         $schedProdQuery = DB::table('od_appointments as a')
             ->join('od_procedure_logs as pl', function ($j) {
                 $j->on('pl.AptNum', '=', 'a.AptNum')
                     ->orOn('pl.PlannedAptNum', '=', 'a.AptNum');
             })
-            ->selectRaw('LEFT(a.AptDateTime, 10) as d, SUM(pl.ProcFee) as total')
+            ->selectRaw('DATE(a.AptDateTime) as d, SUM(pl.ProcFee) as total')
             ->whereIn('a.AptStatus', [1, 2])
-            ->whereRaw('LEFT(a.AptDateTime, 10) BETWEEN ? AND ?', [$start, $end]);
+            ->whereBetween('a.AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
         if ($clinics) {
             $schedProdQuery->whereIn('a.ClinicNum', $clinics);
         }
-        $schedProd = $schedProdQuery->groupBy(DB::raw('LEFT(a.AptDateTime, 10)'))->pluck('total', 'd');
+        $schedProd = $schedProdQuery->groupByRaw('DATE(a.AptDateTime)')->pluck('total', 'd');
 
         $unscheduledQuery = DB::table('od_appointments')
-            ->selectRaw('LEFT(AptDateTime, 10) as d, COUNT(*) as total')
+            ->selectRaw('DATE(AptDateTime) as d, COUNT(*) as total')
             ->where('AptStatus', '5') // Broken/Unscheduled
-            ->whereRaw('LEFT(AptDateTime, 10) BETWEEN ? AND ?', [$start, $end]);
+            ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
         if ($clinics) {
             $unscheduledQuery->whereIn('ClinicNum', $clinics);
         }
-        $unscheduledData = $unscheduledQuery->groupBy(DB::raw('LEFT(AptDateTime, 10)'))->pluck('total', 'd');
+        $unscheduledData = $unscheduledQuery->groupByRaw('DATE(AptDateTime)')->pluck('total', 'd');
 
         // --- AVERAGE METRICS ---
         $adjQuery = DB::table('od_adjustments')
@@ -1225,6 +1281,7 @@ class OperationsAnalyticsService
                 COUNT(DISTINCT {$concat}) AS pts_visits,
                 COUNT(DISTINCT ProcDate)                      AS working_days")
             ->whereIn('ProcStatus', ProcStatus::completed())
+            ->whereRaw('COALESCE(CodeNum, 0) != 626')
             ->whereBetween('ProcDate', [$start, $end]);
         if ($clinics) {
             $prodQ->whereIn('ClinicNum', $clinics);
@@ -1385,14 +1442,19 @@ class OperationsAnalyticsService
     /** New-patient visit counts grouped by "ClinicNum|ProvNum". */
     private function newPatientsByClinicProvider(string $start, string $end, array $clinics): array
     {
-        $firstVisit = $this->patients->firstVisitCohort();
+        $newVisits = $this->patientVisits->newPatientVisits($start, $end, $clinics);
+        $newPatIds = array_column($newVisits, 'patient_id');
+
+        if (empty($newPatIds)) {
+            return [];
+        }
 
         $q = DB::table('od_procedure_logs as pl')
-            ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
             ->selectRaw('pl.ClinicNum, pl.ProvNum, COUNT(DISTINCT pl.PatNum) AS npt')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->whereBetween('pl.ProcDate', [$start, $end])
-            ->whereBetween('fv.first_date', [$start, $end]);
+            ->whereIn('pl.PatNum', $newPatIds);
         if ($clinics) {
             $q->whereIn('pl.ClinicNum', $clinics);
         }
@@ -1628,6 +1690,7 @@ class OperationsAnalyticsService
                 COUNT(DISTINCT {$concat}) AS pts_visit,
                 COUNT(DISTINCT ProcDate)                      AS working_days")
             ->whereIn('ProcStatus', ProcStatus::completed())
+            ->whereRaw('COALESCE(CodeNum, 0) != 626')
             ->whereBetween('ProcDate', [$start, $end]);
 
         if ($clinics) {
@@ -1640,27 +1703,19 @@ class OperationsAnalyticsService
     /** New patients = first-ever completed procedure falls in range; dollars = their production in range. */
     private function newPatientMetrics(string $start, string $end, array $clinics): array
     {
-        $firstVisit = $this->patients->firstVisitCohort();
-
-        $q = DB::table('od_procedure_logs as pl')
-            ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
-            ->selectRaw('pl.ClinicNum,
-                COUNT(DISTINCT pl.PatNum) AS npt_visit,
-                SUM(pl.ProcFee)           AS new_patient_dollars')
-            ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereBetween('pl.ProcDate', [$start, $end])
-            ->whereBetween('fv.first_date', [$start, $end]);
-
-        if ($clinics) {
-            $q->whereIn('pl.ClinicNum', $clinics);
-        }
+        $visits = $this->patientVisits->newPatientVisits($start, $end, $clinics);
 
         $out = [];
-        foreach ($q->groupBy('pl.ClinicNum')->get() as $r) {
-            $out[$r->ClinicNum] = [
-                'npt_visit' => (int) $r->npt_visit,
-                'new_patient_dollars' => (float) $r->new_patient_dollars,
-            ];
+        foreach ($visits as $v) {
+            $c = (int) ($v['clinic_num'] ?? 0);
+            if (! isset($out[$c])) {
+                $out[$c] = [
+                    'npt_visit' => 0,
+                    'new_patient_dollars' => 0.0,
+                ];
+            }
+            $out[$c]['npt_visit']++;
+            $out[$c]['new_patient_dollars'] += (float) $v['amount'];
         }
 
         return $out;
@@ -1833,7 +1888,7 @@ class OperationsAnalyticsService
     {
         $out = [];
         foreach ($rows as $r) {
-            $out[$r['plan_num'].'|'.$r['clinic_num']] = $r;
+            $out[$r['payor'].'|'.$r['clinic_num']] = $r;
         }
 
         return $out;
@@ -1848,9 +1903,9 @@ class OperationsAnalyticsService
         foreach ($keys as $k) {
             $cur = $current[$k] ?? [];
             $ly = $last[$k] ?? [];
-            [$planNum, $clinicNum] = explode('|', $k);
+            [$payor, $clinicNum] = explode('|', $k, 2);
             $row = [
-                'plan_num' => (int) $planNum,
+                'payor' => $payor,
                 'clinic_num' => (int) $clinicNum,
             ];
 
@@ -1935,8 +1990,8 @@ class OperationsAnalyticsService
         $prefix = $alias ? $alias.'.' : '';
 
         return DB::getDriverName() === 'sqlite'
-            ? "{$prefix}PatNum || '|' || {$prefix}ProcDate"
-            : "CONCAT({$prefix}PatNum, '|', {$prefix}ProcDate)";
+            ? "{$prefix}PatNum || '|' || DATE({$prefix}ProcDate)"
+            : "CONCAT({$prefix}PatNum, '|', DATE({$prefix}ProcDate))";
     }
 
     /**
@@ -1973,14 +2028,6 @@ class OperationsAnalyticsService
         $ytdStart = substr($end, 0, 4).'-01-01'; // yyyy-01-01
         $mtdStart = substr($end, 0, 7).'-01';    // yyyy-mm-01
 
-        $firstVisits = $this->patients->firstVisitCohort();
-
-        $qNpt = DB::table('od_procedure_logs as pl')
-            ->joinSub($firstVisits, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
-            ->selectRaw('COUNT(DISTINCT pl.PatNum) as npt')
-            ->whereIn('pl.ProcStatus', ProcStatus::completed());
-
-        // Because of the complexity of filtering, we can just do two basic scalar queries.
         $metrics = $this->newPatientMetrics($start, $end, $clinics); // This gives NPT visits in the active selected range.
         $nptMtdVisits = array_sum(array_column($metrics, 'npt_visit'));
 
@@ -2900,21 +2947,9 @@ class OperationsAnalyticsService
             ->toArray();
 
         // 1) Find New Patients within the date range
-        $firstVisit = $this->patients->firstVisitCohort();
-
-        $newPatsQuery = DB::table('od_procedure_logs as pl')
-            ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
-            ->select('pl.PatNum', 'fv.first_date')
-            ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereBetween('fv.first_date', [$start, $end]);
-
-        if (! empty($clinics)) {
-            $newPatsQuery->whereIn('pl.ClinicNum', $clinics);
-        }
-
-        $newPatRows = $newPatsQuery->groupBy('pl.PatNum', 'fv.first_date')->get();
-        $newPatIds = $newPatRows->pluck('PatNum')->toArray();
-        $newPatFirstDates = $newPatRows->pluck('first_date', 'PatNum')->toArray();
+        $newVisits = $this->patientVisits->newPatientVisits($start, $end, $clinics);
+        $newPatIds = array_column($newVisits, 'patient_id');
+        $newPatFirstDates = array_column($newVisits, 'dates', 'patient_id');
 
         // 2) Find all procedure logs within the range (active patients)
         $allOpsQuery = DB::table('od_procedure_logs as pl')
@@ -2977,14 +3012,11 @@ class OperationsAnalyticsService
         if ($subtab === 'patient-analysis') {
 
             // 1. Gender
-            $firstVisit = $this->patients->firstVisitCohort();
-
             $gQuery = DB::table('od_procedure_logs as pl')
-                ->joinSub($firstVisit, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
                 ->join('od_patients as p', 'p.PatNum', '=', 'pl.PatNum')
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereBetween('pl.ProcDate', [$start, $end])
-                ->whereBetween('fv.first_date', [$start, $end]);
+                ->whereIn('pl.PatNum', $newPatIds);
             $baseFilter($gQuery);
 
             $gendersData = $gQuery->select('p.Gender', DB::raw('COUNT(DISTINCT p.PatNum) as total'))

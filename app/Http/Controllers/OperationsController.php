@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Patient\PatientService;
+use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
@@ -19,6 +20,7 @@ class OperationsController extends Controller
         private readonly ProductionService $production,
         private readonly PatientService $patients,
         private readonly ClinicRegistry $clinics,
+        private readonly PatientVisitService $patientVisits,
     ) {}
 
     /**
@@ -944,52 +946,25 @@ class OperationsController extends Controller
                 ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
             ];
 
-            $firstVisitSubQ = $this->patients->firstVisitCohort();
-
-            $nptLogs = DB::table('od_procedure_logs as pl')
-                ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
-                ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
-                ->select('pl.PatNum', 'pl.ProvNum', 'pl.ProcDate', 'pl.ProcFee', 'pc.ProcCode', 'fv.first_date')
-                ->where('pl.ClinicNum', $clinicNum)
-                ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereBetween('pl.ProcDate', [$start, $end])
-                ->whereBetween('fv.first_date', [$start, $end])
-                ->get();
-
-            $patMap = $mapPatients($nptLogs->pluck('PatNum')->unique());
-
-            $patData = [];
-            foreach ($nptLogs as $log) {
-                if (! isset($patData[$log->PatNum])) {
-                    $patData[$log->PatNum] = [
-                        'first_date' => $log->first_date,
-                        'provs' => [],
-                        'codes' => [],
-                        'production' => 0,
-                    ];
-                }
-                if (! empty($provMap[$log->ProvNum])) {
-                    $patData[$log->PatNum]['provs'][$provMap[$log->ProvNum]] = true;
-                }
-                $patData[$log->PatNum]['codes'][$log->ProcCode] = true;
-                $patData[$log->PatNum]['production'] += (float) $log->ProcFee;
-            }
-
+            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, [$clinicNum]);
             $totalProduction = 0;
-            foreach ($patData as $patNum => $data) {
-                $totalProduction += $data['production'];
+            foreach ($nptVisits as $visit) {
+                $totalProduction += (float) $visit['amount'];
+                $provLabel = ! empty($visit['prov_num']) && ! empty($provMap[$visit['prov_num']])
+                    ? $provMap[$visit['prov_num']]
+                    : 'N/A';
                 $rows[] = [
-                    'pat_id' => $patNum,
+                    'pat_id' => $visit['patient_id'],
                     'patient' => [
-                        'label' => $patMap[$patNum] ?? 'Unknown',
+                        'label' => $visit['patient_name'] ?: 'Unknown',
                         'link' => true,
                     ],
-                    'first_visit' => date('M d, Y', strtotime($data['first_date'])),
-                    'providers' => implode(', ', array_keys($data['provs'])),
+                    'first_visit' => date('M d, Y', strtotime($visit['dates'])),
+                    'providers' => $provLabel,
                     'insurance_carrier' => 'N/A',
                     'referral_source' => 'N/A',
-                    'service_codes' => implode(', ', array_keys($data['codes'])),
-                    'production' => $data['production'],
+                    'service_codes' => $visit['service_codes'],
+                    'production' => $visit['amount'],
                 ];
             }
             $totals = ['production' => $totalProduction];

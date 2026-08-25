@@ -19,6 +19,10 @@ use Illuminate\Support\Facades\DB;
  */
 class PatientService
 {
+    public function __construct(
+        private readonly ?PatientVisitService $patientVisitService = null
+    ) {}
+
     /**
      * First-ever COMPLETED procedure date per patient — the one definition of the
      * "first visit" cohort that new/existing-patient logic joins against.
@@ -31,7 +35,7 @@ class PatientService
         return DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
             ->whereIn('ProcStatus', ProcStatus::completed())
-            ->whereRaw('COALESCE(CodeNum, 0) != 626')
+            ->whereRaw("COALESCE(CodeNum, '') != '626'")
             ->groupBy('PatNum');
     }
 
@@ -47,7 +51,7 @@ class PatientService
         $completed = ProcStatus::inList(ProcStatus::completed());
 
         return "SELECT PatNum, MIN(ProcDate) AS {$dateAlias} "
-            ."FROM od_procedure_logs WHERE ProcStatus IN ({$completed}) AND COALESCE(CodeNum, 0) != 626 GROUP BY PatNum";
+            ."FROM od_procedure_logs WHERE ProcStatus IN ({$completed}) AND COALESCE(CodeNum, '') != '626' GROUP BY PatNum";
     }
 
     /** Patients seen (any completed procedure) in the period. */
@@ -59,11 +63,11 @@ class PatientService
     /** New patients: those whose first-ever completed procedure falls within the period. */
     public function newPatientCount(MetricFilter $filter): int
     {
-        return (int) $this->completedInPeriod($filter)
-            ->joinSub($this->firstVisitCohort(), 'fv', 'pl.PatNum', '=', 'fv.PatNum')
-            ->whereBetween('fv.first_date', [$filter->start, $filter->end])
-            ->distinct()
-            ->count('pl.PatNum');
+        if ($this->patientVisitService) {
+            return $this->patientVisitService->newPatientCount($filter->start, $filter->end, $filter->clinics, $filter->providers);
+        }
+
+        return app(PatientVisitService::class)->newPatientCount($filter->start, $filter->end, $filter->clinics, $filter->providers);
     }
 
     /** Existing patients: seen in the period but whose first visit predates it. */
@@ -81,7 +85,7 @@ class PatientService
     {
         $q = DB::table('od_procedure_logs as pl')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->where('pl.CodeNum', '!=', 626)
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->whereBetween('pl.ProcDate', [$filter->start, $filter->end]);
 
         if ($filter->clinics) {

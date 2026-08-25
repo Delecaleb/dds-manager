@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Patient\PatientService;
+use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
-use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
 use App\Models\ClaimProcs;
@@ -25,6 +25,7 @@ class DashboardController extends Controller
         private readonly ProductionService $production,
         private readonly PatientService $patients,
         private readonly ClinicRegistry $clinics,
+        private readonly PatientVisitService $patientVisits,
     ) {
         $this->clinicNames = $this->clinics->all();
     }
@@ -140,20 +141,8 @@ class DashboardController extends Controller
 
         $net = $this->production->netFrom((float) $gross, (float) $adjustments, (float) $writeoffs);
 
-        $patientVisits = DB::table('od_procedure_logs')
-            ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
-            ->where('CodeNum', '!=', 626)
-            ->whereBetween('ProcDate', [$start, $end])
-            ->selectRaw('PatNum, DATE(ProcDate)')
-            ->distinct()
-            ->get()
-            ->count();
-
-        // New patients = new to the PRACTICE (D8), seen by this provider in the period —
-        // not "new to this provider". Single-sourced via PatientService.
-        $newPatientVisits = $this->patients->newPatientCount(
-            new MetricFilter($start, $end, [], [$id])
-        );
+        $patientVisits = $this->patientVisits->patientVisits($start, $end, [], [$id]);
+        $newPatientVisits = $this->patientVisits->newPatientCount($start, $end, [], [$id]);
 
         // Avg per work-day (days this provider had completed procedures)
         $workDays = DB::table('od_procedure_logs')
@@ -190,21 +179,15 @@ class DashboardController extends Controller
             ]);
 
         /* ── Daily visits (with new-patient detection) ── */
-        $cohortSql = $this->patients->firstVisitCohortSql('first_date');
         $completed = ProcStatus::inList(ProcStatus::completed());
-        $dailyVisits = DB::select("
-            SELECT
-                DATE_FORMAT(pl.ProcDate, '%Y-%m-%d') AS date,
-                COUNT(DISTINCT pl.PatNum) AS patient_visits,
-                COUNT(DISTINCT CASE WHEN pl.ProcDate = fv.first_date THEN pl.PatNum END) AS new_patient_visits
-            FROM od_procedure_logs pl
-            LEFT JOIN (
-                {$cohortSql}
-            ) fv ON pl.PatNum = fv.PatNum
-            WHERE pl.ProvNum = ? AND pl.ProcStatus IN ({$completed}) AND pl.ProcDate BETWEEN ? AND ?
-            GROUP BY DATE_FORMAT(pl.ProcDate, '%Y-%m-%d')
-            ORDER BY date
-        ", [$id, $start, $end]);
+        $dailyVisitStats = $this->patientVisits->dailyStats($start, $end, [], [$id]);
+        $dailyVisits = collect($dailyVisitStats['daily_visits'])->keys()
+            ->merge(collect($dailyVisitStats['daily_new_visits'])->keys())
+            ->unique()->sort()->values()->map(fn ($dStr) => (object) [
+                'date' => $dStr,
+                'patient_visits' => (int) ($dailyVisitStats['daily_visits'][$dStr] ?? 0),
+                'new_patient_visits' => (int) ($dailyVisitStats['daily_new_visits'][$dStr] ?? 0),
+            ])->all();
 
         /* ── Daily TX accepted rate ──────────────────── */
         $dailyTx = DB::table('od_procedure_logs')
@@ -408,55 +391,8 @@ class DashboardController extends Controller
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
 
-        $startLastYear = Carbon::parse($start)->subYear()->toDateString();
-        $endLastYear = Carbon::parse($end)->subYear()->toDateString();
-
-        $buildVisitStats = function ($s, $e) {
-            $patientVisits = DB::table('od_procedure_logs')
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->where('CodeNum', '!=', 626)
-                ->whereBetween('ProcDate', [$s, $e])
-                ->selectRaw('ClinicNum, '.MetricDefinitions::patientVisits('val'))
-                ->groupBy('ClinicNum')
-                ->pluck('val', 'ClinicNum');
-
-            // Find new patient visits per clinic (patient's first completed procedure at this clinic falls in date range)
-            $newPatientVisits = DB::table('od_procedure_logs')
-                ->select('PatNum', 'ClinicNum', DB::raw('MIN(ProcDate) as first_visit'))
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->where('CodeNum', '!=', 626)
-                ->groupBy('PatNum', 'ClinicNum')
-                ->havingBetween('first_visit', [$s, $e])
-                ->get()
-                ->groupBy('ClinicNum')
-                ->map->count();
-
-            return compact('patientVisits', 'newPatientVisits');
-        };
-
-        $currentStats = $buildVisitStats($start, $end);
-        $lastYearStats = $buildVisitStats($startLastYear, $endLastYear);
-
-        $allClinicNums = collect()
-            ->merge($currentStats['patientVisits']->keys())
-            ->merge($currentStats['newPatientVisits']->keys())
-            ->merge($lastYearStats['patientVisits']->keys())
-            ->merge($lastYearStats['newPatientVisits']->keys())
-            ->unique()
-            ->sort();
-
-        $result = [];
-        foreach ($allClinicNums as $cNum) {
-            $result[] = [
-                'clinic_num' => $cNum,
-                'location' => $this->clinicNames[(int) $cNum] ?? 'Location '.$cNum,
-                'patient_visits' => $currentStats['patientVisits']->get($cNum, 0),
-                'patient_visits_last' => $lastYearStats['patientVisits']->get($cNum, 0),
-                'new_patient_visits' => $currentStats['newPatientVisits']->get($cNum, 0),
-                'new_patient_visits_last' => $lastYearStats['newPatientVisits']->get($cNum, 0),
-            ];
-        }
-
-        return response()->json($result);
+        return response()->json(
+            $this->patientVisits->visitsPerLocation($start, $end, $this->clinicNames)
+        );
     }
 }

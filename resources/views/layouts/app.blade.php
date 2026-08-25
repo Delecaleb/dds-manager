@@ -43,110 +43,200 @@
 
                 <div class="p-3">
                     <nav class="space-y-0.5">
-                        <a href="{{ route('aging.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('aging.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('aging.index')) aria-current="page" @endif>
-                            <i data-lucide="hourglass" class="w-4 h-4"></i> Aging
-                        </a>
-                        <a href="{{ route('calendar.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('calendar.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('calendar.index')) aria-current="page" @endif>
-                            <i data-lucide="calendar" class="w-4 h-4"></i> Calendar
-                        </a>
-                        <a href="{{ route('dashboard') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('dashboard') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('dashboard')) aria-current="page" @endif>
-                            <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
-                        </a>
-                        <a href="{{ route('deposits.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('deposits.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('deposits.index')) aria-current="page" @endif>
-                            <i data-lucide="file-check-2" class="w-4 h-4"></i> Deposit Slip
-                        </a>
-                        <a href="{{ route('eod.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('eod.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('eod.index')) aria-current="page" @endif>
-                            <i data-lucide="zap" class="w-4 h-4"></i> EOD Live
-                        </a>
-                        <a href="{{ route('financials.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('financials.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('financials.index')) aria-current="page" @endif>
-                            <i data-lucide="dollar-sign" class="w-4 h-4"></i> Financials
-                        </a>
-                        <a href="{{ route('front-office.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('front-office.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('front-office.index')) aria-current="page" @endif>
-                            <i data-lucide="monitor" class="w-4 h-4"></i> Front Office
-                        </a>
-                        <a href="{{ route('hygiene-recall.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('hygiene-recall.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('hygiene-recall.index')) aria-current="page" @endif>
-                            <i data-lucide="refresh-cw" class="w-4 h-4"></i> Hygiene Recall
-                        </a>
-                        <a href="{{ route('kpis.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('kpis.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('kpis.*')) aria-current="page" @endif>
-                            <i data-lucide="bar-chart-2" class="w-4 h-4"></i> KPIs
-                        </a>
-                        <a href="{{ route('huddle.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('huddle.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('huddle.index')) aria-current="page" @endif>
-                            <i data-lucide="users-round" class="w-4 h-4"></i> Morning Huddle
-                        </a>
-                        <a href="{{ route('operations.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('operations.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('operations.index')) aria-current="page" @endif>
-                            <i data-lucide="briefcase" class="w-4 h-4"></i> Operations
-                        </a>
-                        <a href="{{ route('offices.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('offices.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('offices.*')) aria-current="page" @endif>
-                            <i data-lucide="building-2" class="w-4 h-4 text-blue-600"></i> Offices / Locations
-                        </a>
-                        <a href="{{ route('od-explorer.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('od-explorer.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('od-explorer.*')) aria-current="page" @endif>
-                            <i data-lucide="database" class="w-4 h-4 text-emerald-600"></i> OD Data Explorer
-                        </a>
-                        <a href="{{ route('sync-manager.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('sync-manager.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('sync-manager.*')) aria-current="page" @endif>
-                            <i data-lucide="cloud-lightning" class="w-4 h-4 text-amber-500"></i> Data Sync Manager
-                        </a>
-                        <a href="{{ route('patients.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('patients.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('patients.index')) aria-current="page" @endif>
-                            <i data-lucide="user-square" class="w-4 h-4"></i> Patient Portal
-                        </a>
-                        <a href="{{ route('provider-portal.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('provider-portal.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('provider-portal.*')) aria-current="page" @endif>
-                            <i data-lucide="stethoscope" class="w-4 h-4"></i> Provider Portal
-                        </a>
-                        <a href="{{ route('provisioner.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('provisioner.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('provisioner.index')) aria-current="page" @endif>
-                            <i data-lucide="server-cog" class="w-4 h-4"></i> Provisioner
-                        </a>
-                        <a href="{{ route('rcm.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('rcm.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('rcm.index')) aria-current="page" @endif>
-                            <i data-lucide="landmark" class="w-4 h-4"></i> RCM
-                        </a>
-                        <a href="{{ route('snapshot.index') }}"
-                            class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('snapshot.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
-                            @if(request()->routeIs('snapshot.index')) aria-current="page" @endif>
-                            <i data-lucide="camera" class="w-4 h-4"></i> Snapshot
-                        </a>
+                        @if(auth()->user()->hasModuleAccess('aging'))
+                            <a href="{{ route('aging.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('aging.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('aging.index')) aria-current="page" @endif>
+                                <i data-lucide="hourglass" class="w-4 h-4"></i> Aging
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('calendar'))
+                            <a href="{{ route('calendar.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('calendar.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('calendar.index')) aria-current="page" @endif>
+                                <i data-lucide="calendar" class="w-4 h-4"></i> Calendar
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('dashboard'))
+                            <a href="{{ route('dashboard') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('dashboard') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('dashboard')) aria-current="page" @endif>
+                                <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('deposits'))
+                            <a href="{{ route('deposits.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('deposits.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('deposits.index')) aria-current="page" @endif>
+                                <i data-lucide="file-check-2" class="w-4 h-4"></i> Deposit Slip
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('eod'))
+                            <a href="{{ route('eod.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('eod.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('eod.index')) aria-current="page" @endif>
+                                <i data-lucide="zap" class="w-4 h-4"></i> EOD Live
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('financials'))
+                            <a href="{{ route('financials.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('financials.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('financials.index')) aria-current="page" @endif>
+                                <i data-lucide="dollar-sign" class="w-4 h-4"></i> Financials
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('front-office'))
+                            <a href="{{ route('front-office.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('front-office.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('front-office.index')) aria-current="page" @endif>
+                                <i data-lucide="monitor" class="w-4 h-4"></i> Front Office
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('hygiene-recall'))
+                            <a href="{{ route('hygiene-recall.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('hygiene-recall.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('hygiene-recall.index')) aria-current="page" @endif>
+                                <i data-lucide="refresh-cw" class="w-4 h-4"></i> Hygiene Recall
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('kpis'))
+                            <a href="{{ route('kpis.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('kpis.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('kpis.*')) aria-current="page" @endif>
+                                <i data-lucide="bar-chart-2" class="w-4 h-4"></i> KPIs
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('huddle'))
+                            <a href="{{ route('huddle.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('huddle.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('huddle.index')) aria-current="page" @endif>
+                                <i data-lucide="users-round" class="w-4 h-4"></i> Morning Huddle
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('operations'))
+                            <a href="{{ route('operations.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('operations.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('operations.index')) aria-current="page" @endif>
+                                <i data-lucide="briefcase" class="w-4 h-4"></i> Operations
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('offices'))
+                            <a href="{{ route('offices.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('offices.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('offices.*')) aria-current="page" @endif>
+                                <i data-lucide="building-2" class="w-4 h-4 text-blue-600"></i> Offices / Locations
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('od-explorer'))
+                            <a href="{{ route('od-explorer.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('od-explorer.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('od-explorer.*')) aria-current="page" @endif>
+                                <i data-lucide="database" class="w-4 h-4 text-emerald-600"></i> OD Data Explorer
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('sync-manager'))
+                            <a href="{{ route('sync-manager.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('sync-manager.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('sync-manager.*')) aria-current="page" @endif>
+                                <i data-lucide="cloud-lightning" class="w-4 h-4 text-amber-500"></i> Data Sync Manager
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('patients'))
+                            <a href="{{ route('patients.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('patients.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('patients.index')) aria-current="page" @endif>
+                                <i data-lucide="user-square" class="w-4 h-4"></i> Patient Portal
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('provider-portal'))
+                            <a href="{{ route('provider-portal.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('provider-portal.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('provider-portal.*')) aria-current="page" @endif>
+                                <i data-lucide="stethoscope" class="w-4 h-4"></i> Provider Portal
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('provisioner'))
+                            <a href="{{ route('provisioner.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('provisioner.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('provisioner.index')) aria-current="page" @endif>
+                                <i data-lucide="server-cog" class="w-4 h-4"></i> Provisioner
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('rcm'))
+                            <a href="{{ route('rcm.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('rcm.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('rcm.index')) aria-current="page" @endif>
+                                <i data-lucide="landmark" class="w-4 h-4"></i> RCM
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('snapshot'))
+                            <a href="{{ route('snapshot.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('snapshot.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('snapshot.index')) aria-current="page" @endif>
+                                <i data-lucide="camera" class="w-4 h-4"></i> Snapshot
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasModuleAccess('tx-miner'))
+                            <a href="{{ route('tx-miner.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('tx-miner.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('tx-miner.index')) aria-current="page" @endif>
+                                <i data-lucide="search" class="w-4 h-4"></i> Tx Miner
+                            </a>
+                        @endif
+
+                        {{-- Super Admin Administration Section --}}
+                        @if(auth()->user()->isSuperAdmin())
+                            <div class="pt-4 pb-1 px-3 border-t border-slate-100 mt-3">
+                                <span class="text-[10px] font-bold text-purple-700 uppercase tracking-wider">Administration</span>
+                            </div>
+                            <a href="{{ route('admin.users.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('admin.users.*') ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('admin.users.*')) aria-current="page" @endif>
+                                <i data-lucide="shield-check" class="w-4 h-4 text-purple-600"></i> User & Access
+                            </a>
+                        @endif
                     </nav>
                 </div>
             </div>
 
-            <div class="p-4 border-t border-slate-200 bg-slate-50 sticky bottom-0">
-                <div class="flex items-center justify-between text-xs text-slate-500">
-                    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> OD
-                        LiveSync Active</span>
-                    <i data-lucide="database" class="w-3.5 h-3.5 text-slate-400"></i>
+            <div class="p-3 border-t border-slate-200 bg-slate-50 sticky bottom-0 space-y-2">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <div class="w-7 h-7 rounded-full bg-[#001f3f] text-emerald-400 text-xs font-bold flex items-center justify-center shrink-0">
+                            {{ strtoupper(substr(auth()->user()->name, 0, 2)) }}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-slate-900 truncate">{{ auth()->user()->name }}</p>
+                            <span class="inline-block text-[9px] font-semibold px-1.5 py-0.2 rounded border {{ auth()->user()->getRoleBadgeClass() }}">
+                                {{ auth()->user()->getRoleName() }}
+                            </span>
+                        </div>
+                    </div>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Log Out">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                        </button>
+                    </form>
                 </div>
             </div>
         </aside>
@@ -186,6 +276,58 @@
                         </div>
                     </form>
                 @endif
+
+                <!-- User Profile Dropdown -->
+                <div class="relative" id="user-dropdown-wrapper">
+                    <button id="user-menu-btn" type="button"
+                        class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors focus:outline-none cursor-pointer">
+                        <div class="w-7 h-7 rounded-full bg-[#001f3f] text-emerald-400 text-xs font-bold flex items-center justify-center shrink-0">
+                            {{ strtoupper(substr(auth()->user()->name, 0, 2)) }}
+                        </div>
+                        <div class="hidden sm:flex flex-col text-left">
+                            <span class="text-xs font-bold text-slate-900 leading-tight">{{ auth()->user()->name }}</span>
+                            <span class="text-[10px] text-slate-500 leading-tight">{{ auth()->user()->getRoleName() }}</span>
+                        </div>
+                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+                    </button>
+
+                    <!-- Dropdown Panel -->
+                    <div id="user-dropdown-menu"
+                        class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in duration-100">
+                        <div class="px-4 py-2.5 border-b border-slate-100">
+                            <p class="text-xs font-bold text-slate-900">{{ auth()->user()->name }}</p>
+                            <p class="text-[11px] text-slate-400 truncate">{{ auth()->user()->email }}</p>
+                            <span class="inline-block mt-1 text-[9px] font-semibold px-2 py-0.5 rounded-full border {{ auth()->user()->getRoleBadgeClass() }}">
+                                {{ auth()->user()->getRoleName() }}
+                            </span>
+                        </div>
+
+                        @if(auth()->user()->isSuperAdmin())
+                            <a href="{{ route('admin.users.index') }}"
+                                class="flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-purple-700 transition-colors">
+                                <i data-lucide="shield-check" class="w-4 h-4 text-purple-600"></i>
+                                <span>User & Access Management</span>
+                            </a>
+                        @endif
+
+                        <a href="{{ route('profile.edit') }}"
+                            class="flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors">
+                            <i data-lucide="user" class="w-4 h-4 text-slate-400"></i>
+                            <span>Profile Settings</span>
+                        </a>
+
+                        <div class="border-t border-slate-100 my-1"></div>
+
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit"
+                                class="w-full flex items-center gap-2 px-4 py-2 text-xs text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer">
+                                <i data-lucide="log-out" class="w-4 h-4 text-rose-500"></i>
+                                <span>Sign Out</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -197,7 +339,7 @@
     <script>
         lucide.createIcons();
 
-        // JavaScript Interaction Logic for Overlay
+        // Overlay Navigation Controls
         const menuToggleBtn = document.getElementById('menu-toggle-btn');
         const closeMenuBtn = document.getElementById('close-menu-btn');
         const overlayMenu = document.getElementById('overlay-menu');
@@ -207,9 +349,26 @@
             overlayMenu.classList.toggle('hidden');
         }
 
-        menuToggleBtn.addEventListener('click', toggleMenu);
-        closeMenuBtn.addEventListener('click', toggleMenu);
-        menuBackdrop.addEventListener('click', toggleMenu);
+        if (menuToggleBtn) menuToggleBtn.addEventListener('click', toggleMenu);
+        if (closeMenuBtn) closeMenuBtn.addEventListener('click', toggleMenu);
+        if (menuBackdrop) menuBackdrop.addEventListener('click', toggleMenu);
+
+        // Header User Menu Dropdown Controls
+        const userMenuBtn = document.getElementById('user-menu-btn');
+        const userDropdownMenu = document.getElementById('user-dropdown-menu');
+
+        if (userMenuBtn && userDropdownMenu) {
+            userMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                userDropdownMenu.classList.toggle('hidden');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!userDropdownMenu.contains(e.target) && !userMenuBtn.contains(e.target)) {
+                    userDropdownMenu.classList.add('hidden');
+                }
+            });
+        }
     </script>
     <script src="https://cdn.datatables.net/2.0.8/js/dataTables.js"></script>
     <script src="https://cdn.datatables.net/2.0.8/js/dataTables.tailwind.js"></script>

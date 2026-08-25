@@ -13,6 +13,12 @@ class PatientTreatmentPlanTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAs(User::factory()->create());
+    }
+
     public function test_appointment_scope_scheduled_only_includes_active_scheduled_status(): void
     {
         OdAppointment::create([
