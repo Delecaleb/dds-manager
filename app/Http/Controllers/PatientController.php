@@ -684,10 +684,10 @@ class PatientController extends Controller
         }
 
         if (! empty($dateFrom)) {
-            $query->whereRaw('COALESCE(od_patients.SecDateEntry, od_patients.DateFirstVisit, DATE(od_patients.created_at)) >= ?', [$dateFrom]);
+            $query->whereRaw('DATE(od_patients.created_at) >= ?', [$dateFrom]);
         }
         if (! empty($dateTo)) {
-            $query->whereRaw('COALESCE(od_patients.SecDateEntry, od_patients.DateFirstVisit, DATE(od_patients.created_at)) <= ?', [$dateTo]);
+            $query->whereRaw('DATE(od_patients.created_at) <= ?', [$dateTo]);
         }
 
         return $query;
@@ -832,12 +832,8 @@ class PatientController extends Controller
         $statusRaw = $patient->PatStatus ?? '';
         $status = is_numeric($statusRaw) ? ($statusMap[intval($statusRaw)] ?? 'Active') : ($statusRaw ?: 'Active');
 
-        $dateAdded = $patient->SecDateEntry ?: ($patient->DateFirstVisit ?: ($patient->created_at ? $patient->created_at->format('Y-m-d') : ''));
-        if ($dateAdded && $dateAdded !== '0001-01-01') {
-            $dateAddedFormatted = date('Y-m-d', strtotime($dateAdded));
-        } else {
-            $dateAddedFormatted = '';
-        }
+        $dateAdded = $patient->created_at ? $patient->created_at->format('Y-m-d') : '';
+        $dateAddedFormatted = $dateAdded ?: '';
 
         $allValues = [
             'patient_id' => $patient->PatNum,
