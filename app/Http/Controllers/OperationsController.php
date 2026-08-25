@@ -184,10 +184,11 @@ class OperationsController extends Controller
                 ]);
 
             case 'trends':
-                $metric = request('metric', 'production');
+                $metric = request('metric', 'BYO Production');
                 $lob = request('lob', '');
 
                 return view('operations.tabs.trends', $chrome + [
+                    'metric' => $metric,
                     'spec' => $service->trends($start, $end, $subtab, $clinics, $metric, $lob),
                 ]);
 

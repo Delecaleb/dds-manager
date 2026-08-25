@@ -321,4 +321,167 @@ class OperationsTest extends TestCase
         $this->assertEquals(1, $rows[0]['working_days']);
         $this->assertEquals(2, $rows[0]['procedures']);
     }
+
+    public function test_services_tab_returns_age_brackets_with_unknown_after_greater_than_70(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        DB::table('od_patients')->insert([
+            [
+                'PatNum' => 401,
+                'FName' => 'Child',
+                'LName' => 'Patient',
+                'Birthdate' => '2020-01-01',
+                'PatStatus' => '0',
+            ],
+            [
+                'PatNum' => 402,
+                'FName' => 'Senior',
+                'LName' => 'Patient',
+                'Birthdate' => '1950-01-01',
+                'PatStatus' => '0',
+            ],
+            [
+                'PatNum' => 403,
+                'FName' => 'Unknown',
+                'LName' => 'Patient',
+                'Birthdate' => '0001-01-01',
+                'PatStatus' => '0',
+            ],
+        ]);
+
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 401,
+                'PatNum' => 401,
+                'ClinicNum' => 1,
+                'ProcFee' => 100.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-07-05',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            [
+                'ProcNum' => 402,
+                'PatNum' => 402,
+                'ClinicNum' => 1,
+                'ProcFee' => 150.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-07-05',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            [
+                'ProcNum' => 403,
+                'PatNum' => 403,
+                'ClinicNum' => 1,
+                'ProcFee' => 200.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-07-05',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+        ]);
+
+        $response = $this->get(route('operations.data', [
+            'tab' => 'services',
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-07-15',
+        ]));
+
+        $response->assertOk();
+        $spec = $response->original->getData()['spec'] ?? null;
+        $this->assertNotNull($spec);
+
+        $ageRows = $spec['age_brackets']['rows'] ?? [];
+        $labels = array_column($ageRows, 'label');
+
+        $this->assertEquals([
+            '0-9',
+            '10-19',
+            '20-29',
+            '30-39',
+            '40-49',
+            '50-59',
+            '60-69',
+            '>70',
+            'Unknown',
+        ], $labels);
+
+        $countsByLabel = array_combine($labels, array_column($ageRows, 'count'));
+        $this->assertEquals(1, $countsByLabel['0-9']);
+        $this->assertEquals(1, $countsByLabel['>70']);
+        $this->assertEquals(1, $countsByLabel['Unknown']);
+        $this->assertEquals(0, $countsByLabel['10-19']);
+        $this->assertEquals(3, $spec['age_brackets']['total']);
+    }
+
+    public function test_trends_tab_renders_and_computes_metrics_properly(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Render operations page on trends tab - verify filter is present
+        $pageResponse = $this->get(route('operations.tab', 'trends'));
+        $pageResponse->assertOk();
+        $pageResponse->assertSee('id="opsTrendsMetricWrapper"', false);
+        $pageResponse->assertSee('By Office - Production');
+        $pageResponse->assertSee('BYO Collection');
+
+        // Seed sample pay splits and procedure logs
+        DB::table('od_pay_splits')->insert([
+            [
+                'ProvNum' => 1,
+                'SplitAmt' => 500.00,
+                'DatePay' => '2026-06-15',
+                'ClinicNum' => 1,
+            ],
+        ]);
+
+        // When end date is in August 2026, trends range spans from Aug 2025 to Aug 2026
+        $dataResponse = $this->get(route('operations.data', [
+            'tab' => 'trends',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-25',
+            'metric' => 'BYO Collection',
+        ]));
+
+        $dataResponse->assertOk();
+        $spec = $dataResponse->original->getData()['spec'] ?? null;
+        $this->assertNotNull($spec);
+        $this->assertArrayHasKey('labels', $spec);
+        $this->assertCount(13, $spec['labels']);
+        $this->assertEquals('Aug 2025', $spec['labels'][0]);
+        $this->assertEquals('Aug 2026', $spec['labels'][12]);
+
+        // When end date is in March 2025, trends range spans from Mar 2024 to Mar 2025
+        $marchResponse = $this->get(route('operations.data', [
+            'tab' => 'trends',
+            'start_date' => '2025-03-01',
+            'end_date' => '2025-03-15',
+            'metric' => 'BYO Production',
+        ]));
+
+        $marchResponse->assertOk();
+        $marchSpec = $marchResponse->original->getData()['spec'] ?? null;
+        $this->assertNotNull($marchSpec);
+        $this->assertCount(13, $marchSpec['labels']);
+        $this->assertEquals('Mar 2024', $marchSpec['labels'][0]);
+        $this->assertEquals('Mar 2025', $marchSpec['labels'][12]);
+
+        // Test Doc Production, Hyg Collection, Pending Tx, Appointments, Active Pts metrics
+        foreach (['BYO Doc Production', 'BYO Hyg Collection', 'BYO $ in Pen. Tx', 'BYO Pts Appointment', 'BYO Active Pts Count'] as $met) {
+            $resp = $this->get(route('operations.data', [
+                'tab' => 'trends',
+                'start_date' => '2026-08-01',
+                'end_date' => '2026-08-25',
+                'metric' => $met,
+            ]));
+            $resp->assertOk();
+            $s = $resp->original->getData()['spec'] ?? null;
+            $this->assertNotNull($s);
+            $this->assertCount(13, $s['labels']);
+        }
+    }
 }

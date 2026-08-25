@@ -721,54 +721,197 @@ class FrontOfficeController extends Controller
 
     public function collectionsData(Request $request)
     {
-        // 1. Group patient balances by Guarantor as per screenshot "Values display Guarantor balances"
-        $query = OdPatient::query()
-            ->select(
-                'od_patients.Guarantor',
-                'g.LName as GuarantorLName',
-                'g.FName as GuarantorFName',
-                DB::raw('SUM(CAST(od_patients.Bal_0_30 AS DECIMAL(10,2))) as Bal_0_30'),
-                DB::raw('SUM(CAST(od_patients.Bal_31_60 AS DECIMAL(10,2))) as Bal_31_60'),
-                DB::raw('SUM(CAST(od_patients.Bal_61_90 AS DECIMAL(10,2))) as Bal_61_90'),
-                DB::raw('SUM(CAST(od_patients.BalOver90 AS DECIMAL(10,2))) as BalOver90'),
-                DB::raw('SUM(CAST(od_patients.BalTotal AS DECIMAL(10,2))) as BalTotal')
-            )
-            ->leftJoin('od_patients as g', 'od_patients.Guarantor', '=', 'g.PatNum')
-            ->groupBy('od_patients.Guarantor', 'g.LName', 'g.FName')
-            ->havingRaw('SUM(CAST(od_patients.BalTotal AS DECIMAL(10,2))) > 0');
+        $subtab = $request->get('subtab', 'patient-balances');
+        [$startRange, $endRange] = $this->getFilterDateRange($request);
+        $startDateStr = substr($startRange, 0, 10);
+        $endDateStr = substr($endRange, 0, 10);
 
-        return DataTables::of($query)
-            ->addColumn('guarantor', function ($row) {
-                $name = trim(($row->GuarantorLName ?? '').', '.($row->GuarantorFName ?? ''));
-                if (! $name || $name == ',') {
-                    $name = 'Unknown Guarantor';
-                }
+        // Subtab 1: Patient Balances 30/60/90
+        if ($subtab === 'patient-balances') {
+            $query = OdPatient::query()
+                ->select(
+                    'od_patients.Guarantor',
+                    'g.LName as GuarantorLName',
+                    'g.FName as GuarantorFName',
+                    DB::raw('SUM(CAST(od_patients.Bal_0_30 AS DECIMAL(10,2))) as Bal_0_30'),
+                    DB::raw('SUM(CAST(od_patients.Bal_31_60 AS DECIMAL(10,2))) as Bal_31_60'),
+                    DB::raw('SUM(CAST(od_patients.Bal_61_90 AS DECIMAL(10,2))) as Bal_61_90'),
+                    DB::raw('SUM(CAST(od_patients.BalOver90 AS DECIMAL(10,2))) as BalOver90'),
+                    DB::raw('SUM(CAST(od_patients.BalTotal AS DECIMAL(10,2))) as BalTotal')
+                )
+                ->leftJoin('od_patients as g', 'od_patients.Guarantor', '=', 'g.PatNum')
+                ->groupBy('od_patients.Guarantor', 'g.LName', 'g.FName')
+                ->havingRaw('SUM(CAST(od_patients.BalTotal AS DECIMAL(10,2))) > 0');
 
-                return $name;
-            })
-            ->addColumn('current', function ($row) {
-                return $row->Bal_0_30 > 0 ? '$ '.number_format($row->Bal_0_30, 2) : '$ 0';
-            })
-            ->addColumn('over_30', function ($row) {
-                return $row->Bal_31_60 > 0 ? '$ '.number_format($row->Bal_31_60, 2) : '$ 0';
-            })
-            ->addColumn('over_60', function ($row) {
-                return $row->Bal_61_90 > 0 ? '$ '.number_format($row->Bal_61_90, 2) : '$ 0';
-            })
-            ->addColumn('over_90', function ($row) {
-                return $row->BalOver90 > 0 ? '$ '.number_format($row->BalOver90, 2) : '$ 0';
-            })
-            ->addColumn('over_120', function ($row) {
-                return '-';
-            })
-            ->addColumn('total', function ($row) {
-                return $row->BalTotal > 0 ? '$ '.number_format($row->BalTotal, 2) : '$ 0';
-            })
-            ->make(true);
+            return DataTables::of($query)
+                ->addColumn('guarantor', function ($row) {
+                    $name = trim(($row->GuarantorLName ?? '').', '.($row->GuarantorFName ?? ''));
+                    if (! $name || $name == ',') {
+                        $name = 'Unknown Guarantor';
+                    }
+
+                    return $name;
+                })
+                ->addColumn('current', fn ($row) => (float) ($row->Bal_0_30 ?? 0))
+                ->addColumn('over_30', fn ($row) => (float) ($row->Bal_31_60 ?? 0))
+                ->addColumn('over_60', fn ($row) => (float) ($row->Bal_61_90 ?? 0))
+                ->addColumn('over_90', fn ($row) => (float) ($row->BalOver90 ?? 0))
+                ->addColumn('over_120', fn ($row) => 0.0)
+                ->addColumn('total', fn ($row) => (float) ($row->BalTotal ?? 0))
+                ->make(true);
+        }
+
+        // Subtab 2: CoPay Collections (from fr-off-copay-collection.html)
+        if ($subtab === 'copay-collections') {
+            $query = DB::table('od_procedure_logs as pl')
+                ->leftJoin('od_patients as pt', 'pl.PatNum', '=', 'pt.PatNum')
+                ->leftJoin('od_providers as prov', 'pl.ProvNum', '=', 'prov.ProvNum')
+                ->leftJoin('od_claim_procs as cp', 'pl.ProcNum', '=', 'cp.ProcNum')
+                ->leftJoin('od_pay_splits as ps', 'pl.ProcNum', '=', 'ps.ProcNum')
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereBetween('pl.ProcDate', [$startDateStr, $endDateStr])
+                ->select(
+                    'pl.ProcNum',
+                    'pl.PatNum',
+                    'pl.ProcDate',
+                    'pl.ProcFee',
+                    'pt.FName as pat_fname',
+                    'pt.LName as pat_lname',
+                    'prov.Abbr as prov_abbr',
+                    'prov.LName as prov_lname',
+                    'prov.FName as prov_fname',
+                    DB::raw('COALESCE(SUM(ps.SplitAmt), 0) as pat_paid'),
+                    DB::raw('COALESCE(MAX(cp.InsPayEst), 0) as ins_est'),
+                    DB::raw('COALESCE(MAX(cp.WriteOff), 0) as write_off')
+                )
+                ->groupBy('pl.ProcNum', 'pl.PatNum', 'pl.ProcDate', 'pl.ProcFee', 'pt.FName', 'pt.LName', 'prov.Abbr', 'prov.LName', 'prov.FName');
+
+            return DataTables::query($query)
+                ->addColumn('patient', fn ($r) => trim(($r->pat_lname ?? '').', '.($r->pat_fname ?? '')) ?: 'Patient '.$r->PatNum)
+                ->addColumn('provider', fn ($r) => trim(($r->prov_lname ?? '').', '.($r->prov_fname ?? '')) ?: ($r->prov_abbr ?? '—'))
+                ->addColumn('date_of_service', fn ($r) => $r->ProcDate ? Carbon::parse($r->ProcDate)->format('M d, Y') : '')
+                ->addColumn('patient_paid', fn ($r) => (float) $r->pat_paid)
+                ->addColumn('patient_portion', function ($r) {
+                    $portion = max(0, (float) $r->ProcFee - (float) $r->ins_est - (float) $r->write_off);
+
+                    return $portion > 0 ? $portion : (float) $r->ProcFee;
+                })
+                ->addColumn('copay_percent', function ($r) {
+                    $portion = max(0, (float) $r->ProcFee - (float) $r->ins_est - (float) $r->write_off);
+                    if ($portion <= 0) {
+                        $portion = (float) $r->ProcFee;
+                    }
+                    $paid = (float) $r->pat_paid;
+
+                    return $portion > 0 ? round(($paid / $portion) * 100, 2) : ($paid > 0 ? 100.0 : 0.0);
+                })
+                ->make(true);
+        }
+
+        // Subtab 3: Adjustments (from fr-off-adjustment-tab.html)
+        if ($subtab === 'adjustments') {
+            $query = DB::table('od_adjustments as adj')
+                ->leftJoin('od_patients as pt', 'adj.PatNum', '=', 'pt.PatNum')
+                ->leftJoin('od_providers as prov', 'adj.ProvNum', '=', 'prov.ProvNum')
+                ->leftJoin('od_definitions as def', function ($join) {
+                    $join->on('adj.AdjType', '=', 'def.DefNum')
+                        ->where('def.Category', '=', 1);
+                })
+                ->whereBetween('adj.AdjDate', [$startDateStr, $endDateStr])
+                ->select(
+                    'adj.AdjNum',
+                    'adj.AdjDate',
+                    'adj.AdjAmt',
+                    'adj.AdjNote',
+                    'adj.AdjType',
+                    'pt.FName as pat_fname',
+                    'pt.LName as pat_lname',
+                    'prov.Abbr as prov_abbr',
+                    'prov.LName as prov_lname',
+                    'prov.FName as prov_fname',
+                    'def.ItemName as def_name'
+                );
+
+            return DataTables::query($query)
+                ->addColumn('patient', fn ($r) => trim(($r->pat_lname ?? '').', '.($r->pat_fname ?? '')) ?: 'Patient '.$r->PatNum)
+                ->addColumn('provider', fn ($r) => trim(($r->prov_lname ?? '').', '.($r->prov_fname ?? '')) ?: ($r->prov_abbr ?? '—'))
+                ->addColumn('date', fn ($r) => $r->AdjDate ? Carbon::parse($r->AdjDate)->format('M d, Y') : '')
+                ->addColumn('adjustment_type', fn ($r) => $r->def_name ? ($r->def_name.' - '.$r->AdjType) : ('Adjustment #'.$r->AdjType))
+                ->addColumn('amount', fn ($r) => (float) $r->AdjAmt)
+                ->addColumn('note', fn ($r) => $r->AdjNote ?? '')
+                ->make(true);
+        }
+
+        // Subtab 4: Collections (from fr-off-collection-tab.html)
+        if ($subtab === 'collections') {
+            $grossByDate = DB::table('od_procedure_logs')
+                ->selectRaw('DATE(ProcDate) as d_date, SUM(ProcFee) as val')
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$startDateStr, $endDateStr])
+                ->groupBy(DB::raw('DATE(ProcDate)'))
+                ->pluck('val', 'd_date');
+
+            $adjByDate = DB::table('od_adjustments')
+                ->selectRaw('DATE(AdjDate) as d_date, SUM(AdjAmt) as val')
+                ->whereBetween('AdjDate', [$startDateStr, $endDateStr])
+                ->groupBy(DB::raw('DATE(AdjDate)'))
+                ->pluck('val', 'd_date');
+
+            $woByDate = DB::table('od_claim_procs')
+                ->selectRaw('DATE(ProcDate) as d_date, SUM(WriteOff) as val')
+                ->whereBetween('ProcDate', [$startDateStr, $endDateStr])
+                ->groupBy(DB::raw('DATE(ProcDate)'))
+                ->pluck('val', 'd_date');
+
+            $collByDate = DB::table('od_pay_splits')
+                ->selectRaw('DATE(DatePay) as d_date, SUM(SplitAmt) as val')
+                ->whereBetween('DatePay', [$startDateStr, $endDateStr])
+                ->groupBy(DB::raw('DATE(DatePay)'))
+                ->pluck('val', 'd_date');
+
+            $allDates = array_unique(array_merge(
+                $grossByDate->keys()->toArray(),
+                $adjByDate->keys()->toArray(),
+                $woByDate->keys()->toArray(),
+                $collByDate->keys()->toArray()
+            ));
+            sort($allDates);
+
+            $rows = [];
+            foreach ($allDates as $d) {
+                $gross = (float) ($grossByDate[$d] ?? 0);
+                $adj = (float) ($adjByDate[$d] ?? 0);
+                $wo = (float) ($woByDate[$d] ?? 0);
+                $net = $gross + $adj + $wo;
+                $coll = (float) ($collByDate[$d] ?? 0);
+                $pct = $net > 0 ? round(($coll / $net) * 100, 2) : ($coll > 0 ? 100.0 : 0.0);
+
+                $rows[] = [
+                    'date' => Carbon::parse($d)->format('M d, Y'),
+                    'raw_date' => $d,
+                    'total_net_production' => $net,
+                    'total_collections' => $coll,
+                    'collection_percent' => $pct,
+                ];
+            }
+
+            return DataTables::of(collect($rows))
+                ->addColumn('date', fn ($r) => $r['date'])
+                ->addColumn('total_net_production', fn ($r) => (float) $r['total_net_production'])
+                ->addColumn('total_collections', fn ($r) => (float) $r['total_collections'])
+                ->addColumn('collection_percent', fn ($r) => (float) $r['collection_percent'])
+                ->make(true);
+        }
+
+        return DataTables::of(collect([]))->make(true);
     }
 
     public function collectionsStats(Request $request)
     {
+        [$startRange, $endRange] = $this->getFilterDateRange($request);
+        $startDateStr = substr($startRange, 0, 10);
+        $endDateStr = substr($endRange, 0, 10);
+
         $stats = OdPatient::query()->select(
             DB::raw('SUM(CAST(Bal_0_30 AS DECIMAL(10,2))) as Bal_0_30'),
             DB::raw('SUM(CAST(Bal_31_60 AS DECIMAL(10,2))) as Bal_31_60'),
@@ -777,9 +920,42 @@ class FrontOfficeController extends Controller
             DB::raw('SUM(CAST(BalTotal AS DECIMAL(10,2))) as BalTotal')
         )->first();
 
-        // Ins/Pts Collect
-        $pts_collection = OdProcedureLog::query()->whereIn('ProcStatus', ProcStatus::completed())->sum('ProcFee');
-        $ins_collection = OdPatient::query()->sum(DB::raw('CAST(InsEst AS DECIMAL(10,2))'));
+        // 1. Patient vs Insurance Collections within selected month
+        // Patient Payments (from od_pay_splits on DatePay)
+        $pts_collection = (float) DB::table('od_pay_splits')
+            ->whereBetween('DatePay', [$startDateStr, $endDateStr])
+            ->sum('SplitAmt');
+
+        // Insurance Payments (from od_claim_procs on DateCP or od_claim_payments)
+        $ins_collection = (float) DB::table('od_claim_procs')
+            ->whereBetween('DateCP', [$startDateStr, $endDateStr])
+            ->where('Status', '!=', 0)
+            ->sum('InsPayAmt');
+
+        if ($ins_collection <= 0) {
+            $ins_collection = (float) DB::table('od_claim_payments')
+                ->whereBetween('CheckDate', [$startDateStr, $endDateStr])
+                ->sum('CheckAmt');
+        }
+
+        $total_collection = $pts_collection + $ins_collection;
+
+        // 2. Adjustments and Gross/Net Production within selected month
+        $gross_production = (float) DB::table('od_procedure_logs')
+            ->whereIn('ProcStatus', ProcStatus::completed())
+            ->whereBetween('ProcDate', [$startDateStr, $endDateStr])
+            ->sum('ProcFee');
+
+        $total_adjustments = (float) DB::table('od_adjustments')
+            ->whereBetween('AdjDate', [$startDateStr, $endDateStr])
+            ->sum('AdjAmt');
+
+        $total_writeoffs = (float) DB::table('od_claim_procs')
+            ->whereBetween('ProcDate', [$startDateStr, $endDateStr])
+            ->sum('WriteOff');
+
+        $net_production = $gross_production + $total_adjustments + $total_writeoffs;
+        $adj_percent = $gross_production > 0 ? round((abs($total_adjustments) / $gross_production) * 100, 2) : 0.0;
 
         return response()->json([
             'balances' => [
@@ -791,8 +967,15 @@ class FrontOfficeController extends Controller
                 'total' => (float) ($stats->BalTotal ?? 0),
             ],
             'collections' => [
-                'pts' => (float) $pts_collection,
-                'ins' => (float) $ins_collection,
+                'pts' => $pts_collection,
+                'ins' => $ins_collection,
+                'total' => $total_collection,
+            ],
+            'adjustments' => [
+                'total' => $total_adjustments,
+                'gross_production' => $gross_production,
+                'net_production' => $net_production,
+                'percent' => $adj_percent,
             ],
         ]);
     }

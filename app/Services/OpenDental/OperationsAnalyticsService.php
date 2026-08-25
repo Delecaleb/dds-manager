@@ -2061,16 +2061,21 @@ class OperationsAnalyticsService
             '40-49' => 0,
             '50-59' => 0,
             '60-69' => 0,
-            '>=70' => 0,
+            '>70' => 0,
+            'Unknown' => 0,
         ];
 
         $totalActive = 0;
         $currentDate = new \DateTime($end);
 
         foreach ($activePatients as $pt) {
-            if (! $pt->Birthdate || $pt->Birthdate == '0001-01-01' || $pt->Birthdate == '1880-01-01') {
+            if (empty($pt->Birthdate) || $pt->Birthdate === '0001-01-01' || $pt->Birthdate === '1880-01-01' || $pt->Birthdate < '1850-01-01') {
+                $brackets['Unknown']++;
+                $totalActive++;
+
                 continue;
             }
+
             try {
                 $dob = new \DateTime($pt->Birthdate);
                 $age = $currentDate->diff($dob)->y;
@@ -2090,11 +2095,13 @@ class OperationsAnalyticsService
                 } elseif ($age <= 69) {
                     $brackets['60-69']++;
                 } else {
-                    $brackets['>=70']++;
+                    $brackets['>70']++;
                 }
 
                 $totalActive++;
             } catch (\Exception $e) {
+                $brackets['Unknown']++;
+                $totalActive++;
             }
         }
 
@@ -2169,7 +2176,6 @@ class OperationsAnalyticsService
 
         $totalFee = $data->sum('fee');
         $providers = DB::table('od_providers')->get()->keyBy('ProvNum');
-
         $cats = DB::table('od_definitions')->where('Category', 5)->get()->keyBy('DefNum');
 
         $rows = [];
@@ -2200,40 +2206,20 @@ class OperationsAnalyticsService
     }
 
     /**
-     * Trends tab payload -> Returns 12 trailing months data for Chart.js
+     * Trends tab payload -> Returns 13 trailing months data for Chart.js and comparison table
      */
-    public function trends(string $start, string $end, string $subtab = 'default', array $clinics = [], string $metric = 'production', string $lob = ''): array
+    public function trends(string $start, string $end, string $subtab = 'default', array $clinics = [], string $metric = 'BYO Production', string $lob = ''): array
     {
-        // Offset end by -1 month so we don't include the current month in the 13-month trailing view
-        $end = (new \DateTime($end))->modify('-1 month')->modify('last day of this month')->format('Y-m-d');
-
+        // Include the current month being considered up to its last day
+        $end = (new \DateTime($end))->modify('last day of this month')->format('Y-m-d');
         $currentStart = (new \DateTime($end))->modify('-12 months')->modify('first day of this month')->format('Y-m-d');
-        [$labels, $currentData] = $this->getTrendData($currentStart, $end, $clinics, $metric);
 
-        $spec = [
-            'labels' => $labels,
-            'current' => $currentData,
-            'last' => [],
-        ];
-
-        if ($subtab === 'compare') {
-            $lastEnd = (new \DateTime($end))->modify('-1 year')->format('Y-m-t'); // end of month
-            $lastStart = (new \DateTime($lastEnd))->modify('-12 months')->modify('first day of this month')->format('Y-m-d');
-            [$lastLabels, $lastData] = $this->getTrendData($lastStart, $lastEnd, $clinics, $metric);
-            $spec['last'] = $lastData;
-        }
-
-        // Add dynamic table columns and rows for 13-month trailing trend
-        // Add dynamic table columns and rows for 13-month trailing trend
-        $thirt_start = (new \DateTime($end))->modify('-12 months')->modify('first day of this month')->format('Y-m-d');
-
-        $metricType = $metric === 'visits' ? 'number' : 'money';
-
-        // 13 month buckets for each group (e.g. Clinic)
-        $tDt = new \DateTime($thirt_start);
+        // Setup 13 month buckets
+        $tDt = new \DateTime($currentStart);
         $eDt = new \DateTime($end);
 
-        $months = [];
+        $monthKeys = [];
+        $labels = [];
         $columns = [
             ['key' => 'location', 'label' => 'Location', 'type' => 'text', 'sticky' => true],
         ];
@@ -2242,11 +2228,13 @@ class OperationsAnalyticsService
             $columns[] = ['key' => 'type_label', 'label' => 'Type', 'type' => 'text'];
         }
 
+        $metricType = $this->determineMetricType($metric);
+
         $mIdx = 0;
-        // The table columns use the Current year's month labels
         while ($tDt->format('Y-m') <= $eDt->format('Y-m')) {
             $m = $tDt->format('Y-m');
-            $months[$m] = 'm_'.$mIdx;
+            $monthKeys[] = $m;
+            $labels[] = $tDt->format('M Y');
             $columns[] = ['key' => 'm_'.$mIdx, 'label' => $tDt->format('M Y'), 'type' => $metricType, 'agg' => 'sum'];
             $tDt->modify('+1 month');
             $mIdx++;
@@ -2256,105 +2244,58 @@ class OperationsAnalyticsService
             $columns[] = ['key' => 'diff', 'label' => 'Diff Vs Last Year', 'type' => 'percent', 'agg' => 'avg'];
         }
 
-        // Helper to query tab data
-        $getGroups = function ($startRange, $endRange) use ($metric, $clinics, $mIdx) {
-            $grouped = [];
+        $currData = $this->calculateTrendMetricBuckets($currentStart, $end, $clinics, $metric, $monthKeys);
 
-            $ensureBucket = function ($loc) use (&$grouped, $mIdx) {
-                if (! isset($grouped[$loc])) {
-                    $grouped[$loc] = [];
-                    for ($i = 0; $i < $mIdx; $i++) {
-                        $grouped[$loc]['m_'.$i] = 0;
-                    }
-                }
-            };
+        $spec = [
+            'labels' => $labels,
+            'current' => array_values($currData['totals']),
+            'last' => [],
+        ];
 
-            $addToBucket = function ($loc, $monthStr, $val) use (&$grouped, $startRange, $mIdx, $ensureBucket) {
-                $ensureBucket($loc);
-                $rowDate = new \DateTime($monthStr.'-01');
-                $startDate = new \DateTime(substr($startRange, 0, 7).'-01');
-                $diffMonths = ($rowDate->format('Y') - $startDate->format('Y')) * 12 + ($rowDate->format('m') - $startDate->format('m'));
-                if ($diffMonths >= 0 && $diffMonths < $mIdx) {
-                    $grouped[$loc]['m_'.$diffMonths] += (float) $val;
-                }
-            };
+        $prevMonthKeys = [];
+        $prevData = ['by_clinic' => [], 'totals' => []];
 
-            if ($metric === 'visits') {
-                $qTab = DB::table('od_procedure_logs')
-                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, ".MetricDefinitions::patientVisits('val'))
-                    ->whereIn('ProcStatus', ProcStatus::completed())
-                    ->where('CodeNum', '!=', 626)
-                    ->whereBetween('ProcDate', [$startRange, $endRange]);
-                if ($clinics) {
-                    $qTab->whereIn('ClinicNum', $clinics);
-                }
-                foreach ($qTab->groupBy('ClinicNum', DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $row) {
-                    $addToBucket((int) $row->ClinicNum, $row->month, $row->val);
-                }
-            } else {
-                // Gross Production
-                $qGross = DB::table('od_procedure_logs')
-                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(ProcFee) as val")
-                    ->whereIn('ProcStatus', ProcStatus::completed())
-                    ->whereBetween('ProcDate', [$startRange, $endRange]);
-                if ($clinics) {
-                    $qGross->whereIn('ClinicNum', $clinics);
-                }
-                foreach ($qGross->groupBy('ClinicNum', DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $row) {
-                    $addToBucket((int) $row->ClinicNum, $row->month, $row->val); // Add gross
-                }
+        if ($subtab === 'compare') {
+            $lastEnd = (new \DateTime($end))->modify('-1 year')->format('Y-m-t'); // end of month
+            $lastStart = (new \DateTime($lastEnd))->modify('-12 months')->modify('first day of this month')->format('Y-m-d');
 
-                // Adjustments
-                $qAdj = DB::table('od_adjustments')
-                    ->selectRaw("ClinicNum, DATE_FORMAT(AdjDate, '%Y-%m') as month, SUM(AdjAmt) as val")
-                    ->whereBetween('AdjDate', [$startRange, $endRange]);
-                if ($clinics) {
-                    $qAdj->whereIn('ClinicNum', $clinics);
-                }
-                foreach ($qAdj->groupBy('ClinicNum', DB::raw("DATE_FORMAT(AdjDate, '%Y-%m')"))->get() as $row) {
-                    $addToBucket((int) $row->ClinicNum, $row->month, $row->val);
-                }
-
-                // WriteOffs
-                $qWo = DB::table('od_claim_procs')
-                    ->selectRaw("ClinicNum, DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(WriteOff) as val")
-                    ->whereBetween('ProcDate', [$startRange, $endRange]);
-                if ($clinics) {
-                    $qWo->whereIn('ClinicNum', $clinics);
-                }
-                foreach ($qWo->groupBy('ClinicNum', DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $row) {
-                    $addToBucket((int) $row->ClinicNum, $row->month, $row->val);
-                }
+            $pDt = new \DateTime($lastStart);
+            $peDt = new \DateTime($lastEnd);
+            while ($pDt->format('Y-m') <= $peDt->format('Y-m')) {
+                $prevMonthKeys[] = $pDt->format('Y-m');
+                $pDt->modify('+1 month');
             }
 
-            return $grouped;
-        };
+            $prevData = $this->calculateTrendMetricBuckets($lastStart, $lastEnd, $clinics, $metric, $prevMonthKeys);
+            $spec['last'] = array_values($prevData['totals']);
+        }
 
         $tableRows = [];
 
         if ($subtab === 'compare') {
-            $currGrouped = $getGroups($thirt_start, $end);
-
-            $lastEnd = clone new \DateTime($end);
-            $lastEnd->modify('-1 year');
-            $lastStart = clone new \DateTime($thirt_start);
-            $lastStart->modify('-1 year');
-            $prevGrouped = $getGroups($lastStart->format('Y-m-d'), $lastEnd->format('Y-m-t'));
+            $currGrouped = $currData['by_clinic'];
+            $prevGrouped = $prevData['by_clinic'];
 
             $allLocs = array_unique(array_merge(array_keys($currGrouped), array_keys($prevGrouped)));
+            if (empty($allLocs) && ! empty($clinics)) {
+                $allLocs = $clinics;
+            } elseif (empty($allLocs)) {
+                $allLocs = [1];
+            }
 
             foreach ($allLocs as $loc) {
                 $locName = $this->clinicNames[$loc] ?? ('Location '.$loc);
-                $curr = $currGrouped[$loc] ?? array_fill(0, $mIdx, 0);
-                $prev = $prevGrouped[$loc] ?? array_fill(0, $mIdx, 0);
+                $curr = $currGrouped[$loc] ?? [];
+                $prev = $prevGrouped[$loc] ?? [];
 
-                // Format arrays with proper m_X keys
                 $cVals = [];
                 $pVals = [];
                 $dVals = [];
                 for ($i = 0; $i < $mIdx; $i++) {
-                    $c = $curr['m_'.$i] ?? 0;
-                    $p = $prev['m_'.$i] ?? 0;
+                    $mK = $monthKeys[$i] ?? null;
+                    $pmK = $prevMonthKeys[$i] ?? null;
+                    $c = (float) ($mK ? ($curr[$mK] ?? 0) : 0);
+                    $p = (float) ($pmK ? ($prev[$pmK] ?? 0) : 0);
                     $cVals['m_'.$i] = $c;
                     $pVals['m_'.$i] = $p;
                     $dVals['m_'.$i] = $c - $p;
@@ -2381,17 +2322,26 @@ class OperationsAnalyticsService
 
         } else {
             // Default subtab
-            $currGrouped = $getGroups($thirt_start, $end);
+            $currGrouped = $currData['by_clinic'];
+            if (empty($currGrouped) && ! empty($clinics)) {
+                foreach ($clinics as $c) {
+                    $currGrouped[$c] = [];
+                }
+            } elseif (empty($currGrouped)) {
+                $currGrouped[1] = [];
+            }
+
             foreach ($currGrouped as $loc => $vals) {
                 $r = [
                     'row_key' => 'loc_'.$loc,
                     'location' => $this->clinicNames[$loc] ?? ('Location '.$loc),
                 ];
-                foreach ($vals as $k => $v) {
-                    $r[$k] = $v;
+                for ($i = 0; $i < $mIdx; $i++) {
+                    $mK = $monthKeys[$i] ?? null;
+                    $r['m_'.$i] = (float) ($mK ? ($vals[$mK] ?? 0) : 0);
                 }
-                $lastYearVal = $vals['m_0'];
-                $currVal = $vals['m_'.($mIdx - 1)];
+                $lastYearVal = $r['m_0'];
+                $currVal = $r['m_'.($mIdx - 1)];
 
                 if ($lastYearVal > 0) {
                     $r['diff'] = round((($currVal - $lastYearVal) / $lastYearVal) * 100, 2);
@@ -2407,17 +2357,9 @@ class OperationsAnalyticsService
         $spec['rows'] = $tableRows;
 
         if ($subtab === 'compare') {
-            // Because there are 3 distinct row types per location block, "Total:" footer needs 3 rows too!
-            // However, table.blade.php handles 'total' organically if we pass a single array.
-            // The mockup shows Total: Current, Previous, Difference in footer.
-            // Since `table.blade.php` natively only builds ONE total row, the easiest way to mimic it without rewriting table.blade.php
-            // is to rely on table.blade.php doing `aggregate` for totals. But wait, `aggregate` will sum ALL rows!
-            // We can't sum Current + Previous + Difference together!
-            // We need custom Totals just for compare!
-
-            $cTot = [];
-            $pTot = [];
-            $dTot = [];
+            $cTot = ['location' => 'Total:', 'type_label' => 'Current'];
+            $pTot = ['location' => '', 'type_label' => 'Previous'];
+            $dTot = ['location' => '', 'type_label' => 'Difference'];
             for ($i = 0; $i < $mIdx; $i++) {
                 $cTot['m_'.$i] = 0;
                 $pTot['m_'.$i] = 0;
@@ -2453,80 +2395,342 @@ class OperationsAnalyticsService
         return $spec;
     }
 
-    private function getTrendData(string $start, string $end, array $clinics, string $metric): array
+    /**
+     * Computes the monthly trend data per clinic and total for any selected metric.
+     *
+     * @param  string[]  $monthKeys  List of 'YYYY-MM' strings for the 13 buckets
+     * @return array{by_clinic: array<int, array<string, float>>, totals: array<string, float>}
+     */
+    private function calculateTrendMetricBuckets(string $start, string $end, array $clinics, string $metric, array $monthKeys): array
     {
-        // Setup 12 month buckets
-        $startDt = new \DateTime($start);
-        $endDt = new \DateTime($end);
-
-        $buckets = [];
-        $labels = [];
-
-        $curr = clone $startDt;
-        while ($curr->format('Y-m') <= $endDt->format('Y-m')) {
-            $m = $curr->format('Y-m');
-            $buckets[$m] = 0;
-            $labels[] = $curr->format('M Y'); // e.g. Jul 2026
-            $curr->modify('+1 month');
+        $byClinic = [];
+        $totals = [];
+        foreach ($monthKeys as $mKey) {
+            $totals[$mKey] = 0.0;
         }
 
-        if ($metric === 'visits') {
-            $qTab = DB::table('od_procedure_logs')
-                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, ".MetricDefinitions::patientVisits('val'))
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->where('CodeNum', '!=', 626)
-                ->whereBetween('ProcDate', [$start, $end]);
-            if ($clinics) {
-                $qTab->whereIn('ClinicNum', $clinics);
-            }
-            foreach ($qTab->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $res) {
-                if (isset($buckets[$res->month])) {
-                    $buckets[$res->month] += (float) $res->val;
+        $initClinic = function ($loc) use (&$byClinic, $monthKeys) {
+            if (! isset($byClinic[$loc])) {
+                $byClinic[$loc] = [];
+                foreach ($monthKeys as $mKey) {
+                    $byClinic[$loc][$mKey] = 0.0;
                 }
             }
-        } else {
-            // Gross
-            $qGross = DB::table('od_procedure_logs')
-                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(ProcFee) as val")
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->whereBetween('ProcDate', [$start, $end]);
-            if ($clinics) {
-                $qGross->whereIn('ClinicNum', $clinics);
+        };
+
+        $addVal = function ($loc, $mKey, $val) use (&$byClinic, &$totals, $initClinic) {
+            if (isset($totals[$mKey])) {
+                $initClinic($loc);
+                $byClinic[$loc][$mKey] += (float) $val;
+                $totals[$mKey] += (float) $val;
             }
-            foreach ($qGross->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $res) {
-                if (isset($buckets[$res->month])) {
-                    $buckets[$res->month] += (float) $res->val;
+        };
+
+        $mProcDate = $this->dateMonthExpr('pl.ProcDate');
+        $mDatePay = $this->dateMonthExpr('ps.DatePay');
+        $mAdjDate = $this->dateMonthExpr('adj.AdjDate');
+        $mAptDate = $this->dateMonthExpr('apt.AptDateTime');
+
+        $docProvs = DB::table('od_providers')
+            ->where('Specialty', '!=', 8)
+            ->whereIn('IsSecondary', ['false', '0', 0, false])
+            ->pluck('ProvNum')->toArray();
+
+        $hygProvs = DB::table('od_providers')
+            ->where(function ($q) {
+                $q->where('Specialty', 8)
+                    ->orWhereIn('IsSecondary', ['true', '1', 1, true]);
+            })
+            ->pluck('ProvNum')->toArray();
+
+        $metricNorm = trim($metric);
+
+        // 1. Pending Treatment ($ in Pen. Tx)
+        if ($metricNorm === 'BYO $ in Pen. Tx') {
+            $q = DB::table('od_procedure_logs as pl')
+                ->selectRaw("pl.ClinicNum, {$mProcDate} as month, SUM(pl.ProcFee) as val")
+                ->whereIn('pl.ProcStatus', ['TP', '1', 1])
+                ->whereBetween('pl.ProcDate', [$start, $end]);
+            if ($clinics) {
+                $q->whereIn('pl.ClinicNum', $clinics);
+            }
+            foreach ($q->groupBy('pl.ClinicNum', DB::raw($mProcDate))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // 2. Doctor Production
+        if ($metricNorm === 'BYO Doc Production' || str_contains(strtolower($metricNorm), 'doc prod') || str_contains(strtolower($metricNorm), 'prod per doc')) {
+            $q = DB::table('od_procedure_logs as pl')
+                ->selectRaw("pl.ClinicNum, {$mProcDate} as month, SUM(pl.ProcFee) as val")
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereIn('pl.ProvNum', $docProvs)
+                ->whereBetween('pl.ProcDate', [$start, $end]);
+            if ($clinics) {
+                $q->whereIn('pl.ClinicNum', $clinics);
+            }
+            foreach ($q->groupBy('pl.ClinicNum', DB::raw($mProcDate))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // 3. Hygiene Production
+        if ($metricNorm === 'BYO Hyg Production' || str_contains(strtolower($metricNorm), 'hyg prod') || str_contains(strtolower($metricNorm), 'prod per hyg')) {
+            $q = DB::table('od_procedure_logs as pl')
+                ->selectRaw("pl.ClinicNum, {$mProcDate} as month, SUM(pl.ProcFee) as val")
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereIn('pl.ProvNum', $hygProvs)
+                ->whereBetween('pl.ProcDate', [$start, $end]);
+            if ($clinics) {
+                $q->whereIn('pl.ClinicNum', $clinics);
+            }
+            foreach ($q->groupBy('pl.ClinicNum', DB::raw($mProcDate))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // 4. Doctor Collection
+        if ($metricNorm === 'BYO Doc Collection' || str_contains(strtolower($metricNorm), 'doc coll') || str_contains(strtolower($metricNorm), 'coll per doc')) {
+            $q = DB::table('od_pay_splits as ps')
+                ->selectRaw("ps.ClinicNum, {$mDatePay} as month, SUM(ps.SplitAmt) as val")
+                ->whereIn('ps.ProvNum', $docProvs)
+                ->whereBetween('ps.DatePay', [$start, $end]);
+            if ($clinics) {
+                $q->whereIn('ps.ClinicNum', $clinics);
+            }
+            foreach ($q->groupBy('ps.ClinicNum', DB::raw($mDatePay))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // 5. Hygiene Collection
+        if ($metricNorm === 'BYO Hyg Collection' || str_contains(strtolower($metricNorm), 'hyg coll') || str_contains(strtolower($metricNorm), 'coll per hyg')) {
+            $q = DB::table('od_pay_splits as ps')
+                ->selectRaw("ps.ClinicNum, {$mDatePay} as month, SUM(ps.SplitAmt) as val")
+                ->whereIn('ps.ProvNum', $hygProvs)
+                ->whereBetween('ps.DatePay', [$start, $end]);
+            if ($clinics) {
+                $q->whereIn('ps.ClinicNum', $clinics);
+            }
+            foreach ($q->groupBy('ps.ClinicNum', DB::raw($mDatePay))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // 6. Appointments Count (BYO Pts Appointment)
+        if ($metricNorm === 'BYO Pts Appointment' || str_contains(strtolower($metricNorm), 'appts') || str_contains(strtolower($metricNorm), 'appointment')) {
+            $q = DB::table('od_appointments as apt')
+                ->selectRaw("apt.ClinicNum, {$mAptDate} as month, COUNT(*) as val")
+                ->where('apt.AptStatus', '!=', 6) // Exclude deleted
+                ->whereBetween('apt.AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
+            if ($clinics) {
+                $q->whereIn('apt.ClinicNum', $clinics);
+            }
+            foreach ($q->groupBy('apt.ClinicNum', DB::raw($mAptDate))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // 7. Cancellation Rate / No Show Rate
+        if (str_contains(strtolower($metricNorm), 'no show') || str_contains(strtolower($metricNorm), 'cancellation')) {
+            $q = DB::table('od_appointments as apt')
+                ->selectRaw("apt.ClinicNum, {$mAptDate} as month, COUNT(*) as total_cnt, SUM(CASE WHEN apt.AptStatus IN (5, 6) THEN 1 ELSE 0 END) as broken_cnt")
+                ->whereBetween('apt.AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
+            if ($clinics) {
+                $q->whereIn('apt.ClinicNum', $clinics);
+            }
+            foreach ($q->groupBy('apt.ClinicNum', DB::raw($mAptDate))->get() as $r) {
+                $rate = $r->total_cnt > 0 ? round(($r->broken_cnt / $r->total_cnt) * 100, 2) : 0;
+                $addVal((int) $r->ClinicNum, $r->month, $rate);
+            }
+
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // 8. New Patients Visits
+        if (str_contains(strtolower($metricNorm), 'npts') || str_contains(strtolower($metricNorm), 'new patients') || str_contains(strtolower($metricNorm), 'new pts')) {
+            $firstProcSub = DB::table('od_procedure_logs')
+                ->select('PatNum', DB::raw('MIN(ProcDate) as first_date'))
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->groupBy('PatNum');
+
+            $q = DB::table('od_procedure_logs as pl')
+                ->joinSub($firstProcSub, 'fp', 'pl.PatNum', '=', 'fp.PatNum')
+                ->selectRaw("pl.ClinicNum, {$mProcDate} as month, COUNT(DISTINCT pl.PatNum) as val")
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereRaw('DATE(pl.ProcDate) = DATE(fp.first_date)')
+                ->whereBetween('pl.ProcDate', [$start, $end]);
+            if ($clinics) {
+                $q->whereIn('pl.ClinicNum', $clinics);
+            }
+            foreach ($q->groupBy('pl.ClinicNum', DB::raw($mProcDate))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // 9. Active Patients Count (last 24 months trailing)
+        if (str_contains(strtolower($metricNorm), 'active pts')) {
+            foreach ($monthKeys as $mKey) {
+                $mEnd = (new \DateTime($mKey.'-01'))->modify('last day of this month')->format('Y-m-d');
+                $mStart24 = (new \DateTime($mEnd))->modify('-24 months')->format('Y-m-d');
+
+                $q = DB::table('od_procedure_logs as pl')
+                    ->select('pl.ClinicNum', DB::raw('COUNT(DISTINCT pl.PatNum) as val'))
+                    ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                    ->whereBetween('pl.ProcDate', [$mStart24.' 00:00:00', $mEnd.' 23:59:59']);
+                if ($clinics) {
+                    $q->whereIn('pl.ClinicNum', $clinics);
+                }
+                foreach ($q->groupBy('pl.ClinicNum')->get() as $r) {
+                    $addVal((int) $r->ClinicNum, $mKey, $r->val);
                 }
             }
 
-            // Adjustments
-            $qAdj = DB::table('od_adjustments')
-                ->selectRaw("DATE_FORMAT(AdjDate, '%Y-%m') as month, SUM(AdjAmt) as val")
-                ->whereBetween('AdjDate', [$start, $end]);
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // 10. Specific Clinical Codes (Exams, FMX, Sealants, SRP, Perio, Whitening)
+        $codeFilter = null;
+        if (str_contains(strtolower($metricNorm), 'comprehensive exam')) {
+            $codeFilter = ['D0150'];
+        } elseif (str_contains(strtolower($metricNorm), 'periodic exam')) {
+            $codeFilter = ['D0120'];
+        } elseif (str_contains(strtolower($metricNorm), 'limited exam')) {
+            $codeFilter = ['D0140'];
+        } elseif (str_contains(strtolower($metricNorm), 'fmx')) {
+            $codeFilter = ['D0210', 'D0330'];
+        } elseif (str_contains(strtolower($metricNorm), 'sealant')) {
+            $codeFilter = ['D1351'];
+        } elseif (str_contains(strtolower($metricNorm), 'srp')) {
+            $codeFilter = ['D4341', 'D4342'];
+        } elseif (str_contains(strtolower($metricNorm), 'varnish')) {
+            $codeFilter = ['D1206'];
+        } elseif (str_contains(strtolower($metricNorm), 'whitening')) {
+            $codeFilter = ['D9972', 'D9975'];
+        } elseif (str_contains(strtolower($metricNorm), 'periochip')) {
+            $codeFilter = ['D4381'];
+        } elseif (str_contains(strtolower($metricNorm), 'perio app')) {
+            $codeFilter = ['D4910', 'D4341', 'D4342', 'D4346', 'D4355'];
+        }
+
+        if ($codeFilter) {
+            $q = DB::table('od_procedure_logs as pl')
+                ->join('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
+                ->selectRaw("pl.ClinicNum, {$mProcDate} as month, COUNT(*) as val")
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereIn('pc.ProcCode', $codeFilter)
+                ->whereBetween('pl.ProcDate', [$start, $end]);
             if ($clinics) {
-                $qAdj->whereIn('ClinicNum', $clinics);
+                $q->whereIn('pl.ClinicNum', $clinics);
             }
-            foreach ($qAdj->groupBy(DB::raw("DATE_FORMAT(AdjDate, '%Y-%m')"))->get() as $res) {
-                if (isset($buckets[$res->month])) {
-                    $buckets[$res->month] += (float) $res->val;
-                }
+            foreach ($q->groupBy('pl.ClinicNum', DB::raw($mProcDate))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
             }
 
-            // WriteOffs
-            $qWo = DB::table('od_claim_procs')
-                ->selectRaw("DATE_FORMAT(ProcDate, '%Y-%m') as month, SUM(WriteOff) as val")
-                ->whereBetween('ProcDate', [$start, $end]);
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // 11. Patient Visits
+        if (str_contains(strtolower($metricNorm), 'visit') || str_contains(strtolower($metricNorm), 'pts visits')) {
+            $q = DB::table('od_procedure_logs as pl')
+                ->selectRaw("pl.ClinicNum, {$mProcDate} as month, ".MetricDefinitions::patientVisits('val'))
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->where('pl.CodeNum', '!=', 626)
+                ->whereBetween('pl.ProcDate', [$start, $end]);
             if ($clinics) {
-                $qWo->whereIn('ClinicNum', $clinics);
+                $q->whereIn('pl.ClinicNum', $clinics);
             }
-            foreach ($qWo->groupBy(DB::raw("DATE_FORMAT(ProcDate, '%Y-%m')"))->get() as $res) {
-                if (isset($buckets[$res->month])) {
-                    $buckets[$res->month] += (float) $res->val;
-                }
+            foreach ($q->groupBy('pl.ClinicNum', DB::raw($mProcDate))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // 12. Collections
+        if (str_contains(strtolower($metricNorm), 'collection') || str_contains(strtolower($metricNorm), 'coll')) {
+            $q = DB::table('od_pay_splits as ps')
+                ->selectRaw("ps.ClinicNum, {$mDatePay} as month, SUM(ps.SplitAmt) as val")
+                ->whereBetween('ps.DatePay', [$start, $end]);
+            if ($clinics) {
+                $q->whereIn('ps.ClinicNum', $clinics);
+            }
+            foreach ($q->groupBy('ps.ClinicNum', DB::raw($mDatePay))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
+        // Default: Net Production (Gross + Adjustments + WriteOffs)
+        $qGross = DB::table('od_procedure_logs as pl')
+            ->selectRaw("pl.ClinicNum, {$mProcDate} as month, SUM(pl.ProcFee) as val")
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereBetween('pl.ProcDate', [$start, $end]);
+        if ($clinics) {
+            $qGross->whereIn('pl.ClinicNum', $clinics);
+        }
+        foreach ($qGross->groupBy('pl.ClinicNum', DB::raw($mProcDate))->get() as $r) {
+            $addVal((int) $r->ClinicNum, $r->month, $r->val);
+        }
+
+        $qAdj = DB::table('od_adjustments as adj')
+            ->selectRaw("adj.ClinicNum, {$mAdjDate} as month, SUM(adj.AdjAmt) as val")
+            ->whereBetween('adj.AdjDate', [$start, $end]);
+        if ($clinics) {
+            $qAdj->whereIn('adj.ClinicNum', $clinics);
+        }
+        foreach ($qAdj->groupBy('adj.ClinicNum', DB::raw($mAdjDate))->get() as $r) {
+            $addVal((int) $r->ClinicNum, $r->month, $r->val);
+        }
+
+        $qWo = DB::table('od_claim_procs as pl')
+            ->selectRaw("pl.ClinicNum, {$mProcDate} as month, SUM(pl.WriteOff) as val")
+            ->whereBetween('pl.ProcDate', [$start, $end]);
+        if ($clinics) {
+            $qWo->whereIn('pl.ClinicNum', $clinics);
+        }
+        foreach ($qWo->groupBy('pl.ClinicNum', DB::raw($mProcDate))->get() as $r) {
+            $addVal((int) $r->ClinicNum, $r->month, $r->val);
+        }
+
+        return ['by_clinic' => $byClinic, 'totals' => $totals];
+    }
+
+    private function determineMetricType(string $metric): string
+    {
+        $m = strtolower($metric);
+        if (str_contains($m, 'rate') || str_contains($m, 'percent') || str_contains($m, '%')) {
+            return 'percent';
+        }
+        if (str_contains($m, 'visit') || str_contains($m, 'count') || str_contains($m, 'appts') || str_contains($m, 'appointment') || str_contains($m, 'procedures') || str_contains($m, 'sealants') || str_contains($m, 'exam') || str_contains($m, 'placements') || str_contains($m, 'aid') || str_contains($m, 'retention') || str_contains($m, 'pts')) {
+            if (! str_contains($m, 'prod') && ! str_contains($m, 'coll') && ! str_contains($m, '$')) {
+                return 'number';
             }
         }
 
-        return [$labels, array_values($buckets)];
+        return 'money';
+    }
+
+    private function dateMonthExpr(string $field): string
+    {
+        return DB::getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', {$field})"
+            : "DATE_FORMAT({$field}, '%Y-%m')";
     }
 
     public function claims(string $start, string $end, string $subtab = 'default', array $clinics = []): array

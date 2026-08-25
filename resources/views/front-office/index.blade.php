@@ -61,6 +61,12 @@
     <div id="foContentContainer">
         @if(($activeTab ?? 'schedule') === 'tasks')
             @include('front-office.partials.tasks')
+        @elseif(($activeTab ?? '') === 'collections')
+            @include('front-office.partials.collections')
+        @elseif(($activeTab ?? '') === 'kpis')
+            @include('front-office.partials.kpis')
+        @elseif(($activeTab ?? '') === 'performance')
+            @include('front-office.partials.performance')
         @else
             @include('front-office.partials.schedule')
         @endif

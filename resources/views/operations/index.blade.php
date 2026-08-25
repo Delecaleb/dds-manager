@@ -17,6 +17,120 @@
                         class="appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 font-bold text-slate-700 shadow-sm focus:outline-none focus:border-[#00bfa5] h-[34px] min-w-[150px]">
                 </div>
 
+                {{-- Trends Metric Filter (shown only on Trends tab) --}}
+                <div id="opsTrendsMetricWrapper" class="{{ $activeTab === 'trends' ? '' : 'hidden' }} relative min-w-[260px]">
+                    <div id="opsTrendsDropdown" class="relative">
+                        <button type="button" id="opsTrendsDropdownBtn"
+                            class="w-full flex items-center justify-between bg-white border border-slate-300 rounded px-3 py-1.5 font-medium text-slate-700 shadow-sm text-left text-[13px] hover:border-slate-400 focus:outline-none focus:border-[#00bfa5]">
+                            <span id="opsTrendsSelectedLabel" class="truncate">By Office - Production</span>
+                            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 shrink-0 ml-2"></i>
+                        </button>
+
+                        <div id="opsTrendsDropdownMenu"
+                            class="hidden absolute left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg z-50 max-h-[300px] flex flex-col">
+                            <div class="p-2 border-b border-slate-100 bg-slate-50">
+                                <input type="text" id="opsTrendsSearch" placeholder="Search metrics..."
+                                    class="w-full px-2.5 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:border-[#00bfa5] bg-white">
+                            </div>
+                            <ul id="opsTrendsOptionsList" class="overflow-y-auto py-1 text-xs text-slate-700 max-h-[240px]">
+                                @php
+                                    $trendsOptions = [
+                                        'BYO Active Pts',
+                                        'BYO Active Pts Count',
+                                        'BYO Avg # of Tx Plans Presented',
+                                        'BYO Close Percent',
+                                        'BYO Collection',
+                                        'BYO Co Pay Coll',
+                                        'BYO Doc Collection',
+                                        'BYO Doc Production',
+                                        'BYO $ in Pen. Tx',
+                                        'BYO Hyg Collection',
+                                        'BYO Hyg Production',
+                                        'BYO Npts Visits',
+                                        'BYO No Show Rate',
+                                        'BYO Number of Treatment Plans Presented',
+                                        'BYO Pts Appointment',
+                                        'BYO Patient Retention',
+                                        'BYO Pts Visits',
+                                        'BYO Production',
+                                        'Cancellation Rate',
+                                        'Coll per Doc',
+                                        'Coll per Hyg',
+                                        'Collection VS production $',
+                                        'Collection VS production %',
+                                        'DOC Avg Treatment Plan Existing',
+                                        'DOC Avg Treatment Plan New Patients',
+                                        'DOC Avg. Treatment plan ($) per Existing Pts',
+                                        'DOC Avg. Treatment plan ($) per New Pts',
+                                        'DOC Comprehensive Exam',
+                                        'DOC Limited Exam',
+                                        'DOC Pts Visits',
+                                        'DOC Periodic Exam',
+                                        'DOC Production Per Exam',
+                                        'HYG Adjunctive Aid',
+                                        'HYG Avg FMX',
+                                        'HYG Avg Production Per Day',
+                                        'HYG Avg Production Per Patient',
+                                        'HYG Avg Production Per Procedure',
+                                        'HYG Avg Production Per Provider',
+                                        'HYG Avg SRP Per Day',
+                                        'HYG Pts Visits',
+                                        'HYG Perio Appointments',
+                                        'HYG % Perio to Prophy',
+                                        'HYG Periochip Placements',
+                                        'HYG Production Per Exam',
+                                        'HYG Reappointment Rate',
+                                        'HYG Ret. (Adult - past 12 months)',
+                                        'HYG Ret. (Adult - past 6 months)',
+                                        'HYG Ret. (Child - past 12 months)',
+                                        'HYG Ret. (Child - past 6 months)',
+                                        'HYG Sealants',
+                                        'HYG Varnish Applications Per Day',
+                                        'HYG Whitening Procedure',
+                                        'Medicaid Percentage',
+                                        'OS Collection',
+                                        'ORT Active Pts Count',
+                                        'ORT Active Pts %',
+                                        'ORT Avg. # of Tx Plans Presented',
+                                        'ORT Collection',
+                                        'ORT Npts Visits',
+                                        'ORT No Show Rate',
+                                        'ORT Pts Appts',
+                                        'ORT Patient Retention',
+                                        'ORT Pts Visits',
+                                        'ORT Production',
+                                        'ORT U Pts Visits/day',
+                                        'ORT U Pts Visits/mo',
+                                        'PPV Collection',
+                                        'PPV Procedures',
+                                        'PPV Production',
+                                        'PP Collection',
+                                        'PP Production',
+                                        'PWD Collection',
+                                        'PWD Npts Visits',
+                                        'PWD Pts Visits',
+                                        'PWD Production',
+                                        'Perio Collection',
+                                        'Prod per Doc',
+                                        'Prod per Hyg',
+                                        'Prov Prod Exam Codes',
+                                    ];
+                                @endphp
+                                @foreach ($trendsOptions as $opt)
+                                    @php
+                                        $label = $opt === 'BYO Production' ? 'By Office - Production' : $opt;
+                                    @endphp
+                                    <li class="ops-trends-option px-3 py-1.5 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer flex items-center justify-between {{ $opt === 'BYO Production' ? 'bg-emerald-50/60 font-bold text-emerald-700' : '' }}"
+                                        data-value="{{ $opt }}" data-label="{{ $label }}">
+                                        <span>{{ $label }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        <input type="hidden" id="opsTrendsMetric" value="BYO Production">
+                    </div>
+                </div>
+
                 <div class="relative min-w-[140px]">
                     <select id="opsLocation"
                         class="w-full appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 font-medium text-slate-700 pr-8 shadow-sm focus:outline-none">
@@ -79,6 +193,7 @@
 
             function dateParams() {
                 const isClaims = current.tab === 'claims';
+                const isTrends = current.tab === 'trends';
                 const clinic = document.getElementById('opsLocation')?.value ?? '';
                 const params = new URLSearchParams();
 
@@ -101,6 +216,15 @@
                 }
 
                 if (clinic !== '') params.set('clinics', clinic);
+
+                const lob = document.getElementById('opsLineOfBusiness')?.value ?? '';
+                if (lob) params.set('lob', lob);
+
+                if (isTrends) {
+                    const metric = document.getElementById('opsTrendsMetric')?.value ?? '';
+                    if (metric) params.set('metric', metric);
+                }
+
                 return params;
             }
 
@@ -126,8 +250,10 @@
                 setActiveTab(tab);
 
                 const isClaims = tab === 'claims';
+                const isTrends = tab === 'trends';
                 document.getElementById('opsDateRangeWrapper').classList.toggle('hidden', isClaims);
                 document.getElementById('opsMonthPickerWrapper').classList.toggle('hidden', !isClaims);
+                document.getElementById('opsTrendsMetricWrapper')?.classList.toggle('hidden', !isTrends);
 
                 content.innerHTML =
                     '<div class="flex items-center justify-center py-20 text-slate-400 text-sm gap-2">' +
@@ -209,6 +335,59 @@
                 a.click();
             }
 
+            // Trends Metric dropdown handling
+            const trendsDropdownBtn = document.getElementById('opsTrendsDropdownBtn');
+            const trendsDropdownMenu = document.getElementById('opsTrendsDropdownMenu');
+            const trendsSearchInput = document.getElementById('opsTrendsSearch');
+            const trendsSelectedLabel = document.getElementById('opsTrendsSelectedLabel');
+            const trendsHiddenInput = document.getElementById('opsTrendsMetric');
+
+            if (trendsDropdownBtn && trendsDropdownMenu) {
+                trendsDropdownBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    trendsDropdownMenu.classList.toggle('hidden');
+                    if (!trendsDropdownMenu.classList.contains('hidden')) {
+                        if (trendsSearchInput) {
+                            trendsSearchInput.value = '';
+                            document.querySelectorAll('.ops-trends-option').forEach(opt => opt.style.display = '');
+                            trendsSearchInput.focus();
+                        }
+                    }
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!e.target.closest('#opsTrendsDropdown')) {
+                        trendsDropdownMenu.classList.add('hidden');
+                    }
+                });
+
+                trendsSearchInput?.addEventListener('input', (e) => {
+                    const query = e.target.value.toLowerCase();
+                    document.querySelectorAll('.ops-trends-option').forEach(opt => {
+                        const txt = opt.textContent.toLowerCase();
+                        opt.style.display = txt.includes(query) ? '' : 'none';
+                    });
+                });
+
+                document.querySelectorAll('.ops-trends-option').forEach(opt => {
+                    opt.addEventListener('click', () => {
+                        const val = opt.dataset.value;
+                        const lbl = opt.dataset.label;
+                        if (trendsHiddenInput) trendsHiddenInput.value = val;
+                        if (trendsSelectedLabel) trendsSelectedLabel.textContent = lbl;
+                        document.querySelectorAll('.ops-trends-option').forEach(o => {
+                            o.classList.remove('bg-emerald-50/60', 'font-bold', 'text-emerald-700');
+                        });
+                        opt.classList.add('bg-emerald-50/60', 'font-bold', 'text-emerald-700');
+                        trendsDropdownMenu.classList.add('hidden');
+
+                        if (current.tab === 'trends') {
+                            loadTab('trends', current.subtab, false, current.extra);
+                        }
+                    });
+                });
+            }
+
             // Filters re-fetch the current tab, preserving any grouping state
             window.opsDateApplied = () => loadTab(current.tab, current.subtab, false, current.extra);
             document.getElementById('opsUpdateBtn').addEventListener('click',
@@ -216,6 +395,8 @@
             document.getElementById('opsLocation').addEventListener('change',
                 () => loadTab(current.tab, current.subtab, false, current.extra));
             document.getElementById('opsMonthPicker').addEventListener('change',
+                () => loadTab(current.tab, current.subtab, false, current.extra));
+            document.getElementById('opsLineOfBusiness').addEventListener('change',
                 () => loadTab(current.tab, current.subtab, false, current.extra));
 
             // Browser back/forward

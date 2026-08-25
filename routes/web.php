@@ -60,6 +60,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('module:patients')->group(function () {
         Route::get('patients', [PatientController::class, 'index'])->name('patients.index');
         Route::get('patients/data', [PatientController::class, 'data'])->name('patients.data');
+        Route::get('patients/export-data', [PatientController::class, 'exportData'])->name('patients.export-data');
+        Route::get('patients/export-download', [PatientController::class, 'exportDownload'])->name('patients.export-download');
         Route::get('patients/{id}', [PatientController::class, 'show'])->name('patients.show');
         Route::get('patients/{id}/treatment-plans', [PatientController::class, 'showTreatment']);
         Route::get('patients/{id}/ar', [PatientController::class, 'showArLive']);

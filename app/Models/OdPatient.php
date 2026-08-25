@@ -38,6 +38,8 @@ class OdPatient extends Model
         'LName',
         'Email',
         'Birthdate',
+        'SecDateEntry',
+        'DateFirstVisit',
         'MiddleI',
         'Preferred',
         'PatStatus',
