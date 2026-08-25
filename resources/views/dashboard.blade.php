@@ -60,15 +60,7 @@
 
     <!-- Right: status + user -->
     <div class="flex items-center gap-4">
-      <div
-        class="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded border border-emerald-200 flex items-center gap-1.5">
-        <i data-lucide="check-circle" class="w-3 h-3"></i> Open Dental Inbound Match 100%
-      </div>
-      <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
-        <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">JA
-        </div>
-        <span class="text-sm font-medium text-slate-700 hidden md:inline">Admin Controller</span>
-      </div>
+      
     </div>
   </header>
 

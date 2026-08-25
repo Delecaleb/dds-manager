@@ -209,6 +209,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('module:hygiene-recall')->group(function () {
         Route::get('hygiene-recall', [HygieneRecallController::class, 'index'])->name('hygiene-recall.index');
         Route::get('hygiene-recall/data', [HygieneRecallController::class, 'data'])->name('hygiene-recall.data');
+        Route::get('hygiene-recall/drilldown', [HygieneRecallController::class, 'drilldown'])->name('hygiene-recall.drilldown');
+        Route::get('hygiene-recall/export', [HygieneRecallController::class, 'exportCsv'])->name('hygiene-recall.export');
     });
 
     // Open Dental Explorer Module
