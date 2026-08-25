@@ -25,7 +25,7 @@ class PatientExportTest extends TestCase
         $user = User::factory()->create();
 
         // Patient 1 added in August 2026
-        $p1 = new OdPatient([
+        $p1 = OdPatient::create([
             'office_id' => 1,
             'PatNum' => 5001,
             'FName' => 'Sarah',
@@ -36,14 +36,12 @@ class PatientExportTest extends TestCase
             'City' => 'Los Angeles',
             'State' => 'CA',
             'Zip' => '90001',
+            'SecDateEntry' => '2026-08-10',
             'PatStatus' => 0,
         ]);
-        $p1->timestamps = false;
-        $p1->created_at = '2026-08-10 10:00:00';
-        $p1->save();
 
         // Patient 2 added in January 2026
-        $p2 = new OdPatient([
+        $p2 = OdPatient::create([
             'office_id' => 1,
             'PatNum' => 5002,
             'FName' => 'John',
@@ -54,11 +52,9 @@ class PatientExportTest extends TestCase
             'City' => 'Los Angeles',
             'State' => 'CA',
             'Zip' => '90002',
+            'SecDateEntry' => '2026-01-15',
             'PatStatus' => 0,
         ]);
-        $p2->timestamps = false;
-        $p2->created_at = '2026-01-15 10:00:00';
-        $p2->save();
 
         // Query with Date Range for August 2026
         $response = $this->actingAs($user)->getJson(route('patients.export-data', [
@@ -91,7 +87,7 @@ class PatientExportTest extends TestCase
             'City' => 'Skynet City',
             'State' => 'NV',
             'Zip' => '89001',
-            'created_at' => '2026-08-12 10:00:00',
+            'SecDateEntry' => '2026-08-12',
             'PatStatus' => 0,
         ]);
 
@@ -121,7 +117,7 @@ class PatientExportTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $p4 = new OdPatient([
+        $p4 = OdPatient::create([
             'office_id' => 1,
             'PatNum' => 5004,
             'FName' => 'Ellen',
@@ -132,11 +128,9 @@ class PatientExportTest extends TestCase
             'City' => 'Space Station',
             'State' => 'OR',
             'Zip' => '97001',
+            'SecDateEntry' => '2026-08-20',
             'PatStatus' => 0,
         ]);
-        $p4->timestamps = false;
-        $p4->created_at = '2026-08-20 10:00:00';
-        $p4->save();
 
         $response = $this->actingAs($user)->get(route('patients.export-download', [
             'date_mode' => 'custom',
