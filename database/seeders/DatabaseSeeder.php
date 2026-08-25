@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
     {
         // 1. Create or update Default Super Admin
         $superAdmin = User::updateOrCreate(
-            ['email' => 'admin@dds-manager.local'],
+            ['email' => 'admin@dds-manager.com'],
             [
                 'name' => 'Super Administrator',
                 'password' => Hash::make('password'),
@@ -30,7 +30,7 @@ class DatabaseSeeder extends Seeder
 
         // 2. Create or update a Front Desk / Staff user with basic workflow module access
         $staffUser = User::updateOrCreate(
-            ['email' => 'staff@dds-manager.local'],
+            ['email' => 'staff@dds-manager.com'],
             [
                 'name' => 'Front Desk Staff',
                 'password' => Hash::make('password'),
@@ -51,7 +51,7 @@ class DatabaseSeeder extends Seeder
 
         // 3. Create or update a Doctor / Provider user with clinical module access
         $doctorUser = User::updateOrCreate(
-            ['email' => 'doctor@dds-manager.local'],
+            ['email' => 'doctor@dds-manager.com'],
             [
                 'name' => 'Dr. Alex Mercer',
                 'password' => Hash::make('password'),
