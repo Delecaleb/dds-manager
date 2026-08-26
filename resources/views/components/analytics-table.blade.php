@@ -122,7 +122,7 @@
                     }
                 @endphp
                 <tr class="bg-gray-50">
-                    <th colspan="{{ $leadSpan }}" class="{{ $thBase }} bg-gray-200 border-r-[6px] border-white"></th>
+                    <th colspan="{{ $leadSpan }}" class="{{ $thBase }} bg-gray-200 border-r-[6px] border-white dds-stick dds-stick-shadow" style="min-width: 12rem; z-index: 40;"></th>
                     @foreach ($groups as $group)
                         <th colspan="{{ $group['span'] }}"
                             class="{{ $thBase }} bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white">
@@ -146,7 +146,7 @@
                                {{ ($col['type'] ?? 'text') === 'text' ? 'text-left' : 'text-right' }}
                                {{ $stickyClass($loop->index) }}
                                {{ $col['class'] ?? '' }}"
-                        @if (!empty($col['sticky'])) style="min-width:12rem"
+                        @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;"
                         @elseif (($col['type'] ?? '') === 'yn_badge') style="min-width:3rem"
                         @else style="min-width:8rem" @endif>
                         {{ $col['label'] }}
@@ -189,7 +189,7 @@
                             }
                             if (isset($col['class'])) $cellClasses .= ' ' . $col['class'];
                         @endphp
-                        <td class="{{ $cellClasses }} {{ ops_heat_class($heat, $col['key'], $rawValue) }}" {!! $orderAttr !!}>
+                        <td class="{{ $cellClasses }} {{ ops_heat_class($heat, $col['key'], $rawValue) }}" {!! $orderAttr !!} @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;" @endif>
                             @if ($isDiffMode)
                                 <div class="flex items-center gap-1.5 {{ $type === 'text' ? 'justify-start' : 'justify-end' }}">{!! $cellContent !!}</div>
                             @elseif (($col['key'] === 'provider' || !empty($col['provider_modal'])) && !empty($row['prov_num']))
@@ -254,11 +254,11 @@
                         <tr class="bg-gray-50 text-gray-900 font-bold text-xs text-right">
                             @foreach ($columns as $col)
                                 @if ($loop->first)
-                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right dds-stick dds-stick-shadow bg-gray-50">{{ $loop->parent->first ? 'Total:' : '' }}</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right {{ $stickyClass($loop->index) }} bg-gray-50" @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;" @endif>{{ $loop->parent->first ? 'Total:' : '' }}</td>
                                 @elseif ($col['key'] === 'type_label')
-                                    <td class="px-4 py-3.5 border-r border-gray-300 text-left {{ $col['class'] ?? '' }}">{{ $label }}</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-left {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}">{{ $label }}</td>
                                 @else
-                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['total'][$key][$col['key']] ?? 0, $col['type']) !!}</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['total'][$key][$col['key']] ?? 0, $col['type']) !!}</td>
                                 @endif
                             @endforeach
                         </tr>
@@ -268,9 +268,9 @@
                         <tr class="bg-gray-50 text-gray-900 font-bold text-xs text-right">
                             @foreach ($columns as $col)
                                 @if ($loop->first)
-                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right dds-stick dds-stick-shadow bg-gray-50">Average:</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right {{ $stickyClass($loop->index) }} bg-gray-50" @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;" @endif>Average:</td>
                                 @else
-                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['average'][$col['key']] ?? null, $col['type']) !!}</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['average'][$col['key']] ?? null, $col['type']) !!}</td>
                                 @endif
                             @endforeach
                         </tr>
@@ -279,9 +279,9 @@
                         <tr class="bg-gray-200 text-gray-900 font-bold text-xs text-right border-t border-gray-300">
                             @foreach ($columns as $col)
                                 @if ($loop->first)
-                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right dds-stick dds-stick-shadow bg-gray-200">Total:</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right {{ $stickyClass($loop->index) }} bg-gray-200" @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;" @endif>Total:</td>
                                 @else
-                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['total'][$col['key']] ?? null, $col['type']) !!}</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['total'][$col['key']] ?? null, $col['type']) !!}</td>
                                 @endif
                             @endforeach
                         </tr>

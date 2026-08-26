@@ -634,9 +634,9 @@
                             ${rowsHtml}
 
                             <!-- Summary Rows matching rcm-claim-submission-tab.html -->
-                            <tr class="bg-slate-50/60 border-t border-slate-200 font-bold text-slate-800">
-                                <td class="sticky left-0 bg-slate-50/60 z-10"></td>
-                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-50/60 z-10 border-r border-slate-200 text-slate-500 font-semibold">Average:</td>
+                            <tr class="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+                                <td class="sticky left-0 bg-slate-100 z-10"></td>
+                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-100 z-10 border-r border-slate-200 text-slate-500 font-semibold">Average:</td>
                                 <td class="py-2.5 px-4 text-center text-slate-400 font-normal">-</td>
                                 <td class="py-2.5 px-4 text-center text-slate-400 font-normal">-</td>
                                 <td class="py-2.5 px-4 text-center text-slate-400 font-normal">-</td>
@@ -656,9 +656,9 @@
                                 <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.avg_submitted_formatted}</td>
                                 <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.avg_estimated_formatted}</td>
                             </tr>
-                            <tr class="bg-slate-50/60 border-t border-slate-200 font-bold text-slate-800">
-                                <td class="sticky left-0 bg-slate-50/60 z-10"></td>
-                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-50/60 z-10 border-r border-slate-200 text-slate-500 font-semibold">Total:</td>
+                            <tr class="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+                                <td class="sticky left-0 bg-slate-100 z-10"></td>
+                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-100 z-10 border-r border-slate-200 text-slate-500 font-semibold">Total:</td>
                                 <td class="py-2.5 px-4 text-center text-slate-400 font-normal">-</td>
                                 <td class="py-2.5 px-4 text-center text-slate-400 font-normal">-</td>
                                 <td class="py-2.5 px-4 text-center text-slate-400 font-normal">-</td>
@@ -862,18 +862,18 @@
                             ${rows}
 
                             <!-- Summary Rows matching rcm-patient-statement-tab.html -->
-                            <tr class="bg-slate-50/60 border-t border-slate-200 font-bold text-slate-800">
-                                <td class="sticky left-0 bg-slate-50/60 z-10"></td>
-                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-50/60 z-10 border-r border-slate-200 text-slate-500 font-semibold">Average:</td>
+                            <tr class="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+                                <td class="sticky left-0 bg-slate-100 z-10"></td>
+                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-100 z-10 border-r border-slate-200 text-slate-500 font-semibold">Average:</td>
                                 <td class="py-2.5 px-4"></td>
                                 <td class="py-2.5 px-4"></td>
                                 <td class="py-2.5 px-4"></td>
                                 <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.average_formatted}</td>
                                 <td class="py-2.5 px-4"></td>
                             </tr>
-                            <tr class="bg-slate-50/60 border-t border-slate-200 font-bold text-slate-800">
-                                <td class="sticky left-0 bg-slate-50/60 z-10"></td>
-                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-50/60 z-10 border-r border-slate-200 text-slate-500 font-semibold">Total:</td>
+                            <tr class="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+                                <td class="sticky left-0 bg-slate-100 z-10"></td>
+                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-100 z-10 border-r border-slate-200 text-slate-500 font-semibold">Total:</td>
                                 <td class="py-2.5 px-4"></td>
                                 <td class="py-2.5 px-4"></td>
                                 <td class="py-2.5 px-4"></td>

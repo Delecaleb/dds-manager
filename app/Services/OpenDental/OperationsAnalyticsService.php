@@ -196,16 +196,18 @@ class OperationsAnalyticsService
             $totalCaCompleted = array_sum(array_column($rows, 'ca_completed'));
             $totalCaAccepted = array_sum(array_column($rows, 'ca_accepted'));
 
-            $pwdProduction = $totalWorkingDays > 0 ? round($totalNet / $totalWorkingDays, 2) : 0;
-            $pwdPtsVisit = $totalWorkingDays > 0 ? (int) round($totalPtsVisits / $totalWorkingDays) : 0;
-            $pwdNptVisit = $totalWorkingDays > 0 ? (int) round($totalNptVisit / $totalWorkingDays) : 0;
+            $pwdProduction = array_sum(array_column($rows, 'pwd_production'));
+            $pwdPtsVisit = (int) array_sum(array_column($rows, 'pwd_pts_visit'));
+            $pwdNptVisit = (int) array_sum(array_column($rows, 'pwd_npt_visit'));
 
-            $ppvProduction = $totalPtsVisits > 0 ? round($totalNet / $totalPtsVisits, 2) : 0;
-            $ppvProcedures = $totalPtsVisits > 0 ? (int) round($totalProcedures / $totalPtsVisits) : 0;
+            $ppvProduction = array_sum(array_column($rows, 'ppv_production'));
+            $ppvProcedures = (int) array_sum(array_column($rows, 'ppv_procedures'));
 
-            $ppProduction = $totalProcedures > 0 ? round($totalNet / $totalProcedures, 2) : 0;
+            $ppProduction = array_sum(array_column($rows, 'pp_production'));
 
             return [
+                'location' => '',
+                'payor' => '',
                 'gross' => $totalGross,
                 'adjustment' => $totalAdjustment,
                 'pct_ttl' => $totalNet != 0 ? 100.00 : 0,
@@ -279,26 +281,26 @@ class OperationsAnalyticsService
     private function payorColumns(): array
     {
         return [
-            ['key' => 'payor', 'label' => 'Payor', 'type' => 'text', 'sticky' => true],
-            ['key' => 'location', 'label' => 'Location', 'type' => 'text'],
+            ['key' => 'location', 'label' => 'Location', 'type' => 'text', 'sticky' => true],
+            ['key' => 'payor', 'label' => 'Payor', 'type' => 'text'],
             // By Payor
             ['key' => 'gross', 'label' => 'Gross Production', 'type' => 'money', 'agg' => 'sum'],
             ['key' => 'net', 'label' => 'Net Production', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'pct_ttl', 'label' => '% of TTL', 'type' => 'percent', 'heat' => false],
+            ['key' => 'pct_ttl', 'label' => 'Percent of Total', 'type' => 'percent', 'heat' => false],
             ['key' => 'adjustment', 'label' => 'Adjustment', 'type' => 'money', 'agg' => 'sum'],
             ['key' => 'collection', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'],
             ['key' => 'pts_visits', 'label' => 'Pts Visits', 'type' => 'number', 'agg' => 'sum'],
             ['key' => 'npt_visit', 'label' => 'Npt Visits', 'type' => 'number', 'agg' => 'sum'],
             ['key' => 'case_acceptance', 'label' => 'Case Acceptance', 'type' => 'percent', 'heat' => false],
             // Per Working Day
-            ['key' => 'pwd_production', 'label' => 'Production', 'type' => 'money'],
-            ['key' => 'pwd_pts_visit', 'label' => 'Pts Visits', 'type' => 'number'],
-            ['key' => 'pwd_npt_visit', 'label' => 'Npt Visits', 'type' => 'number'],
+            ['key' => 'pwd_production', 'label' => 'Per Working Day Production', 'type' => 'money'],
+            ['key' => 'pwd_pts_visit', 'label' => 'Per Working Day Pts Visits', 'type' => 'number'],
+            ['key' => 'pwd_npt_visit', 'label' => 'Per Working Day Npt Visits', 'type' => 'number'],
             // Per Patient Visit
-            ['key' => 'ppv_production', 'label' => 'Production', 'type' => 'money'],
-            ['key' => 'ppv_procedures', 'label' => 'Procedures', 'type' => 'number'],
+            ['key' => 'ppv_production', 'label' => 'Per Patient Visit Production', 'type' => 'money'],
+            ['key' => 'ppv_procedures', 'label' => 'Per Patient Visit Procedures', 'type' => 'number'],
             // Per Procedure
-            ['key' => 'pp_production', 'label' => 'Production', 'type' => 'money'],
+            ['key' => 'pp_production', 'label' => 'Per Procedure Production', 'type' => 'money'],
         ];
     }
 
@@ -1103,25 +1105,25 @@ class OperationsAnalyticsService
                 [
                     'label' => 'Production',
                     'actual' => $tot_ap,
-                    'goal' => 135000,
+                    'goal' => 0,
                     'type' => 'currency',
                 ],
                 [
                     'label' => 'Collection',
                     'actual' => $tot_ac,
-                    'goal' => 135000,
+                    'goal' => 0,
                     'type' => 'currency',
                 ],
                 [
                     'label' => 'Patient Visits',
                     'actual' => $tot_apv,
-                    'goal' => 200,
+                    'goal' => 0,
                     'type' => 'number',
                 ],
                 [
                     'label' => 'New Patient Visits',
                     'actual' => $tot_anv,
-                    'goal' => 40,
+                    'goal' => 0,
                     'type' => 'number',
                 ],
             ],

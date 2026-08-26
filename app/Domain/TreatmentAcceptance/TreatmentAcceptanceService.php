@@ -58,7 +58,7 @@ class TreatmentAcceptanceService
     public function rateFrom(float $proposed, float $completed, float $accepted): float
     {
         return $proposed > 0
-            ? round(($completed + $accepted) / $proposed * 100, 2)
+            ? min(100.0, round(($completed + $accepted) / $proposed * 100, 2))
             : 0.0;
     }
 

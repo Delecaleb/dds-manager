@@ -5,7 +5,7 @@
             @foreach ($spec['performance_kpis'] ?? [] as $kpi)
                 @php
                     $actual = (float) ($kpi['actual'] ?? 0);
-                    $goal = (float) ($kpi['goal'] ?? 1);
+                    $goal = (float) ($kpi['goal'] ?? 0);
                     $isNegative = $actual < 0;
                     $absActual = abs($actual);
 

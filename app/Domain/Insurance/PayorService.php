@@ -25,17 +25,27 @@ class PayorService
     ) {}
 
     /**
-     * The patient -> plan map: each patient's highest PlanNum from claim procs (D10).
+     * The patient -> plan map: each patient's latest PlanNum from claim procs.
      * Join against this (leftJoinSub) to attribute a patient's activity to a payor.
      */
     public function planForPatientSubquery(): Builder
     {
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            return DB::table('od_claim_procs as cp')
+                ->where('cp.PlanNum', '>', 0)
+                ->whereRaw('cp.ClaimProcNum = (SELECT MAX(cp2.ClaimProcNum) FROM od_claim_procs cp2 WHERE cp2.PatNum = cp.PatNum AND cp2.PlanNum > 0)')
+                ->select('cp.PatNum', 'cp.PlanNum');
+        }
+
         return DB::table('od_claim_procs')
-            ->select('PatNum', DB::raw('MAX(PlanNum) as PlanNum'))
+            ->selectRaw('PatNum, CAST(SUBSTRING_INDEX(GROUP_CONCAT(PlanNum ORDER BY ClaimProcNum ASC), ",", -1) AS UNSIGNED) AS PlanNum')
+            ->where('PlanNum', '>', 0)
             ->groupBy('PatNum');
     }
 
-    /** Display label for a plan (carrier name - carrier num), resolved via the OpenDental API. */
+    /** Display label for a plan (carrier name - carrier num), resolved via the database or OpenDental API. */
     public function payorLabel(int|string $planNum): string
     {
         $planNum = (int) $planNum;
@@ -75,31 +85,6 @@ class PayorService
     {
         return Cache::remember('od_carrier_string_map', 86400, function () {
             try {
-                $client = app(OpenDentalClient::class);
-                $cMap = [];
-                foreach ($client->get('carriers?limit=5000') as $c) {
-                    $name = trim($c['CarrierName'] ?? '');
-                    if ($name !== '') {
-                        $cMap[$c['CarrierNum']] = $name;
-                    }
-                }
-
-                $pMap = [];
-                foreach ($client->get('insplans?limit=5000') as $p) {
-                    $cNum = $p['CarrierNum'] ?? 0;
-                    $pMap[$p['PlanNum']] = $cNum > 0
-                        ? ($cMap[$cNum] ?? 'Unknown Carrier').' - '.$cNum
-                        : ($p['GroupName'] ?? 'Unknown Plan').' - Plan '.$p['PlanNum'];
-                }
-
-                if (! empty($pMap)) {
-                    return $pMap;
-                }
-            } catch (\Throwable $e) {
-                // Fall back to database tables if API call fails
-            }
-
-            try {
                 $cMap = DB::table('od_carriers')
                     ->whereNotNull('CarrierName')
                     ->where('CarrierName', '!=', '')
@@ -116,6 +101,30 @@ class PayorService
                     $pMap[$p->PlanNum] = $cNum > 0
                         ? ($cMap[$cNum] ?? 'Unknown Carrier').' - '.$cNum
                         : ($p->GroupName ? $p->GroupName.' - Plan '.$p->PlanNum : 'Plan '.$p->PlanNum);
+                }
+
+                if (! empty($pMap)) {
+                    return $pMap;
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                $client = app(OpenDentalClient::class);
+                $cMap = [];
+                foreach ($client->get('carriers?limit=5000') as $c) {
+                    $name = trim($c['CarrierName'] ?? '');
+                    if ($name !== '') {
+                        $cMap[$c['CarrierNum']] = $name;
+                    }
+                }
+
+                $pMap = [];
+                foreach ($client->get('insplans?limit=5000') as $p) {
+                    $cNum = $p['CarrierNum'] ?? 0;
+                    $pMap[$p['PlanNum']] = $cNum > 0
+                        ? ($cMap[$cNum] ?? 'Unknown Carrier').' - '.$cNum
+                        : ($p['GroupName'] ?? 'Unknown Plan').' - Plan '.$p['PlanNum'];
                 }
 
                 return $pMap;
