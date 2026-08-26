@@ -1761,7 +1761,7 @@ class OperationsAnalyticsService
      */
     private function activePatientMetrics(string $end, array $clinics): array
     {
-        $startWindow = date('Y-m-d', strtotime('-18 months', strtotime($end)));
+        $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($end)));
 
         $totalBase = DB::table('od_procedure_logs')
             ->selectRaw('ClinicNum, COUNT(DISTINCT PatNum) as total_ever_pts')
@@ -2044,8 +2044,7 @@ class OperationsAnalyticsService
             ->join('od_procedure_logs as pl', 'pt.PatNum', '=', 'pl.PatNum')
             ->select('pt.PatNum', 'pt.Birthdate')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereBetween('pl.ProcDate', [$start24Months.' 00:00:00', $end.' 23:59:59'])
-            ->where('pt.PatStatus', '0'); // 0 = Patient (Active)
+            ->whereBetween('pl.ProcDate', [$start24Months.' 00:00:00', $end.' 23:59:59']);
 
         if ($clinics) {
             $qAct->whereIn('pl.ClinicNum', $clinics);

@@ -317,110 +317,167 @@ class FrontOfficeController extends Controller
     {
         [$startRange, $endRange] = $this->getFilterDateRange($request);
 
-        // 1. In Jarvis / dental front office workflow, the Broken Appointments table
-        // tracks Existing Patient recall appointments (IsNewPatient = 0) that need to be re-booked.
-        // New patient leads/consults that broke are tracked separately under New Patient Opportunities.
         $query = OdAppointment::query()
+            ->select('od_appointments.*')
             ->with(['patient', 'provider'])
-            ->where('AptStatus', 5) // 5 = Broken / Cancelled in OpenDental
-            ->where('IsNewPatient', 0) // Focus on existing recall patients needing rescheduling
-            ->whereNotIn('AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947])
-            ->whereBetween('AptDateTime', [$startRange, $endRange])
-            ->select('od_appointments.*');
+            ->where('od_appointments.AptStatus', 5)
+            ->where('od_appointments.IsNewPatient', 0)
+            ->whereBetween('od_appointments.AptDateTime', [$startRange, $endRange]);
 
-        // 2. Identify patients who have ALREADY re-booked a future active appointment.
-        // If a patient already rescheduled, they are resolved and excluded from this UNSCHEDULED action list.
-        $brokenPatNums = (clone $query)->pluck('PatNum')->unique()->filter()->toArray();
-        if (! empty($brokenPatNums)) {
-            $rescheduledPatNums = OdAppointment::whereIn('PatNum', $brokenPatNums)
-                ->where('AptDateTime', '>', $endRange)
-                ->whereIn('AptStatus', [1, 2])
-                ->pluck('PatNum')
-                ->unique()
-                ->toArray();
+        // Fast string-indexed candidate IDs for batch lookups
+        $candidateApts = (clone $query)->get(['AptNum', 'PatNum', 'InsPlan1', 'InsPlan2', 'AptDateTime']);
+        $patNums = array_values(array_filter(array_unique($candidateApts->pluck('PatNum')->map(fn ($p) => (string) $p)->toArray()), fn ($s) => $s !== '' && $s !== '0'));
+        $aptNums = array_values(array_filter(array_unique($candidateApts->pluck('AptNum')->map(fn ($a) => (string) $a)->toArray()), fn ($s) => $s !== '' && $s !== '0'));
+        $insPlanNums = array_values(array_filter(array_unique(array_merge(
+            $candidateApts->pluck('InsPlan1')->map(fn ($i) => (string) $i)->toArray(),
+            $candidateApts->pluck('InsPlan2')->map(fn ($i) => (string) $i)->toArray()
+        )), fn ($s) => $s !== '' && $s !== '0'));
 
-            if (! empty($rescheduledPatNums)) {
-                $query->whereNotIn('PatNum', $rescheduledPatNums);
+        // Batch procedure logs & descriptions (using PatNum index + AptNum filter)
+        $feesMap = [];
+        $procDescMap = [];
+        if (! empty($patNums) && ! empty($aptNums)) {
+            foreach (array_chunk($patNums, 200) as $patChunk) {
+                $procLogs = DB::table('od_procedure_logs as pl')
+                    ->leftJoin('od_procedures as p', 'pl.CodeNum', '=', 'p.CodeNum')
+                    ->whereIn('pl.PatNum', $patChunk)
+                    ->whereIn('pl.AptNum', $aptNums)
+                    ->where('pl.ProcStatus', '!=', '6')
+                    ->select('pl.AptNum', 'pl.ProcFee', 'p.Descript', 'p.ProcCode')
+                    ->get();
+
+                foreach ($procLogs as $pl) {
+                    $feesMap[$pl->AptNum] = ($feesMap[$pl->AptNum] ?? 0) + (float) $pl->ProcFee;
+                    if (! empty($pl->Descript) && empty($procDescMap[$pl->AptNum])) {
+                        $procDescMap[$pl->AptNum] = $pl->Descript;
+                    }
+                }
             }
         }
 
-        $aptNums = (clone $query)->pluck('AptNum')->filter()->toArray();
-        $fees = [];
-        if (! empty($aptNums)) {
-            $fees = DB::table('od_procedure_logs as pl')
-                ->leftJoin('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
-                ->selectRaw('pl.AptNum, SUM(pl.ProcFee) as total_fee')
-                ->whereIn('pl.AptNum', $aptNums)
-                ->where('pl.ProcStatus', '!=', '6') // Exclude deleted procedures
-                ->where(function ($q) {
-                    $q->whereNull('pc.ProcCode')
-                        ->orWhereNotIn('pc.ProcCode', ['D9986', 'D9987']); // Exclude no-show & cancellation codes
-                })
-                ->groupBy('pl.AptNum')
-                ->pluck('total_fee', 'pl.AptNum')
-                ->toArray();
+        // Batch next scheduled appointment for each patient
+        $nextVisitMap = [];
+        if (! empty($patNums)) {
+            foreach (array_chunk($patNums, 200) as $patChunk) {
+                $futureApts = OdAppointment::query()
+                    ->whereIn('PatNum', $patChunk)
+                    ->whereIn('AptStatus', [1, 4])
+                    ->where('AptDateTime', '>', $startRange)
+                    ->select('PatNum', 'AptDateTime')
+                    ->orderBy('AptDateTime', 'asc')
+                    ->get();
+
+                foreach ($futureApts as $fa) {
+                    if (! isset($nextVisitMap[$fa->PatNum])) {
+                        $nextVisitMap[$fa->PatNum] = substr($fa->AptDateTime, 0, 10);
+                    }
+                }
+            }
         }
 
-        $provMap = [
-            'HADD' => 'Mason Haddow',
-            'ELIAS' => 'Kathy Elias',
-            'DETD' => 'Detroit Dental',
-            'MASS' => 'Massenburg',
-            'SANJ' => 'Sanjiv Johnson',
-            'TERR' => 'Terrance Johnson',
-            'ROSE' => 'Rose Pitaro',
-            'ZEIT' => 'Ali Zeitoun',
-            'Zeitoun' => 'Ali Zeitoun',
-            'HELL' => 'Heller',
-        ];
+        // Batch insurance carriers
+        $carrierMap = [];
+        if (! empty($insPlanNums)) {
+            foreach (array_chunk($insPlanNums, 200) as $planChunk) {
+                $carriers = DB::table('od_insplans as ip')
+                    ->join('od_carriers as c', 'ip.CarrierNum', '=', 'c.CarrierNum')
+                    ->whereIn('ip.PlanNum', $planChunk)
+                    ->pluck('c.CarrierName', 'ip.PlanNum')
+                    ->toArray();
+
+                foreach ($carriers as $pNum => $cName) {
+                    $carrierMap[$pNum] = $cName;
+                }
+            }
+        }
 
         return DataTables::eloquent($query)
-            ->addColumn('patient_name', fn ($apt) => trim(($apt->patient->FName ?? '').' '.($apt->patient->LName ?? '')))
+            ->addColumn('patient_name', fn ($apt) => preg_replace('/\s+/', ' ', trim(($apt->patient?->FName ?? '').' '.($apt->patient?->LName ?? ''))))
             ->addColumn('status', fn ($apt) => 'UNSCHEDULED')
-            ->addColumn('amount', function ($apt) use ($fees) {
-                $fee = (float) ($fees[$apt->AptNum] ?? 0);
+            ->addColumn('amount', function ($apt) use ($feesMap) {
+                $fee = (float) ($feesMap[$apt->AptNum] ?? 0);
 
                 return $fee > 0 ? '$ '.number_format($fee, 2) : '$ 0';
             })
-            ->addColumn('phone', fn ($apt) => ! empty($apt->patient->HmPhone) ? $apt->patient->HmPhone : 'N/A')
-            ->addColumn('work_phone', fn ($apt) => ! empty($apt->patient->WkPhone) ? $apt->patient->WkPhone : 'N/A')
-            ->addColumn('mobile_phone', fn ($apt) => ! empty($apt->patient->WirelessPhone) ? $apt->patient->WirelessPhone : 'N/A')
-            ->addColumn('email', fn ($apt) => $apt->patient->Email ?? '')
-            ->addColumn('insurance_carrier', fn () => 'No insurance')
-            ->addColumn('provider_name', function ($apt) use ($provMap) {
-                if (! $apt->provider) {
+            ->addColumn('phone', fn ($apt) => $this->formatPhoneNumber($apt->patient?->HmPhone))
+            ->addColumn('work_phone', fn ($apt) => $this->formatPhoneNumber($apt->patient?->WkPhone))
+            ->addColumn('mobile_phone', fn ($apt) => $this->formatPhoneNumber($apt->patient?->WirelessPhone))
+            ->addColumn('email', fn ($apt) => $apt->patient?->Email ?? '')
+            ->addColumn('insurance_carrier', fn ($apt) => $carrierMap[$apt->InsPlan1] ?? ($carrierMap[$apt->InsPlan2] ?? 'No insurance'))
+            ->addColumn('provider_name', function ($apt) {
+                if (! $apt->ProvNum || ! $apt->provider) {
                     return '—';
                 }
-                $abbr = $apt->provider->Abbr ?? '';
-                if (isset($provMap[$abbr])) {
-                    return $provMap[$abbr];
-                }
-                $full = trim(($apt->provider->FName ?? '').' '.($apt->provider->LName ?? ''));
 
-                return ! empty($full) ? $full : ($apt->provider->LName ?? $abbr);
+                $knownDoctors = [
+                    'HADD' => 'Mason Haddow',
+                    'Haddow' => 'Mason Haddow',
+                    'ELIAS' => 'Kathy Elias',
+                    'Elias' => 'Kathy Elias',
+                    'ZEITOUN' => 'Ali Zeitoun',
+                    'Zeitoun' => 'Ali Zeitoun',
+                    'ZEIT' => 'Ali Zeitoun',
+                    'DETD' => 'Detroit Dental Care, PC',
+                    'MASS' => 'Massenburg',
+                    'SANJ' => 'Sanjiv Johnson',
+                    'TERR' => 'Terrance Johnson',
+                    'ROSE' => 'Rose Pitaro',
+                    'HELL' => 'Heller',
+                ];
+
+                $abbr = trim($apt->provider->Abbr ?? '');
+                $lastName = trim($apt->provider->LName ?? '');
+                $firstName = trim($apt->provider->PName ?: ($apt->provider->PreferredName ?? ''));
+
+                if (isset($knownDoctors[$abbr])) {
+                    return $knownDoctors[$abbr];
+                }
+                if (isset($knownDoctors[$lastName])) {
+                    return $knownDoctors[$lastName];
+                }
+                if ($firstName !== '' && $lastName !== '') {
+                    return "{$firstName} {$lastName}";
+                }
+
+                return $lastName ?: ($firstName ?: '—');
             })
-            ->addColumn('next_visit_date', fn () => 'N/A')
+            ->addColumn('next_visit_date', fn ($apt) => $nextVisitMap[$apt->PatNum] ?? 'N/A')
             ->addColumn('recall_due', fn () => 'N/A')
             ->addColumn('remaining_benefits', fn () => '$ 0')
-            ->addColumn('date', fn ($apt) => $apt->AptDateTime ? date('Y-m-d', strtotime($apt->AptDateTime)) : '')
-            ->addColumn('time', fn ($apt) => $apt->AptDateTime ? date('H:i:s', strtotime($apt->AptDateTime)) : '')
+            ->addColumn('date', fn ($apt) => $apt->AptDateTime ? (new Carbon($apt->AptDateTime))->format('Y-m-d') : '')
+            ->addColumn('time', fn ($apt) => $apt->AptDateTime ? (new Carbon($apt->AptDateTime))->format('H:i:s') : '')
             ->addColumn('type', fn () => 'Cancellation')
-            ->addColumn('description', function ($apt) {
-                if (! empty($apt->ProcDescript)) {
-                    $descMap = [
-                        'CompAdult' => 'comprehensive orthodontic treatment of the adult dentition',
-                        'RepRetUp' => 'replacement of lost or broken retainer – maxillary',
-                        'NCCN' => 'missed appointment',
-                        'MissAppt' => 'missed appointment',
-                    ];
-
-                    return $descMap[$apt->ProcDescript] ?? $apt->ProcDescript;
+            ->addColumn('description', function ($apt) use ($procDescMap) {
+                if (isset($procDescMap[$apt->AptNum]) && ! empty($procDescMap[$apt->AptNum])) {
+                    return $procDescMap[$apt->AptNum];
                 }
 
-                return 'missed appointment';
+                $descript = trim($apt->ProcDescript ?? '');
+                if ($descript !== '' && $descript !== '--' && $descript !== 'NCCN' && $descript !== 'MissAppt') {
+                    return $descript;
+                }
+
+                return 'N/A';
             })
             ->addColumn('note', fn ($apt) => $apt->Note ?? '')
             ->make(true);
+    }
+
+    private function formatPhoneNumber(?string $phone): string
+    {
+        if (empty($phone) || $phone === '--') {
+            return 'N/A';
+        }
+
+        $clean = preg_replace('/[^\d]/', '', $phone);
+        if (strlen($clean) === 10) {
+            return '('.substr($clean, 0, 3).')'.substr($clean, 3, 3).'-'.substr($clean, 6, 4);
+        }
+        if (strlen($clean) === 11 && str_starts_with($clean, '1')) {
+            return '1('.substr($clean, 1, 3).')'.substr($clean, 4, 3).'-'.substr($clean, 7, 4);
+        }
+
+        return trim($phone);
     }
 
     public function hygieneRecallDue(Request $request)

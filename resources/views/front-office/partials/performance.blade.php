@@ -214,7 +214,7 @@
             serverSide: true,
             pageLength: 10,
             lengthChange: true,
-            lengthMenu: [10, 20, 50, 100],
+            lengthMenu: [[10, 20, 50, 100, -1], [10, 20, 50, 100, 'All']],
             layout: { topStart: null, topEnd: null, bottomStart: ['pageLength', 'info'], bottomEnd: 'paging' },
             language: {
                 emptyTable: '<div class="py-1 text-[11px] text-gray-600 font-medium text-center bg-gray-50 w-full border-y border-gray-100">No data</div>',

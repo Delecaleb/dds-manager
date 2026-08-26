@@ -484,4 +484,134 @@ class OperationsTest extends TestCase
             $this->assertCount(13, $s['labels']);
         }
     }
+
+    public function test_act_pts_breakdown_drilldown_renders_with_and_without_clinic_num(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        DB::table('od_providers')->insert([
+            'ProvNum' => 81,
+            'Abbr' => 'ELIAS',
+            'LName' => 'Elias',
+            'PName' => 'Kathy',
+        ]);
+
+        DB::table('od_patients')->insert([
+            'PatNum' => 22057,
+            'LName' => 'Akinbode',
+            'FName' => 'Erioluwa',
+        ]);
+
+        // Procedure completed 20 months ago (within 24-month window, outside 18-month window)
+        DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 991,
+            'PatNum' => 22057,
+            'ProvNum' => 81,
+            'ClinicNum' => 0,
+            'ProcFee' => 150.00,
+            'ProcStatus' => '2',
+            'ProcDate' => '2025-01-15 10:00:00',
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+
+        // Request drilldown with clinic_num=0
+        $responseWithZero = $this->get(route('operations.drilldown', [
+            'metric' => 'act_pts_count',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-26',
+            'clinic_num' => '0',
+        ]));
+
+        $responseWithZero->assertOk();
+        $responseWithZero->assertSee('Akinbode, Erioluwa');
+        $responseWithZero->assertSee('81 - ELIAS');
+        $responseWithZero->assertSee('Kathy Elias');
+
+        // Request drilldown without clinic_num (All Clinics)
+        $responseWithoutClinic = $this->get(route('operations.drilldown', [
+            'metric' => 'act_pts_count',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-26',
+        ]));
+
+        $responseWithoutClinic->assertOk();
+        $responseWithoutClinic->assertSee('Akinbode, Erioluwa');
+        $responseWithoutClinic->assertSee('81 - ELIAS');
+        $responseWithoutClinic->assertSee('Kathy Elias');
+    }
+
+    public function test_active_patient_count_matches_between_offices_tab_and_services_tab_age_bracket(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Patient 1: Active PatStatus '0'
+        DB::table('od_patients')->insert([
+            'PatNum' => 501,
+            'LName' => 'Smith',
+            'FName' => 'John',
+            'Birthdate' => '1990-05-15',
+            'PatStatus' => '0',
+        ]);
+
+        // Patient 2: Inactive PatStatus '1' but had procedure in 24 months
+        DB::table('od_patients')->insert([
+            'PatNum' => 502,
+            'LName' => 'Doe',
+            'FName' => 'Jane',
+            'Birthdate' => '2005-08-20',
+            'PatStatus' => '1',
+        ]);
+
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 8001,
+                'PatNum' => 501,
+                'ClinicNum' => 1,
+                'ProcFee' => 200.00,
+                'ProcStatus' => '2',
+                'ProcDate' => '2026-06-10 10:00:00',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            [
+                'ProcNum' => 8002,
+                'PatNum' => 502,
+                'ClinicNum' => 1,
+                'ProcFee' => 300.00,
+                'ProcStatus' => '2',
+                'ProcDate' => '2026-07-12 11:00:00',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+        ]);
+
+        // Query Offices tab data
+        $officesResp = $this->get(route('operations.data', [
+            'tab' => 'offices',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-25',
+        ]));
+        $officesResp->assertOk();
+        $officesSpec = $officesResp->original->getData()['spec'] ?? null;
+        $officesActiveCount = $officesSpec['rows'][0]['act_pts_count'] ?? null;
+
+        // Query Services tab data
+        $servicesResp = $this->get(route('operations.data', [
+            'tab' => 'services',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-25',
+        ]));
+        $servicesResp->assertOk();
+        $servicesSpec = $servicesResp->original->getData()['spec'] ?? null;
+        $servicesAgeTotal = $servicesSpec['age_brackets']['total'] ?? null;
+
+        $this->assertEquals(2, $officesActiveCount);
+        $this->assertEquals(2, $servicesAgeTotal);
+        $this->assertEquals($officesActiveCount, $servicesAgeTotal);
+    }
 }
+
+

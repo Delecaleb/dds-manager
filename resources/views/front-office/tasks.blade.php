@@ -392,7 +392,7 @@
                 serverSide: true,
                 pageLength: 20,
                 lengthChange: true,
-                lengthMenu: [10, 20, 50, 100],
+                lengthMenu: [[10, 20, 50, 100, -1], [10, 20, 50, 100, 'All']],
                 layout: { topStart: null, topEnd: null, bottomStart: ['pageLength', 'info'], bottomEnd: 'paging' },
                 language: {
                     lengthMenu: 'Items per page _MENU_ <span class="text-gray-300 mx-2">|</span>',

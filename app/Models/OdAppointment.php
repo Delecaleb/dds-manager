@@ -133,6 +133,16 @@ class OdAppointment extends Model
         return $this->hasMany(OdProcedureLog::class, 'AptNum', 'AptNum');
     }
 
+    public function insPlan1()
+    {
+        return $this->belongsTo(OdInsplan::class, 'InsPlan1', 'PlanNum');
+    }
+
+    public function insPlan2()
+    {
+        return $this->belongsTo(OdInsplan::class, 'InsPlan2', 'PlanNum');
+    }
+
     public function getDurationMinutesAttribute(): int
     {
         $pattern = $this->Pattern ?? '';

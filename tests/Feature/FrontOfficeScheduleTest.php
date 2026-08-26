@@ -68,4 +68,87 @@ class FrontOfficeScheduleTest extends TestCase
         $resReappoint = $this->actingAs($user)->getJson(route('front-office.hygiene-reappoint', ['month_year' => $monthYear]));
         $resReappoint->assertStatus(200);
     }
+
+    public function test_broken_appointments_resolves_next_visit_date_insurance_and_amount(): void
+    {
+        $user = User::factory()->create();
+
+        $carrier = \App\Models\OdCarrier::create([
+            'CarrierNum' => 88,
+            'CarrierName' => 'Delta Dental of MI',
+        ]);
+
+        $insPlan = \App\Models\OdInsplan::create([
+            'PlanNum' => 401,
+            'CarrierNum' => $carrier->CarrierNum,
+        ]);
+
+        $patient = \App\Models\OdPatient::create([
+            'PatNum' => 101,
+            'FName' => 'Jane',
+            'LName' => 'Doe',
+            'WirelessPhone' => '3135559876',
+            'Email' => 'jane.doe@example.com',
+        ]);
+
+        $provider = \App\Models\OdProvider::create([
+            'ProvNum' => 95,
+            'LName' => 'Haddow',
+            'PName' => 'Mason',
+            'Abbr' => 'HADD',
+        ]);
+
+        $proc = \App\Models\OdProcedure::create([
+            'CodeNum' => 201,
+            'ProcCode' => 'D8090',
+            'Descript' => 'comprehensive orthodontic treatment',
+        ]);
+
+        // Broken appointment in August
+        $brokenApt = \App\Models\OdAppointment::create([
+            'AptNum' => 98881,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'InsPlan1' => $insPlan->PlanNum,
+            'AptStatus' => 5, // Broken
+            'IsNewPatient' => 0,
+            'AptDateTime' => '2026-08-10 10:00:00',
+            'Note' => 'Left voicemail',
+        ]);
+
+        // Attached procedure fee
+        \App\Models\OdProcedureLog::create([
+            'ProcNum' => 988811,
+            'PatNum' => $patient->PatNum,
+            'AptNum' => $brokenApt->AptNum,
+            'CodeNum' => $proc->CodeNum,
+            'ProcDate' => '2026-08-10',
+            'ProcStatus' => '1',
+            'ProcFee' => 4500.00,
+        ]);
+
+        // Future re-booked appointment in September
+        \App\Models\OdAppointment::create([
+            'AptNum' => 98882,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'AptStatus' => 1, // Scheduled
+            'IsNewPatient' => 0,
+            'AptDateTime' => '2026-09-15 14:00:00',
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('front-office.broken-appointments', [
+            'month_year' => '2026-08',
+        ]));
+
+        $response->assertOk()
+            ->assertJsonFragment(['patient_name' => 'Jane Doe'])
+            ->assertJsonFragment(['provider_name' => 'Mason Haddow'])
+            ->assertJsonFragment(['insurance_carrier' => 'Delta Dental of MI'])
+            ->assertJsonFragment(['amount' => '$ 4,500.00'])
+            ->assertJsonFragment(['mobile_phone' => '(313)555-9876'])
+            ->assertJsonFragment(['next_visit_date' => '2026-09-15'])
+            ->assertJsonFragment(['description' => 'comprehensive orthodontic treatment'])
+            ->assertJsonFragment(['status' => 'UNSCHEDULED']);
+    }
 }

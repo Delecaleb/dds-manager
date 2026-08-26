@@ -846,7 +846,7 @@
                 serverSide: true,
                 pageLength: 10,
                 lengthChange: true,
-                lengthMenu: [10, 20, 50, 100],
+                lengthMenu: [[10, 20, 50, 100, -1], [10, 20, 50, 100, 'All']],
                 layout: { topStart: null, topEnd: null, bottomStart: ['pageLength', 'info'], bottomEnd: 'paging' },
                 language: {
                     info: '_START_-_END_ of _TOTAL_ items',

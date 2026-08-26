@@ -95,4 +95,9 @@ class OdProcedureLog extends Model
     {
         return $query->whereBetween('ProcDate', [$start, $end]);
     }
+
+    public function procedure()
+    {
+        return $this->belongsTo(OdProcedure::class, 'CodeNum', 'CodeNum');
+    }
 }

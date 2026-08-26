@@ -59,4 +59,9 @@ class OdInsplan extends Model
         'PerVisitPatAmount',
         'PerVisitInsAmount',
     ];
+
+    public function carrier()
+    {
+        return $this->belongsTo(OdCarrier::class, 'CarrierNum', 'CarrierNum');
+    }
 }

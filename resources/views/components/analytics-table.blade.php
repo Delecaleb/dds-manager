@@ -214,7 +214,7 @@
                                         'start_date' => request('start_date', now()->startOfMonth()->toDateString()),
                                         'end_date' => request('end_date', now()->toDateString()),
                                         'subtab' => $activeSubtab ?? 'default',
-                                    ]));
+                                    ], fn ($v) => $v !== null && $v !== ''));
                                 @endphp
                                 <div class="flex items-center justify-end gap-1.5 {{ $type === 'text' ? 'justify-start' : '' }}">
                                     {!! $cellContent !!}

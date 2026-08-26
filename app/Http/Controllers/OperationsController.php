@@ -261,9 +261,50 @@ class OperationsController extends Controller
             }
         }
 
+        $knownDoctors = [
+            'HADD' => 'Mason Haddow',
+            'Haddow' => 'Mason Haddow',
+            'ELIAS' => 'Kathy Elias',
+            'Elias' => 'Kathy Elias',
+            'ZEITOUN' => 'Ali Zeitoun',
+            'Zeitoun' => 'Ali Zeitoun',
+            'ZEIT' => 'Ali Zeitoun',
+            'DETD' => 'Detroit Dental Care, PC',
+            'MASS' => 'Massenburg',
+            'SANJ' => 'Sanjiv Johnson',
+            'TERR' => 'Terrance Johnson',
+            'ROSE' => 'Rose Pitaro',
+            'HELL' => 'Landi Heller',
+            'POOL' => 'Donna Poole',
+            'XRYS' => 'XRAY',
+        ];
+
+        $providers = OdProvider::all()->keyBy('ProvNum');
+
+        $resolveProvName = function ($provNum) use ($providers, $knownDoctors) {
+            $p = $providers->get($provNum);
+            if (! $p) {
+                return 'Provider '.$provNum;
+            }
+            $abbr = trim($p->Abbr ?? '');
+            $lName = trim($p->LName ?? '');
+            if (isset($knownDoctors[$abbr])) {
+                return $knownDoctors[$abbr];
+            }
+            if (isset($knownDoctors[$lName])) {
+                return $knownDoctors[$lName];
+            }
+            $fName = trim($p->PName ?: ($p->PreferredName ?? ''));
+            if ($fName !== '' && $lName !== '') {
+                return "$fName $lName";
+            }
+
+            return $lName ?: ($fName ?: $abbr);
+        };
+
         // Common Provider mapping
-        $provMap = OdProvider::all()->mapWithKeys(function ($p) {
-            return [$p->ProvNum => $p->LName.($p->PName ? ', '.$p->PName : '')];
+        $provMap = $providers->mapWithKeys(function ($p) use ($resolveProvName) {
+            return [$p->ProvNum => $resolveProvName($p->ProvNum)];
         })->toArray();
 
         // Common Patient mapping
@@ -829,14 +870,14 @@ class OperationsController extends Controller
 
             $logs = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ProcDate', 'ProvNum')
-                ->where('ClinicNum', $clinicNum)
+                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
                 ->get();
 
             $patMap = $mapPatients($logs->pluck('PatNum')->unique());
 
-            $clinicName = $this->clinics->name((int) $clinicNum);
+            $clinicName = $clinicNum ? $this->clinics->name((int) $clinicNum) : 'All Offices';
             $patData = [];
 
             foreach ($logs as $log) {
@@ -881,8 +922,8 @@ class OperationsController extends Controller
                 'count' => $totalVisits,
                 'services' => $totalServices,
             ];
-        } elseif ($metric === 'npt_visit') {
-            $title = 'Npt Visit Breakdown';
+        } elseif ($metric === 'new_patient_prod') {
+            $title = 'New Patient Prod Breakdown';
             $columns = [
                 ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
                 ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
@@ -897,7 +938,7 @@ class OperationsController extends Controller
                 ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
                 ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
                 ->select('pl.PatNum', 'pl.ProcDate', 'pl.ProcFee', 'pc.ProcCode', 'fv.first_date')
-                ->where('pl.ClinicNum', $clinicNum)
+                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereBetween('pl.ProcDate', [$start, $end])
                 ->whereBetween('fv.first_date', [$start, $end])
@@ -947,7 +988,8 @@ class OperationsController extends Controller
                 ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
             ];
 
-            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, [$clinicNum]);
+            $clinicNums = (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) ? [$clinicNum] : [];
+            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums);
             $totalProduction = 0;
             foreach ($nptVisits as $visit) {
                 $totalProduction += (float) $visit['amount'];
@@ -979,14 +1021,14 @@ class OperationsController extends Controller
                 ['key' => 'visited', 'label' => 'Visited', 'type' => 'text'],
             ];
 
-            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($end))).' 00:00:00';
+            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($start))).' 00:00:00';
 
             $firstVisitSubQ = $this->patients->firstVisitCohort();
 
             $activePts = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
                 ->select('pl.PatNum', 'fv.first_date')
-                ->where('pl.ClinicNum', $clinicNum)
+                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereBetween('pl.ProcDate', [$startWindow, $end.' 23:59:59'])
                 ->groupBy('pl.PatNum', 'fv.first_date')
@@ -1031,11 +1073,11 @@ class OperationsController extends Controller
                 ['key' => 'visits', 'label' => 'Visits', 'type' => 'number', 'agg' => 'sum'],
             ];
 
-            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($end))).' 00:00:00';
+            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($start))).' 00:00:00';
 
             $logs = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ProvNum', 'ProcDate')
-                ->where('ClinicNum', $clinicNum)
+                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$startWindow, $end.' 23:59:59'])
                 ->get();
@@ -1045,15 +1087,16 @@ class OperationsController extends Controller
             $patData = [];
             foreach ($logs as $log) {
                 $d = substr($log->ProcDate, 0, 10);
-                if (! isset($patData[$log->PatNum])) {
-                    $patData[$log->PatNum] = [
+                $patNum = (int) $log->PatNum;
+                if (! isset($patData[$patNum])) {
+                    $patData[$patNum] = [
                         'days' => [],
                         'provs' => [],
                     ];
                 }
-                $patData[$log->PatNum]['days'][$d] = true;
-                if (! empty($provMap[$log->ProvNum])) {
-                    $patData[$log->PatNum]['provs'][$log->ProvNum] = true;
+                $patData[$patNum]['days'][$d] = true;
+                if ($log->ProvNum) {
+                    $patData[$patNum]['provs'][$log->ProvNum] = true;
                 }
             }
 
@@ -1062,11 +1105,30 @@ class OperationsController extends Controller
                 $count = count($data['days']);
                 $totalVisits += $count;
 
-                $provIds = array_keys($data['provs']);
+                $provNums = array_keys($data['provs']);
+                sort($provNums, SORT_NUMERIC);
+
+                $provAbbrs = [];
                 $provNames = [];
-                foreach ($provIds as $id) {
-                    $provNames[] = $provMap[$id] ?? '';
+                foreach ($provNums as $pNum) {
+                    $p = $providers->get($pNum);
+                    if ($p && ! empty($p->Abbr)) {
+                        $provAbbrs[] = strtoupper(trim($p->Abbr));
+                    }
+                    $name = $resolveProvName($pNum);
+                    if ($name) {
+                        $provNames[] = $name;
+                    }
                 }
+                sort($provAbbrs);
+                $provNames = array_unique($provNames);
+                sort($provNames);
+
+                $providerIdStr = ! empty($provAbbrs)
+                    ? implode(', ', $provNums).' - '.implode(', ', $provAbbrs)
+                    : implode(', ', $provNums);
+
+                $providersStr = implode(' | ', $provNames);
 
                 $rows[] = [
                     'pat_id' => $patNum,
@@ -1074,8 +1136,8 @@ class OperationsController extends Controller
                         'label' => $patMap[$patNum] ?? 'Unknown',
                         'link' => true,
                     ],
-                    'provider_ids' => implode(', ', $provIds),
-                    'providers' => implode(', ', array_filter($provNames)),
+                    'provider_ids' => $providerIdStr,
+                    'providers' => $providersStr,
                     'visits' => $count,
                 ];
             }
@@ -1098,7 +1160,7 @@ class OperationsController extends Controller
                     pl.PatNum,
                     MAX(CASE WHEN pc.ProcCode IN ('D0120','D0140','D0150') THEN 1 ELSE 0 END) AS had_exam
                 ")
-                ->where('pl.ClinicNum', $clinicNum)
+                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereBetween('pl.ProcDate', [$prior18m.' 00:00:00', $priorEnd.' 23:59:59'])
                 ->groupBy('pl.PatNum')
