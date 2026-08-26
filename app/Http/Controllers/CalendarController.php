@@ -456,7 +456,13 @@ class CalendarController extends Controller
 
         // We fetch scheduled & completed appointments for the date frame using indexed AptDateTime range.
         $appointments = OdAppointment::whereBetween('AptDateTime', [$startDateTime, $endDateTime])
-            ->whereIn('AptStatus', [1, 2]) // Scheduled & Complete
+            ->whereIn('AptStatus', [1, 2, 4, 5])
+            ->where(function ($q) {
+                $q->whereNull('SecDateTEntry')->orWhere('SecDateTEntry', '!=', '0001-01-01T00:00:00');
+            })
+            ->where(function ($q) {
+                $q->whereNull('Op')->orWhere('Op', '!=', 3);
+            })
             ->get();
 
         // Calculate aggregate metrics
@@ -534,7 +540,13 @@ class CalendarController extends Controller
         $endDateTime = substr($end, 0, 10).' 23:59:59';
 
         $query = OdAppointment::whereBetween('AptDateTime', [$startDateTime, $endDateTime])
-            ->whereIn('AptStatus', [1, 2]);
+            ->whereIn('AptStatus', [1, 2, 4, 5])
+            ->where(function ($q) {
+                $q->whereNull('SecDateTEntry')->orWhere('SecDateTEntry', '!=', '0001-01-01T00:00:00');
+            })
+            ->where(function ($q) {
+                $q->whereNull('Op')->orWhere('Op', '!=', 3);
+            });
 
         if ($type === 'avg_lead_new') {
             $query->whereIn('IsNewPatient', ['1', 1, 'true', true]);
@@ -548,37 +560,80 @@ class CalendarController extends Controller
 
         $appointments = $query->with(['patient', 'provider'])->get();
 
+        $knownDoctors = [
+            64 => ['first' => 'Mason', 'last' => 'Haddow'],
+            81 => ['first' => 'Kathy', 'last' => 'Elias'],
+            83 => ['first' => 'Ali', 'last' => 'Zeitoun'],
+            76 => ['first' => 'Landi', 'last' => 'Heller'],
+            41 => ['first' => 'Donna', 'last' => 'Poole'],
+            49 => ['first' => 'XRAY', 'last' => ''],
+        ];
+
         if ($type === 'provider_count') {
-            $providers = $appointments->map(function ($apt) {
+            $providers = $appointments->map(function ($apt) use ($knownDoctors) {
                 $prov = $apt->provider;
-                $name = $prov ? trim(($prov->LName ?? '').', '.($prov->FName ?: $prov->PName ?: $prov->Abbr ?: '')) : ('Provider #'.$apt->ProvNum);
+                $pNum = (int) $apt->ProvNum;
+                if ($pNum <= 0) {
+                    return null;
+                }
+
+                $name = '';
+                if (isset($knownDoctors[$pNum])) {
+                    $doc = $knownDoctors[$pNum];
+                    $name = $doc['last'] ? trim($doc['last'].', '.$doc['first']) : $doc['first'];
+                } elseif ($prov) {
+                    $last = trim($prov->LName ?? '');
+                    $first = trim($prov->FName ?: $prov->PName ?: $prov->Abbr ?: '');
+                    $name = $last !== '' && $first !== '' ? $last.', '.$first : ($last ?: $first);
+                } else {
+                    $name = 'Provider #'.$pNum;
+                }
 
                 return [
                     'provider' => $name,
                     'provider_name' => $name,
-                    'provider_id' => $apt->ProvNum ?: 'N/A',
+                    'provider_id' => (string) $pNum,
                 ];
-            })->unique('provider_id')->values();
+            })->filter()->unique('provider_id')->values();
 
             return response()->json($providers);
         }
 
-        $rows = $appointments->map(function ($apt) {
+        $rows = $appointments->map(function ($apt) use ($knownDoctors) {
             $pat = $apt->patient;
             $prov = $apt->provider;
 
             $patName = 'Unknown Patient';
             if ($pat) {
-                $formatted = trim(($pat->FName ?? '').' '.($pat->LName ?? ''));
-                if (empty($formatted)) {
-                    $formatted = trim(($pat->LName ?? '').', '.($pat->FName ?? ''));
-                }
-                if (! empty($formatted)) {
-                    $patName = $formatted;
+                $last = trim($pat->LName ?? '');
+                $first = trim($pat->FName ?? '');
+                if ($last !== '' && $first !== '') {
+                    $patName = $last.', '.$first;
+                } elseif ($last !== '') {
+                    $patName = $last;
+                } elseif ($first !== '') {
+                    $patName = $first;
                 }
             }
 
-            $provName = $prov ? trim(($prov->LName ?? '').', '.($prov->FName ?: $prov->PName ?: $prov->Abbr ?: '')) : ('Provider #'.$apt->ProvNum);
+            $pNum = (int) $apt->ProvNum;
+            $hasProc = ! empty(trim($apt->ProcDescript ?? ''));
+            $provName = '';
+            $provId = '';
+
+            if ($hasProc && $pNum > 0) {
+                $provId = (string) $pNum;
+                if (isset($knownDoctors[$pNum])) {
+                    $doc = $knownDoctors[$pNum];
+                    $provName = $doc['last'] ? trim($doc['last'].', '.$doc['first']) : $doc['first'];
+                } elseif ($prov) {
+                    $last = trim($prov->LName ?? '');
+                    $first = trim($prov->FName ?: $prov->PName ?: $prov->Abbr ?: '');
+                    $provName = $last !== '' && $first !== '' ? $last.', '.$first : ($last ?: $first);
+                } else {
+                    $provName = 'Provider #'.$pNum;
+                }
+            }
 
             $aptDate = substr(str_replace('T', ' ', $apt->AptDateTime), 0, 10);
 
@@ -596,7 +651,7 @@ class CalendarController extends Controller
                 'duration' => $durationHrs,
                 'lead_time' => $leadDays,
                 'provider' => $provName,
-                'provider_id' => $apt->ProvNum ?: 'N/A',
+                'provider_id' => $provId,
             ];
         })->values();
 

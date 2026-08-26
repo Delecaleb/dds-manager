@@ -2020,8 +2020,8 @@
 
         // ── Appointment Capacity Breakdown Modal ─────────────────────────
         function openCapacityBreakdown(type) {
-            const datePicker = document.getElementById('calDate');
-            const date = datePicker ? datePicker.value : "{{ date('Y-m-d') }}";
+            const range = getCalendarDateRange();
+            const date = range.start || "{{ date('Y-m-d') }}";
 
             let title = 'Capacity Breakdown';
             let columns = [];
@@ -2088,7 +2088,7 @@
 
             setDataTableModalLoading('capacity-breakdown-modal', title);
 
-            fetch(baseUrl + '/calendar/capacity-breakdown?date=' + date + '&type=' + type)
+            fetch(`${baseUrl}/calendar/capacity-breakdown?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}&date=${encodeURIComponent(date)}&type=${encodeURIComponent(type)}`)
                 .then(r => r.json())
                 .then(data => {
                     openDataTableModal('capacity-breakdown-modal', title, columns, data);
