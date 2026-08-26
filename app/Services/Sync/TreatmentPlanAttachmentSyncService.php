@@ -37,9 +37,6 @@ class TreatmentPlanAttachmentSyncService extends BaseQuerySyncService
         return '*';
     }
 
-    /**
-     * Used during full sync.
-     */
     protected function orderBy(): string
     {
         return 'TreatPlanAttachNum';

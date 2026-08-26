@@ -30,4 +30,5 @@ class SyncDefinitionsService extends BaseQuerySyncService
     {
         return 'definitions';
     }
+
 }

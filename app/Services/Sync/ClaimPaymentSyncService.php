@@ -30,4 +30,5 @@ class ClaimPaymentSyncService extends BaseQuerySyncService
     {
         return 'claimpayments';
     }
+
 }

@@ -30,4 +30,5 @@ class PayPlanChargeSyncService extends BaseQuerySyncService
     {
         return 'payplancharges';
     }
+
 }

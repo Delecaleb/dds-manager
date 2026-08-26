@@ -79,12 +79,12 @@ class OperationsAnalyticsService
 
             $pwdProduction = $totalWorkingDays > 0 ? round($totalNet / $totalWorkingDays, 2) : 0;
             $pwdCollection = $totalWorkingDays > 0 ? round($totalCollection / $totalWorkingDays, 2) : 0;
-            $pwdPtsVisit = $totalWorkingDays > 0 ? (int) ceil($totalPtsVisit / $totalWorkingDays) : 0;
-            $pwdNptVisit = $totalWorkingDays > 0 ? (int) ceil($totalNptVisit / $totalWorkingDays) : 0;
+            $pwdPtsVisit = $totalWorkingDays > 0 ? (int) round($totalPtsVisit / $totalWorkingDays) : 0;
+            $pwdNptVisit = $totalWorkingDays > 0 ? (int) round($totalNptVisit / $totalWorkingDays) : 0;
 
             $ppvProduction = $totalPtsVisit > 0 ? round($totalNet / $totalPtsVisit, 2) : 0;
             $ppvCollection = $totalPtsVisit > 0 ? round($totalCollection / $totalPtsVisit, 2) : 0;
-            $ppvProcedures = $totalPtsVisit > 0 ? (int) ceil($totalProcedures / $totalPtsVisit) : 0;
+            $ppvProcedures = $totalPtsVisit > 0 ? (int) round($totalProcedures / $totalPtsVisit) : 0;
 
             $ppProduction = $totalProcedures > 0 ? round($totalNet / $totalProcedures, 2) : 0;
             $ppCollection = $totalProcedures > 0 ? round($totalCollection / $totalProcedures, 2) : 0;
@@ -197,11 +197,11 @@ class OperationsAnalyticsService
             $totalCaAccepted = array_sum(array_column($rows, 'ca_accepted'));
 
             $pwdProduction = $totalWorkingDays > 0 ? round($totalNet / $totalWorkingDays, 2) : 0;
-            $pwdPtsVisit = $totalWorkingDays > 0 ? (int) ceil($totalPtsVisits / $totalWorkingDays) : 0;
-            $pwdNptVisit = $totalWorkingDays > 0 ? (int) ceil($totalNptVisit / $totalWorkingDays) : 0;
+            $pwdPtsVisit = $totalWorkingDays > 0 ? (int) round($totalPtsVisits / $totalWorkingDays) : 0;
+            $pwdNptVisit = $totalWorkingDays > 0 ? (int) round($totalNptVisit / $totalWorkingDays) : 0;
 
             $ppvProduction = $totalPtsVisits > 0 ? round($totalNet / $totalPtsVisits, 2) : 0;
-            $ppvProcedures = $totalPtsVisits > 0 ? (int) ceil($totalProcedures / $totalPtsVisits) : 0;
+            $ppvProcedures = $totalPtsVisits > 0 ? (int) round($totalProcedures / $totalPtsVisits) : 0;
 
             $ppProduction = $totalProcedures > 0 ? round($totalNet / $totalProcedures, 2) : 0;
 
@@ -518,10 +518,10 @@ class OperationsAnalyticsService
                 'working_days' => $workingDays,
                 'procedures' => $procedures,
                 'pwd_production' => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
-                'pwd_pts_visit' => $workingDays > 0 ? (int) ceil($ptsVisits / $workingDays) : 0,
-                'pwd_npt_visit' => $workingDays > 0 ? (int) ceil($nptVisit / $workingDays) : 0,
+                'pwd_pts_visit' => $workingDays > 0 ? (int) round($ptsVisits / $workingDays) : 0,
+                'pwd_npt_visit' => $workingDays > 0 ? (int) round($nptVisit / $workingDays) : 0,
                 'ppv_production' => $ptsVisits > 0 ? round($net / $ptsVisits, 2) : 0,
-                'ppv_procedures' => $ptsVisits > 0 ? (int) ceil($procedures / $ptsVisits) : 0,
+                'ppv_procedures' => $ptsVisits > 0 ? (int) round($procedures / $ptsVisits) : 0,
                 'pp_production' => $procedures > 0 ? round($net / $procedures, 2) : 0,
             ];
         }
@@ -713,11 +713,11 @@ class OperationsAnalyticsService
                 'new_pts_visit' => $nptVisits,
                 'pwd_production' => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
                 'pwd_collection' => $workingDays > 0 ? round($collection / $workingDays, 2) : 0,
-                'pwd_pts_visit' => $workingDays > 0 ? (int) ceil($ptsVisits / $workingDays) : 0,
-                'pwd_npt_visit' => $workingDays > 0 ? (int) ceil($nptVisits / $workingDays) : 0,
+                'pwd_pts_visit' => $workingDays > 0 ? (int) round($ptsVisits / $workingDays) : 0,
+                'pwd_npt_visit' => $workingDays > 0 ? (int) round($nptVisits / $workingDays) : 0,
                 'ppv_production' => $ptsVisits > 0 ? round($net / $ptsVisits, 2) : 0,
                 'ppv_collection' => $ptsVisits > 0 ? round($collection / $ptsVisits, 2) : 0,
-                'ppv_procedures' => $ptsVisits > 0 ? (int) ceil($procedures / $ptsVisits) : 0,
+                'ppv_procedures' => $ptsVisits > 0 ? (int) round($procedures / $ptsVisits) : 0,
                 'pp_production' => $procedures > 0 ? round($net / $procedures, 2) : 0,
                 'pp_collection' => $procedures > 0 ? round($collection / $procedures, 2) : 0,
             ];
@@ -1168,11 +1168,11 @@ class OperationsAnalyticsService
                 'retention' => $tTotPts > 0 ? round(($tRetPts / $tTotPts) * 100, 2) : 0,
                 'pwd_production' => $totalWorkingDays > 0 ? round($totalNet / $totalWorkingDays, 2) : 0,
                 'pwd_collection' => $totalWorkingDays > 0 ? round($totalCollection / $totalWorkingDays, 2) : 0,
-                'pwd_pts_visits' => $totalWorkingDays > 0 ? (int) ceil($totalPtsVisits / $totalWorkingDays) : 0,
-                'pwd_npt_visits' => $totalWorkingDays > 0 ? (int) ceil($totalNptVisits / $totalWorkingDays) : 0,
+                'pwd_pts_visits' => $totalWorkingDays > 0 ? (int) round($totalPtsVisits / $totalWorkingDays) : 0,
+                'pwd_npt_visits' => $totalWorkingDays > 0 ? (int) round($totalNptVisits / $totalWorkingDays) : 0,
                 'ppv_production' => $totalPtsVisits > 0 ? round($totalNet / $totalPtsVisits, 2) : 0,
                 'ppv_collection' => $totalPtsVisits > 0 ? round($totalCollection / $totalPtsVisits, 2) : 0,
-                'ppv_procedures' => $totalPtsVisits > 0 ? (int) ceil($totalProcedures / $totalPtsVisits) : 0,
+                'ppv_procedures' => $totalPtsVisits > 0 ? (int) round($totalProcedures / $totalPtsVisits) : 0,
                 'pp_production' => $totalProcedures > 0 ? round($totalNet / $totalProcedures, 2) : 0,
                 'pp_collection' => $totalProcedures > 0 ? round($totalCollection / $totalProcedures, 2) : 0,
                 'production_goal' => $totalGoal,
@@ -1379,11 +1379,11 @@ class OperationsAnalyticsService
                 '_r_pts' => $rPts,
                 'pwd_production' => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
                 'pwd_collection' => $workingDays > 0 ? round($collection / $workingDays, 2) : 0,
-                'pwd_pts_visits' => $workingDays > 0 ? (int) ceil($ptsVisits / $workingDays) : 0,
-                'pwd_npt_visits' => $workingDays > 0 ? (int) ceil($nptVisits / $workingDays) : 0,
+                'pwd_pts_visits' => $workingDays > 0 ? (int) round($ptsVisits / $workingDays) : 0,
+                'pwd_npt_visits' => $workingDays > 0 ? (int) round($nptVisits / $workingDays) : 0,
                 'ppv_production' => $ptsVisits > 0 ? round($net / $ptsVisits, 2) : 0,
                 'ppv_collection' => $ptsVisits > 0 ? round($collection / $ptsVisits, 2) : 0,
-                'ppv_procedures' => $ptsVisits > 0 ? (int) ceil($procedures / $ptsVisits) : 0,
+                'ppv_procedures' => $ptsVisits > 0 ? (int) round($procedures / $ptsVisits) : 0,
                 'pp_production' => $procedures > 0 ? round($net / $procedures, 2) : 0,
                 'pp_collection' => $procedures > 0 ? round($collection / $procedures, 2) : 0,
                 'production_goal' => $goal,
@@ -1665,11 +1665,11 @@ class OperationsAnalyticsService
                 'working_days' => $workingDays,
                 'pwd_production' => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
                 'pwd_collection' => $workingDays > 0 ? round($collection / $workingDays, 2) : 0,
-                'pwd_pts_visit' => $workingDays > 0 ? (int) ceil($ptsVisit / $workingDays) : 0,
-                'pwd_npt_visit' => $workingDays > 0 ? (int) ceil($npt / $workingDays) : 0,
+                'pwd_pts_visit' => $workingDays > 0 ? (int) round($ptsVisit / $workingDays) : 0,
+                'pwd_npt_visit' => $workingDays > 0 ? (int) round($npt / $workingDays) : 0,
                 'ppv_production' => $ptsVisit > 0 ? round($net / $ptsVisit, 2) : 0,
                 'ppv_collection' => $ptsVisit > 0 ? round($collection / $ptsVisit, 2) : 0,
-                'ppv_procedures' => $ptsVisit > 0 ? (int) ceil($procedures / $ptsVisit) : 0,
+                'ppv_procedures' => $ptsVisit > 0 ? (int) round($procedures / $ptsVisit) : 0,
                 'pp_production' => $procedures > 0 ? round($net / $procedures, 2) : 0,
                 'pp_collection' => $procedures > 0 ? round($collection / $procedures, 2) : 0,
             ];

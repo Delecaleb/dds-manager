@@ -30,4 +30,5 @@ class DepositSyncService extends BaseQuerySyncService
     {
         return 'deposits';
     }
+
 }

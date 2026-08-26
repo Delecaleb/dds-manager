@@ -30,4 +30,5 @@ class ScheduleSyncService extends BaseQuerySyncService
     {
         return 'schedules';
     }
+
 }

@@ -612,6 +612,60 @@ class OperationsTest extends TestCase
         $this->assertEquals(2, $servicesAgeTotal);
         $this->assertEquals($officesActiveCount, $servicesAgeTotal);
     }
+
+    public function test_per_working_days_rounds_to_nearest_integer_instead_of_ceiling(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // 159 visits / 12 working days = 13.25 -> must round to 13 (not 14)
+        // 26 NPT visits / 12 working days = 2.1666 -> must round to 2 (not 3)
+        $this->assertSame(13, (int) round(159 / 12));
+        $this->assertSame(2, (int) round(26 / 12));
+
+        // Seed 1 clinic schedule with 12 working days
+        DB::table('od_schedules')->insert(
+            collect(range(1, 12))->map(fn ($d) => [
+                'ClinicNum' => 1,
+                'ProvNum' => 1,
+                'SchedDate' => sprintf('2026-08-%02d', $d),
+                'StartTime' => '09:00:00',
+                'StopTime' => '17:00:00',
+                'SchedType' => 0,
+                'Status' => 2,
+            ])->all()
+        );
+
+        // 159 distinct patients with completed procedures spread across the 12 days
+        DB::table('od_procedure_logs')->insert(
+            collect(range(1, 159))->map(fn ($i) => [
+                'ProcNum' => 9000 + $i,
+                'PatNum' => 1000 + $i,
+                'ClinicNum' => 1,
+                'ProcFee' => 100.00,
+                'ProcStatus' => '2',
+                'ProcDate' => sprintf('2026-08-%02d 10:00:00', ($i % 12) + 1),
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ])->all()
+        );
+
+        $response = $this->get(route('operations.data', [
+            'tab' => 'offices',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-25',
+        ]));
+
+        $response->assertOk();
+        $spec = $response->original->getData()['spec'] ?? null;
+        $this->assertNotNull($spec);
+
+        $row = $spec['rows'][0] ?? [];
+        $this->assertSame(159, $row['pts_visit']);
+        $this->assertSame(12, $row['working_days']);
+        $this->assertSame(13, $row['pwd_pts_visit']);
+    }
 }
+
 
 
