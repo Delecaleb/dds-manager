@@ -205,18 +205,21 @@ class OperationsAnalyticsService
 
             $ppProduction = array_sum(array_column($rows, 'pp_production'));
 
+            $totalPctTtl = array_sum(array_column($rows, 'pct_ttl'));
+
             return [
-                'location' => '',
+                'location' => 'Total:',
                 'payor' => '',
                 'gross' => $totalGross,
-                'adjustment' => $totalAdjustment,
-                'pct_ttl' => $totalNet != 0 ? 100.00 : 0,
                 'net' => $totalNet,
+                'pct_ttl' => round($totalPctTtl, 2),
+                'adjustment' => $totalAdjustment,
                 'collection' => $totalCollection,
                 'pts_visits' => $totalPtsVisits,
                 'npt_visit' => $totalNptVisit,
                 'case_acceptance' => $this->treatmentAcceptance->rateFrom($totalCaProposed, $totalCaCompleted, $totalCaAccepted),
                 'working_days' => $totalWorkingDays,
+                'procedures' => $totalProcedures,
                 'pwd_production' => $pwdProduction,
                 'pwd_pts_visit' => $pwdPtsVisit,
                 'pwd_npt_visit' => $pwdNptVisit,
@@ -226,10 +229,36 @@ class OperationsAnalyticsService
             ];
         };
 
+        $calculateAverage = function (array $rows, array $total) {
+            $count = max(1, count($rows));
+
+            return [
+                'location' => 'Average:',
+                'payor' => '',
+                'gross' => round($total['gross'] / $count, 2),
+                'net' => round($total['net'] / $count, 2),
+                'pct_ttl' => '-',
+                'adjustment' => round($total['adjustment'] / $count, 2),
+                'collection' => round($total['collection'] / $count, 2),
+                'pts_visits' => (int) round($total['pts_visits'] / $count),
+                'npt_visit' => (int) round($total['npt_visit'] / $count),
+                'case_acceptance' => '-',
+                'working_days' => (int) round($total['working_days'] / $count),
+                'procedures' => (int) round($total['procedures'] / $count),
+                'pwd_production' => round($total['pwd_production'] / $count, 2),
+                'pwd_pts_visit' => (int) round($total['pwd_pts_visit'] / $count),
+                'pwd_npt_visit' => (int) round($total['pwd_npt_visit'] / $count),
+                'ppv_production' => round($total['ppv_production'] / $count, 2),
+                'ppv_procedures' => (int) round($total['ppv_procedures'] / $count),
+                'pp_production' => round($total['pp_production'] / $count, 2),
+            ];
+        };
+
         if ($subtab === 'last-year') {
             [$start, $end] = $this->shiftYear($start, $end);
             $rows = $this->payorRows($start, $end, $clinics);
             $total = $calculateAbsoluteTotal($rows);
+            $average = $calculateAverage($rows, $total);
         } elseif ($subtab === 'diff-last-year' || $percentDiff) {
             [$lyStart, $lyEnd] = $this->shiftYear($start, $end);
             $currentRows = $this->payorRows($start, $end, $clinics);
@@ -246,22 +275,26 @@ class OperationsAnalyticsService
             foreach ($columns as $col) {
                 $key = $col['key'];
                 if (($col['type'] ?? '') === 'text') {
+                    $total[$key] = $key === 'location' ? 'Total:' : '-';
+
                     continue;
                 }
                 $a = $currentTotal[$key] ?? null;
                 $b = $lastTotal[$key] ?? null;
 
-                if ($a === null || $b === null) {
-                    $total[$key] = null;
+                if ($a === null || $b === null || ! is_numeric($a) || ! is_numeric($b)) {
+                    $total[$key] = '-';
                 } elseif ($percentDiff) {
                     $total[$key] = $b != 0 ? round(($a - $b) / abs($b) * 100, 2) : null;
                 } else {
                     $total[$key] = round($a - $b, 2);
                 }
             }
+            $average = $this->aggregate($rows, $columns, 'avg');
         } else {
             $rows = $this->payorRows($start, $end, $clinics);
             $total = $calculateAbsoluteTotal($rows);
+            $average = $calculateAverage($rows, $total);
         }
 
         return [
@@ -273,7 +306,7 @@ class OperationsAnalyticsService
             ],
             'columns' => $percentDiff ? $this->asPercentColumns($columns) : $columns,
             'rows' => $rows,
-            'average' => $this->aggregate($rows, $columns, 'avg'),
+            'average' => $average,
             'total' => $total,
         ];
     }
@@ -321,7 +354,7 @@ class OperationsAnalyticsService
                 pl.ProcFee AS gross
             ')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw('COALESCE(pl.CodeNum, 0) != 626')
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
             $prodQ->whereIn('pl.ClinicNum', $clinics);
@@ -349,7 +382,9 @@ class OperationsAnalyticsService
             $prodByPayorClinic[$key]['gross'] += (float) $row->gross;
             $prodByPayorClinic[$key]['procedures']++;
             $visitsByPayorClinic[$key][$row->PatNum.'|'.$row->proc_date] = true;
-            $daysByPayorClinic[$key][$row->proc_date] = true;
+            if ((float) $row->gross > 0) {
+                $daysByPayorClinic[$key][$row->proc_date] = true;
+            }
         }
 
         // 2. Adjustments mapped by PlanNum
@@ -400,24 +435,24 @@ class OperationsAnalyticsService
         }
 
         // 5. Case-acceptance components ($ presented vs $ completed/scheduled) mapped by PlanNum.
-        $tpSum = ProcStatus::sumWhereTreatmentPlanned('pl.ProcFee', 'pl');
-        $completedSum = ProcStatus::sumWhereCompleted('pl.ProcFee', 'pl');
-        $tpList = ProcStatus::inList(ProcStatus::TREATMENT_PLANNED);
-        $caStatuses = array_merge(ProcStatus::TREATMENT_PLANNED, ProcStatus::COMPLETED);
-
         $caQ = DB::table('od_procedure_logs as pl')
             ->leftJoinSub($latestClaim, 'cp', 'pl.PatNum', '=', 'cp.PatNum')
             ->selectRaw("
                 COALESCE(cp.PlanNum, 0) AS PlanNum,
                 pl.ClinicNum,
-                {$tpSum} AS proposed,
-                {$completedSum} AS completed,
-                SUM(CASE WHEN pl.ProcStatus IN ({$tpList}) AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'
+                SUM(CASE WHEN pl.ProcStatus IN ('1', 1) THEN pl.ProcFee ELSE 0 END) AS proposed,
+                SUM(CASE WHEN pl.ProcStatus IN ('2', 'C', 2) THEN pl.ProcFee ELSE 0 END) AS completed,
+                SUM(CASE WHEN pl.ProcStatus IN ('1', 1) AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.AptNum > 0
                          THEN pl.ProcFee ELSE 0 END) AS accepted
             ")
-            ->whereIn('pl.ProcStatus', $caStatuses)
-            ->whereRaw('COALESCE(pl.CodeNum, 0) != 626')
-            ->whereBetween('pl.ProcDate', [$start, $end]);
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->where(function ($q) use ($start, $end) {
+                $q->whereBetween('pl.DateTP', [$start, $end])
+                    ->orWhere(function ($q2) use ($start, $end) {
+                        $q2->whereBetween('pl.ProcDate', [$start, $end])
+                            ->whereIn('pl.ProcStatus', ['2', 'C', 2]);
+                    });
+            });
         if ($clinics) {
             $caQ->whereIn('pl.ClinicNum', $clinics);
         }
@@ -469,6 +504,7 @@ class OperationsAnalyticsService
             $caProposed = (float) ($caByPayorClinic[$key]['proposed'] ?? 0);
             $caCompleted = (float) ($caByPayorClinic[$key]['completed'] ?? 0);
             $caAccepted = (float) ($caByPayorClinic[$key]['accepted'] ?? 0);
+            $caTotalPresented = $caCompleted + $caProposed;
 
             $workingDays = count($daysByPayorClinic[$key] ?? []);
             $ptsVisits = count($visitsByPayorClinic[$key] ?? []);
@@ -487,10 +523,10 @@ class OperationsAnalyticsService
                 'pts_visits' => $ptsVisits,
                 'procedures' => $procedures,
                 'npt_visit' => $nptVisit,
-                'ca_proposed' => $caProposed,
+                'ca_proposed' => $caTotalPresented,
                 'ca_completed' => $caCompleted,
                 'ca_accepted' => $caAccepted,
-                'case_acceptance' => $this->treatmentAcceptance->rateFrom($caProposed, $caCompleted, $caAccepted),
+                'case_acceptance' => $this->treatmentAcceptance->rateFrom($caTotalPresented, $caCompleted, $caAccepted),
             ];
         }
 
@@ -528,7 +564,9 @@ class OperationsAnalyticsService
             ];
         }
 
-        usort($rows, fn ($a, $b) => $b['net'] <=> $a['net']);
+        usort($rows, function ($a, $b) {
+            return $a['gross'] <=> $b['gross'] ?: $a['net'] <=> $b['net'];
+        });
 
         return $rows;
     }

@@ -199,16 +199,16 @@ class OperationsTest extends TestCase
         $this->assertEquals(1200.00, $total['collection']);
         $this->assertEquals(2, $total['pts_visits']);
         $this->assertEquals(2, $total['npt_visit']);
-        $this->assertTrue(is_null($total['case_acceptance']) || $total['case_acceptance'] == 0);
+        $this->assertEquals(100.00, $total['case_acceptance']);
 
         // Assert Per Working Day totals
         $this->assertEquals(600.00, $total['pwd_production']);
-        $this->assertEquals(1.0, $total['pwd_pts_visit']);
-        $this->assertEquals(1.0, $total['pwd_npt_visit']);
+        $this->assertEquals(1, $total['pwd_pts_visit']);
+        $this->assertEquals(1, $total['pwd_npt_visit']);
 
         // Assert Per Patient Visit totals
         $this->assertEquals(600.00, $total['ppv_production']);
-        $this->assertEquals(1.0, $total['ppv_procedures']);
+        $this->assertEquals(1, $total['ppv_procedures']);
 
         // Assert Per Procedure totals
         $this->assertEquals(600.00, $total['pp_production']);
@@ -1092,7 +1092,140 @@ class OperationsTest extends TestCase
         // Only Aug 4 (with $1200 production) should be returned, Aug 11 ($0) should be excluded
         $this->assertCount(1, $rows);
         $this->assertEquals(1200.00, $rows[0]['production']);
-        $this->assertCount(1, $rows);
-        $this->assertEquals(1200.00, $rows[0]['production']);
+    }
+
+    public function test_payors_tab_returns_exact_columns_and_calculated_metrics_and_aggregates(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Seed carriers and plans
+        DB::table('od_carriers')->insert([
+            ['CarrierNum' => 1029, 'CarrierName' => 'Delta Dental of MI'],
+            ['CarrierNum' => 7, 'CarrierName' => 'Medicaid'],
+        ]);
+
+        DB::table('od_insplans')->insert([
+            ['PlanNum' => 130, 'CarrierNum' => 1029, 'GroupName' => 'Delta'],
+            ['PlanNum' => 13161, 'CarrierNum' => 1029, 'GroupName' => 'Delta Sub'],
+            ['PlanNum' => 1, 'CarrierNum' => 7, 'GroupName' => 'Medicaid'],
+        ]);
+
+        // Seed claim_procs for patient plan mapping
+        DB::table('od_claim_procs')->insert([
+            ['ClaimProcNum' => 1, 'PatNum' => 101, 'PlanNum' => 130, 'ProcDate' => '2026-08-05', 'WriteOff' => 894.75, 'ClinicNum' => 1, 'Status' => 0, 'ClaimPaymentNum' => 0],
+            ['ClaimProcNum' => 2, 'PatNum' => 102, 'PlanNum' => 13161, 'ProcDate' => '2026-08-05', 'WriteOff' => 0.00, 'ClinicNum' => 1, 'Status' => 0, 'ClaimPaymentNum' => 0],
+            ['ClaimProcNum' => 3, 'PatNum' => 103, 'PlanNum' => 1, 'ProcDate' => '2026-08-05', 'WriteOff' => 0.00, 'ClinicNum' => 1, 'Status' => 0, 'ClaimPaymentNum' => 0],
+        ]);
+
+        // Seed procedure logs
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 501,
+                'PatNum' => 101,
+                'ClinicNum' => 1,
+                'ProvNum' => 83,
+                'ProcFee' => 4500.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-08-05',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            [
+                'ProcNum' => 502,
+                'PatNum' => 102,
+                'ClinicNum' => 1,
+                'ProvNum' => 83,
+                'ProcFee' => 0.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-08-05',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            [
+                'ProcNum' => 503,
+                'PatNum' => 103,
+                'ClinicNum' => 1,
+                'ProvNum' => 83,
+                'ProcFee' => 0.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-08-06',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            [
+                'ProcNum' => 504,
+                'PatNum' => 104, // No insurance patient
+                'ClinicNum' => 1,
+                'ProvNum' => 83,
+                'ProcFee' => 5000.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-08-07',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+        ]);
+
+        // Seed collections
+        DB::table('od_pay_splits')->insert([
+            ['ProvNum' => 83, 'PatNum' => 101, 'SplitAmt' => 3855.25, 'DatePay' => '2026-08-05', 'ClinicNum' => 1],
+            ['ProvNum' => 83, 'PatNum' => 104, 'SplitAmt' => 4000.00, 'DatePay' => '2026-08-07', 'ClinicNum' => 1],
+        ]);
+
+        $response = $this->get(route('operations.data', [
+            'tab' => 'payors',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+        ]));
+
+        $response->assertOk();
+        $spec = $response->original->getData()['spec'] ?? null;
+        $this->assertNotNull($spec);
+
+        // Verify columns
+        $this->assertCount(16, $spec['columns']);
+        $columnKeys = array_column($spec['columns'], 'key');
+        $expectedKeys = [
+            'location', 'payor', 'gross', 'net', 'pct_ttl', 'adjustment', 'collection',
+            'pts_visits', 'npt_visit', 'case_acceptance',
+            'pwd_production', 'pwd_pts_visit', 'pwd_npt_visit',
+            'ppv_production', 'ppv_procedures', 'pp_production',
+        ];
+        $this->assertSame($expectedKeys, $columnKeys);
+
+        // Verify rows: 3 payors (Delta plans consolidated into Delta Dental of MI - 1029)
+        $rows = $spec['rows'];
+        $this->assertCount(3, $rows);
+
+        $delta = collect($rows)->firstWhere('payor', 'Delta Dental of MI - 1029');
+        $this->assertNotNull($delta);
+        $this->assertEquals(4500.00, $delta['gross']);
+        $this->assertEquals(3605.25, $delta['net']); // 4500 - 894.75 writeoff
+        $this->assertEquals(3855.25, $delta['collection']);
+        $this->assertEquals(1, $delta['working_days']); // 1 day with positive fee
+        $this->assertEquals(3605.25, $delta['pwd_production']);
+
+        $noIns = collect($rows)->firstWhere('payor', 'No Insurance - 999999');
+        $this->assertNotNull($noIns);
+        $this->assertEquals(5000.00, $noIns['gross']);
+        $this->assertEquals(5000.00, $noIns['net']);
+        $this->assertEquals(1, $noIns['working_days']);
+
+        $medicaid = collect($rows)->firstWhere('payor', 'Medicaid - 7');
+        $this->assertNotNull($medicaid);
+        $this->assertEquals(0.00, $medicaid['gross']);
+        $this->assertEquals(0, $medicaid['working_days']);
+
+        // Check Total row
+        $total = $spec['total'];
+        $this->assertEquals(9500.00, $total['gross']);
+        $this->assertEquals(8605.25, $total['net']);
+        $this->assertEquals(7855.25, $total['collection']);
+        $this->assertEquals(8605.25, $total['pwd_production']);
+
+        // Check Average row
+        $avg = $spec['average'];
+        $this->assertEquals(3166.67, $avg['gross']); // 9500 / 3
+        $this->assertEquals(2868.42, $avg['net']); // 8605.25 / 3
     }
 }
