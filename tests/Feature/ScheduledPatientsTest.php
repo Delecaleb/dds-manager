@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Helpers\MetricDefinitions;
 use App\Models\OdAppointment;
 use App\Models\OdPatient;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -96,5 +97,53 @@ class ScheduledPatientsTest extends TestCase
 
         // Status 1 (2026-07-05) and Status 2 (2026-07-06) should be counted -> total 2
         $this->assertEquals(2, $count);
+    }
+
+    public function test_financial_breakdown_patients_scheduled_excludes_empty_consultations_without_treatment(): void
+    {
+        $user = User::factory()->create();
+
+        OdPatient::create(['PatNum' => 101, 'LName' => 'Valid', 'FName' => 'Patient']);
+        OdPatient::create(['PatNum' => 102, 'LName' => 'Consult', 'FName' => 'Only']);
+
+        // Appointment 1: Completed or scheduled with valid procedure attached
+        DB::table('od_appointments')->insert([
+            'AptNum' => 301,
+            'PatNum' => 101,
+            'AptStatus' => 1,
+            'AptDateTime' => '2026-08-10 10:00:00',
+            'ProcDescript' => 'Prophy',
+        ]);
+        DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 901,
+            'PatNum' => 101,
+            'AptNum' => 301,
+            'CodeNum' => 1,
+            'ProcDate' => '2026-08-10',
+            'ProcFee' => 150.00,
+            'ProcStatus' => 1,
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+
+        // Appointment 2: Empty consult hold with no procedure / treatment plan
+        DB::table('od_appointments')->insert([
+            'AptNum' => 302,
+            'PatNum' => 102,
+            'AptStatus' => 1,
+            'AptDateTime' => '2026-08-11 11:00:00',
+            'ProcDescript' => 'NCCN',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('financials.breakdown', [
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+            'type' => 'patients_scheduled',
+        ]));
+
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertCount(1, $data);
+        $this->assertEquals(101, $data[0]['patient_id']);
     }
 }

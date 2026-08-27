@@ -7,7 +7,6 @@ use App\Domain\Production\ProductionService;
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
-use App\Models\OdAppointment;
 use App\Services\OpenDental\FinancialAnalyticsService;
 use App\Services\OpenDental\PatientAnalyticsService;
 use Carbon\CarbonPeriod;
@@ -60,7 +59,7 @@ class FinancialController extends Controller
 
         if (in_array($section, ['all', 'patient-kpis'])) {
             $filter = new MetricFilter($start, $end);
-            $scheduled = (new OdAppointment)->scheduledPatients($start, $end);
+            $scheduled = count($this->bkPatientsScheduled($start, $end));
             $visited = $this->patientVisits->patientVisits($start, $end);
             $netProduction = $this->production->netProduction($filter);
             $patientAvgProduction = $visited > 0 ? round($netProduction / $visited, 2) : 0;
@@ -189,11 +188,9 @@ class FinancialController extends Controller
             $dailyVisits = $visitStats['daily_visits'];
             $dailyNewVisits = $visitStats['daily_new_visits'];
 
-            $dailyScheduled = OdAppointment::whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59'])
-                ->scheduled()
-                ->selectRaw('DATE(AptDateTime) as date, '.MetricDefinitions::scheduledPatients('cnt'))
-                ->groupByRaw('DATE(AptDateTime)')
-                ->pluck('cnt', 'date');
+            $dailyScheduled = collect($this->bkPatientsScheduled($start, $end))
+                ->groupBy('dates')
+                ->map(fn ($group) => $group->count());
 
             $dailyNewScheduled = collect($this->bkNewPatientsScheduled($start, $end))
                 ->groupBy('dates')
@@ -654,6 +651,19 @@ class FinancialController extends Controller
             LEFT JOIN od_patients p ON a.PatNum = p.PatNum
             WHERE a.AptDateTime BETWEEN ? AND ?
               AND a.AptStatus IN (1, 2)
+              AND (
+                  a.AptStatus = 2
+                  OR (
+                      a.ProcDescript IS NOT NULL
+                      AND a.ProcDescript != ''
+                      AND a.ProcDescript != 'NCCN'
+                      AND EXISTS (
+                          SELECT 1 FROM od_procedure_logs pl
+                          WHERE (pl.AptNum = a.AptNum OR pl.PatNum = a.PatNum)
+                            AND COALESCE(pl.CodeNum, '') != '995'
+                      )
+                  )
+              )
             GROUP BY a.PatNum, p.LName, p.FName
             ORDER BY count DESC, p.LName
         ", [$startDate, $endDate]);

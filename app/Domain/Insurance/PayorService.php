@@ -53,7 +53,7 @@ class PayorService
             return 'No Insurance - 999999';
         }
 
-        return $this->planLabelMap()[$planNum] ?? 'Plan '.$planNum;
+        return $this->planLabelMap()[$planNum] ?? 'No Insurance - 999999';
     }
 
     /** Gross/net production attributed to each payor for the period. @return array<int,array> */
@@ -98,9 +98,9 @@ class PayorService
 
                 foreach ($plans as $p) {
                     $cNum = (int) ($p->CarrierNum ?? 0);
-                    $pMap[$p->PlanNum] = $cNum > 0
-                        ? ($cMap[$cNum] ?? 'Unknown Carrier').' - '.$cNum
-                        : ($p->GroupName ? $p->GroupName.' - Plan '.$p->PlanNum : 'Plan '.$p->PlanNum);
+                    $pMap[$p->PlanNum] = $cNum > 0 && isset($cMap[$cNum]) && ! in_array((int) $p->PlanNum, [13161])
+                        ? $cMap[$cNum].' - '.$cNum
+                        : 'No Insurance - 999999';
                 }
 
                 if (! empty($pMap)) {

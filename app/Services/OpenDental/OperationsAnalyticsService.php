@@ -298,12 +298,6 @@ class OperationsAnalyticsService
         }
 
         return [
-            'groups' => [
-                ['label' => 'By Payor', 'span' => 8],
-                ['label' => 'Per Working Day', 'span' => 3],
-                ['label' => 'Per Patient Visit', 'span' => 2],
-                ['label' => 'Per Procedure', 'span' => 1],
-            ],
             'columns' => $percentDiff ? $this->asPercentColumns($columns) : $columns,
             'rows' => $rows,
             'average' => $average,
@@ -556,10 +550,10 @@ class OperationsAnalyticsService
                 'working_days' => $workingDays,
                 'procedures' => $procedures,
                 'pwd_production' => $workingDays > 0 ? round($net / $workingDays, 2) : 0,
-                'pwd_pts_visit' => $workingDays > 0 ? (int) round($ptsVisits / $workingDays) : 0,
-                'pwd_npt_visit' => $workingDays > 0 ? (int) round($nptVisit / $workingDays) : 0,
+                'pwd_pts_visit' => $workingDays > 0 ? (int) ($ptsVisits / $workingDays) : 0,
+                'pwd_npt_visit' => $workingDays > 0 ? (int) ($nptVisit / $workingDays) : 0,
                 'ppv_production' => $ptsVisits > 0 ? round($net / $ptsVisits, 2) : 0,
-                'ppv_procedures' => $ptsVisits > 0 ? (int) round($procedures / $ptsVisits) : 0,
+                'ppv_procedures' => $ptsVisits > 0 ? (int) ($procedures / $ptsVisits) : 0,
                 'pp_production' => $procedures > 0 ? round($net / $procedures, 2) : 0,
             ];
         }
