@@ -134,7 +134,7 @@ class OperationsController extends Controller
         }
 
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
-        $end = $request->input('end_date', now()->toDateString());
+        $end = $request->input('end_date', now()->endOfMonth()->toDateString());
         $subtab = $subtab ?: $this->defaultSubtab($tab);
         $clinics = array_filter(explode(',', (string) $request->input('clinics', '')), 'strlen');
 

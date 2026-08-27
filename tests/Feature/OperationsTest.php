@@ -665,7 +665,381 @@ class OperationsTest extends TestCase
         $this->assertSame(12, $row['working_days']);
         $this->assertSame(13, $row['pwd_pts_visit']);
     }
+
+    public function test_performance_tab_returns_exact_17_columns_and_calculated_metrics_and_aggregates(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Seed 1 completed procedure on 2026-08-04 ($1000)
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 101,
+                'PatNum' => 501,
+                'ClinicNum' => 1,
+                'ProcFee' => 1000.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-08-04',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            // 1 treatment planned procedure on 2026-08-07 ($100)
+            [
+                'ProcNum' => 102,
+                'PatNum' => 502,
+                'ClinicNum' => 1,
+                'ProcFee' => 100.00,
+                'ProcStatus' => '1',
+                'ProcDate' => '2026-08-07',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            // 1 unscheduled treatment planned procedure on 2026-08-06 ($500)
+            [
+                'ProcNum' => 103,
+                'PatNum' => 503,
+                'ClinicNum' => 1,
+                'ProcFee' => 500.00,
+                'ProcStatus' => 'TP',
+                'ProcDate' => '2026-08-06',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+        ]);
+
+        // Seed adjustment on 2026-08-04 (-$50)
+        DB::table('od_adjustments')->insert([
+            [
+                'ProvNum' => 1,
+                'AdjAmt' => -50.00,
+                'AdjDate' => '2026-08-04',
+                'ClinicNum' => 1,
+            ],
+        ]);
+
+        // Seed collection on 2026-08-04 ($800)
+        DB::table('od_pay_splits')->insert([
+            [
+                'ProvNum' => 1,
+                'SplitAmt' => 800.00,
+                'DatePay' => '2026-08-04',
+                'ClinicNum' => 1,
+            ],
+        ]);
+
+        // Seed scheduled appointments
+        DB::table('od_appointments')->insert([
+            [
+                'AptNum' => 1,
+                'PatNum' => 501,
+                'ClinicNum' => 1,
+                'AptDateTime' => '2026-08-04 10:00:00',
+                'AptStatus' => 2,
+                'IsNewPatient' => 1,
+            ],
+            [
+                'AptNum' => 2,
+                'PatNum' => 502,
+                'ClinicNum' => 1,
+                'AptDateTime' => '2026-08-07 11:00:00',
+                'AptStatus' => 1,
+                'IsNewPatient' => 0,
+            ],
+        ]);
+
+        // Query performance data for 2 days (2026-08-04 to 2026-08-05)
+        $response = $this->get(route('operations.data', [
+            'tab' => 'performance',
+            'start_date' => '2026-08-04',
+            'end_date' => '2026-08-05',
+        ]));
+
+        $response->assertOk();
+        $spec = $response->original->getData()['spec'] ?? null;
+        $this->assertNotNull($spec);
+
+        // Verify exact 17 columns
+        $this->assertCount(17, $spec['columns']);
+        $columnKeys = array_column($spec['columns'], 'key');
+        $expectedKeys = [
+            'date', 'goal', 'actual_production', 'actual_collection',
+            'actual_pts_visit', 'actual_npt_visit', 'sched_production',
+            'sched_pts_visit', 'sched_new_pts_visit', 'open_appt_hours',
+            'unscheduled_tx', 'booked_production', 'booked_prod_pct_goal',
+            'actual_prod_vs_goal', 'actual_vs_sched_prod', 'act_vs_sched_pts',
+            'act_vs_sched_npts',
+        ];
+        $this->assertSame($expectedKeys, $columnKeys);
+
+        // Verify headers are flat (no grouped header row)
+        $this->assertEmpty($spec['header_groups']);
+
+        // Check rows
+        $rows = $spec['rows'];
+        $this->assertCount(2, $rows);
+
+        // Row 1: 2026-08-04
+        $r1 = $rows[0];
+        $this->assertEquals('Tuesday - August 04, 2026', $r1['date']);
+        $this->assertEquals(950.00, $r1['actual_production']); // 1000 - 50 = 950
+        $this->assertEquals(800.00, $r1['actual_collection']);
+        $this->assertEquals(1, $r1['actual_pts_visit']);
+        $this->assertEquals(950.00, $r1['booked_production']);
+        $this->assertEquals(950.00, $r1['actual_prod_vs_goal']);
+        $this->assertEquals(950.00, $r1['actual_vs_sched_prod']);
+        $this->assertEquals(0, $r1['act_vs_sched_pts']); // 1 actual - 1 sched = 0
+
+        // Check Total row
+        $total = $spec['total'];
+        $this->assertEquals(950.00, $total['actual_production']);
+        $this->assertEquals(800.00, $total['actual_collection']);
+        $this->assertEquals(1, $total['actual_pts_visit']);
+        $this->assertEquals(950.00, $total['booked_production']);
+
+        // Check Average row (over 2 days)
+        $avg = $spec['average'];
+        $this->assertEquals(475.00, $avg['actual_production']); // 950 / 2 = 475
+        $this->assertEquals(400.00, $avg['actual_collection']); // 800 / 2 = 400
+        $this->assertEquals(1, $avg['actual_pts_visit']); // round(1 / 2) = 1
+    }
+
+    public function test_compliance_tab_returns_exact_grouped_headers_and_provider_metrics_and_aggregates(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Seed provider 1 with completed procedures and adjustments
+        DB::table('od_providers')->insert([
+            ['ProvNum' => 10, 'LName' => 'Zeitoun', 'PName' => 'Ali', 'Abbr' => 'ZEIT'],
+            ['ProvNum' => 20, 'LName' => 'Elias', 'PName' => 'Kathy', 'Abbr' => 'ELIA'],
+        ]);
+
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 201,
+                'PatNum' => 601,
+                'ClinicNum' => 1,
+                'ProvNum' => 10,
+                'ProcFee' => 1000.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-08-04',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            [
+                'ProcNum' => 202,
+                'PatNum' => 602,
+                'ClinicNum' => 1,
+                'ProvNum' => 10,
+                'ProcFee' => 500.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-08-05',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+        ]);
+
+        // Seed adjustment for Prov 10 (-$100) and Prov 20 (-$200, adjustment only)
+        DB::table('od_adjustments')->insert([
+            [
+                'ProvNum' => 10,
+                'AdjAmt' => -100.00,
+                'AdjDate' => '2026-08-04',
+                'ClinicNum' => 1,
+            ],
+            [
+                'ProvNum' => 20,
+                'AdjAmt' => -200.00,
+                'AdjDate' => '2026-08-05',
+                'ClinicNum' => 1,
+            ],
+        ]);
+
+        $response = $this->get(route('operations.data', [
+            'tab' => 'compliance',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-10',
+        ]));
+
+        $response->assertOk();
+        $spec = $response->original->getData()['spec'] ?? null;
+        $this->assertNotNull($spec);
+
+        // Verify columns (14 columns)
+        $this->assertCount(14, $spec['columns']);
+        $columnKeys = array_column($spec['columns'], 'key');
+        $expectedKeys = [
+            'location', 'provider', 'total_prod', 'total_visits',
+            'pwd_prod', 'pwd_proc', 'ppv_prod', 'ppv_proc',
+            'ppv_fil', 'ppv_crn', 'ppv_ext', 'ppv_pulp', 'ppv_root',
+            'pp_prod',
+        ];
+        $this->assertSame($expectedKeys, $columnKeys);
+
+        // Verify standard groups with leadSpan = 2 (Location + Provider)
+        $this->assertNotEmpty($spec['groups']);
+        $this->assertSame('Provider', $spec['groups'][0]['label']);
+        $this->assertSame(2, $spec['groups'][0]['span']);
+
+        // Check rows
+        $rows = $spec['rows'];
+        $this->assertCount(2, $rows);
+
+        // Prov 10: Zeitoun ($1500 - $100 = $1400 net production, 2 visits, 2 working days, 2 procedures)
+        $r1 = collect($rows)->firstWhere('prov_num', 10);
+        $this->assertNotNull($r1);
+        $this->assertEquals('Zeitoun, Ali', $r1['provider']);
+        $this->assertEquals(1400.00, $r1['total_prod']);
+        $this->assertEquals(2, $r1['total_visits']);
+        $this->assertEquals(700.00, $r1['pwd_prod']); // 1400 / 2 days = 700
+        $this->assertEquals(1.0, $r1['pwd_proc']); // 2 procs / 2 days = 1.0
+        $this->assertEquals(700.00, $r1['ppv_prod']); // 1400 / 2 visits = 700
+        $this->assertEquals(1, $r1['ppv_proc']); // 2 / 2 = 1
+        $this->assertEquals(700.00, $r1['pp_prod']); // 1400 / 2 procs = 700
+
+        // Prov 20: Elias (-$200 net production from adjustment only)
+        $r2 = collect($rows)->firstWhere('prov_num', 20);
+        $this->assertNotNull($r2);
+        $this->assertEquals('Elias, Kathy', $r2['provider']);
+        $this->assertEquals(-200.00, $r2['total_prod']);
+        $this->assertEquals(0, $r2['total_visits']);
+
+        // Check Total row
+        $total = $spec['total'];
+        $this->assertEquals(1200.00, $total['total_prod']); // 1400 - 200 = 1200
+        $this->assertEquals(2, $total['total_visits']);
+        $this->assertEquals(700.00, $total['pwd_prod']);
+        $this->assertEquals(700.00, $total['ppv_prod']);
+
+        // Check Average row (2 active providers)
+        $avg = $spec['average'];
+        $this->assertEquals(600.00, $avg['total_prod']); // 1200 / 2 = 600
+        $this->assertEquals(1, $avg['total_visits']); // 2 / 2 = 1
+        $this->assertEquals(350.00, $avg['pwd_prod']); // 700 / 2 = 350
+        $this->assertEquals(350.00, $avg['ppv_prod']); // 700 / 2 = 350
+    }
+
+    public function test_providers_tab_returns_exact_25_columns_and_calculated_metrics_and_aggregates(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Seed provider specialties in od_definitions
+        DB::table('od_definitions')->insert([
+            ['DefNum' => 268, 'Category' => 35, 'ItemName' => 'Not Set', 'ItemValue' => '', 'ItemColor' => 0, 'IsHidden' => 0],
+            ['DefNum' => 269, 'Category' => 35, 'ItemName' => 'Invisalign', 'ItemValue' => '', 'ItemColor' => 0, 'IsHidden' => 0],
+        ]);
+
+        // Seed providers
+        DB::table('od_providers')->insert([
+            ['ProvNum' => 83, 'LName' => 'Zeitoun', 'PName' => 'Ali', 'Abbr' => 'ZEIT', 'Specialty' => 268, 'IsNotPerson' => 0],
+            ['ProvNum' => 64, 'LName' => 'Haddow', 'PName' => 'Mason', 'Abbr' => 'HADD', 'Specialty' => 269, 'IsNotPerson' => 0],
+            ['ProvNum' => 46, 'LName' => 'Detroit Dental Care, PC', 'PName' => '', 'Abbr' => 'DETD', 'Specialty' => 0, 'IsNotPerson' => 1],
+            ['ProvNum' => 76, 'LName' => 'Heller', 'PName' => 'Landi', 'Abbr' => 'HELL', 'Specialty' => 268, 'IsNotPerson' => 0], // Inactive provider
+        ]);
+
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 301,
+                'PatNum' => 701,
+                'ClinicNum' => 1,
+                'ProvNum' => 83,
+                'ProcFee' => 1000.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-08-04',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            [
+                'ProcNum' => 302,
+                'PatNum' => 702,
+                'ClinicNum' => 1,
+                'ProvNum' => 64,
+                'ProcFee' => 500.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-08-05',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+        ]);
+
+        // Seed payments and adjustments
+        DB::table('od_pay_splits')->insert([
+            ['ProvNum' => 83, 'SplitAmt' => 800.00, 'DatePay' => '2026-08-04', 'ClinicNum' => 1],
+            ['ProvNum' => 64, 'SplitAmt' => 400.00, 'DatePay' => '2026-08-05', 'ClinicNum' => 1],
+        ]);
+
+        DB::table('od_adjustments')->insert([
+            ['ProvNum' => 83, 'AdjAmt' => -100.00, 'AdjDate' => '2026-08-04', 'ClinicNum' => 1],
+            ['ProvNum' => 46, 'AdjAmt' => 50.00, 'AdjDate' => '2026-08-05', 'ClinicNum' => 1],
+        ]);
+
+        $response = $this->get(route('operations.data', [
+            'tab' => 'providers',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-10',
+        ]));
+
+        $response->assertOk();
+        $spec = $response->original->getData()['spec'] ?? null;
+        $this->assertNotNull($spec);
+
+        // Verify columns (25 columns)
+        $this->assertCount(25, $spec['columns']);
+        $columnKeys = array_column($spec['columns'], 'key');
+        $expectedKeys = [
+            'location', 'line_of_business', 'provider', 'provider_id',
+            'gross', 'net', 'adjustment', 'collection', 'pts_visits', 'npt_visits', 'working_days', 'procedures', 'retention',
+            'pwd_production', 'pwd_collection', 'pwd_pts_visits', 'pwd_npt_visits',
+            'ppv_production', 'ppv_collection', 'ppv_procedures',
+            'pp_production', 'pp_collection',
+            'production_goal', 'actual_production', 'variance',
+        ];
+        $this->assertSame($expectedKeys, $columnKeys);
+
+        // Verify Provider column is sticky
+        $provCol = collect($spec['columns'])->firstWhere('key', 'provider');
+        $this->assertNotNull($provCol);
+        $this->assertTrue($provCol['sticky'] ?? false);
+
+        // Check rows (Inactive provider Heller (76) excluded, active 83, 64, 46 present)
+        $rows = $spec['rows'];
+        $this->assertCount(3, $rows);
+        $this->assertNull(collect($rows)->firstWhere('prov_num', 76));
+
+        // Prov 83: Zeitoun
+        $r83 = collect($rows)->firstWhere('prov_num', 83);
+        $this->assertNotNull($r83);
+        $this->assertEquals('Not Set', $r83['line_of_business']);
+        $this->assertEquals(1000.00, $r83['gross']);
+        $this->assertEquals(900.00, $r83['net']);
+        $this->assertEquals(-100.00, $r83['adjustment']);
+        $this->assertEquals(800.00, $r83['collection']);
+
+        // Prov 64: Haddow
+        $r64 = collect($rows)->firstWhere('prov_num', 64);
+        $this->assertNotNull($r64);
+        $this->assertEquals('Invisalign', $r64['line_of_business']);
+        $this->assertEquals(500.00, $r64['gross']);
+        $this->assertEquals(500.00, $r64['net']);
+        $this->assertEquals(400.00, $r64['collection']);
+
+        // Prov 46: Detroit Dental Care (Hygiene)
+        $r46 = collect($rows)->firstWhere('prov_num', 46);
+        $this->assertNotNull($r46);
+        $this->assertEquals('Hygiene', $r46['line_of_business']);
+        $this->assertEquals(50.00, $r46['net']);
+
+        // Check Total row
+        $total = $spec['total'];
+        $this->assertEquals(1500.00, $total['gross']);
+        $this->assertEquals(1450.00, $total['net']); // 900 + 500 + 50
+        $this->assertEquals(-50.00, $total['adjustment']);
+        $this->assertEquals(1200.00, $total['collection']);
+
+        // Check Average row
+        $avg = $spec['average'];
+        $this->assertEquals(500.00, $avg['gross']); // 1500 / 3
+        $this->assertEquals(483.33, $avg['net']); // 1450 / 3
+    }
 }
-
-
-

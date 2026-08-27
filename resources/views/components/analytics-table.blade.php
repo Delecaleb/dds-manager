@@ -31,6 +31,8 @@
                     $abs = number_format(abs($v), 2);
                     return $v < 0 ? "$ ($abs)" : "$ $abs";
                 case 'percent': return number_format((float) $value, 2) . '%';
+                case 'number_3': return number_format((float) $value, 3);
+                case 'number_2': return number_format((float) $value, 2);
                 case 'number':
                     $v = (float) $value;
                     return floor($v) == $v ? number_format($v) : number_format($v, 2);
@@ -169,7 +171,7 @@
                             // would land at the top. Missing values get an empty key so they sort
                             // together at one end instead of scattering.
                             $orderAttr = '';
-                            if (in_array($type, ['money', 'percent', 'number'], true)) {
+                            if (in_array($type, ['money', 'percent', 'number', 'number_2', 'number_3'], true)) {
                                 $orderAttr = ($rawValue === null || $rawValue === '--')
                                     ? ' data-order=""'
                                     : ' data-order="' . (float) $rawValue . '"';
