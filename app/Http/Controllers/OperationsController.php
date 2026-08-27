@@ -823,6 +823,7 @@ class OperationsController extends Controller
             $query = DB::table('od_procedure_logs')
                 ->selectRaw('ProcDate, COUNT(DISTINCT PatNum) as pts_visits, COUNT(*) as procedures, SUM(ProcFee) as production')
                 ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereRaw("COALESCE(CodeNum, '') != '626'")
                 ->whereBetween('ProcDate', [$start, $end]);
 
             if ($provNum) {
@@ -831,7 +832,10 @@ class OperationsController extends Controller
                 $query->where('ClinicNum', $clinicNum);
             }
 
-            $logs = $query->groupBy('ProcDate')->get();
+            $logs = $query->groupBy('ProcDate')
+                ->havingRaw('SUM(ProcFee) > 0')
+                ->orderBy('ProcDate', 'desc')
+                ->get();
 
             $totVisits = 0;
             $totProcs = 0;

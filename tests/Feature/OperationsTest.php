@@ -1042,4 +1042,57 @@ class OperationsTest extends TestCase
         $this->assertEquals(500.00, $avg['gross']); // 1500 / 3
         $this->assertEquals(483.33, $avg['net']); // 1450 / 3
     }
+
+    public function test_working_days_drilldown_only_includes_positive_production_dates(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Seed provider and procedures with positive and zero fee
+        DB::table('od_providers')->insert([
+            ['ProvNum' => 83, 'LName' => 'Zeitoun', 'PName' => 'Ali', 'Abbr' => 'ZEIT', 'Specialty' => 268, 'IsNotPerson' => 0],
+        ]);
+
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 401,
+                'PatNum' => 801,
+                'ClinicNum' => 1,
+                'ProvNum' => 83,
+                'ProcFee' => 1200.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-08-04',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+            [
+                'ProcNum' => 402,
+                'PatNum' => 802,
+                'ClinicNum' => 1,
+                'ProvNum' => 83,
+                'ProcFee' => 0.00,
+                'ProcStatus' => 'C',
+                'ProcDate' => '2026-08-11',
+                'MedicalCode' => '',
+                'ToothNum' => '',
+            ],
+        ]);
+
+        $response = $this->get(route('operations.drilldown', [
+            'metric' => 'working_days',
+            'prov_num' => 83,
+            'start' => '2026-08-01',
+            'end' => '2026-08-31',
+        ]));
+
+        $response->assertOk();
+        $response->assertViewHas('rows');
+        $rows = $response->original->getData()['rows'] ?? [];
+
+        // Only Aug 4 (with $1200 production) should be returned, Aug 11 ($0) should be excluded
+        $this->assertCount(1, $rows);
+        $this->assertEquals(1200.00, $rows[0]['production']);
+        $this->assertCount(1, $rows);
+        $this->assertEquals(1200.00, $rows[0]['production']);
+    }
 }
