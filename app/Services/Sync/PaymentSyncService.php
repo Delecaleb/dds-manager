@@ -30,5 +30,4 @@ class PaymentSyncService extends BaseQuerySyncService
     {
         return 'payments';
     }
-
 }

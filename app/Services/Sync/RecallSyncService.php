@@ -30,5 +30,4 @@ class RecallSyncService extends BaseQuerySyncService
     {
         return 'recalls';
     }
-
 }

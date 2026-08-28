@@ -81,19 +81,61 @@ class FinancialController extends Controller
 
         // Utilization Data Chart (Provider Production)
         if (in_array($section, ['all', 'utilization-chart'])) {
-            $utilizationData = DB::select("
-                SELECT
-                    COALESCE(NULLIF(pr.Abbr, ''), pr.LName, CAST(pr.ProvNum AS CHAR)) AS provider,
-                    SUM(pl.ProcFee) AS production
-                FROM od_procedure_logs pl
-                JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-                WHERE pl.ProcStatus IN ({$this->completedIn})
-                  AND pr.IsHidden IN ('false', '0', 0)
-                  AND pl.ProcDate BETWEEN ? AND ?
-                GROUP BY pr.ProvNum, pr.Abbr, pr.LName
-                HAVING SUM(pl.ProcFee) > 0
-                ORDER BY production DESC
-            ", [$start, $end]);
+            $grossSub = DB::table('od_procedure_logs')
+                ->select('ProvNum', DB::raw('SUM(ProcFee) AS gross'))
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$start, $end])
+                ->groupBy('ProvNum');
+
+            $adjSub = DB::table('od_adjustments')
+                ->select('ProvNum', DB::raw('SUM(AdjAmt) AS adjustments'))
+                ->whereBetween('AdjDate', [$start, $end])
+                ->groupBy('ProvNum');
+
+            $writeoffSub = DB::table('od_claim_procs')
+                ->select('ProvNum', DB::raw('SUM(WriteOff) AS writeoffs'))
+                ->whereBetween('ProcDate', [$start, $end])
+                ->groupBy('ProvNum');
+
+            $providers = DB::table('od_providers as pr')
+                ->select(
+                    'pr.ProvNum',
+                    'pr.LName',
+                    'pr.Abbr',
+                    DB::raw('COALESCE(g.gross, 0) AS gross_production'),
+                    DB::raw('COALESCE(a.adjustments, 0) AS adjustments'),
+                    DB::raw('COALESCE(w.writeoffs, 0) AS writeoffs')
+                )
+                ->leftJoinSub($grossSub, 'g', 'pr.ProvNum', '=', 'g.ProvNum')
+                ->leftJoinSub($adjSub, 'a', 'pr.ProvNum', '=', 'a.ProvNum')
+                ->leftJoinSub($writeoffSub, 'w', 'pr.ProvNum', '=', 'w.ProvNum')
+                ->whereIn('pr.IsHidden', ['false', '0', 0, false])
+                ->where(function ($q) {
+                    $q->whereRaw('COALESCE(g.gross, 0) != 0')
+                        ->orWhereRaw('COALESCE(a.adjustments, 0) != 0')
+                        ->orWhereRaw('COALESCE(w.writeoffs, 0) != 0');
+                })
+                ->get();
+
+            $utilizationData = $providers->map(function ($p) {
+                $net = $this->production->netFrom(
+                    (float) $p->gross_production,
+                    (float) $p->adjustments,
+                    (float) $p->writeoffs
+                );
+                $providerName = ! empty($p->Abbr) ? $p->Abbr : (! empty($p->LName) ? $p->LName : (string) $p->ProvNum);
+
+                return (object) [
+                    'provider' => $providerName,
+                    'production' => $net,
+                    'net_production' => $net,
+                    'gross_production' => round((float) $p->gross_production, 2),
+                ];
+            })
+                ->filter(fn ($item) => $item->production > 0)
+                ->sortByDesc('production')
+                ->values()
+                ->all();
 
             $response['utilization'] = $utilizationData;
         }

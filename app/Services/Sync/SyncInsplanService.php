@@ -30,5 +30,4 @@ class SyncInsplanService extends BaseQuerySyncService
     {
         return 'insplans';
     }
-
 }

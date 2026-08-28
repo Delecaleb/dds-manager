@@ -30,5 +30,4 @@ class RecallTypeSyncService extends BaseQuerySyncService
     {
         return 'recall_types';
     }
-
 }

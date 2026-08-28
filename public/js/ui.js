@@ -299,12 +299,98 @@
         var html = '<div class="dds-modal"><div class="dds-modal-panel">' +
             '<div class="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/50">' +
             '<h4 class="text-sm font-bold text-gray-900">Breakdown | ' + (title || 'Details') + '</h4>' +
-            '<button type="button" data-dds-close class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button></div>' +
+            '<div class="flex items-center gap-3">' +
+            (rows.length ? '<button type="button" onclick="exportDrilldownModalCsv(this)" class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded border border-emerald-500 text-emerald-600 hover:bg-emerald-50 focus:outline-none transition-colors cursor-pointer shadow-xs"><svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>' : '') +
+            '<button type="button" data-dds-close class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button></div></div>' +
             '<div class="flex-1 overflow-y-auto p-6">' + body + '</div></div></div>';
         var modal = DDS.modal.openHtml(html);
         if (rows.length) DDS.dataTable(document.getElementById(tableId)); // sortable columns
         return modal;
     };
+
+    // Export CSV helper for drilldown modals (both server-rendered and DDS.modal.details)
+    function exportDrilldownModalCsv(btn) {
+        var modal = (btn && btn.closest ? btn.closest('.ds-limitless-modal, .dds-modal') : null) || document.querySelector('.ds-limitless-modal, .dds-modal') || document;
+        var table = modal.querySelector('table');
+        if (!table) return;
+
+        var titleEl = modal.querySelector('h2, h3, h4');
+        var title = (titleEl ? titleEl.textContent : '').replace(/^Breakdown\s*\|\s*/i, '').trim() || 'breakdown';
+        var filename = title.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + new Date().toISOString().slice(0, 10) + '.csv';
+
+        var headers = [];
+        table.querySelectorAll('thead tr th').forEach(function (th) {
+            var clone = th.cloneNode(true);
+            clone.querySelectorAll('.pointer-events-none, svg, button, .dt-column-order').forEach(function (el) { el.remove(); });
+            var txt = clone.textContent.trim().replace(/\s+/g, ' ');
+            if (txt) {
+                headers.push('"' + txt.replace(/"/g, '""') + '"');
+            }
+        });
+
+        var rows = [];
+        if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(table)) {
+            var dt = jQuery(table).DataTable();
+            var nodes = dt.rows({ search: 'applied' }).nodes();
+            for (var i = 0; i < nodes.length; i++) {
+                var rowCells = [];
+                nodes[i].querySelectorAll('td').forEach(function (td) {
+                    var clone = td.cloneNode(true);
+                    clone.querySelectorAll('.pointer-events-none, svg, button').forEach(function (el) { el.remove(); });
+                    var txt = clone.textContent.trim().replace(/\s+/g, ' ');
+                    rowCells.push('"' + txt.replace(/"/g, '""') + '"');
+                });
+                if (rowCells.length) {
+                    rows.push(rowCells.join(','));
+                }
+            }
+        }
+
+        if (!rows.length) {
+            table.querySelectorAll('tbody tr').forEach(function (tr) {
+                var rowCells = [];
+                tr.querySelectorAll('td').forEach(function (td) {
+                    var clone = td.cloneNode(true);
+                    clone.querySelectorAll('.pointer-events-none, svg, button').forEach(function (el) { el.remove(); });
+                    var txt = clone.textContent.trim().replace(/\s+/g, ' ');
+                    rowCells.push('"' + txt.replace(/"/g, '""') + '"');
+                });
+                if (rowCells.length && rowCells.join('') !== '""') {
+                    rows.push(rowCells.join(','));
+                }
+            });
+        }
+
+        var tfoot = table.querySelector('tfoot');
+        if (tfoot) {
+            var footCells = [];
+            tfoot.querySelectorAll('td, th').forEach(function (c) {
+                var clone = c.cloneNode(true);
+                clone.querySelectorAll('.pointer-events-none, svg, button').forEach(function (el) { el.remove(); });
+                var txt = clone.textContent.trim().replace(/\s+/g, ' ');
+                footCells.push('"' + txt.replace(/"/g, '""') + '"');
+            });
+            if (footCells.length && footCells.some(function (v) { return v !== '""' && v !== '"Total:"'; })) {
+                rows.push(footCells.join(','));
+            }
+        }
+
+        var csvContent = (headers.length ? [headers.join(',')] : []).concat(rows).join('\r\n');
+        var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 200);
+    }
+    window.exportDrilldownModalCsv = exportDrilldownModalCsv;
+    DDS.modal.exportCsv = exportDrilldownModalCsv;
+
     // Back-compat aliases so existing markup keeps working while callers migrate.
     window.openOpsDrilldown = function (t, d) { return DDS.modal.details(t, d); };
     window.openMarketingDrilldown = function (t, d) { return DDS.modal.details(t, d); };

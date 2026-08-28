@@ -1228,4 +1228,61 @@ class OperationsTest extends TestCase
         $this->assertEquals(3166.67, $avg['gross']); // 9500 / 3
         $this->assertEquals(2868.42, $avg['net']); // 8605.25 / 3
     }
+
+    public function test_cancellation_drilldown_renders_and_includes_export_csv(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        DB::table('od_providers')->insert([
+            'ProvNum' => 99,
+            'Abbr' => 'TESTPROV',
+            'LName' => 'Tester',
+            'PName' => 'John',
+        ]);
+
+        DB::table('od_patients')->insert([
+            'PatNum' => 5001,
+            'LName' => 'Doe',
+            'FName' => 'Jane',
+        ]);
+
+        DB::table('od_appointments')->insert([
+            'AptNum' => 7001,
+            'PatNum' => 5001,
+            'ProvNum' => 99,
+            'ClinicNum' => 1,
+            'AptStatus' => '5', // Broken / Cancelled
+            'AptDateTime' => '2026-08-10 14:00:00',
+            'Note' => 'Patient called to cancel appointment',
+            'ProcDescript' => 'Prophy and Exam',
+        ]);
+
+        DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 8001,
+            'PatNum' => 5001,
+            'ProvNum' => 99,
+            'ClinicNum' => 1,
+            'AptNum' => 7001,
+            'ProcFee' => 250.00,
+            'ProcStatus' => '2',
+            'ProcDate' => '2026-08-10 14:00:00',
+        ]);
+
+        $response = $this->get(route('operations.drilldown', [
+            'metric' => 'cancellation',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+            'clinic_num' => 1,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Cancellation Breakdown');
+        $response->assertSee('Export CSV');
+        $response->assertSee('exportDrilldownModalCsv');
+        $response->assertSee('Doe, Jane');
+        $response->assertSee('Tester, John');
+        $response->assertSee('Patient called to cancel appointment');
+        $response->assertSee('$ 250.00');
+    }
 }

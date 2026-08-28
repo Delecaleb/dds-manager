@@ -521,7 +521,7 @@
     {{-- ── Utilization Data Chart (Production by Provider) ────────────────────── --}}
     <div class="mt-8">
       <div class="font-bold border-b p-3 text-lg text-black bg-gray-50 border-gray-100 flex items-center">
-        Production (by Provider)
+        Utilization Data Chart
       </div>
       <div class="bg-white p-8 border border-gray-100 border-t-0 shadow-sm relative pt-[60px]">
         <div class="h-[400px] w-full">
@@ -852,7 +852,7 @@
     function renderUtilizationChart(utilData) {
       var ctx = document.getElementById('utilizationChart').getContext('2d');
       var labels = utilData.map(function (item) { return item.provider || 'Unknown Provider'; });
-      var values = utilData.map(function (item) { return parseFloat(item.production); });
+      var values = utilData.map(function (item) { return parseFloat(item.net_production !== undefined ? item.net_production : item.production); });
 
       if (utilizationChartInstance) {
         utilizationChartInstance.data.labels = labels;
@@ -864,7 +864,7 @@
           data: {
             labels: labels,
             datasets: [{
-              label: 'Production',
+              label: 'Net Production',
               data: values,
               backgroundColor: '#996BE5',
               barThickness: 100, // Slightly adjusted for better representation

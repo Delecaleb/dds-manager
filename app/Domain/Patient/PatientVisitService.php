@@ -4,6 +4,7 @@ namespace App\Domain\Patient;
 
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
+use App\Helpers\MetricDefinitions;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -250,7 +251,7 @@ class PatientVisitService
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereRaw("COALESCE(CodeNum, '') != '626'")
                 ->whereBetween('ProcDate', [$s, $e])
-                ->selectRaw('ClinicNum, COUNT(DISTINCT PatNum) as val')
+                ->selectRaw('ClinicNum, '.MetricDefinitions::patientVisits('val'))
                 ->groupBy('ClinicNum')
                 ->pluck('val', 'ClinicNum');
 

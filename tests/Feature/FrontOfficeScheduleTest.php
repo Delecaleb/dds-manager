@@ -3,7 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\OdAdjustment;
+use App\Models\OdAppointment;
+use App\Models\OdCarrier;
+use App\Models\OdInsplan;
+use App\Models\OdPatient;
+use App\Models\OdProcedure;
 use App\Models\OdProcedureLog;
+use App\Models\OdProvider;
 use App\Models\User;
 use Carbon\Carbon;
 use Tests\TestCase;
@@ -73,17 +79,17 @@ class FrontOfficeScheduleTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $carrier = \App\Models\OdCarrier::create([
+        $carrier = OdCarrier::create([
             'CarrierNum' => 88,
             'CarrierName' => 'Delta Dental of MI',
         ]);
 
-        $insPlan = \App\Models\OdInsplan::create([
+        $insPlan = OdInsplan::create([
             'PlanNum' => 401,
             'CarrierNum' => $carrier->CarrierNum,
         ]);
 
-        $patient = \App\Models\OdPatient::create([
+        $patient = OdPatient::create([
             'PatNum' => 101,
             'FName' => 'Jane',
             'LName' => 'Doe',
@@ -91,21 +97,21 @@ class FrontOfficeScheduleTest extends TestCase
             'Email' => 'jane.doe@example.com',
         ]);
 
-        $provider = \App\Models\OdProvider::create([
+        $provider = OdProvider::create([
             'ProvNum' => 95,
             'LName' => 'Haddow',
             'PName' => 'Mason',
             'Abbr' => 'HADD',
         ]);
 
-        $proc = \App\Models\OdProcedure::create([
+        $proc = OdProcedure::create([
             'CodeNum' => 201,
             'ProcCode' => 'D8090',
             'Descript' => 'comprehensive orthodontic treatment',
         ]);
 
         // Broken appointment in August
-        $brokenApt = \App\Models\OdAppointment::create([
+        $brokenApt = OdAppointment::create([
             'AptNum' => 98881,
             'PatNum' => $patient->PatNum,
             'ProvNum' => $provider->ProvNum,
@@ -117,7 +123,7 @@ class FrontOfficeScheduleTest extends TestCase
         ]);
 
         // Attached procedure fee
-        \App\Models\OdProcedureLog::create([
+        OdProcedureLog::create([
             'ProcNum' => 988811,
             'PatNum' => $patient->PatNum,
             'AptNum' => $brokenApt->AptNum,
@@ -128,7 +134,7 @@ class FrontOfficeScheduleTest extends TestCase
         ]);
 
         // Future re-booked appointment in September
-        \App\Models\OdAppointment::create([
+        OdAppointment::create([
             'AptNum' => 98882,
             'PatNum' => $patient->PatNum,
             'ProvNum' => $provider->ProvNum,

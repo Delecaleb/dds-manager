@@ -30,5 +30,4 @@ class SyncCarrierService extends BaseQuerySyncService
     {
         return 'carriers';
     }
-
 }
