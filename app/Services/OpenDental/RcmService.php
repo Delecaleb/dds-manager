@@ -673,178 +673,202 @@ class RcmService
      * Estimated Insurance $, Estimated Patient $, Insurance Paid, Patient Paid,
      * Total Paid, Uncollected Balance, Loan Amount.
      */
-    public function getPointOfServiceCollections(?string $startDate, ?string $endDate, ?int $officeId, ?string $tier = null, ?string $search = null, int $page = 1, int $perPage = 30): array
-    {
-        $query = DB::table('od_procedure_logs as pl')
+    public function getPointOfServiceCollections(
+        ?string $startDate,
+        ?string $endDate,
+        ?int $officeId,
+        ?string $tier = null,
+        ?string $search = null,
+        int $page = 1,
+        int $perPage = 30,
+        string $sortKey = 'date_of_service',
+        string $sortDir = 'desc'
+    ): array {
+        $baseQuery = DB::table('od_procedure_logs as pl')
             ->leftJoin('od_patients as pat', 'pl.PatNum', '=', 'pat.PatNum')
             ->leftJoin('offices as o', 'pl.office_id', '=', 'o.id')
             ->leftJoin('od_providers as prov', 'pl.ProvNum', '=', 'prov.ProvNum')
-            ->leftJoin('od_procedures as proc', 'pl.CodeNum', '=', 'proc.CodeNum')
-            ->leftJoin('od_claim_procs as cp', 'pl.ProcNum', '=', 'cp.ProcNum');
+            ->leftJoin('od_procedures as proc', 'pl.CodeNum', '=', 'proc.CodeNum');
 
         if ($officeId && $officeId > 0) {
-            $query->where('pl.office_id', $officeId);
-        }
-
-        if ($startDate && $endDate) {
-            $query->whereBetween('pl.ProcDate', [$startDate, $endDate]);
-        }
-
-        if ($search = trim((string) $search)) {
-            $query->where(function (Builder $q) use ($search) {
-                $q->where('pat.FName', 'like', "%{$search}%")
-                    ->orWhere('pat.LName', 'like', "%{$search}%")
-                    ->orWhere('pl.PatNum', 'like', "%{$search}%")
-                    ->orWhere('proc.ProcCode', 'like', "%{$search}%");
+            $baseQuery->where(function ($q) use ($officeId) {
+                $q->where('pl.office_id', $officeId)->orWhere('pl.ClinicNum', $officeId);
             });
         }
 
-        $query->select([
-            'pl.ProcNum as proc_num',
-            'pl.PatNum as patient_id',
-            'pat.FName as patient_fname',
-            'pat.LName as patient_lname',
-            'pl.office_id',
-            'o.name as office_name',
-            'cp.ClaimNum as claim_id',
-            'pl.ProcDate as date_of_service',
-            'pl.ProvNum as provider_id',
-            'prov.Abbr as provider_abbr',
-            'prov.LName as prov_lname',
-            'prov.PName as prov_pname',
-            'proc.ProcCode as service_code',
-            'pat.BalTotal as past_due_balance',
-            'pl.ProcFee as total_amount_service',
-            'cp.InsPayEst as ins_pay_est',
-            'cp.InsPayAmt as ins_pay_amt',
-            'cp.WriteOff as write_off',
-        ]);
+        if ($startDate && $endDate) {
+            $baseQuery->whereBetween('pl.ProcDate', [$startDate, $endDate]);
+        }
 
-        $query->orderByDesc('pl.ProcDate');
+        if ($search = trim((string) $search)) {
+            $baseQuery->where(function (Builder $q) use ($search) {
+                $q->where('pat.FName', 'like', "%{$search}%")
+                    ->orWhere('pat.LName', 'like', "%{$search}%")
+                    ->orWhere('pl.PatNum', 'like', "%{$search}%")
+                    ->orWhere('proc.ProcCode', 'like', "%{$search}%")
+                    ->orWhere('prov.Abbr', 'like', "%{$search}%")
+                    ->orWhere('prov.LName', 'like', "%{$search}%");
+            });
+        }
 
-        $totalItems = $query->count();
+        if ($tier === 'top_20') {
+            $baseQuery->where('pl.ProcFee', '>=', 300);
+        } elseif ($tier === 'mid_tier') {
+            $baseQuery->whereBetween('pl.ProcFee', [100, 299.99]);
+        } elseif ($tier === 'bottom_20') {
+            $baseQuery->where('pl.ProcFee', '<', 100);
+        }
+
+        $sortMap = [
+            'patient' => 'pat.LName',
+            'patient_id' => 'pl.PatNum',
+            'office' => 'o.name',
+            'date_of_service' => 'pl.ProcDate',
+            'provider' => 'prov.LName',
+            'provider_id' => 'pl.ProvNum',
+            'service_code' => 'proc.ProcCode',
+            'past_due_balance' => 'pat.BalTotal',
+            'total_amount_service' => 'pl.ProcFee',
+        ];
+
+        $orderCol = $sortMap[$sortKey] ?? 'pl.ProcDate';
+        $orderDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
+
+        $countQuery = clone $baseQuery;
+        $totalItems = $countQuery->count();
+
+        // Summary aggregates for Point of Service
+        $sumFee = (float) (clone $baseQuery)->sum('pl.ProcFee');
+        $avgFee = $totalItems > 0 ? ($sumFee / $totalItems) : 0.0;
+        $sumPastDue = (float) (clone $baseQuery)->sum('pat.BalTotal');
+        $avgPastDue = $totalItems > 0 ? ($sumPastDue / $totalItems) : 0.0;
+
         $offset = ($page - 1) * $perPage;
-        $records = $query->offset($offset)->limit($perPage)->get();
 
-        $formatted = $records->map(function ($row) {
+        $records = $baseQuery
+            ->select([
+                'pl.ProcNum as proc_num',
+                'pl.PatNum as patient_id',
+                'pat.FName as patient_fname',
+                'pat.LName as patient_lname',
+                'pl.office_id',
+                'o.name as office_name',
+                'pl.ProcDate as date_of_service',
+                'pl.ProvNum as provider_id',
+                'prov.Abbr as provider_abbr',
+                'prov.LName as prov_lname',
+                'prov.PName as prov_pname',
+                'proc.ProcCode as service_code',
+                'pat.BalTotal as past_due_balance',
+                'pl.ProcFee as total_amount_service',
+            ])
+            ->orderBy($orderCol, $orderDir)
+            ->offset($offset)
+            ->limit($perPage)
+            ->get();
+
+        $procNums = $records->pluck('proc_num')->filter()->all();
+
+        $claimProcs = empty($procNums) ? collect() : DB::table('od_claim_procs')
+            ->whereIn('ProcNum', $procNums)
+            ->get()
+            ->groupBy('ProcNum');
+
+        $paySplits = empty($procNums) ? collect() : DB::table('od_pay_splits')
+            ->whereIn('ProcNum', $procNums)
+            ->get()
+            ->groupBy('ProcNum');
+
+        $pageTotEstIns = 0.0;
+        $pageTotEstPat = 0.0;
+        $pageTotInsPaid = 0.0;
+        $pageTotPatPaid = 0.0;
+        $pageTotPaid = 0.0;
+        $pageTotUncollected = 0.0;
+
+        $formatted = $records->map(function ($row) use ($claimProcs, $paySplits, &$pageTotEstIns, &$pageTotEstPat, &$pageTotInsPaid, &$pageTotPatPaid, &$pageTotPaid, &$pageTotUncollected) {
             $patientName = trim(($row->patient_lname ?? '').', '.($row->patient_fname ?? ''));
             if ($patientName === ',') {
-                $patientName = 'Hamilton, Aaliyah';
+                $patientName = 'Patient #'.$row->patient_id;
             }
 
             $provName = trim(($row->prov_lname ?? '').' '.($row->prov_pname ?? ''));
             if (empty($provName)) {
-                $provName = $row->provider_abbr ?: 'Landi Heller';
+                $provName = $row->provider_abbr ?: ($row->provider_id ? 'Provider #'.$row->provider_id : '-');
             }
 
-            $provDisplayId = $row->provider_id ? ($row->provider_id.' - '.($row->provider_abbr ?: 'PROV')) : '76 - HELL';
+            $provDisplayId = $row->provider_id ? ($row->provider_id.' - '.($row->provider_abbr ?: 'PROV')) : '-';
 
-            $fee = (float) ($row->total_amount_service ?? 133.25);
-            $insEst = (float) ($row->ins_pay_est ?? $fee);
+            $cpList = $claimProcs->get($row->proc_num, collect());
+            $claimId = $cpList->pluck('ClaimNum')->filter()->first() ?: 0;
+            $insEst = (float) $cpList->sum('InsPayEst');
+            $insPaid = (float) $cpList->sum('InsPayAmt');
+            $writeOff = (float) $cpList->sum('WriteOff');
+
+            $psList = $paySplits->get($row->proc_num, collect());
+            $patPaid = (float) $psList->sum('SplitAmt');
+
+            $fee = (float) ($row->total_amount_service ?? 0.0);
             $patEst = max(0, $fee - $insEst);
-            $insPaid = (float) ($row->ins_pay_amt ?? $insEst);
-            $patPaid = 0.0;
             $totalPaid = $insPaid + $patPaid;
             $uncollected = max(0, $fee - $totalPaid);
             $pastDue = (float) ($row->past_due_balance ?? 0.0);
 
+            $pageTotEstIns += $insEst;
+            $pageTotEstPat += $patEst;
+            $pageTotInsPaid += $insPaid;
+            $pageTotPatPaid += $patPaid;
+            $pageTotPaid += $totalPaid;
+            $pageTotUncollected += $uncollected;
+
             // Tier styling
             $feeBgClass = $fee >= 300 ? 'bg-[#dcfce7] text-[#15803d]' : ($fee > 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
-            $pastDueBgClass = $pastDue > 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fef3c7] text-[#b45309]';
+            $pastDueBgClass = $pastDue > 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#dcfce7] text-[#15803d]';
+            $insPaidBgClass = $insPaid > 0 ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#fee2e2] text-[#b91c1c]';
+            $patPaidBgClass = $patPaid > 0 ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#fee2e2] text-[#b91c1c]';
+            $totalPaidBgClass = $totalPaid > 0 ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#fee2e2] text-[#b91c1c]';
+            $uncollectedBgClass = $uncollected > 0 ? 'bg-[#fee2e2] text-[#b91c1c]' : 'bg-[#dcfce7] text-[#15803d]';
 
             return [
                 'proc_num' => (int) ($row->proc_num ?? 1),
-                'patient_id' => (int) ($row->patient_id ?? 21214),
+                'patient_id' => (int) ($row->patient_id ?? 0),
                 'patient_name' => $patientName,
                 'office_name' => $row->office_name ?? '8 Mile',
-                'claim_id' => (int) ($row->claim_id ?? 0),
-                'date_of_service' => $row->date_of_service ? Carbon::parse($row->date_of_service)->format('Y-m-d') : '2025-01-02',
+                'claim_id' => (int) $claimId,
+                'date_of_service' => $row->date_of_service ? Carbon::parse($row->date_of_service)->format('Y-m-d') : '-',
                 'provider_id_code' => $provDisplayId,
                 'provider_name' => $provName,
                 'line_of_business' => 'General',
-                'service_code' => $row->service_code ?: 'D0140, D0210',
+                'service_code' => $row->service_code ?: '-',
                 'past_due_balance' => $pastDue,
-                'past_due_balance_formatted' => '$ '.number_format($pastDue, 2),
+                'past_due_balance_formatted' => $this->formatAccountingMoney($pastDue),
                 'past_due_bg' => $pastDueBgClass,
                 'total_amount_service' => $fee,
-                'total_amount_service_formatted' => '$ '.number_format($fee, 2),
+                'total_amount_service_formatted' => $this->formatAccountingMoney($fee),
                 'fee_bg' => $feeBgClass,
                 'estimated_ins' => $insEst,
-                'estimated_ins_formatted' => '$ '.number_format($insEst, 2),
+                'estimated_ins_formatted' => $this->formatAccountingMoney($insEst),
                 'estimated_pat' => $patEst,
-                'estimated_pat_formatted' => '$ '.number_format($patEst, 2),
+                'estimated_pat_formatted' => $this->formatAccountingMoney($patEst),
                 'ins_paid' => $insPaid,
-                'ins_paid_formatted' => '$ '.number_format($insPaid, 2),
+                'ins_paid_formatted' => $this->formatAccountingMoney($insPaid),
+                'ins_paid_bg' => $insPaidBgClass,
                 'pat_paid' => $patPaid,
-                'pat_paid_formatted' => '$ '.number_format($patPaid, 2),
+                'pat_paid_formatted' => $this->formatAccountingMoney($patPaid),
+                'pat_paid_bg' => $patPaidBgClass,
                 'total_paid' => $totalPaid,
-                'total_paid_formatted' => '$ '.number_format($totalPaid, 2),
+                'total_paid_formatted' => $this->formatAccountingMoney($totalPaid),
+                'total_paid_bg' => $totalPaidBgClass,
                 'uncollected_balance' => $uncollected,
-                'uncollected_balance_formatted' => '$ '.number_format($uncollected, 2),
+                'uncollected_balance_formatted' => $this->formatAccountingMoney($uncollected),
+                'uncollected_bg' => $uncollectedBgClass,
                 'loan_amount' => 0.0,
-                'loan_amount_formatted' => '$ 0',
+                'loan_amount_formatted' => '$ 0.00',
             ];
         });
 
-        if ($formatted->isEmpty()) {
-            // Provide realistic sample dataset matching rcm-point-of-service-collection-tab.html
-            $samplePOS = [
-                [
-                    'patient_id' => 21214, 'patient_name' => 'Hamilton, Aaliyah', 'office_name' => '8 Mile', 'claim_id' => 0,
-                    'date_of_service' => '2025-01-02', 'provider_id_code' => '49 - XRYS', 'provider_name' => 'XRAY', 'line_of_business' => 'General',
-                    'service_code' => 'D0330', 'past_due' => 0.0, 'fee' => 0.0, 'ins_est' => 0.0, 'pat_est' => 0.0, 'ins_paid' => 0.0, 'pat_paid' => 0.0, 'tot_paid' => 0.0, 'uncollected' => 0.0, 'loan' => 0.0,
-                ],
-                [
-                    'patient_id' => 21214, 'patient_name' => 'Hamilton, Aaliyah', 'office_name' => '8 Mile', 'claim_id' => 57787,
-                    'date_of_service' => '2025-01-02', 'provider_id_code' => '76 - HELL', 'provider_name' => 'Landi Heller', 'line_of_business' => 'General',
-                    'service_code' => 'D0140, D0210', 'past_due' => 0.0, 'fee' => 133.25, 'ins_est' => 133.25, 'pat_est' => 0.0, 'ins_paid' => 133.25, 'pat_paid' => 0.0, 'tot_paid' => 133.25, 'uncollected' => 0.0, 'loan' => 0.0,
-                ],
-                [
-                    'patient_id' => 5437, 'patient_name' => 'Harrell, Barbara', 'office_name' => '8 Mile', 'claim_id' => 0,
-                    'date_of_service' => '2025-01-02', 'provider_id_code' => '76 - HELL', 'provider_name' => 'Landi Heller', 'line_of_business' => 'General',
-                    'service_code' => 'D0140, D0220', 'past_due' => 0.0, 'fee' => 133.25, 'ins_est' => 133.25, 'pat_est' => 0.0, 'ins_paid' => 133.25, 'pat_paid' => 0.0, 'tot_paid' => 133.25, 'uncollected' => 0.0, 'loan' => 0.0,
-                ],
-            ];
-
-            foreach ($samplePOS as $idx => $sp) {
-                $feeBgClass = $sp['fee'] >= 300 ? 'bg-[#dcfce7] text-[#15803d]' : ($sp['fee'] > 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
-                $formatted->push([
-                    'proc_num' => $idx + 1,
-                    'patient_id' => $sp['patient_id'],
-                    'patient_name' => $sp['patient_name'],
-                    'office_name' => $sp['office_name'],
-                    'claim_id' => $sp['claim_id'],
-                    'date_of_service' => $sp['date_of_service'],
-                    'provider_id_code' => $sp['provider_id_code'],
-                    'provider_name' => $sp['provider_name'],
-                    'line_of_business' => $sp['line_of_business'],
-                    'service_code' => $sp['service_code'],
-                    'past_due_balance' => $sp['past_due'],
-                    'past_due_balance_formatted' => '$ '.number_format($sp['past_due'], 2),
-                    'past_due_bg' => 'bg-[#fef3c7] text-[#b45309]',
-                    'total_amount_service' => $sp['fee'],
-                    'total_amount_service_formatted' => '$ '.number_format($sp['fee'], 2),
-                    'fee_bg' => $feeBgClass,
-                    'estimated_ins' => $sp['ins_est'],
-                    'estimated_ins_formatted' => '$ '.number_format($sp['ins_est'], 2),
-                    'estimated_pat' => $sp['pat_est'],
-                    'estimated_pat_formatted' => '$ '.number_format($sp['pat_est'], 2),
-                    'ins_paid' => $sp['ins_paid'],
-                    'ins_paid_formatted' => '$ '.number_format($sp['ins_paid'], 2),
-                    'pat_paid' => $sp['pat_paid'],
-                    'pat_paid_formatted' => '$ '.number_format($sp['pat_paid'], 2),
-                    'total_paid' => $sp['tot_paid'],
-                    'total_paid_formatted' => '$ '.number_format($sp['tot_paid'], 2),
-                    'uncollected_balance' => $sp['uncollected'],
-                    'uncollected_balance_formatted' => '$ '.number_format($sp['uncollected'], 2),
-                    'loan_amount' => $sp['loan'],
-                    'loan_amount_formatted' => '$ 0',
-                ]);
-            }
-            $totalItems = count($samplePOS);
-        }
-
         $totalPages = (int) ceil($totalItems / max($perPage, 1));
+        $pageCount = max($formatted->count(), 1);
 
         return [
             'items' => $formatted,
@@ -854,6 +878,24 @@ class RcmService
             'total_pages' => max($totalPages, 1),
             'from' => $totalItems > 0 ? $offset + 1 : 0,
             'to' => min($offset + $perPage, $totalItems),
+            'summary' => [
+                'average_past_due_formatted' => $this->formatAccountingMoney($avgPastDue),
+                'total_past_due_formatted' => $this->formatAccountingMoney($sumPastDue),
+                'average_total_amount_formatted' => $this->formatAccountingMoney($avgFee),
+                'total_total_amount_formatted' => $this->formatAccountingMoney($sumFee),
+                'average_estimated_ins_formatted' => $this->formatAccountingMoney($pageTotEstIns / $pageCount),
+                'total_estimated_ins_formatted' => $this->formatAccountingMoney($pageTotEstIns),
+                'average_estimated_pat_formatted' => $this->formatAccountingMoney($pageTotEstPat / $pageCount),
+                'total_estimated_pat_formatted' => $this->formatAccountingMoney($pageTotEstPat),
+                'average_ins_paid_formatted' => $this->formatAccountingMoney($pageTotInsPaid / $pageCount),
+                'total_ins_paid_formatted' => $this->formatAccountingMoney($pageTotInsPaid),
+                'average_pat_paid_formatted' => $this->formatAccountingMoney($pageTotPatPaid / $pageCount),
+                'total_pat_paid_formatted' => $this->formatAccountingMoney($pageTotPatPaid),
+                'average_total_paid_formatted' => $this->formatAccountingMoney($pageTotPaid / $pageCount),
+                'total_total_paid_formatted' => $this->formatAccountingMoney($pageTotPaid),
+                'average_uncollected_formatted' => $this->formatAccountingMoney($pageTotUncollected / $pageCount),
+                'total_uncollected_formatted' => $this->formatAccountingMoney($pageTotUncollected),
+            ],
         ];
     }
 
@@ -861,12 +903,81 @@ class RcmService
      * Fetch Adjustments matching rcm-adjustment-tab-ui.html:
      * Patient, Patient ID, Office, Date, Provider ID, Provider, Adjustment Type, Amount, Note.
      */
-    public function getAdjustments(?string $startDate, ?string $endDate, ?int $officeId, ?string $tier = null, ?string $search = null, int $page = 1, int $perPage = 30): array
-    {
-        $query = DB::table('od_adjustments as a')
+    public function getAdjustments(
+        ?string $startDate,
+        ?string $endDate,
+        ?int $officeId,
+        ?string $tier = null,
+        ?string $search = null,
+        int $page = 1,
+        int $perPage = 30,
+        string $sortKey = 'date',
+        string $sortDir = 'desc'
+    ): array {
+        $baseQuery = DB::table('od_adjustments as a')
             ->leftJoin('od_patients as p', 'a.PatNum', '=', 'p.PatNum')
             ->leftJoin('offices as o', 'a.office_id', '=', 'o.id')
             ->leftJoin('od_providers as prov', 'a.ProvNum', '=', 'prov.ProvNum')
+            ->leftJoin('od_definitions as def', function ($join) {
+                $join->on('a.AdjType', '=', 'def.DefNum')
+                    ->where('def.Category', '=', 1);
+            });
+
+        if ($officeId && $officeId > 0) {
+            $baseQuery->where(function ($q) use ($officeId) {
+                $q->where('a.office_id', $officeId)->orWhere('a.ClinicNum', $officeId);
+            });
+        }
+
+        if ($startDate && $endDate) {
+            $baseQuery->whereBetween('a.AdjDate', [$startDate, $endDate]);
+        }
+
+        if ($search = trim((string) $search)) {
+            $baseQuery->where(function (Builder $q) use ($search) {
+                $q->where('p.FName', 'like', "%{$search}%")
+                    ->orWhere('p.LName', 'like', "%{$search}%")
+                    ->orWhere('a.PatNum', 'like', "%{$search}%")
+                    ->orWhere('a.AdjNote', 'like', "%{$search}%")
+                    ->orWhere('def.ItemName', 'like', "%{$search}%")
+                    ->orWhere('prov.Abbr', 'like', "%{$search}%")
+                    ->orWhere('prov.LName', 'like', "%{$search}%");
+            });
+        }
+
+        if ($tier === 'top_20') {
+            $baseQuery->whereRaw('ABS(a.AdjAmt) >= 100');
+        } elseif ($tier === 'mid_tier') {
+            $baseQuery->whereRaw('ABS(a.AdjAmt) >= 25 AND ABS(a.AdjAmt) < 100');
+        } elseif ($tier === 'bottom_20') {
+            $baseQuery->whereRaw('ABS(a.AdjAmt) < 25');
+        }
+
+        $sortMap = [
+            'patient' => 'p.LName',
+            'patient_id' => 'a.PatNum',
+            'office' => 'o.name',
+            'date' => 'a.AdjDate',
+            'adj_date' => 'a.AdjDate',
+            'provider' => 'prov.LName',
+            'provider_id' => 'a.ProvNum',
+            'adj_type' => 'def.ItemName',
+            'amount' => 'a.AdjAmt',
+            'adj_amount' => 'a.AdjAmt',
+        ];
+
+        $orderCol = $sortMap[$sortKey] ?? 'a.AdjDate';
+        $orderDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
+
+        $countQuery = clone $baseQuery;
+        $totalItems = $countQuery->count();
+
+        $sumAmt = (float) (clone $baseQuery)->sum('a.AdjAmt');
+        $avgAmt = $totalItems > 0 ? ($sumAmt / $totalItems) : 0.0;
+
+        $offset = ($page - 1) * $perPage;
+
+        $records = $baseQuery
             ->select([
                 'a.AdjNum as adj_id',
                 'a.PatNum as patient_id',
@@ -875,61 +986,45 @@ class RcmService
                 'a.office_id',
                 'o.name as office_name',
                 'a.AdjDate as adj_date',
-                DB::raw('COALESCE(CAST(a.AdjAmt AS DECIMAL(10,2)), 0) as adj_amount'),
+                'a.AdjAmt as adj_amount',
                 'a.AdjType as adj_type',
+                'def.ItemName as def_name',
+                'def.ItemValue as def_val',
                 'a.ProvNum as provider_id',
                 'prov.Abbr as provider_abbr',
                 'prov.LName as prov_lname',
                 'prov.PName as prov_pname',
                 'a.AdjNote as adj_note',
-            ]);
-
-        if ($officeId && $officeId > 0) {
-            $query->where('a.office_id', $officeId);
-        }
-
-        if ($startDate && $endDate) {
-            $query->whereBetween('a.AdjDate', [$startDate, $endDate]);
-        }
-
-        if ($search = trim((string) $search)) {
-            $query->where(function (Builder $q) use ($search) {
-                $q->where('p.FName', 'like', "%{$search}%")
-                    ->orWhere('p.LName', 'like', "%{$search}%")
-                    ->orWhere('a.PatNum', 'like', "%{$search}%")
-                    ->orWhere('a.AdjNote', 'like', "%{$search}%");
-            });
-        }
-
-        $query->orderByDesc('a.AdjDate');
-
-        $totalItems = $query->count();
-        $offset = ($page - 1) * $perPage;
-        $records = $query->offset($offset)->limit($perPage)->get();
+            ])
+            ->orderBy($orderCol, $orderDir)
+            ->offset($offset)
+            ->limit($perPage)
+            ->get();
 
         $formatted = $records->map(function ($row) {
             $patientName = trim(($row->patient_lname ?? '').', '.($row->patient_fname ?? ''));
             if ($patientName === ',') {
-                $patientName = 'White, Dorothy';
+                $patientName = 'Patient #'.$row->patient_id;
             }
 
-            $provName = trim(($row->prov_lname ?? '').', '.($row->prov_pname ?? ''));
-            if ($provName === ',') {
-                $provName = $row->provider_abbr ?: 'Heller, Landi';
+            $provName = trim(($row->prov_lname ?? '').' '.($row->prov_pname ?? ''));
+            if (empty($provName)) {
+                $provName = $row->provider_abbr ?: ($row->provider_id ? 'Provider #'.$row->provider_id : '-');
             }
 
-            $provDisplayId = $row->provider_id ? ($row->provider_id.' - '.($row->provider_abbr ?: 'HELL')) : '76 - HELL';
-            $adjTypeName = self::KNOWN_ADJ_TYPES[(int) $row->adj_type] ?? ('+Adjustment - '.$row->adj_type);
+            $provDisplayId = $row->provider_id ? ($row->provider_id.' - '.($row->provider_abbr ?: 'PROV')) : '-';
+
+            $adjTypeName = $row->def_name ?: (self::KNOWN_ADJ_TYPES[(int) $row->adj_type] ?? ('+Adjustment - '.$row->adj_type));
 
             $amt = (float) $row->adj_amount;
             $amtBgClass = $amt >= 100 ? 'bg-[#dcfce7] text-[#15803d]' : ($amt >= 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
 
             return [
                 'adj_id' => (int) $row->adj_id,
-                'patient_id' => (int) ($row->patient_id ?: 2123),
+                'patient_id' => (int) ($row->patient_id ?: 0),
                 'patient_name' => $patientName,
                 'office_name' => $row->office_name ?? '8 Mile',
-                'adj_date' => $row->adj_date ? Carbon::parse($row->adj_date)->format('Y-m-d') : '2025-01-03',
+                'adj_date' => $row->adj_date ? Carbon::parse($row->adj_date)->format('Y-m-d') : '-',
                 'provider_id_code' => $provDisplayId,
                 'provider_name' => $provName,
                 'adj_type' => $adjTypeName,
@@ -940,35 +1035,6 @@ class RcmService
             ];
         });
 
-        if ($formatted->isEmpty()) {
-            // Provide realistic sample dataset matching rcm-adjustment-tab-ui.html
-            $sampleAdj = [
-                ['patient_id' => 2123, 'patient_name' => 'White, Dorothy', 'office' => '8 Mile', 'date' => '2025-01-03', 'prov_id' => '76 - HELL', 'prov_name' => 'Heller, Landi', 'type' => '+Debit Adjustment', 'amt' => 75.75, 'note' => ''],
-                ['patient_id' => 2123, 'patient_name' => 'White, Dorothy', 'office' => '8 Mile', 'date' => '2025-01-03', 'prov_id' => '76 - HELL', 'prov_name' => 'Heller, Landi', 'type' => '-Insurance Par Write Off', 'amt' => -31.75, 'note' => ''],
-                ['patient_id' => 3554, 'patient_name' => 'Sampson, Herbine', 'office' => '8 Mile', 'date' => '2025-01-03', 'prov_id' => '76 - HELL', 'prov_name' => 'Heller, Landi', 'type' => '+Debit Adjustment', 'amt' => 4.00, 'note' => ''],
-                ['patient_id' => 15373, 'patient_name' => 'Lee, Terrance', 'office' => '8 Mile', 'date' => '2025-01-03', 'prov_id' => '76 - HELL', 'prov_name' => 'Heller, Landi', 'type' => '+Debit Adjustment', 'amt' => 97.08, 'note' => ''],
-            ];
-
-            foreach ($sampleAdj as $idx => $sa) {
-                $amtBgClass = $sa['amt'] >= 100 ? 'bg-[#dcfce7] text-[#15803d]' : ($sa['amt'] >= 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
-                $formatted->push([
-                    'adj_id' => $idx + 1,
-                    'patient_id' => $sa['patient_id'],
-                    'patient_name' => $sa['patient_name'],
-                    'office_name' => $sa['office'],
-                    'adj_date' => $sa['date'],
-                    'provider_id_code' => $sa['prov_id'],
-                    'provider_name' => $sa['prov_name'],
-                    'adj_type' => $sa['type'],
-                    'adj_amount' => $sa['amt'],
-                    'adj_amount_formatted' => $this->formatAccountingMoney($sa['amt']),
-                    'amt_bg' => $amtBgClass,
-                    'note' => $sa['note'],
-                ]);
-            }
-            $totalItems = count($sampleAdj);
-        }
-
         $totalPages = (int) ceil($totalItems / max($perPage, 1));
 
         return [
@@ -979,6 +1045,10 @@ class RcmService
             'total_pages' => max($totalPages, 1),
             'from' => $totalItems > 0 ? $offset + 1 : 0,
             'to' => min($offset + $perPage, $totalItems),
+            'summary' => [
+                'average_formatted' => $this->formatAccountingMoney($avgAmt),
+                'total_formatted' => $this->formatAccountingMoney($sumAmt),
+            ],
         ];
     }
 
@@ -987,123 +1057,312 @@ class RcmService
      */
     public function getDashboardMetrics(?string $startDate, ?string $endDate, ?int $officeId, ?string $search = null, int $page = 1, int $perPage = 10): array
     {
-        $grossProd = 3450000.0;
-        $patPayments = 385500.0;
-        $otcPct = 11.17;
-        $closed60Pct = 99.07;
-        $insEstLost = 3354.71;
+        $startDate = $startDate ?: now()->startOfMonth()->toDateString();
+        $endDate = $endDate ?: now()->toDateString();
+
+        $startCarbon = Carbon::parse($startDate);
+        $endCarbon = Carbon::parse($endDate);
+
+        $prevStartDate = $startCarbon->copy()->subYear()->toDateString();
+        $prevEndDate = $endCarbon->copy()->subYear()->toDateString();
+
+        // 1. Gross Production (current and previous year)
+        $grossProdQuery = DB::table('od_procedure_logs')
+            ->whereBetween('ProcDate', [$startDate, $endDate])
+            ->where('ProcStatus', 2);
+        if ($officeId && $officeId > 0) {
+            $grossProdQuery->where('office_id', $officeId);
+        }
+        $grossProd = (float) $grossProdQuery->sum('ProcFee');
+
+        // 2. Patient Payments (current and previous year)
+        $patPayQuery = DB::table('od_pay_splits')
+            ->whereBetween('DatePay', [$startDate, $endDate]);
+        if ($officeId && $officeId > 0) {
+            $patPayQuery->where('office_id', $officeId);
+        }
+        $patPayments = (float) $patPayQuery->sum('SplitAmt');
+
+        // OTC %
+        $otcPct = $grossProd > 0 ? round(($patPayments / $grossProd) * 100, 2) : 0.0;
+
+        // Previous year OTC %
+        $prevGrossQuery = DB::table('od_procedure_logs')
+            ->whereBetween('ProcDate', [$prevStartDate, $prevEndDate])
+            ->where('ProcStatus', 2);
+        if ($officeId && $officeId > 0) {
+            $prevGrossQuery->where('office_id', $officeId);
+        }
+        $prevGrossProd = (float) $prevGrossQuery->sum('ProcFee');
+
+        $prevPatPayQuery = DB::table('od_pay_splits')
+            ->whereBetween('DatePay', [$prevStartDate, $prevEndDate]);
+        if ($officeId && $officeId > 0) {
+            $prevPatPayQuery->where('office_id', $officeId);
+        }
+        $prevPatPayments = (float) $prevPatPayQuery->sum('SplitAmt');
+        $prevOtcPct = $prevGrossProd > 0 ? round(($prevPatPayments / $prevGrossProd) * 100, 2) : 0.0;
+        $otcDiff = $otcPct - $prevOtcPct;
+        $otcDiffText = abs($otcDiff) < 0.01
+            ? '0.00% change vs previous year'
+            : number_format(abs($otcDiff), 2).'% '.($otcDiff >= 0 ? 'up' : 'down').' vs previous year';
+
+        // 3. Claims closed within 60 days
+        $driver = DB::connection()->getDriverName();
+        $dateDiffRaw = $driver === 'sqlite'
+            ? '(julianday(COALESCE(DateCP, ProcDate)) - julianday(ProcDate)) <= 60'
+            : 'DATEDIFF(COALESCE(DateCP, ProcDate), ProcDate) <= 60';
+
+        $claimsClosedQuery = DB::table('od_claim_procs')
+            ->whereBetween('ProcDate', [$startDate, $endDate])
+            ->whereIn('Status', [1, 4]);
+        if ($officeId && $officeId > 0) {
+            $claimsClosedQuery->where('office_id', $officeId);
+        }
+        $totalClosedClaims = (int) (clone $claimsClosedQuery)->count();
+        $closedWithin60 = (int) (clone $claimsClosedQuery)
+            ->whereRaw($dateDiffRaw)
+            ->count();
+        $closed60Pct = $totalClosedClaims > 0 ? round(($closedWithin60 / $totalClosedClaims) * 100, 2) : 100.0;
+
+        // Previous year closed within 60 days
+        $prevClaimsClosedQuery = DB::table('od_claim_procs')
+            ->whereBetween('ProcDate', [$prevStartDate, $prevEndDate])
+            ->whereIn('Status', [1, 4]);
+        if ($officeId && $officeId > 0) {
+            $prevClaimsClosedQuery->where('office_id', $officeId);
+        }
+        $prevTotalClosedClaims = (int) (clone $prevClaimsClosedQuery)->count();
+        $prevClosedWithin60 = (int) (clone $prevClaimsClosedQuery)
+            ->whereRaw($dateDiffRaw)
+            ->count();
+        $prevClosed60Pct = $prevTotalClosedClaims > 0 ? round(($prevClosedWithin60 / $prevTotalClosedClaims) * 100, 2) : 100.0;
+        $closed60Diff = $closed60Pct - $prevClosed60Pct;
+        $closed60DiffText = abs($closed60Diff) < 0.01
+            ? '0.00% change vs previous year'
+            : number_format(abs($closed60Diff), 2).'% '.($closed60Diff >= 0 ? 'up' : 'down').' vs previous year';
+
+        // 4. Insurance Estimate Lost
+        $lostExpr = 'COALESCE(SUM(CASE WHEN CAST(InsPayAmt AS DECIMAL(10,2)) = 0 AND CAST(WriteOff AS DECIMAL(10,2)) > 0 THEN CAST(WriteOff AS DECIMAL(10,2)) WHEN CAST(InsPayEst AS DECIMAL(10,2)) > CAST(InsPayAmt AS DECIMAL(10,2)) THEN (CAST(InsPayEst AS DECIMAL(10,2)) - CAST(InsPayAmt AS DECIMAL(10,2))) ELSE 0 END), 0) as lost';
+
+        $insLostQuery = DB::table('od_claim_procs')
+            ->whereBetween('ProcDate', [$startDate, $endDate])
+            ->whereIn('Status', [1, 4]);
+        if ($officeId && $officeId > 0) {
+            $insLostQuery->where('office_id', $officeId);
+        }
+        $insEstLost = (float) (clone $insLostQuery)
+            ->selectRaw($lostExpr)
+            ->value('lost');
+
+        $prevInsLostQuery = DB::table('od_claim_procs')
+            ->whereBetween('ProcDate', [$prevStartDate, $prevEndDate])
+            ->whereIn('Status', [1, 4]);
+        if ($officeId && $officeId > 0) {
+            $prevInsLostQuery->where('office_id', $officeId);
+        }
+        $prevInsEstLost = (float) (clone $prevInsLostQuery)
+            ->selectRaw($lostExpr)
+            ->value('lost');
+        $insLostDiff = $insEstLost - $prevInsEstLost;
+        $insLostDiffText = abs($insLostDiff) < 0.01
+            ? '$ 0.00 change vs previous year'
+            : '$ '.number_format(abs($insLostDiff), 2).' '.($insLostDiff >= 0 ? 'up' : 'down').' vs previous year';
+
+        // 5. Aging / Patient Balances
+        $agingQuery = DB::table('od_patients');
+        if ($officeId && $officeId > 0) {
+            $agingQuery->where('office_id', $officeId);
+        }
+        $aging = $agingQuery->selectRaw('
+            COALESCE(SUM(CAST(Bal_0_30 AS DECIMAL(10,2))), 0) as bal_0_30,
+            COALESCE(SUM(CAST(Bal_31_60 AS DECIMAL(10,2))), 0) as bal_31_60,
+            COALESCE(SUM(CAST(Bal_61_90 AS DECIMAL(10,2)) + CAST(BalOver90 AS DECIMAL(10,2))), 0) as bal_over_60
+        ')->first();
+
+        $bal0_30 = (float) ($aging->bal_0_30 ?? 0);
+        $bal31_60 = (float) ($aging->bal_31_60 ?? 0);
+        $balOver60 = (float) ($aging->bal_over_60 ?? 0);
+
+        // 6. Patient vs Insurance Collections
+        $insPayQuery = DB::table('od_claim_procs')
+            ->whereBetween('ProcDate', [$startDate, $endDate])
+            ->whereIn('Status', [1, 4]);
+        if ($officeId && $officeId > 0) {
+            $insPayQuery->where('office_id', $officeId);
+        }
+        $insCollections = (float) $insPayQuery->sum('InsPayAmt');
+        $totalOfficeCollection = $patPayments + $insCollections;
+
+        // 7. Claims Outstanding vs Not Outstanding
+        $claimsOutQuery = DB::table('od_claim_procs')
+            ->whereBetween('ProcDate', [$startDate, $endDate]);
+        if ($officeId && $officeId > 0) {
+            $claimsOutQuery->where('office_id', $officeId);
+        }
+        $outstandingCounts = $claimsOutQuery->selectRaw('
+            SUM(CASE WHEN Status = 0 THEN 1 ELSE 0 END) as outstanding,
+            SUM(CASE WHEN Status != 0 THEN 1 ELSE 0 END) as not_outstanding
+        ')->first();
+        $outstandingClaims = (int) ($outstandingCounts->outstanding ?? 0);
+        $notOutstandingClaims = (int) ($outstandingCounts->not_outstanding ?? 0);
 
         $charts = [
             'aging_production' => [
                 'title' => 'Aging | Production',
                 'labels' => ['LESS 30', '30 60', 'OVER 60'],
-                'data' => [67261.95, 60739.58, 289349.29],
+                'data' => [$bal0_30, $bal31_60, $balOver60],
                 'colors' => ['#6DE5C1', '#996BE5', '#56D9FE'],
                 'legend' => [
-                    ['label' => 'LESS 30', 'amount_formatted' => '$ 67,261.95', 'color' => '#6DE5C1'],
-                    ['label' => '30 60', 'amount_formatted' => '$ 60,739.58', 'color' => '#996BE5'],
-                    ['label' => 'OVER 60', 'amount_formatted' => '$ 289,349.29', 'color' => '#56D9FE'],
+                    ['label' => 'LESS 30', 'amount_formatted' => $this->formatAccountingMoney($bal0_30), 'color' => '#6DE5C1'],
+                    ['label' => '30 60', 'amount_formatted' => $this->formatAccountingMoney($bal31_60), 'color' => '#996BE5'],
+                    ['label' => 'OVER 60', 'amount_formatted' => $this->formatAccountingMoney($balOver60), 'color' => '#56D9FE'],
                 ],
             ],
             'patient_vs_ins' => [
                 'title' => 'Patient vs Insurance | Collection',
                 'labels' => ['PTS COLLECTION', 'INS COLLECTION'],
-                'data' => [108121.26, 194420.08],
+                'data' => [$patPayments, $insCollections],
                 'colors' => ['#6DE5C1', '#996BE5'],
                 'legend' => [
-                    ['label' => 'PTS COLLECTION', 'amount_formatted' => '$ 108,121.26', 'color' => '#6DE5C1'],
-                    ['label' => 'INS COLLECTION', 'amount_formatted' => '$ 194,420.08', 'color' => '#996BE5'],
+                    ['label' => 'PTS COLLECTION', 'amount_formatted' => $this->formatAccountingMoney($patPayments), 'color' => '#6DE5C1'],
+                    ['label' => 'INS COLLECTION', 'amount_formatted' => $this->formatAccountingMoney($insCollections), 'color' => '#996BE5'],
                 ],
             ],
             'rcm_collection' => [
                 'title' => 'RCM | Collection',
                 'labels' => ['OFFICE COLLECTION', 'RCM COLLECTION'],
-                'data' => [302541.34, 0.0],
+                'data' => [$totalOfficeCollection, 0.0],
                 'colors' => ['#6DE5C1', '#996BE5'],
                 'legend' => [
-                    ['label' => 'OFFICE COLLECTION', 'amount_formatted' => '$ 302,541.34', 'color' => '#6DE5C1'],
-                    ['label' => 'RCM COLLECTION', 'amount_formatted' => '$ 0', 'color' => '#996BE5'],
+                    ['label' => 'OFFICE COLLECTION', 'amount_formatted' => $this->formatAccountingMoney($totalOfficeCollection), 'color' => '#6DE5C1'],
+                    ['label' => 'RCM COLLECTION', 'amount_formatted' => '$ 0.00', 'color' => '#996BE5'],
                 ],
             ],
             'claims_count' => [
                 'title' => 'Claims | Count',
-                'has_data' => false,
+                'has_data' => ($outstandingClaims + $notOutstandingClaims) > 0,
             ],
             'claims_performance' => [
                 'title' => 'Claims | Performance',
-                'has_data' => false,
+                'has_data' => $totalClosedClaims > 0,
             ],
             'claims_outstanding' => [
                 'title' => 'Claims | Outstanding',
                 'labels' => ['Outstanding', 'Not Outstanding'],
-                'data' => [0, 574],
+                'data' => [$outstandingClaims, $notOutstandingClaims],
                 'colors' => ['#996BE5', '#56D9FE'],
             ],
         ];
 
-        $adjustmentsRows = [
-            ['name' => '+Transfer Balance Debit - 364', 'amt' => 74212.61, 'tier' => 'top', 'bg_class' => 'bg-[#dcfce7] text-[#15803d]'],
-            ['name' => '+Debit Adjustment - 349', 'amt' => 13072.31, 'tier' => 'top', 'bg_class' => 'bg-[#dcfce7] text-[#15803d]'],
-            ['name' => '-UnCollected Balance - 383', 'amt' => -9680.64, 'tier' => 'bottom', 'bg_class' => 'bg-[#fee2e2] text-[#b91c1c]'],
-            ['name' => '+Cap Production - 374', 'amt' => 5868.11, 'tier' => 'top', 'bg_class' => 'bg-[#dcfce7] text-[#15803d]'],
-            ['name' => '-Write-Off - 351', 'amt' => -5642.87, 'tier' => 'bottom', 'bg_class' => 'bg-[#fee2e2] text-[#b91c1c]'],
-            ['name' => '+Misc. Debit - 366', 'amt' => 3592.48, 'tier' => 'top', 'bg_class' => 'bg-[#dcfce7] text-[#15803d]'],
-            ['name' => 'CARE CREDIT/CHERRY/HFD FEE - 347', 'amt' => -2600.41, 'tier' => 'bottom', 'bg_class' => 'bg-[#fee2e2] text-[#b91c1c]'],
-            ['name' => '-Transfer Balance Credit - 365', 'amt' => -1660.42, 'tier' => 'bottom', 'bg_class' => 'bg-[#fee2e2] text-[#b91c1c]'],
-            ['name' => '+Credit Card Processing Fee - 385', 'amt' => 1548.80, 'tier' => 'mid', 'bg_class' => 'bg-[#fef3c7] text-[#b45309]'],
-            ['name' => '-Insurance Par Write Off - 371', 'amt' => -1442.79, 'tier' => 'mid', 'bg_class' => 'bg-[#fef3c7] text-[#b45309]'],
-            ['name' => '+Patient Refund - 350', 'amt' => 1380.51, 'tier' => 'mid', 'bg_class' => 'bg-[#fef3c7] text-[#b45309]'],
-            ['name' => '+ReInstate Balance - 384', 'amt' => 1074.32, 'tier' => 'mid', 'bg_class' => 'bg-[#fef3c7] text-[#b45309]'],
-            ['name' => '+Interest Debit Adj - 353', 'amt' => 859.63, 'tier' => 'mid', 'bg_class' => 'bg-[#fef3c7] text-[#b45309]'],
-            ['name' => '-Professional Courtesy - 346', 'amt' => -500.00, 'tier' => 'mid', 'bg_class' => 'bg-[#fef3c7] text-[#b45309]'],
-            ['name' => 'WriteOff', 'amt' => -431.71, 'tier' => 'mid', 'bg_class' => 'bg-[#fef3c7] text-[#b45309]'],
-            ['name' => '+Insurance Co or TPA Refund - 357', 'amt' => 395.09, 'tier' => 'mid', 'bg_class' => 'bg-[#fef3c7] text-[#b45309]'],
-            ['name' => '-Ins Co/Other Eft Auto Recovery - 360', 'amt' => -395.00, 'tier' => 'mid', 'bg_class' => 'bg-[#fef3c7] text-[#b45309]'],
-            ['name' => '-Credit Adjustment - 348', 'amt' => 50.69, 'tier' => 'mid', 'bg_class' => 'bg-[#fef3c7] text-[#b45309]'],
-            ['name' => '-Misc. Credit - 367', 'amt' => -5.91, 'tier' => 'mid', 'bg_class' => 'bg-[#fef3c7] text-[#b45309]'],
-        ];
+        // 8. Adjustments Table Grouped by Definition/Type
+        $adjQuery = DB::table('od_adjustments as a')
+            ->leftJoin('od_definitions as def', function ($join) {
+                $join->on('def.DefNum', '=', 'a.AdjType')
+                    ->where('def.Category', '=', 1);
+            })
+            ->whereBetween('a.AdjDate', [$startDate, $endDate]);
+        if ($officeId && $officeId > 0) {
+            $adjQuery->where('a.office_id', $officeId);
+        }
+        if (! empty($search)) {
+            $adjQuery->where(function ($q) use ($search) {
+                $q->where('def.ItemName', 'LIKE', "%{$search}%")
+                    ->orWhere('a.AdjType', 'LIKE', "%{$search}%");
+            });
+        }
+        $adjGroups = $adjQuery->selectRaw('
+            def.ItemName as def_name,
+            a.AdjType,
+            SUM(CAST(a.AdjAmt AS DECIMAL(10,2))) as total_amt,
+            COUNT(*) as count
+        ')
+            ->groupBy('def.ItemName', 'a.AdjType')
+            ->orderByDesc(DB::raw('ABS(SUM(CAST(a.AdjAmt AS DECIMAL(10,2))))'))
+            ->get();
 
-        $adjTotal = 0.0;
         $formattedAdjRows = [];
-        foreach ($adjustmentsRows as $r) {
-            $adjTotal += $r['amt'];
+        $adjTotal = 0.0;
+        foreach ($adjGroups as $r) {
+            $amt = (float) $r->total_amt;
+            $adjTotal += $amt;
+            $absAmt = abs($amt);
+            $tier = $absAmt >= 1000 ? 'top' : ($absAmt >= 200 ? 'mid' : 'bottom');
+            $bgClass = $amt >= 1000 ? 'bg-[#dcfce7] text-[#15803d]' : ($amt >= 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
+            $name = $r->def_name ?: ('Adjustment - '.$r->AdjType);
+
             $formattedAdjRows[] = [
-                'name' => $r['name'],
-                'amount' => $r['amt'],
-                'amount_formatted' => $this->formatAccountingMoney($r['amt']),
-                'tier' => $r['tier'],
-                'bg_class' => $r['bg_class'],
+                'name' => $name,
+                'amount' => $amt,
+                'amount_formatted' => $this->formatAccountingMoney($amt),
+                'tier' => $tier,
+                'bg_class' => $bgClass,
             ];
         }
 
-        $claimsServiceCodes = [
-            ['code' => 'D0120', 'sent' => 98, 'close' => 98, 'denied' => 1, 'tier' => 'top'],
-            ['code' => 'D0140', 'sent' => 170, 'close' => 170, 'denied' => 5, 'tier' => 'top'],
-            ['code' => 'D0150', 'sent' => 68, 'close' => 68, 'denied' => 0, 'tier' => 'mid'],
-            ['code' => 'D0210', 'sent' => 87, 'close' => 87, 'denied' => 5, 'tier' => 'top'],
-            ['code' => 'D0220', 'sent' => 156, 'close' => 156, 'denied' => 5, 'tier' => 'top'],
-            ['code' => 'D0230', 'sent' => 226, 'close' => 226, 'denied' => 8, 'tier' => 'top'],
-            ['code' => 'D0274', 'sent' => 56, 'close' => 56, 'denied' => 2, 'tier' => 'mid'],
-            ['code' => 'D0330', 'sent' => 31, 'close' => 31, 'denied' => 0, 'tier' => 'mid'],
-            ['code' => 'D1110', 'sent' => 44, 'close' => 44, 'denied' => 0, 'tier' => 'mid'],
-            ['code' => 'D1120', 'sent' => 22, 'close' => 22, 'denied' => 0, 'tier' => 'mid'],
-        ];
+        // 9. Claims Service Codes Breakdown Table
+        $codesQuery = DB::table('od_claim_procs as cp')
+            ->leftJoin('od_procedure_logs as pl', 'pl.ProcNum', '=', 'cp.ProcNum')
+            ->leftJoin('od_procedures as p', 'p.CodeNum', '=', 'pl.CodeNum')
+            ->whereBetween('cp.ProcDate', [$startDate, $endDate]);
+        if ($officeId && $officeId > 0) {
+            $codesQuery->where('cp.office_id', $officeId);
+        }
+        if (! empty($search)) {
+            $codesQuery->where(function ($q) use ($search) {
+                $q->where('cp.CodeSent', 'LIKE', "%{$search}%")
+                    ->orWhere('p.ProcCode', 'LIKE', "%{$search}%");
+            });
+        }
+        $codeGroups = $codesQuery->selectRaw('
+            COALESCE(NULLIF(cp.CodeSent, ""), NULLIF(p.ProcCode, ""), "UNKNOWN") as code,
+            COUNT(*) as sent,
+            SUM(CASE WHEN cp.Status IN (1, 4) THEN 1 ELSE 0 END) as close,
+            SUM(CASE WHEN cp.Status IN (1, 4) AND CAST(cp.InsPayAmt AS DECIMAL(10,2)) = 0 AND (CAST(cp.WriteOff AS DECIMAL(10,2)) > 0 OR cp.Status = 4) THEN 1 ELSE 0 END) as denied
+        ')
+            ->groupBy('code')
+            ->orderByDesc('sent')
+            ->get();
 
-        $totalSent = 958;
-        $totalClose = 958;
-        $totalDenied = 26;
+        $claimsServiceCodes = [];
+        $totalSent = 0;
+        $totalClose = 0;
+        $totalDenied = 0;
+
+        foreach ($codeGroups as $cg) {
+            $sent = (int) $cg->sent;
+            $close = (int) $cg->close;
+            $denied = (int) $cg->denied;
+            $totalSent += $sent;
+            $totalClose += $close;
+            $totalDenied += $denied;
+            $tier = $sent >= 50 ? 'top' : ($sent >= 10 ? 'mid' : 'bottom');
+
+            $claimsServiceCodes[] = [
+                'code' => $cg->code,
+                'sent' => $sent,
+                'close' => $close,
+                'denied' => $denied,
+                'tier' => $tier,
+            ];
+        }
+
+        $totalCodeItems = count($claimsServiceCodes);
+        $offset = ($page - 1) * $perPage;
+        $paginatedCodes = array_slice($claimsServiceCodes, $offset, $perPage);
+        $totalCodePages = (int) ceil($totalCodeItems / max($perPage, 1));
 
         return [
             'summary' => [
                 'ins_est_lost' => $insEstLost,
-                'ins_est_lost_formatted' => '$ '.number_format($insEstLost, 2),
-                'ins_est_lost_diff' => '$ (340,401.63) down vs previous year',
+                'ins_est_lost_formatted' => $this->formatAccountingMoney($insEstLost),
+                'ins_est_lost_diff' => $insLostDiffText,
                 'otc_pct' => $otcPct,
                 'otc_pct_formatted' => number_format($otcPct, 2).'%',
-                'otc_pct_diff' => '5.00% up vs previous year',
+                'otc_pct_diff' => $otcDiffText,
                 'claims_closed_60_pct' => $closed60Pct,
                 'claims_closed_60_pct_formatted' => number_format($closed60Pct, 2).'%',
-                'claims_closed_60_pct_diff' => '1.30% up vs previous year',
+                'claims_closed_60_pct_diff' => $closed60DiffText,
             ],
             'charts' => $charts,
             'adjustments' => [
@@ -1111,14 +1370,14 @@ class RcmService
                 'total_formatted' => $this->formatAccountingMoney($adjTotal),
             ],
             'claims_service_codes' => [
-                'items' => $claimsServiceCodes,
+                'items' => $paginatedCodes,
                 'total_sent' => $totalSent,
                 'total_close' => $totalClose,
                 'total_denied' => $totalDenied,
-                'total_items' => 61,
+                'total_items' => $totalCodeItems,
                 'page' => $page,
                 'per_page' => $perPage,
-                'total_pages' => 7,
+                'total_pages' => max($totalCodePages, 1),
             ],
         ];
     }

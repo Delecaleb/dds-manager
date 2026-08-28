@@ -135,17 +135,113 @@ class RcmTest extends TestCase
         }
     }
 
+    public function test_point_of_service_collection_endpoint_returns_data_and_summary(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        OdPatient::create([
+            'PatNum' => 102,
+            'FName' => 'Dorothy',
+            'LName' => 'White',
+            'BalTotal' => '150.00',
+            'office_id' => $this->office->id,
+        ]);
+
+        \DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 9001,
+            'PatNum' => 102,
+            'ProcDate' => '2025-02-15',
+            'ProcFee' => '250.00',
+            'CodeNum' => 1,
+            'ProvNum' => 10,
+            'office_id' => $this->office->id,
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('rcm.data', [
+            'tab' => 'point_of_service',
+            'start_date' => '2025-01-01',
+            'end_date' => '2025-12-31',
+            'office_id' => $this->office->id,
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('tab', 'point_of_service');
+        $response->assertJsonPath('data.total', 1);
+        $response->assertJsonPath('data.items.0.patient_id', 102);
+        $response->assertJsonPath('data.items.0.patient_name', 'White, Dorothy');
+        $response->assertJsonPath('data.items.0.total_amount_service_formatted', '$ 250.00');
+        $response->assertJsonStructure([
+            'data' => [
+                'summary' => [
+                    'average_past_due_formatted',
+                    'total_past_due_formatted',
+                    'average_total_amount_formatted',
+                    'total_total_amount_formatted',
+                ],
+            ],
+        ]);
+    }
+
+    public function test_adjustment_endpoint_returns_data_and_summary(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        OdPatient::create([
+            'PatNum' => 103,
+            'FName' => 'James',
+            'LName' => 'Miller',
+            'office_id' => $this->office->id,
+        ]);
+
+        \DB::table('od_adjustments')->insert([
+            'AdjNum' => 8001,
+            'PatNum' => 103,
+            'AdjDate' => '2025-03-10',
+            'AdjAmt' => '75.50',
+            'AdjType' => 349,
+            'ProvNum' => 10,
+            'AdjNote' => 'Debit adjustment for missed appointment',
+            'office_id' => $this->office->id,
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('rcm.data', [
+            'tab' => 'adjustment',
+            'start_date' => '2025-01-01',
+            'end_date' => '2025-12-31',
+            'office_id' => $this->office->id,
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('tab', 'adjustment');
+        $response->assertJsonPath('data.total', 1);
+        $response->assertJsonPath('data.items.0.patient_id', 103);
+        $response->assertJsonPath('data.items.0.patient_name', 'Miller, James');
+        $response->assertJsonPath('data.items.0.adj_amount_formatted', '$ 75.50');
+        $response->assertJsonStructure([
+            'data' => [
+                'summary' => [
+                    'average_formatted',
+                    'total_formatted',
+                ],
+            ],
+        ]);
+    }
+
     public function test_rcm_export_endpoint_streams_csv(): void
     {
         $user = User::factory()->superAdmin()->create();
 
-        $response = $this->actingAs($user)->get(route('rcm.export', [
-            'tab' => 'claim_submissions',
-            'start_date' => '2025-01-01',
-            'end_date' => '2025-12-31',
-        ]));
+        foreach (['claim_submissions', 'point_of_service', 'adjustment', 'payor_overview', 'payment_arrangement', 'patients_statements'] as $tab) {
+            $response = $this->actingAs($user)->get(route('rcm.export', [
+                'tab' => $tab,
+                'start_date' => '2025-01-01',
+                'end_date' => '2025-12-31',
+            ]));
 
-        $response->assertStatus(200);
-        $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+            $response->assertStatus(200);
+            $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        }
     }
 }

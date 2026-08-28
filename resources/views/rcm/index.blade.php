@@ -36,10 +36,8 @@
                 </button>
 
                 <!-- Date Range Selector (Hidden on Payor Overview) -->
-                <div id="rcmDateRangeContainer" class="relative flex items-center bg-white border border-slate-300 rounded-lg px-3 py-1.5 shadow-sm ml-2">
-                    <i data-lucide="calendar" class="w-4 h-4 text-slate-400 mr-2 shrink-0"></i>
-                    <input type="text" id="rcmDateRange" value="Jan 01, 2025 - Dec 31, 2025"
-                        class="text-xs font-semibold text-slate-700 outline-none w-52 bg-transparent cursor-pointer" readonly>
+                <div id="rcmDateRangeContainer" class="ml-2">
+                    <x-daterange-picker id="rcmDateRange" on-apply="onRcmDateRangeApply" />
                 </div>
             </div>
 
@@ -191,46 +189,13 @@
     <!-- Reusable Patient Modal Component -->
     <x-app-components.patient-modal />
 
-    <!-- Date Range Picker Modal -->
-    <div id="datePickerModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-sm p-5 space-y-4">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-                <h3 class="text-sm font-bold text-slate-800">Select Date Range</h3>
-                <button type="button" onclick="closeDatePickerModal()" class="text-slate-400 hover:text-slate-600">
-                    <i data-lucide="x" class="w-4 h-4"></i>
-                </button>
-            </div>
-
-            <div class="space-y-3">
-                <div class="space-y-1">
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase">Start Date</label>
-                    <input type="date" id="modalStartDate" value="2025-01-01" class="app-input w-full text-xs">
-                </div>
-                <div class="space-y-1">
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase">End Date</label>
-                    <input type="date" id="modalEndDate" value="2025-12-31" class="app-input w-full text-xs">
-                </div>
-                <div class="flex flex-wrap gap-1.5 pt-1">
-                    <button type="button" onclick="setDatePreset('2025-01-01', '2025-12-31')" class="px-2 py-1 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold hover:bg-slate-200">Year 2025</button>
-                    <button type="button" onclick="setDatePreset('2026-01-01', '2026-12-31')" class="px-2 py-1 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold hover:bg-slate-200">Year 2026</button>
-                    <button type="button" onclick="setDatePreset('{{ date('Y-m-01') }}', '{{ date('Y-m-t') }}')" class="px-2 py-1 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold hover:bg-slate-200">This Month</button>
-                    <button type="button" onclick="setDatePreset('1900-01-01', '2099-12-31')" class="px-2 py-1 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold hover:bg-slate-200">All Time</button>
-                </div>
-            </div>
-
-            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button type="button" onclick="closeDatePickerModal()" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button type="button" onclick="applyDatePickerModal()" class="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm">Apply Range</button>
-            </div>
-        </div>
-    </div>
-
     <!-- JavaScript Controller Logic -->
     <script>
+        const _params = new URLSearchParams(window.location.search);
         const RCM_STATE = {
             currentTab: 'claim_submissions',
-            startDate: '{{ $defaultStart }}',
-            endDate: '{{ $defaultEnd }}',
+            startDate: _params.get('start_date') || '{{ $defaultStart }}',
+            endDate: _params.get('end_date') || '{{ $defaultEnd }}',
             officeId: '{{ $activeOfficeId ?: "all" }}',
             tier: '',
             search: '',
@@ -249,7 +214,6 @@
             initTierButtons();
             initSearchAndFilter();
             initPaginationControls();
-            initDatePicker();
 
             loadTabData();
         });
@@ -401,36 +365,12 @@
             });
         }
 
-        function initDatePicker() {
-            document.getElementById('rcmDateRange').addEventListener('click', () => {
-                document.getElementById('modalStartDate').value = RCM_STATE.startDate;
-                document.getElementById('modalEndDate').value = RCM_STATE.endDate;
-                document.getElementById('datePickerModal').classList.remove('hidden');
-            });
-        }
-
-        function closeDatePickerModal() {
-            document.getElementById('datePickerModal').classList.add('hidden');
-        }
-
-        function setDatePreset(start, end) {
-            document.getElementById('modalStartDate').value = start;
-            document.getElementById('modalEndDate').value = end;
-        }
-
-        function applyDatePickerModal() {
-            RCM_STATE.startDate = document.getElementById('modalStartDate').value;
-            RCM_STATE.endDate = document.getElementById('modalEndDate').value;
-
-            const startObj = new Date(RCM_STATE.startDate);
-            const endObj = new Date(RCM_STATE.endDate);
-            const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-
-            document.getElementById('rcmDateRange').value = `${fmt(startObj)} - ${fmt(endObj)}`;
-            closeDatePickerModal();
+        window.onRcmDateRangeApply = function(start, end) {
+            RCM_STATE.startDate = start;
+            RCM_STATE.endDate = end;
             RCM_STATE.page = 1;
             loadTabData();
-        }
+        };
 
         function loadTabData() {
             const loading = document.getElementById('rcmLoading');
@@ -893,24 +833,43 @@
                 return;
             }
 
+            const summary = data.summary || {
+                average_past_due_formatted: '$ 0.00',
+                total_past_due_formatted: '$ 0.00',
+                average_total_amount_formatted: '$ 0.00',
+                total_total_amount_formatted: '$ 0.00',
+                average_estimated_ins_formatted: '$ 0.00',
+                total_estimated_ins_formatted: '$ 0.00',
+                average_estimated_pat_formatted: '$ 0.00',
+                total_estimated_pat_formatted: '$ 0.00',
+                average_ins_paid_formatted: '$ 0.00',
+                total_ins_paid_formatted: '$ 0.00',
+                average_pat_paid_formatted: '$ 0.00',
+                total_pat_paid_formatted: '$ 0.00',
+                average_total_paid_formatted: '$ 0.00',
+                total_total_paid_formatted: '$ 0.00',
+                average_uncollected_formatted: '$ 0.00',
+                total_uncollected_formatted: '$ 0.00'
+            };
+
             let rows = '';
             data.items.forEach(r => {
                 rows += `
                     <tr class="hover:bg-slate-50/70 border-b border-slate-100 transition-colors">
-                        <td class="py-3 px-3 text-center sticky left-0 bg-white z-10">
+                        <td class="py-3 px-3 text-center sticky left-0 bg-white z-10" style="width: 45px;">
                             <input type="checkbox" class="claim-row-checkbox w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-0 accent-emerald-600 cursor-pointer" value="${r.patient_id}">
                         </td>
                         <td class="py-3 px-4 font-bold text-slate-900 sticky left-10 bg-white z-10 border-r border-slate-100 min-w-48">
                             <div class="flex items-center justify-between">
                                 <span class="truncate hover:text-emerald-600 cursor-pointer" onclick="openPatient(${r.patient_id})">${escapeHtml(r.patient_name)}</span>
-                                <button type="button" onclick="openPatient(${r.patient_id})" class="text-slate-400 hover:text-emerald-600 ml-1">
+                                <button type="button" onclick="openPatient(${r.patient_id})" class="text-slate-400 hover:text-emerald-600 ml-1" title="View Patient Details">
                                     <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
                                 </button>
                             </div>
                         </td>
                         <td class="py-3 px-4 text-slate-600 text-center">${r.patient_id}</td>
                         <td class="py-3 px-4 text-slate-700 text-center font-medium">${escapeHtml(r.office_name)}</td>
-                        <td class="py-3 px-4 text-slate-600 text-center">${r.claim_id}</td>
+                        <td class="py-3 px-4 text-slate-800 text-center font-semibold">${r.claim_id > 0 ? r.claim_id : '-'}</td>
                         <td class="py-3 px-4 text-slate-600 text-center whitespace-nowrap">${r.date_of_service}</td>
                         <td class="py-3 px-4 text-slate-600 text-center whitespace-nowrap">${escapeHtml(r.provider_id_code)}</td>
                         <td class="py-3 px-4 text-slate-800 text-center font-medium whitespace-nowrap">${escapeHtml(r.provider_name)}</td>
@@ -920,10 +879,10 @@
                         <td class="py-3 px-4 text-center font-bold text-xs ${r.fee_bg}">${r.total_amount_service_formatted}</td>
                         <td class="py-3 px-4 text-center font-bold text-xs ${r.fee_bg}">${r.estimated_ins_formatted}</td>
                         <td class="py-3 px-4 text-center font-bold text-xs bg-[#fee2e2] text-[#b91c1c]">${r.estimated_pat_formatted}</td>
-                        <td class="py-3 px-4 text-center font-bold text-xs ${r.fee_bg}">${r.ins_paid_formatted}</td>
-                        <td class="py-3 px-4 text-center font-bold text-xs bg-[#fee2e2] text-[#b91c1c]">${r.pat_paid_formatted}</td>
-                        <td class="py-3 px-4 text-center font-bold text-xs ${r.fee_bg}">${r.total_paid_formatted}</td>
-                        <td class="py-3 px-4 text-center font-bold text-xs bg-[#fee2e2] text-[#b91c1c]">${r.uncollected_balance_formatted}</td>
+                        <td class="py-3 px-4 text-center font-bold text-xs ${r.ins_paid_bg || r.fee_bg}">${r.ins_paid_formatted}</td>
+                        <td class="py-3 px-4 text-center font-bold text-xs ${r.pat_paid_bg || 'bg-[#fee2e2] text-[#b91c1c]'}">${r.pat_paid_formatted}</td>
+                        <td class="py-3 px-4 text-center font-bold text-xs ${r.total_paid_bg || r.fee_bg}">${r.total_paid_formatted}</td>
+                        <td class="py-3 px-4 text-center font-bold text-xs ${r.uncollected_bg || 'bg-[#fee2e2] text-[#b91c1c]'}">${r.uncollected_balance_formatted}</td>
                         <td class="py-3 px-4 text-center font-bold text-xs bg-[#dcfce7] text-[#15803d]">${r.loan_amount_formatted}</td>
                     </tr>
                 `;
@@ -931,10 +890,10 @@
 
             container.innerHTML = `
                 <div class="overflow-x-auto border border-slate-200 rounded-lg">
-                    <table class="w-full text-left text-xs border-collapse min-w-[2100px]">
+                    <table class="w-full text-left text-xs border-collapse min-w-[2200px]">
                         <thead>
                             <tr class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200 select-none">
-                                <th class="py-3 px-3 w-10 text-center sticky left-0 bg-slate-100 z-20">
+                                <th class="py-3 px-3 w-10 text-center sticky left-0 bg-slate-100 z-20" style="width: 45px;">
                                     <input type="checkbox" id="rcmMasterCheck" class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-0 accent-emerald-600 cursor-pointer" onclick="toggleAllCheckboxes(this.checked)">
                                 </th>
                                 <th class="py-3 px-4 sticky left-10 bg-slate-100 z-20 border-r border-slate-200 min-w-48 cursor-pointer" onclick="handleSort('patient')">
@@ -943,15 +902,29 @@
                                 <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('patient_id')">
                                     <div class="flex items-center justify-center gap-1"><span>Patient ID</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
                                 </th>
-                                <th class="py-3 px-4 text-center">Office</th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('office')">
+                                    <div class="flex items-center justify-center gap-1"><span>Office</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
                                 <th class="py-3 px-4 text-center">Claim ID</th>
-                                <th class="py-3 px-4 text-center">Date of Service</th>
-                                <th class="py-3 px-4 text-center">Provider ID</th>
-                                <th class="py-3 px-4 text-center">Provider</th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('date_of_service')">
+                                    <div class="flex items-center justify-center gap-1"><span>Date of Service</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('provider_id')">
+                                    <div class="flex items-center justify-center gap-1"><span>Provider ID</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('provider')">
+                                    <div class="flex items-center justify-center gap-1"><span>Provider</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
                                 <th class="py-3 px-4 text-center">Line of Business</th>
-                                <th class="py-3 px-4 text-center">Service Code</th>
-                                <th class="py-3 px-4 text-center">Past Due Balance</th>
-                                <th class="py-3 px-4 text-center">Total Amount of Service</th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('service_code')">
+                                    <div class="flex items-center justify-center gap-1"><span>Service Code</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('past_due_balance')">
+                                    <div class="flex items-center justify-center gap-1"><span>Past Due Balance</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('total_amount_service')">
+                                    <div class="flex items-center justify-center gap-1"><span>Total Amount of Service</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
                                 <th class="py-3 px-4 text-center">Estimated Insurance $</th>
                                 <th class="py-3 px-4 text-center">Estimated Patient $</th>
                                 <th class="py-3 px-4 text-center">Insurance Paid</th>
@@ -961,7 +934,53 @@
                                 <th class="py-3 px-4 text-center">Loan Amount</th>
                             </tr>
                         </thead>
-                        <tbody>${rows}</tbody>
+                        <tbody>
+                            ${rows}
+
+                            <!-- Summary Rows matching Point of Service specs -->
+                            <tr class="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+                                <td class="sticky left-0 bg-slate-100 z-10"></td>
+                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-100 z-10 border-r border-slate-200 text-slate-500 font-semibold">Average:</td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4 text-center font-bold text-slate-800">${summary.average_past_due_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-bold text-slate-800">${summary.average_total_amount_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-bold text-slate-800">${summary.average_estimated_ins_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-bold text-slate-800">${summary.average_estimated_pat_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-bold text-slate-800">${summary.average_ins_paid_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-bold text-slate-800">${summary.average_pat_paid_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-bold text-slate-800">${summary.average_total_paid_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-bold text-slate-800">${summary.average_uncollected_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-bold text-slate-800">$ 0.00</td>
+                            </tr>
+                            <tr class="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+                                <td class="sticky left-0 bg-slate-100 z-10"></td>
+                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-100 z-10 border-r border-slate-200 text-slate-500 font-semibold">Total:</td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.total_past_due_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.total_total_amount_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.total_estimated_ins_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.total_estimated_pat_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.total_ins_paid_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.total_pat_paid_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.total_total_paid_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.total_uncollected_formatted}</td>
+                                <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">$ 0.00</td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             `;
@@ -974,17 +993,22 @@
                 return;
             }
 
+            const summary = data.summary || {
+                average_formatted: '$ 0.00',
+                total_formatted: '$ 0.00'
+            };
+
             let rows = '';
             data.items.forEach(r => {
                 rows += `
                     <tr class="hover:bg-slate-50/70 border-b border-slate-100 transition-colors">
-                        <td class="py-3 px-3 text-center sticky left-0 bg-white z-10">
+                        <td class="py-3 px-3 text-center sticky left-0 bg-white z-10" style="width: 45px;">
                             <input type="checkbox" class="claim-row-checkbox w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-0 accent-emerald-600 cursor-pointer" value="${r.patient_id}">
                         </td>
                         <td class="py-3 px-4 font-bold text-slate-900 sticky left-10 bg-white z-10 border-r border-slate-100 min-w-48">
                             <div class="flex items-center justify-between">
                                 <span class="truncate hover:text-emerald-600 cursor-pointer" onclick="openPatient(${r.patient_id})">${escapeHtml(r.patient_name)}</span>
-                                <button type="button" onclick="openPatient(${r.patient_id})" class="text-slate-400 hover:text-emerald-600 ml-1">
+                                <button type="button" onclick="openPatient(${r.patient_id})" class="text-slate-400 hover:text-emerald-600 ml-1" title="View Patient Details">
                                     <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
                                 </button>
                             </div>
@@ -996,17 +1020,17 @@
                         <td class="py-3 px-4 text-slate-800 text-center font-medium whitespace-nowrap">${escapeHtml(r.provider_name)}</td>
                         <td class="py-3 px-4 text-slate-800 font-semibold text-center">${escapeHtml(r.adj_type)}</td>
                         <td class="py-3 px-4 text-center font-bold text-xs ${r.amt_bg}">${r.adj_amount_formatted}</td>
-                        <td class="py-3 px-4 text-slate-500 max-w-xs truncate">${escapeHtml(r.note)}</td>
+                        <td class="py-3 px-4 text-slate-500 max-w-xs truncate" title="${escapeHtml(r.note)}">${escapeHtml(r.note)}</td>
                     </tr>
                 `;
             });
 
             container.innerHTML = `
                 <div class="overflow-x-auto border border-slate-200 rounded-lg">
-                    <table class="w-full text-left text-xs border-collapse min-w-[1250px]">
+                    <table class="w-full text-left text-xs border-collapse min-w-[1300px]">
                         <thead>
                             <tr class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200 select-none">
-                                <th class="py-3 px-3 w-10 text-center sticky left-0 bg-slate-100 z-20">
+                                <th class="py-3 px-3 w-10 text-center sticky left-0 bg-slate-100 z-20" style="width: 45px;">
                                     <input type="checkbox" id="rcmMasterCheck" class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-0 accent-emerald-600 cursor-pointer" onclick="toggleAllCheckboxes(this.checked)">
                                 </th>
                                 <th class="py-3 px-4 sticky left-10 bg-slate-100 z-20 border-r border-slate-200 min-w-48 cursor-pointer" onclick="handleSort('patient')">
@@ -1015,16 +1039,56 @@
                                 <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('patient_id')">
                                     <div class="flex items-center justify-center gap-1"><span>Patient ID</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
                                 </th>
-                                <th class="py-3 px-4 text-center">Office</th>
-                                <th class="py-3 px-4 text-center">Date</th>
-                                <th class="py-3 px-4 text-center">Provider ID</th>
-                                <th class="py-3 px-4 text-center">Provider</th>
-                                <th class="py-3 px-4 text-center">Adjustment Type</th>
-                                <th class="py-3 px-4 text-center">Amount</th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('office')">
+                                    <div class="flex items-center justify-center gap-1"><span>Office</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('date')">
+                                    <div class="flex items-center justify-center gap-1"><span>Date</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('provider_id')">
+                                    <div class="flex items-center justify-center gap-1"><span>Provider ID</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('provider')">
+                                    <div class="flex items-center justify-center gap-1"><span>Provider</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('adj_type')">
+                                    <div class="flex items-center justify-center gap-1"><span>Adjustment Type</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
+                                <th class="py-3 px-4 text-center cursor-pointer" onclick="handleSort('amount')">
+                                    <div class="flex items-center justify-center gap-1"><span>Amount</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div>
+                                </th>
                                 <th class="py-3 px-4">Note</th>
                             </tr>
                         </thead>
-                        <tbody>${rows}</tbody>
+                        <tbody>
+                            ${rows}
+
+                            <!-- Summary Rows matching Adjustment specs -->
+                            <tr class="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+                                <td class="sticky left-0 bg-slate-100 z-10"></td>
+                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-100 z-10 border-r border-slate-200 text-slate-500 font-semibold">Average:</td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4 text-center font-bold text-slate-800">${summary.average_formatted}</td>
+                                <td class="py-2.5 px-4"></td>
+                            </tr>
+                            <tr class="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+                                <td class="sticky left-0 bg-slate-100 z-10"></td>
+                                <td class="py-2.5 px-4 text-right pr-4 sticky left-10 bg-slate-100 z-10 border-r border-slate-200 text-slate-500 font-semibold">Total:</td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4"></td>
+                                <td class="py-2.5 px-4 text-center font-extrabold text-slate-900">${summary.total_formatted}</td>
+                                <td class="py-2.5 px-4"></td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             `;
@@ -1039,31 +1103,70 @@
 
             // Adjustments rows HTML
             let adjRowsHtml = '';
-            (adj.items || []).forEach(row => {
-                adjRowsHtml += `
-                    <tr class="hover:bg-slate-50/70 border-b border-slate-100">
-                        <td class="py-2.5 px-4 font-medium text-slate-800">${escapeHtml(row.name)}</td>
-                        <td class="py-2.5 px-4 font-bold text-xs ${row.bg_class} text-right pr-6">${row.amount_formatted}</td>
-                    </tr>
-                `;
-            });
+            if (adj.items && adj.items.length > 0) {
+                adj.items.forEach(row => {
+                    adjRowsHtml += `
+                        <tr class="hover:bg-slate-50/70 border-b border-slate-100">
+                            <td class="py-2.5 px-4 font-medium text-slate-800">${escapeHtml(row.name)}</td>
+                            <td class="py-2.5 px-4 font-bold text-xs ${row.bg_class} text-right pr-6">${row.amount_formatted}</td>
+                        </tr>
+                    `;
+                });
+            } else {
+                adjRowsHtml = `<tr><td colspan="2" class="py-6 text-center text-slate-400 text-xs font-medium">No adjustments recorded for this period.</td></tr>`;
+            }
 
             // Claims Service Codes rows HTML
             let codesRowsHtml = '';
-            (claimsCodes.items || []).forEach(row => {
-                const badgeClass = row.tier === 'top' ? 'bg-[#dcfce7] text-[#15803d]' : (row.tier === 'bottom' ? 'bg-[#fee2e2] text-[#b91c1c]' : 'bg-[#fef3c7] text-[#b45309]');
-                codesRowsHtml += `
-                    <tr class="hover:bg-slate-50/70 border-b border-slate-100">
-                        <td class="py-2.5 px-4 font-bold text-slate-900">${escapeHtml(row.code)}</td>
-                        <td class="py-2.5 px-4 text-center font-bold text-xs ${badgeClass}">${row.sent}</td>
-                        <td class="py-2.5 px-4 text-center font-bold text-xs ${badgeClass}">${row.close}</td>
-                        <td class="py-2.5 px-4 text-center font-bold text-xs ${row.denied > 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]'}">
-                            <div class="flex items-center justify-center gap-1">
-                                <span>${row.denied}</span>
-                                ${row.denied > 0 ? '<i data-lucide="external-link" class="w-3 h-3 text-slate-400 cursor-pointer"></i>' : ''}
-                            </div>
-                        </td>
-                    </tr>
+            if (claimsCodes.items && claimsCodes.items.length > 0) {
+                claimsCodes.items.forEach(row => {
+                    const badgeClass = row.tier === 'top' ? 'bg-[#dcfce7] text-[#15803d]' : (row.tier === 'bottom' ? 'bg-[#fee2e2] text-[#b91c1c]' : 'bg-[#fef3c7] text-[#b45309]');
+                    codesRowsHtml += `
+                        <tr class="hover:bg-slate-50/70 border-b border-slate-100">
+                            <td class="py-2.5 px-4 font-bold text-slate-900">${escapeHtml(row.code)}</td>
+                            <td class="py-2.5 px-4 text-center font-bold text-xs ${badgeClass}">${row.sent}</td>
+                            <td class="py-2.5 px-4 text-center font-bold text-xs ${badgeClass}">${row.close}</td>
+                            <td class="py-2.5 px-4 text-center font-bold text-xs ${row.denied > 0 ? 'bg-[#fee2e2] text-[#b91c1c]' : 'bg-slate-50 text-slate-500'}">
+                                <div class="flex items-center justify-center gap-1">
+                                    <span>${row.denied}</span>
+                                    ${row.denied > 0 ? '<i data-lucide="external-link" class="w-3 h-3 text-slate-400 cursor-pointer"></i>' : ''}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } else {
+                codesRowsHtml = `<tr><td colspan="4" class="py-6 text-center text-slate-400 text-xs font-medium">No claims service codes recorded for this period.</td></tr>`;
+            }
+
+            // Dynamic Chart Legends
+            let agingLegendHtml = '';
+            (charts.aging_production?.legend || []).forEach(leg => {
+                agingLegendHtml += `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-xs shrink-0" style="background-color: ${leg.color};"></span><span>${escapeHtml(leg.label)}</span></div>
+                        <span class="text-slate-600 font-semibold">${leg.amount_formatted}</span>
+                    </div>
+                `;
+            });
+
+            let patInsLegendHtml = '';
+            (charts.patient_vs_ins?.legend || []).forEach(leg => {
+                patInsLegendHtml += `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-xs shrink-0" style="background-color: ${leg.color};"></span><span>${escapeHtml(leg.label)}</span></div>
+                        <span class="text-slate-600 font-semibold">${leg.amount_formatted}</span>
+                    </div>
+                `;
+            });
+
+            let rcmColLegendHtml = '';
+            (charts.rcm_collection?.legend || []).forEach(leg => {
+                rcmColLegendHtml += `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-xs shrink-0" style="background-color: ${leg.color};"></span><span>${escapeHtml(leg.label)}</span></div>
+                        <span class="text-slate-600 font-semibold">${leg.amount_formatted}</span>
+                    </div>
                 `;
             });
 
@@ -1082,13 +1185,13 @@
                                 </span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <h3 class="text-2xl font-extrabold text-slate-900">${s.ins_est_lost_formatted || '$ 3,354.71'}</h3>
+                                <h3 class="text-2xl font-extrabold text-slate-900">${s.ins_est_lost_formatted || '$ 0.00'}</h3>
                                 <span class="text-rose-500 flex items-center font-bold text-xs">
                                     <i data-lucide="trending-down" class="w-4 h-4"></i>
                                 </span>
                             </div>
                             <div class="text-[11px] text-slate-400 font-medium">
-                                ${s.ins_est_lost_diff || '$ (340,401.63) down vs previous year'}
+                                ${s.ins_est_lost_diff || '$ 0.00 change vs previous year'}
                             </div>
                         </div>
 
@@ -1101,13 +1204,13 @@
                                 </span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <h3 class="text-2xl font-extrabold text-slate-900">${s.otc_pct_formatted || '11.17%'}</h3>
+                                <h3 class="text-2xl font-extrabold text-slate-900">${s.otc_pct_formatted || '0.00%'}</h3>
                                 <span class="text-emerald-500 flex items-center font-bold text-xs">
                                     <i data-lucide="trending-up" class="w-4 h-4"></i>
                                 </span>
                             </div>
                             <div class="text-[11px] text-slate-400 font-medium">
-                                ${s.otc_pct_diff || '5.00% up vs previous year'}
+                                ${s.otc_pct_diff || '0.00% change vs previous year'}
                             </div>
                         </div>
 
@@ -1120,13 +1223,13 @@
                                 </span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <h3 class="text-2xl font-extrabold text-slate-900">${s.claims_closed_60_pct_formatted || '99.07%'}</h3>
+                                <h3 class="text-2xl font-extrabold text-slate-900">${s.claims_closed_60_pct_formatted || '100.00%'}</h3>
                                 <span class="text-emerald-500 flex items-center font-bold text-xs">
                                     <i data-lucide="trending-up" class="w-4 h-4"></i>
                                 </span>
                             </div>
                             <div class="text-[11px] text-slate-400 font-medium">
-                                ${s.claims_closed_60_pct_diff || '1.30% up vs previous year'}
+                                ${s.claims_closed_60_pct_diff || '0.00% change vs previous year'}
                             </div>
                         </div>
 
@@ -1143,18 +1246,7 @@
                                     <canvas id="dashChart_aging"></canvas>
                                 </div>
                                 <div class="w-full space-y-2 pt-3 border-t border-slate-100 text-xs font-bold text-slate-700">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-xs shrink-0 bg-[#6DE5C1]"></span><span>LESS 30</span></div>
-                                        <span class="text-slate-400 font-semibold">$ 67,261.95</span>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-xs shrink-0 bg-[#996BE5]"></span><span>30 60</span></div>
-                                        <span class="text-slate-400 font-semibold">$ 60,739.58</span>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-xs shrink-0 bg-[#56D9FE]"></span><span>OVER 60</span></div>
-                                        <span class="text-slate-400 font-semibold">$ 289,349.29</span>
-                                    </div>
+                                    ${agingLegendHtml}
                                 </div>
                             </div>
                         </div>
@@ -1167,14 +1259,7 @@
                                     <canvas id="dashChart_pat_vs_ins"></canvas>
                                 </div>
                                 <div class="w-full space-y-2 pt-3 border-t border-slate-100 text-xs font-bold text-slate-700">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-xs shrink-0 bg-[#6DE5C1]"></span><span>PTS COLLECTION</span></div>
-                                        <span class="text-slate-400 font-semibold">$ 108,121.26</span>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-xs shrink-0 bg-[#996BE5]"></span><span>INS COLLECTION</span></div>
-                                        <span class="text-slate-400 font-semibold">$ 194,420.08</span>
-                                    </div>
+                                    ${patInsLegendHtml}
                                 </div>
                             </div>
                         </div>
@@ -1187,14 +1272,7 @@
                                     <canvas id="dashChart_rcm_col"></canvas>
                                 </div>
                                 <div class="w-full space-y-2 pt-3 border-t border-slate-100 text-xs font-bold text-slate-700">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-xs shrink-0 bg-[#6DE5C1]"></span><span>OFFICE COLLECTION</span></div>
-                                        <span class="text-slate-400 font-semibold">$ 302,541.34</span>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-xs shrink-0 bg-[#996BE5]"></span><span>RCM COLLECTION</span></div>
-                                        <span class="text-slate-400 font-semibold">$ 0</span>
-                                    </div>
+                                    ${rcmColLegendHtml}
                                 </div>
                             </div>
                         </div>
@@ -1208,7 +1286,7 @@
                         <div class="space-y-2">
                             <h5 class="text-sm font-bold text-slate-900">Claims <span class="font-normal text-slate-500">| Count</span></h5>
                             <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-center min-h-[260px] text-xs font-semibold text-slate-400">
-                                <span>No data available</span>
+                                <span>${charts.claims_count?.has_data ? 'Active Claims Overview Available' : 'No data available'}</span>
                             </div>
                         </div>
 
@@ -1216,7 +1294,7 @@
                         <div class="space-y-2">
                             <h5 class="text-sm font-bold text-slate-900">Claims <span class="font-normal text-slate-500">| Performance</span></h5>
                             <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-center min-h-[260px] text-xs font-semibold text-slate-400">
-                                <span>No data available</span>
+                                <span>${charts.claims_performance?.has_data ? 'Claims Processed' : 'No data available'}</span>
                             </div>
                         </div>
 
@@ -1225,8 +1303,8 @@
                             <h5 class="text-sm font-bold text-slate-900">Claims <span class="font-normal text-slate-500">| Outstanding</span></h5>
                             <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between min-h-[260px]">
                                 <div class="flex items-center justify-center gap-4 text-xs font-bold text-slate-700 mb-2">
-                                    <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-[#996BE5]"></span><span>Outstanding</span></div>
-                                    <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-[#56D9FE]"></span><span>Not Outstanding</span></div>
+                                    <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-[#996BE5]"></span><span>Outstanding (${charts.claims_outstanding?.data?.[0] ?? 0})</span></div>
+                                    <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-[#56D9FE]"></span><span>Not Outstanding (${charts.claims_outstanding?.data?.[1] ?? 0})</span></div>
                                 </div>
                                 <div class="relative h-44 w-full">
                                     <canvas id="dashChart_outstanding"></canvas>
@@ -1243,16 +1321,11 @@
                             <!-- Toolbar -->
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="flex items-center gap-1.5">
-                                    <span class="bg-[#dcfce7] text-[#15803d] px-3 py-1 rounded text-xs font-semibold">Top 20%</span>
+                                    <span class="bg-[#dcfce7] text-[#15803d] px-3 py-1 rounded text-xs font-semibold">Top Tier</span>
                                     <span class="bg-[#fef3c7] text-[#b45309] px-3 py-1 rounded text-xs font-semibold">Mid Tier</span>
-                                    <span class="bg-[#fee2e2] text-[#b91c1c] px-3 py-1 rounded text-xs font-semibold">Bottom 20%</span>
+                                    <span class="bg-[#fee2e2] text-[#b91c1c] px-3 py-1 rounded text-xs font-semibold">Bottom Tier</span>
                                 </div>
                                 <div class="flex items-center gap-2.5 ml-auto">
-                                    <div class="relative">
-                                        <input type="text" placeholder="Search"
-                                            class="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 pr-8 w-48 shadow-sm">
-                                        <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none"></i>
-                                    </div>
                                     <button type="button" onclick="document.getElementById('rcmExportBtn').click()"
                                         class="border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold px-3.5 py-1.5 rounded-lg text-xs transition shadow-sm cursor-pointer">
                                         Export CSV
@@ -1265,8 +1338,8 @@
                                 <table class="w-full text-left text-xs border-collapse">
                                     <thead>
                                         <tr class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200">
-                                            <th class="py-3 px-4"><div class="flex items-center gap-1"><span>Adjustment</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div></th>
-                                            <th class="py-3 px-4 text-right pr-6"><div class="flex items-center justify-end gap-1"><span>Amount</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div></th>
+                                            <th class="py-3 px-4"><div class="flex items-center gap-1"><span>Adjustment Type</span></div></th>
+                                            <th class="py-3 px-4 text-right pr-6"><div class="flex items-center justify-end gap-1"><span>Amount</span></div></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1274,7 +1347,7 @@
                                         <!-- Summary Row -->
                                         <tr class="bg-slate-100 font-bold text-slate-900 border-t border-slate-200">
                                             <td class="py-3 px-4 text-right font-extrabold">Total:</td>
-                                            <td class="py-3 px-4 text-right pr-6 font-extrabold">${adj.total_formatted || '$ 79,694.80'}</td>
+                                            <td class="py-3 px-4 text-right pr-6 font-extrabold">${adj.total_formatted || '$ 0.00'}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1284,21 +1357,16 @@
 
                     <!-- Section 5: Claims Service Code Breakdown Table -->
                     <div class="space-y-2 pt-2">
-                        <h5 class="text-base font-bold text-slate-900">Claims</h5>
+                        <h5 class="text-base font-bold text-slate-900">Claims Service Codes</h5>
                         <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
                             <!-- Toolbar -->
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="flex items-center gap-1.5">
-                                    <span class="bg-[#dcfce7] text-[#15803d] px-3 py-1 rounded text-xs font-semibold">Top 20%</span>
-                                    <span class="bg-[#fef3c7] text-[#b45309] px-3 py-1 rounded text-xs font-semibold">Mid Tier</span>
-                                    <span class="bg-[#fee2e2] text-[#b91c1c] px-3 py-1 rounded text-xs font-semibold">Bottom 20%</span>
+                                    <span class="bg-[#dcfce7] text-[#15803d] px-3 py-1 rounded text-xs font-semibold">High Volume</span>
+                                    <span class="bg-[#fef3c7] text-[#b45309] px-3 py-1 rounded text-xs font-semibold">Mid Volume</span>
+                                    <span class="bg-[#fee2e2] text-[#b91c1c] px-3 py-1 rounded text-xs font-semibold">Low Volume</span>
                                 </div>
                                 <div class="flex items-center gap-2.5 ml-auto">
-                                    <div class="relative">
-                                        <input type="text" placeholder="Search"
-                                            class="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 pr-8 w-48 shadow-sm">
-                                        <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none"></i>
-                                    </div>
                                     <button type="button" onclick="document.getElementById('rcmExportBtn').click()"
                                         class="border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold px-3.5 py-1.5 rounded-lg text-xs transition shadow-sm cursor-pointer">
                                         Export CSV
@@ -1311,10 +1379,10 @@
                                 <table class="w-full text-left text-xs border-collapse">
                                     <thead>
                                         <tr class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200">
-                                            <th class="py-3 px-4"><div class="flex items-center gap-1"><span>Service Code</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div></th>
-                                            <th class="py-3 px-4 text-center"><div class="flex items-center justify-center gap-1"><span>Sent</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div></th>
-                                            <th class="py-3 px-4 text-center"><div class="flex items-center justify-center gap-1"><span>Close</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div></th>
-                                            <th class="py-3 px-4 text-center"><div class="flex items-center justify-center gap-1"><span>Denied</span> <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i></div></th>
+                                            <th class="py-3 px-4"><div class="flex items-center gap-1"><span>Service Code</span></div></th>
+                                            <th class="py-3 px-4 text-center"><div class="flex items-center justify-center gap-1"><span>Sent</span></div></th>
+                                            <th class="py-3 px-4 text-center"><div class="flex items-center justify-center gap-1"><span>Closed</span></div></th>
+                                            <th class="py-3 px-4 text-center"><div class="flex items-center justify-center gap-1"><span>Denied</span></div></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1322,46 +1390,12 @@
                                         <!-- Summary Row -->
                                         <tr class="bg-slate-100 font-bold text-slate-900 border-t border-slate-200">
                                             <td class="py-3 px-4 font-extrabold text-right">Total:</td>
-                                            <td class="py-3 px-4 text-center font-extrabold">${claimsCodes.total_sent || 958}</td>
-                                            <td class="py-3 px-4 text-center font-extrabold">${claimsCodes.total_close || 958}</td>
-                                            <td class="py-3 px-4 text-center font-extrabold">${claimsCodes.total_denied || 26}</td>
+                                            <td class="py-3 px-4 text-center font-extrabold">${claimsCodes.total_sent || 0}</td>
+                                            <td class="py-3 px-4 text-center font-extrabold">${claimsCodes.total_close || 0}</td>
+                                            <td class="py-3 px-4 text-center font-extrabold">${claimsCodes.total_denied || 0}</td>
                                         </tr>
                                     </tbody>
                                 </table>
-                            </div>
-
-                            <!-- Footer Pagination -->
-                            <div class="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs text-slate-600">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-slate-500">Items per page</span>
-                                    <select class="bg-white border border-slate-300 rounded px-2 py-0.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none">
-                                        <option value="10" selected>10</option>
-                                        <option value="20">20</option>
-                                        <option value="30">30</option>
-                                        <option value="50">50</option>
-                                    </select>
-                                    <span class="ml-1 font-medium text-slate-500">1-10 of 61 items</span>
-                                </div>
-                                <div class="flex items-center gap-2 ml-auto">
-                                    <select class="bg-white border border-slate-300 rounded px-2 py-0.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none">
-                                        <option value="1" selected>1</option>
-                                        <option value="2">2</option>
-                                        <option value="3">3</option>
-                                        <option value="4">4</option>
-                                        <option value="5">5</option>
-                                        <option value="6">6</option>
-                                        <option value="7">7</option>
-                                    </select>
-                                    <span class="text-slate-500 font-medium">of 7 pages</span>
-                                    <div class="flex items-center gap-1 ml-1">
-                                        <button type="button" class="p-1 rounded border border-slate-300 text-slate-600 opacity-40 cursor-not-allowed">
-                                            <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
-                                        </button>
-                                        <button type="button" class="p-1 rounded border border-slate-300 text-slate-600">
-                                            <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1444,21 +1478,25 @@
                 const outCtx = document.getElementById('dashChart_outstanding')?.getContext('2d');
                 if (outCtx && charts.claims_outstanding) {
                     if (RCM_STATE.chartInstances.dash_out) RCM_STATE.chartInstances.dash_out.destroy();
+                    const outstandingCount = charts.claims_outstanding.data?.[0] || 0;
+                    const notOutstandingCount = charts.claims_outstanding.data?.[1] || 0;
+                    const maxVal = Math.max(10, outstandingCount, notOutstandingCount);
+
                     RCM_STATE.chartInstances.dash_out = new Chart(outCtx, {
                         type: 'bar',
                         data: {
-                            labels: ['claims'],
+                            labels: ['Claims'],
                             datasets: [
                                 {
                                     label: 'Outstanding',
-                                    data: [0],
+                                    data: [outstandingCount],
                                     backgroundColor: '#996BE5',
                                     borderRadius: 3,
                                     barPercentage: 0.4,
                                 },
                                 {
                                     label: 'Not Outstanding',
-                                    data: [574],
+                                    data: [notOutstandingCount],
                                     backgroundColor: '#56D9FE',
                                     borderRadius: 3,
                                     barPercentage: 0.4,
@@ -1472,8 +1510,8 @@
                             scales: {
                                 y: {
                                     beginAtZero: true,
-                                    max: 600,
-                                    ticks: { stepSize: 100, font: { size: 10 } }
+                                    suggestedMax: Math.ceil(maxVal * 1.2),
+                                    ticks: { font: { size: 10 } }
                                 },
                                 x: { ticks: { font: { size: 11 } } }
                             }

@@ -88,6 +88,7 @@
 
     $metricTitle = $selectedMetric;
     $metricDesc = $metricDescriptions[$selectedMetric] ?? 'Performance metric trends based on a given date range.';
+    $metricType = $spec['columns'][1]['type'] ?? 'money';
 @endphp
 
 <div class="bg-transparent space-y-5">
@@ -163,6 +164,9 @@
             const dataCurrent = @json($spec['current'] ?? []);
             const dataLast = @json($spec['last'] ?? []);
             const isCompare = "{{ $activeSubtab ?? 'default' }}" === 'compare';
+            const metricTitle = @json($metricTitle);
+            const metricType = @json($metricType ?? 'money');
+            const isActivePts = metricTitle.toLowerCase().includes('active pts');
 
             const datasets = [
                 {
@@ -216,14 +220,41 @@
                             borderWidth: 1,
                             padding: 10,
                             displayColors: true,
+                            callbacks: {
+                                label: function (tooltipItem) {
+                                    const val = tooltipItem.parsed.y;
+                                    if (val === null || val === undefined) return '';
+                                    let formatted = val.toLocaleString();
+                                    if (metricType === 'percent') {
+                                        formatted = Number(val).toFixed(2) + '%';
+                                    } else if (metricType === 'money') {
+                                        formatted = '$ ' + Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    } else {
+                                        formatted = Number.isInteger(val) ? val.toLocaleString() : Number(val).toFixed(2);
+                                    }
+                                    return (tooltipItem.dataset.label ? tooltipItem.dataset.label + ': ' : '') + formatted;
+                                }
+                            }
                         }
                     },
                     scales: {
                         y: {
-                            beginAtZero: true,
+                            beginAtZero: !isActivePts,
+                            grace: isActivePts ? '5%' : 0,
                             grid: { color: '#f1f5f9', borderDash: [3, 3], drawBorder: false },
                             ticks: {
-                                callback: function (v) { return v >= 1000 ? (v / 1000) + 'k' : v; },
+                                callback: function (v) {
+                                    if (isActivePts) {
+                                        return v >= 10000 ? (v / 1000) + 'k' : v.toLocaleString();
+                                    }
+                                    if (metricType === 'percent') {
+                                        return v + '%';
+                                    }
+                                    if (metricType === 'number') {
+                                        return v >= 10000 ? (v / 1000) + 'k' : v.toLocaleString();
+                                    }
+                                    return v >= 1000 ? '$ ' + (v / 1000) + 'k' : '$ ' + v;
+                                },
                                 font: { size: 11, family: 'Inter, sans-serif' },
                                 color: '#64748b',
                                 padding: 10

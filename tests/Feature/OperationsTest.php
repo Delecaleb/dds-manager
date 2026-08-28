@@ -1343,4 +1343,66 @@ class OperationsTest extends TestCase
         $response->assertSee('Scheduled');
         $response->assertSee('$ 180.00');
     }
+
+    public function test_trends_tab_tx_plans_presented_and_active_pts(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Seed completing procedures for working days
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 10001,
+                'PatNum' => 7001,
+                'ClinicNum' => 1,
+                'ProcFee' => 200.00,
+                'ProcStatus' => '2',
+                'ProcDate' => '2026-08-10',
+                'DateTP' => '2026-08-10',
+            ],
+            [
+                'ProcNum' => 10002,
+                'PatNum' => 7002,
+                'ClinicNum' => 1,
+                'ProcFee' => 300.00,
+                'ProcStatus' => '2',
+                'ProcDate' => '2026-08-11',
+                'DateTP' => '2026-08-11',
+            ],
+            [
+                'ProcNum' => 10003,
+                'PatNum' => 7003,
+                'ClinicNum' => 1,
+                'ProcFee' => 150.00,
+                'ProcStatus' => '1',
+                'ProcDate' => '2026-08-11',
+                'DateTP' => '2026-08-11',
+            ],
+        ]);
+
+        $responseTx = $this->get(route('operations.data', [
+            'tab' => 'trends',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+            'metric' => 'BYO Avg # of Tx Plans Presented',
+        ]));
+
+        $responseTx->assertOk();
+        $specTx = $responseTx->original->getData()['spec'] ?? null;
+        $this->assertNotNull($specTx);
+        // Column type should be 'number', not 'money'
+        $this->assertEquals('number', $specTx['columns'][1]['type']);
+
+        $responseActive = $this->get(route('operations.data', [
+            'tab' => 'trends',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+            'metric' => 'BYO Active Pts Count',
+        ]));
+
+        $responseActive->assertOk();
+        $specActive = $responseActive->original->getData()['spec'] ?? null;
+        $this->assertNotNull($specActive);
+        $this->assertEquals('number', $specActive['columns'][1]['type']);
+    }
 }

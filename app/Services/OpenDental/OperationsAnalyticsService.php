@@ -2557,6 +2557,103 @@ class OperationsAnalyticsService
             return ['by_clinic' => $byClinic, 'totals' => $totals];
         }
 
+        // 1b. Tx Plans Presented per Working Day (Total number of tx plans presented divided by working days)
+        if (
+            str_contains(strtolower($metricNorm), 'tx plans presented') ||
+            str_contains(strtolower($metricNorm), 'treatment plans presented') ||
+            str_contains(strtolower($metricNorm), 'avg # of tx plans') ||
+            str_contains(strtolower($metricNorm), 'avg. # of tx plans') ||
+            str_contains(strtolower($metricNorm), 'number of treatment plans') ||
+            str_contains(strtolower($metricNorm), 'plans presented')
+        ) {
+            $mDateTP = $this->dateMonthExpr('pl.DateTP');
+            $driver = DB::connection()->getDriverName();
+            $distinctTpExpr = $driver === 'sqlite' ? 'pl.PatNum || "_" || pl.DateTP' : 'CONCAT(pl.PatNum, "_", pl.DateTP)';
+
+            // 1. Count of treatment plans presented per clinic per month
+            $qTx = DB::table('od_procedure_logs as pl')
+                ->whereNotNull('pl.DateTP')
+                ->where('pl.DateTP', '!=', '0001-01-01')
+                ->whereBetween('pl.DateTP', [$start, $end]);
+            if ($clinics) {
+                $qTx->whereIn('pl.ClinicNum', $clinics);
+            }
+            if (str_starts_with(strtolower($metricNorm), 'ort')) {
+                $qTx->where(function ($q) {
+                    $q->whereIn('pl.CodeNum', function ($sub) {
+                        $sub->select('CodeNum')->from('od_procedures')->where('ProcCode', 'LIKE', 'D8%');
+                    });
+                });
+            }
+
+            $txCounts = $qTx->selectRaw("pl.ClinicNum, {$mDateTP} as month, COUNT(DISTINCT {$distinctTpExpr}) as cnt")
+                ->groupBy('pl.ClinicNum', DB::raw($mDateTP))
+                ->get();
+
+            $txByLocMonth = [];
+            $txTotalByMonth = [];
+            foreach ($monthKeys as $mKey) {
+                $txTotalByMonth[$mKey] = 0;
+            }
+
+            foreach ($txCounts as $r) {
+                $cNum = (int) $r->ClinicNum;
+                $mK = $r->month;
+                $cnt = (int) $r->cnt;
+                if (isset($txTotalByMonth[$mK])) {
+                    $txByLocMonth[$cNum][$mK] = ($txByLocMonth[$cNum][$mK] ?? 0) + $cnt;
+                    $txTotalByMonth[$mK] += $cnt;
+                }
+            }
+
+            // 2. Working days per clinic per month
+            $qWd = DB::table('od_procedure_logs as pl')
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereBetween('pl.ProcDate', [$start, $end]);
+            if ($clinics) {
+                $qWd->whereIn('pl.ClinicNum', $clinics);
+            }
+            $wdCounts = $qWd->selectRaw("pl.ClinicNum, {$mProcDate} as month, COUNT(DISTINCT pl.ProcDate) as wd")
+                ->groupBy('pl.ClinicNum', DB::raw($mProcDate))
+                ->get();
+
+            $wdByLocMonth = [];
+            $wdTotalByMonth = [];
+            foreach ($monthKeys as $mKey) {
+                $wdTotalByMonth[$mKey] = 0;
+            }
+
+            foreach ($wdCounts as $r) {
+                $cNum = (int) $r->ClinicNum;
+                $mK = $r->month;
+                $wd = (int) $r->wd;
+                if (isset($wdTotalByMonth[$mK])) {
+                    $wdByLocMonth[$cNum][$mK] = ($wdByLocMonth[$cNum][$mK] ?? 0) + $wd;
+                    $wdTotalByMonth[$mK] += $wd;
+                }
+            }
+
+            // 3. Compute ratio per clinic and totals
+            $locList = array_unique(array_merge(array_keys($txByLocMonth), array_keys($wdByLocMonth), $clinics ?: [0]));
+            foreach ($locList as $loc) {
+                $initClinic($loc);
+                foreach ($monthKeys as $mKey) {
+                    $tx = (int) ($txByLocMonth[$loc][$mKey] ?? 0);
+                    $wd = (int) ($wdByLocMonth[$loc][$mKey] ?? 0);
+                    $ratio = $wd > 0 ? round($tx / $wd, 2) : 0.0;
+                    $byClinic[$loc][$mKey] = $ratio;
+                }
+            }
+
+            foreach ($monthKeys as $mKey) {
+                $totTx = (int) ($txTotalByMonth[$mKey] ?? 0);
+                $totWd = (int) ($wdTotalByMonth[$mKey] ?? 0);
+                $totals[$mKey] = $totWd > 0 ? round($totTx / $totWd, 2) : 0.0;
+            }
+
+            return ['by_clinic' => $byClinic, 'totals' => $totals];
+        }
+
         // 2. Doctor Production
         if ($metricNorm === 'BYO Doc Production' || str_contains(strtolower($metricNorm), 'doc prod') || str_contains(strtolower($metricNorm), 'prod per doc')) {
             $q = DB::table('od_procedure_logs as pl')
@@ -2813,7 +2910,25 @@ class OperationsAnalyticsService
         if (str_contains($m, 'rate') || str_contains($m, 'percent') || str_contains($m, '%')) {
             return 'percent';
         }
-        if (str_contains($m, 'visit') || str_contains($m, 'count') || str_contains($m, 'appts') || str_contains($m, 'appointment') || str_contains($m, 'procedures') || str_contains($m, 'sealants') || str_contains($m, 'exam') || str_contains($m, 'placements') || str_contains($m, 'aid') || str_contains($m, 'retention') || str_contains($m, 'pts')) {
+        if (
+            str_contains($m, 'visit') ||
+            str_contains($m, 'count') ||
+            str_contains($m, 'appts') ||
+            str_contains($m, 'appointment') ||
+            str_contains($m, 'procedures') ||
+            str_contains($m, 'sealants') ||
+            str_contains($m, 'exam') ||
+            str_contains($m, 'placements') ||
+            str_contains($m, 'aid') ||
+            str_contains($m, 'retention') ||
+            str_contains($m, 'pts') ||
+            str_contains($m, 'tx plans presented') ||
+            str_contains($m, 'treatment plans presented') ||
+            str_contains($m, 'avg # of tx plans') ||
+            str_contains($m, 'avg. # of tx plans') ||
+            str_contains($m, 'number of treatment plans') ||
+            str_contains($m, 'plans presented')
+        ) {
             if (! str_contains($m, 'prod') && ! str_contains($m, 'coll') && ! str_contains($m, '$')) {
                 return 'number';
             }

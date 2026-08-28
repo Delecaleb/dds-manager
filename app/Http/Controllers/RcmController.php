@@ -23,8 +23,8 @@ class RcmController extends Controller
         $offices = Office::where('is_active', true)->orderBy('name')->get();
         $activeOfficeId = Office::getActiveOfficeId();
 
-        $defaultStart = '2025-01-01';
-        $defaultEnd = '2025-12-31';
+        $defaultStart = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $defaultEnd = $request->input('end_date', now()->toDateString());
 
         return view('rcm.index', [
             'offices' => $offices,
@@ -51,10 +51,10 @@ class RcmController extends Controller
         $sortDir = $request->input('sort_dir', 'desc');
 
         $data = match ($tab) {
-            'payment_arrangement' => $this->rcmService->getPaymentArrangements($startDate, $endDate, $officeId, $search, $page, $perPage),
-            'patients_statements' => $this->rcmService->getPatientsStatements($startDate, $endDate, $officeId, $search, $page, $perPage),
-            'point_of_service' => $this->rcmService->getPointOfServiceCollections($startDate, $endDate, $officeId, $search, $page, $perPage),
-            'adjustment' => $this->rcmService->getAdjustments($startDate, $endDate, $officeId, $search, $page, $perPage),
+            'payment_arrangement' => $this->rcmService->getPaymentArrangements($startDate, $endDate, $officeId, $tier, $search, $page, $perPage, $sortKey, $sortDir),
+            'patients_statements' => $this->rcmService->getPatientsStatements($startDate, $endDate, $officeId, $tier, $search, $page, $perPage, $sortKey, $sortDir),
+            'point_of_service' => $this->rcmService->getPointOfServiceCollections($startDate, $endDate, $officeId, $tier, $search, $page, $perPage, $sortKey, $sortDir),
+            'adjustment' => $this->rcmService->getAdjustments($startDate, $endDate, $officeId, $tier, $search, $page, $perPage, $sortKey, $sortDir),
             'dashboard' => $this->rcmService->getDashboardMetrics($startDate, $endDate, $officeId),
             'collection_refund' => $this->rcmService->getCollectionRefunds($startDate, $endDate, $officeId, $search, $page, $perPage),
             'payor_overview' => $this->rcmService->getPayorOverview($startDate, $endDate, $officeId, $search, $page, $perPage),
@@ -112,7 +112,69 @@ class RcmController extends Controller
                         $row['ins_pay_est'],
                         $row['ins_paid'],
                         $row['write_off'],
-                        $row['status'],
+                        $row['status'] ?? 'Active',
+                    ]);
+                }
+            } elseif ($tab === 'point_of_service') {
+                fputcsv($handle, ['Patient', 'Patient ID', 'Office', 'Claim ID', 'Date of Service', 'Provider ID', 'Provider', 'Line of Business', 'Service Code', 'Past Due Balance', 'Total Amount of Service', 'Estimated Insurance $', 'Estimated Patient $', 'Insurance Paid', 'Patient Paid', 'Total Paid', 'Uncollected Balance', 'Loan Amount']);
+                $result = $this->rcmService->getPointOfServiceCollections($startDate, $endDate, $officeId, $tier, $search, 1, 5000);
+                foreach ($result['items'] as $row) {
+                    fputcsv($handle, [
+                        $row['patient_name'],
+                        $row['patient_id'],
+                        $row['office_name'],
+                        $row['claim_id'],
+                        $row['date_of_service'],
+                        $row['provider_id_code'],
+                        $row['provider_name'],
+                        $row['line_of_business'],
+                        $row['service_code'],
+                        $row['past_due_balance'],
+                        $row['total_amount_service'],
+                        $row['estimated_ins'],
+                        $row['estimated_pat'],
+                        $row['ins_paid'],
+                        $row['pat_paid'],
+                        $row['total_paid'],
+                        $row['uncollected_balance'],
+                        $row['loan_amount'],
+                    ]);
+                }
+            } elseif ($tab === 'adjustment') {
+                fputcsv($handle, ['Patient', 'Patient ID', 'Office', 'Date', 'Provider ID', 'Provider', 'Adjustment Type', 'Amount', 'Note']);
+                $result = $this->rcmService->getAdjustments($startDate, $endDate, $officeId, $tier, $search, 1, 5000);
+                foreach ($result['items'] as $row) {
+                    fputcsv($handle, [
+                        $row['patient_name'],
+                        $row['patient_id'],
+                        $row['office_name'],
+                        $row['adj_date'],
+                        $row['provider_id_code'],
+                        $row['provider_name'],
+                        $row['adj_type'],
+                        $row['adj_amount'],
+                        $row['note'],
+                    ]);
+                }
+            } elseif ($tab === 'payment_arrangement') {
+                fputcsv($handle, ['Patient', 'Patient ID', 'Office', 'Line of Business', 'Start Date', 'Creation Date', 'Last Pay Date', 'Loan Amount', 'Payment Frequency', 'Number of Payments', 'Installment Amount', 'Last Payment Amount', 'Remaining Balance', 'Days Past Due']);
+                $result = $this->rcmService->getPaymentArrangements($startDate, $endDate, $officeId, $tier, $search, 1, 5000);
+                foreach ($result['items'] as $row) {
+                    fputcsv($handle, [
+                        $row['patient_name'],
+                        $row['patient_id'],
+                        $row['office_name'],
+                        $row['line_of_business'],
+                        $row['start_date'],
+                        $row['creation_date'],
+                        $row['last_pay_date'],
+                        $row['loan_amount'],
+                        $row['payment_frequency'],
+                        $row['number_of_payments'],
+                        $row['installment_amount'],
+                        $row['last_payment_amount'],
+                        $row['remaining_balance'],
+                        $row['days_past_due'],
                     ]);
                 }
             } elseif ($tab === 'payor_overview') {
@@ -130,16 +192,16 @@ class RcmController extends Controller
                     ]);
                 }
             } else {
-                fputcsv($handle, ['Patient', 'Patient ID', 'Office', 'Details', 'Amount', 'Date']);
-                $result = $this->rcmService->getPatientsStatements($startDate, $endDate, $officeId, $search, 1, 5000);
+                fputcsv($handle, ['Patient', 'Patient ID', 'Office', 'Statement Date', 'Balance Due Now', 'Due Date']);
+                $result = $this->rcmService->getPatientsStatements($startDate, $endDate, $officeId, $tier, $search, 1, 5000);
                 foreach ($result['items'] as $row) {
                     fputcsv($handle, [
                         $row['patient_name'],
                         $row['patient_id'],
                         $row['office_name'],
-                        'Total Balance',
-                        $row['bal_total'],
-                        $row['last_statement_date'],
+                        $row['statement_date'],
+                        $row['balance_due_now'],
+                        $row['due_date'],
                     ]);
                 }
             }
