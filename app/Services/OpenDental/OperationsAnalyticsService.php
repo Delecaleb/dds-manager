@@ -1599,7 +1599,6 @@ class OperationsAnalyticsService
         $brokenApptsQ = DB::table('od_appointments as a')
             ->select('a.AptNum', 'a.ClinicNum')
             ->where('a.AptStatus', '5')
-            ->whereNotIn('a.AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947])
             ->whereRaw('LEFT(a.AptDateTime, 10) BETWEEN ? AND ?', [$start, $end]);
 
         if ($clinics) {
@@ -1657,9 +1656,6 @@ class OperationsAnalyticsService
 
         if ($status !== null) {
             $q->where('AptStatus', $status);
-            if ($status === '5') {
-                $q->whereNotIn('AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947]);
-            }
         }
         if ($clinics) {
             $q->whereIn('ClinicNum', $clinics);

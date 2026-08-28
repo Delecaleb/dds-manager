@@ -748,7 +748,6 @@ class OperationsController extends Controller
                     'a.ProcDescript'
                 )
                 ->where('a.AptStatus', '5')
-                ->whereNotIn('a.AptNum', [85716, 85845, 85891, 85892, 85468, 85466, 85947])
                 ->whereBetween('a.AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
 
             if ($provNum) {
