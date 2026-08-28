@@ -811,6 +811,104 @@ class OperationsController extends Controller
 
             $totals = ['amount' => $totAmt];
 
+        } elseif ($metric === 'total_appointments' || $metric === 'total_appointments_count') {
+            $title = 'Total Appointments Count Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'appt_id', 'label' => 'Appt ID', 'type' => 'text'],
+                ['key' => 'appt_date', 'label' => 'Appt Date', 'type' => 'text'],
+                ['key' => 'note', 'label' => 'Note', 'type' => 'text'],
+                ['key' => 'type', 'label' => 'Type', 'type' => 'text'],
+                ['key' => 'amount', 'label' => 'Amount', 'type' => 'money', 'agg' => 'sum'],
+            ];
+
+            $query = DB::table('od_appointments as a')
+                ->select(
+                    'a.AptNum',
+                    'a.PatNum',
+                    'a.ProvNum',
+                    'a.AptStatus',
+                    'a.AptDateTime',
+                    'a.Note',
+                    'a.ProcDescript'
+                )
+                ->whereBetween('a.AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
+
+            if ($provNum) {
+                $query->where('a.ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $query->where('a.ClinicNum', $clinicNum);
+            }
+
+            $appts = $query->orderBy('a.AptDateTime', 'desc')->get()->unique('AptNum');
+
+            $patMap = $mapPatients($appts->pluck('PatNum')->unique());
+
+            $providers = OdProvider::whereIn('ProvNum', $appts->pluck('ProvNum')->unique())
+                ->get()
+                ->keyBy('ProvNum');
+
+            $aptNums = $appts->pluck('AptNum')->unique();
+            $fees = [];
+            if ($aptNums->isNotEmpty()) {
+                $fees = DB::table('od_procedure_logs')
+                    ->selectRaw('AptNum, SUM(ProcFee) as total_fee')
+                    ->whereIn('AptNum', $aptNums)
+                    ->groupBy('AptNum')
+                    ->pluck('total_fee', 'AptNum')
+                    ->all();
+            }
+
+            $statusMap = [
+                '1' => 'Scheduled',
+                '2' => 'Complete',
+                '3' => 'Unscheduled',
+                '4' => 'ASAP',
+                '5' => 'Cancellation',
+                '6' => 'Planned',
+                '7' => 'PtNote',
+                '8' => 'PtNoteCompleted',
+            ];
+
+            $totAmt = 0;
+            foreach ($appts as $apt) {
+                $p = $providers[$apt->ProvNum] ?? null;
+                $provName = $p ? trim(($p->LName ?? '').(($p->LName && $p->PName) ? ', ' : '').($p->PName ?? '')) : ($provMap[$apt->ProvNum] ?? 'Unknown');
+                $provAbbr = $p ? ($p->Abbr ?? '') : '';
+                $provIdStr = $apt->ProvNum.($provAbbr ? ' - '.strtoupper($provAbbr) : '');
+
+                $amt = (float) ($fees[$apt->AptNum] ?? 0);
+                $totAmt += $amt;
+
+                $noteText = trim(($apt->Note ?: $apt->ProcDescript) ?: 'No note');
+                $aptType = $statusMap[(string) $apt->AptStatus] ?? ($apt->AptStatus ? 'Status '.$apt->AptStatus : 'Appointment');
+
+                $rows[] = [
+                    'pat_id' => $apt->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$apt->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provIdStr,
+                    'provider' => [
+                        'label' => $provName,
+                        'link' => true,
+                        'prov_num' => $apt->ProvNum,
+                    ],
+                    'prov_num' => $apt->ProvNum,
+                    'appt_id' => $apt->AptNum,
+                    'appt_date' => date('M d, Y', strtotime($apt->AptDateTime)),
+                    'note' => $noteText,
+                    'type' => $aptType,
+                    'amount' => $amt,
+                ];
+            }
+
+            $totals = ['amount' => $totAmt];
+
         } elseif ($metric === 'working_days') {
             $title = 'Working Days Breakdown';
             $columns = [

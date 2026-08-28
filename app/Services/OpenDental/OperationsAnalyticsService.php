@@ -1578,7 +1578,7 @@ class OperationsAnalyticsService
             ['key' => 'cancellation_rescheduled_dollars', 'label' => 'Cancellation Rescheduled $', 'type' => 'money', 'agg' => 'sum'],
             ['key' => 'cancellation_pct', 'label' => '% Cancellation', 'type' => 'percent', 'heat' => 'invert'],
             ['key' => 'rescheduled_pct', 'label' => '% Rescheduled', 'type' => 'percent'],
-            ['key' => 'total_appointments', 'label' => 'Total Appointments Count', 'type' => 'number', 'agg' => 'sum'],
+            ['key' => 'total_appointments', 'label' => 'Total Appointments Count', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'total_appointments'],
         ];
     }
 

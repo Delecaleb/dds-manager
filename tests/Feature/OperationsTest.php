@@ -1285,4 +1285,62 @@ class OperationsTest extends TestCase
         $response->assertSee('Patient called to cancel appointment');
         $response->assertSee('$ 250.00');
     }
+
+    public function test_total_appointments_drilldown_renders_and_includes_export_csv(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        DB::table('od_providers')->insert([
+            'ProvNum' => 101,
+            'Abbr' => 'SMITH',
+            'LName' => 'Smith',
+            'PName' => 'Sarah',
+        ]);
+
+        DB::table('od_patients')->insert([
+            'PatNum' => 6001,
+            'LName' => 'Johnson',
+            'FName' => 'Robert',
+        ]);
+
+        DB::table('od_appointments')->insert([
+            'AptNum' => 9001,
+            'PatNum' => 6001,
+            'ProvNum' => 101,
+            'ClinicNum' => 1,
+            'AptStatus' => '1', // Scheduled
+            'AptDateTime' => '2026-08-15 10:00:00',
+            'Note' => 'Regular checkup and cleaning',
+            'ProcDescript' => 'Cleaning and exam',
+        ]);
+
+        DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 9501,
+            'PatNum' => 6001,
+            'ProvNum' => 101,
+            'ClinicNum' => 1,
+            'AptNum' => 9001,
+            'ProcFee' => 180.00,
+            'ProcStatus' => '2',
+            'ProcDate' => '2026-08-15 10:00:00',
+        ]);
+
+        $response = $this->get(route('operations.drilldown', [
+            'metric' => 'total_appointments',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+            'clinic_num' => 1,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Total Appointments Count Breakdown');
+        $response->assertSee('Export CSV');
+        $response->assertSee('exportDrilldownModalCsv');
+        $response->assertSee('Johnson, Robert');
+        $response->assertSee('Smith, Sarah');
+        $response->assertSee('Regular checkup and cleaning');
+        $response->assertSee('Scheduled');
+        $response->assertSee('$ 180.00');
+    }
 }
