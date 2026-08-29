@@ -348,7 +348,6 @@ class OperationsAnalyticsService
                 pl.ProcFee AS gross
             ')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->whereBetween('pl.ProcDate', [$start, $end]);
         if ($clinics) {
             $prodQ->whereIn('pl.ClinicNum', $clinics);
@@ -573,7 +572,12 @@ class OperationsAnalyticsService
         }
 
         usort($rows, function ($a, $b) {
-            return $a['gross'] <=> $b['gross'] ?: $a['net'] <=> $b['net'];
+            preg_match('/-(\s*)(\d+)$/', $a['payor'], $ma);
+            preg_match('/-(\s*)(\d+)$/', $b['payor'], $mb);
+            $numA = isset($ma[2]) ? (int) $ma[2] : 999999;
+            $numB = isset($mb[2]) ? (int) $mb[2] : 999999;
+
+            return $numA <=> $numB ?: strcmp($a['payor'], $b['payor']);
         });
 
         return $rows;
@@ -800,10 +804,9 @@ class OperationsAnalyticsService
             ->selectRaw("ClinicNum,
                 SUM(ProcFee)                                  AS gross,
                 COUNT(*)                                      AS procedures,
-                COUNT(DISTINCT {$concat}) AS pts_visits,
+                COUNT(DISTINCT CASE WHEN COALESCE(CodeNum, 0) != 626 THEN {$concat} END) AS pts_visits,
                 COUNT(DISTINCT ProcDate)                      AS working_days")
             ->whereIn('ProcStatus', ProcStatus::completed())
-            ->whereRaw('COALESCE(CodeNum, 0) != 626')
             ->whereBetween('ProcDate', [$start, $end]);
 
         $groupCols = ['ClinicNum'];
@@ -1441,10 +1444,9 @@ class OperationsAnalyticsService
             ->selectRaw("ClinicNum, ProvNum,
                 SUM(ProcFee)                                  AS gross,
                 COUNT(*)                                      AS procedures,
-                COUNT(DISTINCT {$concat}) AS pts_visits,
+                COUNT(DISTINCT CASE WHEN COALESCE(CodeNum, '') != '626' THEN {$concat} END) AS pts_visits,
                 COUNT(DISTINCT CASE WHEN ProcFee > 0 THEN ProcDate END) AS working_days")
             ->whereIn('ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(CodeNum, '') != '626'")
             ->whereBetween('ProcDate', [$start, $end]);
         if ($clinics) {
             $prodQ->whereIn('ClinicNum', $clinics);
@@ -1457,7 +1459,7 @@ class OperationsAnalyticsService
         $npt = $this->newPatientsByClinicProvider($start, $end, $clinics);
         $hours = $this->scheduledHoursByClinicProvider($start, $end, $clinics);
 
-        // Retention: 36-month baseline exam cohort vs 18-month returned exam cohort
+        // Retention: Cohort A (Exam in months 19-36) vs Cohort B (Cohort A returning for exam in months 1-18)
         $start36m = \Carbon\Carbon::parse($end)->subMonths(36)->startOfDay()->toDateTimeString();
         $start18m = \Carbon\Carbon::parse($end)->subMonths(18)->startOfDay()->toDateTimeString();
         $endStr = \Carbon\Carbon::parse($end)->endOfDay()->toDateTimeString();
@@ -1468,7 +1470,7 @@ class OperationsAnalyticsService
         $pats36 = DB::table('od_procedure_logs as pl')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereIn('pl.CodeNum', $codeNums)
-            ->whereBetween('pl.ProcDate', [$start36m, $endStr])
+            ->whereBetween('pl.ProcDate', [$start36m, $start18m])
             ->when($clinics, fn ($q) => $q->whereIn('pl.ClinicNum', $clinics))
             ->select('pl.ClinicNum', 'pl.ProvNum', 'pl.PatNum')
             ->distinct()
@@ -1546,8 +1548,10 @@ class OperationsAnalyticsService
             $schedHours = (float) ($hours[$key] ?? 0);
             $goal = ($hourlyGoal > 0 && $schedHours > 0) ? round($hourlyGoal * $schedHours, 2) : 0.00;
 
-            $tPts = count($aByProv[$key] ?? []);
-            $rPts = count($bByProv[$key] ?? []);
+            $patsA = $aByProv[$key] ?? [];
+            $retained = array_intersect_key($patsA, $bByProv[$key] ?? []);
+            $tPts = count($patsA);
+            $rPts = count($retained);
             $retPct = $tPts > 0 ? round(($rPts / $tPts) * 100, 2) : 0;
 
             $rows[] = [
@@ -1892,10 +1896,9 @@ class OperationsAnalyticsService
                 SUM(ProcFee)                                  AS gross,
                 COUNT(*)                                      AS procedures,
                 COUNT(DISTINCT PatNum)                        AS unique_pts,
-                COUNT(DISTINCT {$concat}) AS pts_visit,
+                COUNT(DISTINCT CASE WHEN COALESCE(CodeNum, 0) != 626 THEN {$concat} END) AS pts_visit,
                 COUNT(DISTINCT ProcDate)                      AS working_days")
             ->whereIn('ProcStatus', ProcStatus::completed())
-            ->whereRaw('COALESCE(CodeNum, 0) != 626')
             ->whereBetween('ProcDate', [$start, $end]);
 
         if ($clinics) {
@@ -1928,8 +1931,8 @@ class OperationsAnalyticsService
 
     /**
      * Patient Retention:
-     * A = Patients who completed an exam ('D0120','D0140','D0150') in the last 36 months.
-     * B = Patients from A who returned for another exam ('D0120','D0140','D0150') in the nearest 18 months.
+     * Cohort A = Patients who completed an exam ('D0120','D0140','D0150') between 19 and 36 months ago (months 19–36).
+     * Cohort B = Patients from Cohort A who returned for another exam ('D0120','D0140','D0150') in the nearest 18 months (months 1–18).
      * Retention = B / A * 100
      */
     private function patientRetentionMetrics(string $end, array $clinics): array
@@ -1940,17 +1943,17 @@ class OperationsAnalyticsService
         $examCodes = ['D0120', 'D0140', 'D0150'];
         $codeNums = DB::table('od_procedures')->whereIn('ProcCode', $examCodes)->pluck('CodeNum')->toArray();
 
-        // 1. Cohort A: 36m exam patients
+        // 1. Cohort A: Exam patients in months 19 to 36 ago
         $qA = DB::table('od_procedure_logs as pl')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereIn('pl.CodeNum', $codeNums)
-            ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $end.' 23:59:59']);
+            ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $start18m.' 00:00:00']);
         if ($clinics) {
             $qA->whereIn('pl.ClinicNum', $clinics);
         }
         $pats36 = $qA->select('pl.ClinicNum', 'pl.PatNum')->distinct()->get();
 
-        // 2. Cohort B: 18m exam patients
+        // 2. Returned in nearest 18 months (months 1 to 18)
         $qB = DB::table('od_procedure_logs as pl')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereIn('pl.CodeNum', $codeNums)
@@ -1973,7 +1976,8 @@ class OperationsAnalyticsService
         $out = [];
         foreach ($aByClinic as $clinicNum => $patsA) {
             $cntA = count($patsA);
-            $cntB = count($bByClinic[$clinicNum] ?? []);
+            $retained = array_intersect_key($patsA, $bByClinic[$clinicNum] ?? []);
+            $cntB = count($retained);
             $out[$clinicNum] = $cntA > 0 ? round(($cntB / $cntA) * 100, 2) : 0.0;
         }
 
@@ -3047,7 +3051,7 @@ class OperationsAnalyticsService
                     $pats36 = [];
                     $pats18 = [];
                     foreach ($cProcs as $r) {
-                        if ($r->pdate >= $mStart36 && $r->pdate <= $mEnd) {
+                        if ($r->pdate >= $mStart36 && $r->pdate < $mStart18) {
                             $pats36[$r->PatNum] = true;
                             $allActive36[$r->PatNum] = true;
                         }
@@ -3056,13 +3060,15 @@ class OperationsAnalyticsService
                             $allActive18[$r->PatNum] = true;
                         }
                     }
+                    $retained = array_intersect_key($pats36, $pats18);
                     $cntA = count($pats36);
-                    $cntB = count($pats18);
+                    $cntB = count($retained);
                     $byClinic[$cNum][$mKey] = $cntA > 0 ? round(($cntB / $cntA) * 100, 2) : 0.0;
                 }
 
+                $allRetained = array_intersect_key($allActive36, $allActive18);
                 $totA = count($allActive36);
-                $totB = count($allActive18);
+                $totB = count($allRetained);
                 $totals[$mKey] = $totA > 0 ? round(($totB / $totA) * 100, 2) : 0.0;
             }
 

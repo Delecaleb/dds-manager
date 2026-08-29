@@ -1334,9 +1334,9 @@ class OperationsController extends Controller
             $columns = [
                 ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
                 ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
-                ['key' => 'first_exam', 'label' => 'Exam Date (36m)', 'type' => 'text'],
-                ['key' => 'recent_exam', 'label' => 'Recent Exam Date (18m)', 'type' => 'text'],
-                ['key' => 'visited', 'label' => 'Retained (18m)', 'type' => 'text'],
+                ['key' => 'first_exam', 'label' => 'Prior Exam (19-36m)', 'type' => 'text'],
+                ['key' => 'recent_exam', 'label' => 'Returned Exam (1-18m)', 'type' => 'text'],
+                ['key' => 'visited', 'label' => 'Retained', 'type' => 'text'],
             ];
 
             $start36m = date('Y-m-d', strtotime('-36 months', strtotime($end)));
@@ -1346,31 +1346,45 @@ class OperationsController extends Controller
 
             $cohortA = DB::table('od_procedure_logs as pl')
                 ->join('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
-                ->selectRaw("
+                ->selectRaw('
                     pl.PatNum,
-                    MIN(pl.ProcDate) AS first_exam_date,
-                    MAX(CASE WHEN pl.ProcDate >= '{$start18m} 00:00:00' THEN pl.ProcDate ELSE NULL END) AS recent_exam_date,
-                    MAX(CASE WHEN pl.ProcDate >= '{$start18m} 00:00:00' THEN 1 ELSE 0 END) AS returned_in_18m
-                ")
+                    MAX(pl.ProcDate) AS prior_exam_date
+                ')
                 ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereIn('pc.ProcCode', $examCodes)
-                ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $end.' 23:59:59'])
+                ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $start18m.' 00:00:00'])
                 ->groupBy('pl.PatNum')
                 ->get();
+
+            $cohortB = DB::table('od_procedure_logs as pl')
+                ->join('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
+                ->selectRaw('
+                    pl.PatNum,
+                    MAX(pl.ProcDate) AS recent_exam_date
+                ')
+                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereIn('pc.ProcCode', $examCodes)
+                ->whereBetween('pl.ProcDate', [$start18m.' 00:00:00', $end.' 23:59:59'])
+                ->whereIn('pl.PatNum', $cohortA->pluck('PatNum')->unique())
+                ->groupBy('pl.PatNum')
+                ->get()
+                ->keyBy('PatNum');
 
             $patMap = $mapPatients($cohortA->pluck('PatNum')->unique());
 
             foreach ($cohortA as $pt) {
-                $isRetained = (bool) $pt->returned_in_18m;
+                $ret = $cohortB->get($pt->PatNum);
+                $isRetained = $ret !== null;
                 $rows[] = [
                     'pat_id' => $pt->PatNum,
                     'patient' => [
                         'label' => $patMap[$pt->PatNum] ?? 'Unknown',
                         'link' => true,
                     ],
-                    'first_exam' => date('M d, Y', strtotime($pt->first_exam_date)),
-                    'recent_exam' => $pt->recent_exam_date ? date('M d, Y', strtotime($pt->recent_exam_date)) : '—',
+                    'first_exam' => date('M d, Y', strtotime($pt->prior_exam_date)),
+                    'recent_exam' => $isRetained ? date('M d, Y', strtotime($ret->recent_exam_date)) : '—',
                     'visited' => $isRetained ? 'Yes' : 'No',
                 ];
             }

@@ -433,17 +433,37 @@ class KpisController extends Controller
         // 1 & 10. Patient Retention + Active Patients
         $retentionData = DB::selectOne("
             SELECT
-                COUNT(DISTINCT CASE WHEN pl.ProcDate >= ? THEN pl.PatNum END) AS active_36m,
-                COUNT(DISTINCT CASE WHEN pl.ProcDate >= ? AND pc.ProcCode NOT IN ('D9986', 'D9987') THEN pl.PatNum END) AS active_18m,
-                COUNT(DISTINCT CASE WHEN pl.ProcDate >= ? AND pc.ProcCode IN ('D0120','D0140','D0150','D0160','D0170','D0180') THEN pl.PatNum END) AS exam_in_18m
+                COUNT(DISTINCT CASE WHEN pl.ProcDate >= ? AND pc.ProcCode NOT IN ('D9986', 'D9987') THEN pl.PatNum END) AS active_18m
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             WHERE pl.ProcStatus IN ({$this->completedIn})
-        ", [$cutoff36m, $cutoff18m, $cutoff18m]);
+        ", [$cutoff18m]);
 
         $activePatients = (int) ($retentionData->active_18m ?? 0);
-        $active36m = (int) ($retentionData->active_36m ?? 0);
-        $patientRetention = $active36m > 0 ? round(($retentionData->exam_in_18m / $active36m) * 100, 2) : 0;
+
+        $examCodes = ['D0120', 'D0140', 'D0150', 'D0160', 'D0170', 'D0180'];
+        $codeNums = DB::table('od_procedures')->whereIn('ProcCode', $examCodes)->pluck('CodeNum')->toArray();
+
+        $pats19_36 = DB::table('od_procedure_logs as pl')
+            ->whereIn('pl.ProcStatus', [2, '2', 'C'])
+            ->whereIn('pl.CodeNum', $codeNums)
+            ->whereBetween('pl.ProcDate', [$cutoff36m.' 00:00:00', $cutoff18m.' 00:00:00'])
+            ->pluck('pl.PatNum')
+            ->unique()
+            ->toArray();
+
+        $pats18 = DB::table('od_procedure_logs as pl')
+            ->whereIn('pl.ProcStatus', [2, '2', 'C'])
+            ->whereIn('pl.CodeNum', $codeNums)
+            ->whereBetween('pl.ProcDate', [$cutoff18m.' 00:00:00', now()->toDateString().' 23:59:59'])
+            ->pluck('pl.PatNum')
+            ->unique()
+            ->toArray();
+
+        $retained = array_intersect($pats19_36, $pats18);
+        $cntA = count($pats19_36);
+        $cntB = count($retained);
+        $patientRetention = $cntA > 0 ? round(($cntB / $cntA) * 100, 2) : 0;
 
         // 2. Treatment Plans per Day
         $tpDays = DB::selectOne("
