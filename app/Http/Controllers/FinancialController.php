@@ -109,7 +109,6 @@ class FinancialController extends Controller
                 ->leftJoinSub($grossSub, 'g', 'pr.ProvNum', '=', 'g.ProvNum')
                 ->leftJoinSub($adjSub, 'a', 'pr.ProvNum', '=', 'a.ProvNum')
                 ->leftJoinSub($writeoffSub, 'w', 'pr.ProvNum', '=', 'w.ProvNum')
-                ->whereIn('pr.IsHidden', ['false', '0', 0, false])
                 ->where(function ($q) {
                     $q->whereRaw('COALESCE(g.gross, 0) != 0')
                         ->orWhereRaw('COALESCE(a.adjustments, 0) != 0')
@@ -196,10 +195,17 @@ class FinancialController extends Controller
                 ->groupByRaw('DATE(ProcDate)')
                 ->pluck('amount', 'date');
 
-            $dailyColl = DB::table('od_pay_splits')
+            $dailyPatColl = DB::table('od_pay_splits')
                 ->whereBetween('DatePay', [$start, $end])
-                ->selectRaw('DATE(DatePay) as date, '.MetricDefinitions::collections('amount'))
+                ->selectRaw('DATE(DatePay) as date, SUM(SplitAmt) as amount')
                 ->groupByRaw('DATE(DatePay)')
+                ->pluck('amount', 'date');
+
+            $dailyInsColl = DB::table('od_claim_procs')
+                ->whereBetween('DateCP', [$start, $end])
+                ->where('Status', '!=', 0)
+                ->selectRaw('DATE(DateCP) as date, SUM(InsPayAmt) as amount')
+                ->groupByRaw('DATE(DateCP)')
                 ->pluck('amount', 'date');
 
             $period = CarbonPeriod::create($start, $end);
@@ -208,12 +214,11 @@ class FinancialController extends Controller
                 $allDates->push($dt->toDateString());
             }
 
-            $response['daily_revenue'] = $allDates->map(function ($date) use ($dailyGross, $dailyAdj, $dailyWriteOffs, $dailyColl) {
+            $response['daily_revenue'] = $allDates->map(function ($date) use ($dailyGross, $dailyAdj, $dailyWriteOffs, $dailyPatColl, $dailyInsColl) {
                 $g = (float) ($dailyGross[$date] ?? 0);
-                $a = (float) ($dailyAdj[$date] ?? 0);
-                $w = (float) ($dailyWriteOffs[$date] ?? 0);
-                $c = (float) ($dailyColl[$date] ?? 0);
-                $n = $g + $a + $w;
+                $a = (float) ($dailyAdj[$date] ?? 0) - (float) ($dailyWriteOffs[$date] ?? 0);
+                $c = (float) ($dailyPatColl[$date] ?? 0) + (float) ($dailyInsColl[$date] ?? 0);
+                $n = $g + $a;
 
                 return [
                     'date' => $date,
@@ -602,22 +607,49 @@ class FinancialController extends Controller
     // ── Adjustment ────────────────────────────────────────────────────────────
     private function bkAdjustment(string $start, string $end): array
     {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $patNameExpr = $isSqlite ? "(p.LName || ', ' || p.FName)" : "CONCAT(p.LName, ', ', p.FName)";
+        $provIdExpr = $isSqlite ? "(pr.ProvNum || ' - ' || pr.Abbr)" : "CONCAT(pr.ProvNum, ' - ', pr.Abbr)";
+        $provNameExpr = $isSqlite ? "(pr.LName || ', ' || pr.PName)" : "CONCAT(pr.LName, ', ', pr.PName)";
+
+        $defMap = DB::table('od_definitions')->where('Category', 1)->pluck('ItemName', 'DefNum')->toArray();
+
         $rows = DB::select("
             SELECT
                 p.PatNum                                          AS patient_id,
-                CONCAT(p.LName, ', ', p.FName)                   AS patient_name,
-                COALESCE(CONCAT(pr.ProvNum, ' - ', pr.Abbr), '') AS provider_ids,
-                COALESCE(CONCAT(pr.LName, ', ', pr.PName), '')   AS providers,
+                {$patNameExpr}                                    AS patient_name,
+                COALESCE({$provIdExpr}, '')                       AS provider_ids,
+                COALESCE({$provNameExpr}, '')                     AS providers,
                 a.AdjDate                                         AS dates,
                 a.AdjAmt                                          AS amount,
                 a.AdjType                                         AS adj_type_id,
-                COALESCE(NULLIF(a.AdjNote, ''), NULL)             AS adj_note
+                'adjustment'                                      AS source_type
             FROM od_adjustments a
             JOIN od_patients  p  ON a.PatNum  = p.PatNum
             LEFT JOIN od_providers pr ON a.ProvNum = pr.ProvNum
             WHERE a.AdjDate BETWEEN ? AND ?
-            ORDER BY a.AdjDate, p.LName
-        ", [$start, $end]);
+
+            UNION ALL
+
+            SELECT
+                p.PatNum                                          AS patient_id,
+                COALESCE({$patNameExpr}, 'Insurance Payment')     AS patient_name,
+                COALESCE({$provIdExpr}, '')                       AS provider_ids,
+                COALESCE({$provNameExpr}, '')                     AS providers,
+                cp.ProcDate                                       AS dates,
+                -SUM(cp.WriteOff)                                 AS amount,
+                0                                                 AS adj_type_id,
+                'writeoff'                                        AS source_type
+            FROM od_claim_procs cp
+            JOIN od_patients  p  ON cp.PatNum  = p.PatNum
+            LEFT JOIN od_providers pr ON cp.ProvNum = pr.ProvNum
+            WHERE cp.ProcDate BETWEEN ? AND ?
+              AND cp.WriteOff <> 0
+            GROUP BY p.PatNum, p.LName, p.FName,
+                     pr.ProvNum, pr.Abbr, pr.LName, pr.PName, cp.ProcDate
+
+            ORDER BY dates, patient_name
+        ", [$start, $end, $start, $end]);
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
@@ -626,30 +658,54 @@ class FinancialController extends Controller
             'providers' => $r->providers,
             'dates' => $r->dates,
             'amount' => round((float) $r->amount, 2),
-            'adj_type' => ((float) $r->amount >= 0 ? '+' : '-').' Adjustment (Type #'.$r->adj_type_id.')',
+            'adj_type' => $r->source_type === 'writeoff'
+                ? 'WriteOff'
+                : ($defMap[$r->adj_type_id] ?? (((float) $r->amount >= 0 ? '+' : '-').' Adjustment (Type #'.$r->adj_type_id.')')),
         ], $rows);
     }
 
     // ── Collection ────────────────────────────────────────────────────────────
     private function bkCollection(string $start, string $end): array
     {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $patNameExpr = $isSqlite ? "(p.LName || ', ' || p.FName)" : "CONCAT(p.LName, ', ', p.FName)";
+        $provIdExpr = $isSqlite ? "(pr.ProvNum || ' - ' || pr.Abbr)" : "CONCAT(pr.ProvNum, ' - ', pr.Abbr)";
+        $provNameExpr = $isSqlite ? "(pr.LName || ', ' || pr.PName)" : "CONCAT(pr.LName, ', ', pr.PName)";
+
         $rows = DB::select("
             SELECT
                 p.PatNum                                          AS patient_id,
-                CONCAT(p.LName, ', ', p.FName)                   AS patient_name,
-                COALESCE(CONCAT(pr.ProvNum, ' - ', pr.Abbr), '') AS provider_ids,
-                COALESCE(CONCAT(pr.LName, ', ', pr.PName), '')   AS providers,
+                {$patNameExpr}                                    AS patient_name,
+                COALESCE({$provIdExpr}, '')                       AS provider_ids,
+                COALESCE({$provNameExpr}, '')                     AS providers,
                 ps.DatePay                                        AS dates,
                 SUM(ps.SplitAmt)                                  AS amount
             FROM od_pay_splits ps
-            JOIN od_patients  p  ON ps.PatNum  = p.PatNum
+            LEFT JOIN od_patients  p  ON ps.PatNum  = p.PatNum
             LEFT JOIN od_providers pr ON ps.ProvNum = pr.ProvNum
             WHERE ps.DatePay BETWEEN ? AND ?
             GROUP BY p.PatNum, p.LName, p.FName,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
                      ps.DatePay
-            ORDER BY ps.DatePay, p.LName
-        ", [$start, $end]);
+            UNION ALL
+            SELECT
+                p.PatNum                                          AS patient_id,
+                COALESCE({$patNameExpr}, 'Insurance Payment')     AS patient_name,
+                COALESCE({$provIdExpr}, '')                       AS provider_ids,
+                COALESCE({$provNameExpr}, '')                     AS providers,
+                cp.DateCP                                         AS dates,
+                SUM(cp.InsPayAmt)                                 AS amount
+            FROM od_claim_procs cp
+            LEFT JOIN od_patients  p  ON cp.PatNum  = p.PatNum
+            LEFT JOIN od_providers pr ON cp.ProvNum = pr.ProvNum
+            WHERE cp.DateCP BETWEEN ? AND ?
+              AND cp.Status != 0
+              AND cp.InsPayAmt != 0
+            GROUP BY p.PatNum, p.LName, p.FName,
+                     pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
+                     cp.DateCP
+            ORDER BY dates, patient_name
+        ", [$start, $end, $start, $end]);
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,

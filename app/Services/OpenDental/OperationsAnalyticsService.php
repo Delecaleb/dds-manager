@@ -397,7 +397,7 @@ class OperationsAnalyticsService
             $adjByPayorClinic[$key] = ($adjByPayorClinic[$key] ?? 0.0) + (float) $row->AdjAmt;
         }
 
-        // 3. Collections mapped by PlanNum
+        // 3. Collections mapped by PlanNum (Patient + Insurance)
         $colQ = DB::table('od_pay_splits as p')
             ->leftJoinSub($latestClaim, 'cp', 'p.PatNum', '=', 'cp.PatNum')
             ->selectRaw('COALESCE(cp.PlanNum, 0) AS PlanNum, p.ClinicNum, p.SplitAmt')
@@ -411,6 +411,19 @@ class OperationsAnalyticsService
             $payor = $this->payorLabel($row->PlanNum);
             $key = $payor.'|'.$row->ClinicNum;
             $colByPayorClinic[$key] = ($colByPayorClinic[$key] ?? 0.0) + (float) $row->SplitAmt;
+        }
+
+        $insColQ = DB::table('od_claim_procs')
+            ->selectRaw('COALESCE(PlanNum, 0) AS PlanNum, ClinicNum, InsPayAmt')
+            ->whereBetween('DateCP', [$start, $end])
+            ->where('Status', '!=', 0);
+        if ($clinics) {
+            $insColQ->whereIn('ClinicNum', $clinics);
+        }
+        foreach ($insColQ->get() as $row) {
+            $payor = $this->payorLabel($row->PlanNum);
+            $key = $payor.'|'.$row->ClinicNum;
+            $colByPayorClinic[$key] = ($colByPayorClinic[$key] ?? 0.0) + (float) $row->InsPayAmt;
         }
 
         // 4. WriteOffs mapped by PlanNum
@@ -488,10 +501,11 @@ class OperationsAnalyticsService
             $clinicNum = (int) $clinicNum;
 
             $gross = (float) ($prodByPayorClinic[$key]['gross'] ?? 0);
-            $adjustment = (float) ($adjByPayorClinic[$key] ?? 0);
+            $rawAdj = (float) ($adjByPayorClinic[$key] ?? 0);
             $writeoff = (float) ($woByPayorClinic[$key] ?? 0);
+            $adjustment = $rawAdj - $writeoff;
             $collection = (float) ($colByPayorClinic[$key] ?? 0);
-            $net = $this->production->netFrom($gross, $adjustment, $writeoff);
+            $net = $this->production->netFrom($gross, $adjustment, 0.0);
 
             $totalNet += $net;
 
@@ -703,7 +717,7 @@ class OperationsAnalyticsService
     {
         $prod = $this->pdGroupedProduction($start, $end, $dims, $clinics);
         $adj = $this->pdGroupedSum('od_adjustments', 'AdjAmt', 'AdjDate', $dims, $start, $end, $clinics);
-        $coll = $this->pdGroupedSum('od_pay_splits', 'SplitAmt', 'DatePay', $dims, $start, $end, $clinics);
+        $coll = $this->pdGroupedCollections($dims, $start, $end, $clinics);
         $wo = $this->pdGroupedSum('od_claim_procs', 'WriteOff', 'ProcDate', $dims, $start, $end, $clinics);
         $npt = $this->pdGroupedNewPatients($start, $end, $dims, $clinics);
 
@@ -727,10 +741,11 @@ class OperationsAnalyticsService
 
             $p = $prod[$key] ?? null;
             $gross = (float) ($p->gross ?? 0);
-            $adjustment = (float) ($adj[$key] ?? 0);
+            $rawAdj = (float) ($adj[$key] ?? 0);
             $writeoff = (float) ($wo[$key] ?? 0);
+            $adjustment = $rawAdj - $writeoff;
             $collection = (float) ($coll[$key] ?? 0);
-            $net = $this->production->netFrom($gross, $adjustment, $writeoff);
+            $net = $this->production->netFrom($gross, $adjustment, 0.0);
             $ptsVisits = (int) ($p->pts_visits ?? 0);
             $procedures = (int) ($p->procedures ?? 0);
             $workingDays = (int) ($p->working_days ?? 0);
@@ -840,6 +855,38 @@ class OperationsAnalyticsService
         return $out;
     }
 
+    /** Total collections (patient + insurance) grouped by active dimensions. Keyed by composite. */
+    private function pdGroupedCollections(array $dims, string $start, string $end, array $clinics): array
+    {
+        $pat = $this->pdGroupedSum('od_pay_splits', 'SplitAmt', 'DatePay', $dims, $start, $end, $clinics);
+
+        $q = DB::table('od_claim_procs')
+            ->selectRaw('ClinicNum, SUM(InsPayAmt) AS total')
+            ->whereBetween('DateCP', [$start, $end])
+            ->where('Status', '!=', 0);
+
+        $groupCols = ['ClinicNum'];
+        if (in_array('provider', $dims, true)) {
+            $q->addSelect('ProvNum');
+            $groupCols[] = 'ProvNum';
+        }
+        if (in_array('date', $dims, true)) {
+            $q->selectRaw('DateCP AS grp_date');
+            $groupCols[] = 'DateCP';
+        }
+        if ($clinics) {
+            $q->whereIn('ClinicNum', $clinics);
+        }
+
+        $out = $pat;
+        foreach ($q->groupBy($groupCols)->get() as $r) {
+            $key = $this->pdKey($r, $dims);
+            $out[$key] = ($out[$key] ?? 0.0) + (float) $r->total;
+        }
+
+        return $out;
+    }
+
     /** New-patient visits grouped by the active dimensions. Keyed by composite. */
     private function pdGroupedNewPatients(string $start, string $end, array $dims, array $clinics): array
     {
@@ -942,13 +989,35 @@ class OperationsAnalyticsService
         }
         $adjData = $adjQuery->groupBy('AdjDate')->pluck('total', 'd');
 
-        $colQuery = DB::table('od_pay_splits')
+        $woQuery = DB::table('od_claim_procs')
+            ->selectRaw('ProcDate as d, SUM(WriteOff) as total')
+            ->whereBetween('ProcDate', [$start, $end]);
+        if ($clinics) {
+            $woQuery->whereIn('ClinicNum', $clinics);
+        }
+        $woData = $woQuery->groupBy('ProcDate')->pluck('total', 'd');
+
+        $colPatQuery = DB::table('od_pay_splits')
             ->selectRaw('DatePay as d, SUM(SplitAmt) as total')
             ->whereBetween('DatePay', [$start, $end]);
         if ($clinics) {
-            $colQuery->whereIn('ClinicNum', $clinics);
+            $colPatQuery->whereIn('ClinicNum', $clinics);
         }
-        $actualCol = $colQuery->groupBy('DatePay')->pluck('total', 'd');
+        $colPat = $colPatQuery->groupBy('DatePay')->pluck('total', 'd');
+
+        $colInsQuery = DB::table('od_claim_procs')
+            ->selectRaw('DateCP as d, SUM(InsPayAmt) as total')
+            ->whereBetween('DateCP', [$start, $end])
+            ->where('Status', '!=', 0);
+        if ($clinics) {
+            $colInsQuery->whereIn('ClinicNum', $clinics);
+        }
+        $colIns = $colInsQuery->groupBy('DateCP')->pluck('total', 'd');
+
+        $actualCol = collect();
+        foreach ($colPat->keys()->merge($colIns->keys())->unique() as $d) {
+            $actualCol->put($d, (float) ($colPat->get($d, 0) + $colIns->get($d, 0)));
+        }
 
         $newVisits = $this->patientVisits->newPatientVisits($start, $end, $clinics);
         $actualNpt = collect($newVisits)->groupBy('dates')->map(fn ($g) => $g->count());
@@ -1035,7 +1104,7 @@ class OperationsAnalyticsService
         $rows = [];
         foreach ($dates as $d => $dateLabel) {
             $gross = (float) ($actualProd[$d]->gross ?? 0);
-            $adj = (float) ($adjData[$d] ?? 0);
+            $adj = (float) ($adjData[$d] ?? 0) - (float) ($woData[$d] ?? 0);
             $ap = $gross + $adj;
             $ac = (float) ($actualCol[$d] ?? 0);
             $apv = (int) ($actualProd[$d]->pts_visits ?? 0);
@@ -1384,7 +1453,7 @@ class OperationsAnalyticsService
 
         $adj = $this->sumByClinicProvider('od_adjustments', 'AdjAmt', 'AdjDate', $start, $end, $clinics);
         $wo = $this->sumByClinicProvider('od_claim_procs', 'WriteOff', 'ProcDate', $start, $end, $clinics);
-        $col = $this->sumByClinicProvider('od_pay_splits', 'SplitAmt', 'DatePay', $start, $end, $clinics);
+        $col = $this->collectionsByClinicProvider($start, $end, $clinics);
         $npt = $this->newPatientsByClinicProvider($start, $end, $clinics);
         $hours = $this->scheduledHoursByClinicProvider($start, $end, $clinics);
 
@@ -1432,6 +1501,7 @@ class OperationsAnalyticsService
         $activeKeys = array_unique(array_merge(
             $prodMap->keys()->toArray(),
             array_keys($adj),
+            array_keys($wo),
             array_keys($col)
         ));
 
@@ -1441,10 +1511,11 @@ class OperationsAnalyticsService
             $p = $prodMap[$key] ?? null;
 
             $gross = (float) ($p->gross ?? 0);
-            $adjustment = (float) ($adj[$key] ?? 0);
+            $rawAdj = (float) ($adj[$key] ?? 0);
             $writeoff = (float) ($wo[$key] ?? 0);
+            $adjustment = $rawAdj - $writeoff;
             $collection = (float) ($col[$key] ?? 0);
-            $net = $this->production->netFrom($gross, $adjustment, $writeoff);
+            $net = $this->production->netFrom($gross, $adjustment, 0.0);
             $ptsVisits = (int) ($p->pts_visits ?? 0);
             $procedures = (int) ($p->procedures ?? 0);
             $workingDays = (int) ($p->working_days ?? 0);
@@ -1534,6 +1605,28 @@ class OperationsAnalyticsService
         $out = [];
         foreach ($q->groupBy('ClinicNum', 'ProvNum')->get() as $r) {
             $out[$r->ClinicNum.'|'.$r->ProvNum] = (float) $r->total;
+        }
+
+        return $out;
+    }
+
+    /** Total collections (patient + insurance) grouped by "ClinicNum|ProvNum". */
+    private function collectionsByClinicProvider(string $start, string $end, array $clinics): array
+    {
+        $pat = $this->sumByClinicProvider('od_pay_splits', 'SplitAmt', 'DatePay', $start, $end, $clinics);
+
+        $qIns = DB::table('od_claim_procs')
+            ->selectRaw('ClinicNum, ProvNum, SUM(InsPayAmt) AS total')
+            ->whereBetween('DateCP', [$start, $end])
+            ->where('Status', '!=', 0);
+        if ($clinics) {
+            $qIns->whereIn('ClinicNum', $clinics);
+        }
+
+        $out = $pat;
+        foreach ($qIns->groupBy('ClinicNum', 'ProvNum')->get() as $r) {
+            $key = $r->ClinicNum.'|'.$r->ProvNum;
+            $out[$key] = ($out[$key] ?? 0.0) + (float) $r->total;
         }
 
         return $out;
@@ -1724,7 +1817,7 @@ class OperationsAnalyticsService
     {
         $prod = $this->productionMetrics($start, $end, $clinics);
         $adj = $this->sumByClinic('od_adjustments', 'AdjAmt', 'AdjDate', $start, $end, $clinics);
-        $coll = $this->sumByClinic('od_pay_splits', 'SplitAmt', 'DatePay', $start, $end, $clinics);
+        $coll = $this->collectionsByClinic($start, $end, $clinics);
         $wo = $this->sumByClinic('od_claim_procs', 'WriteOff', 'ProcDate', $start, $end, $clinics);
         $newp = $this->newPatientMetrics($start, $end, $clinics);
         $activeP = $this->activePatientMetrics($end, $clinics);
@@ -1733,6 +1826,7 @@ class OperationsAnalyticsService
         $clinicNums = array_values(array_unique(array_merge(
             array_keys($prod),
             array_keys($adj),
+            array_keys($wo),
             array_keys($coll),
             array_keys($activeP),
             array_keys($retentionMetrics)
@@ -1743,10 +1837,11 @@ class OperationsAnalyticsService
         foreach ($clinicNums as $c) {
             $p = $prod[$c] ?? null;
             $gross = (float) ($p->gross ?? 0);
-            $adjustment = (float) ($adj[$c] ?? 0);
+            $rawAdj = (float) ($adj[$c] ?? 0);
             $writeoff = (float) ($wo[$c] ?? 0);
+            $adjustment = $rawAdj - $writeoff;
             $collection = (float) ($coll[$c] ?? 0);
-            $net = $this->production->netFrom($gross, $adjustment, $writeoff);
+            $net = $this->production->netFrom($gross, $adjustment, 0.0);
             $ptsVisit = (int) ($p->pts_visit ?? 0);
             $procedures = (int) ($p->procedures ?? 0);
             $workingDays = (int) ($p->working_days ?? 0);
@@ -1758,7 +1853,7 @@ class OperationsAnalyticsService
                 'location' => $this->clinicNames[(int) $c] ?? ('Location '.$c),
                 'gross' => round($gross, 2),
                 'adjustment' => round($adjustment, 2),
-                'adj_pct' => $gross > 0 ? round($adjustment / $gross * 100, 2) : 0,
+                'adj_pct' => $gross > 0 ? round(abs($adjustment) / $gross * 100, 2) : 0,
                 'net' => round($net, 2),
                 'collection' => round($collection, 2),
                 'coll_pct' => $net > 0 ? round($collection / $net * 100, 2) : 0,
@@ -1940,6 +2035,28 @@ class OperationsAnalyticsService
         }
 
         return $q->groupBy('ClinicNum')->pluck('total', 'ClinicNum')->all();
+    }
+
+    /** Total collections (patient + insurance) grouped by ClinicNum. Returns [ClinicNum => total]. */
+    private function collectionsByClinic(string $start, string $end, array $clinics): array
+    {
+        $pat = $this->sumByClinic('od_pay_splits', 'SplitAmt', 'DatePay', $start, $end, $clinics);
+
+        $qIns = DB::table('od_claim_procs')
+            ->selectRaw('ClinicNum, SUM(InsPayAmt) AS total')
+            ->whereBetween('DateCP', [$start, $end])
+            ->where('Status', '!=', 0);
+        if ($clinics) {
+            $qIns->whereIn('ClinicNum', $clinics);
+        }
+        $ins = $qIns->groupBy('ClinicNum')->pluck('total', 'ClinicNum')->all();
+
+        $res = [];
+        foreach (array_unique(array_merge(array_keys($pat), array_keys($ins))) as $c) {
+            $res[$c] = (float) ($pat[$c] ?? 0) + (float) ($ins[$c] ?? 0);
+        }
+
+        return $res;
     }
 
     /* ─────────────────────────────────────────────────────────────
@@ -2557,6 +2674,7 @@ class OperationsAnalyticsService
 
         $mProcDate = $this->dateMonthExpr('pl.ProcDate');
         $mDatePay = $this->dateMonthExpr('ps.DatePay');
+        $mDateCP = $this->dateMonthExpr('cp.DateCP');
         $mAdjDate = $this->dateMonthExpr('adj.AdjDate');
         $mAptDate = $this->dateMonthExpr('apt.AptDateTime');
         $mCpDate = $this->dateMonthExpr('cp.ProcDate');
@@ -2735,6 +2853,18 @@ class OperationsAnalyticsService
                 $addVal((int) $r->ClinicNum, $r->month, $r->val);
             }
 
+            $qIns = DB::table('od_claim_procs as cp')
+                ->selectRaw("cp.ClinicNum, {$mDateCP} as month, SUM(cp.InsPayAmt) as val")
+                ->whereIn('cp.ProvNum', $docProvs)
+                ->whereBetween('cp.DateCP', [$start, $end])
+                ->where('cp.Status', '!=', 0);
+            if ($clinics) {
+                $qIns->whereIn('cp.ClinicNum', $clinics);
+            }
+            foreach ($qIns->groupBy('cp.ClinicNum', DB::raw($mDateCP))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
             return ['by_clinic' => $byClinic, 'totals' => $totals];
         }
 
@@ -2748,6 +2878,18 @@ class OperationsAnalyticsService
                 $q->whereIn('ps.ClinicNum', $clinics);
             }
             foreach ($q->groupBy('ps.ClinicNum', DB::raw($mDatePay))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
+            $qIns = DB::table('od_claim_procs as cp')
+                ->selectRaw("cp.ClinicNum, {$mDateCP} as month, SUM(cp.InsPayAmt) as val")
+                ->whereIn('cp.ProvNum', $hygProvs)
+                ->whereBetween('cp.DateCP', [$start, $end])
+                ->where('cp.Status', '!=', 0);
+            if ($clinics) {
+                $qIns->whereIn('cp.ClinicNum', $clinics);
+            }
+            foreach ($qIns->groupBy('cp.ClinicNum', DB::raw($mDateCP))->get() as $r) {
                 $addVal((int) $r->ClinicNum, $r->month, $r->val);
             }
 
@@ -3071,6 +3213,17 @@ class OperationsAnalyticsService
                 $addVal((int) $r->ClinicNum, $r->month, $r->val);
             }
 
+            $qIns = DB::table('od_claim_procs as cp')
+                ->selectRaw("cp.ClinicNum, {$mDateCP} as month, SUM(cp.InsPayAmt) as val")
+                ->whereBetween('cp.DateCP', [$start, $end])
+                ->where('cp.Status', '!=', 0);
+            if ($clinics) {
+                $qIns->whereIn('cp.ClinicNum', $clinics);
+            }
+            foreach ($qIns->groupBy('cp.ClinicNum', DB::raw($mDateCP))->get() as $r) {
+                $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            }
+
             return ['by_clinic' => $byClinic, 'totals' => $totals];
         }
 
@@ -3103,7 +3256,7 @@ class OperationsAnalyticsService
             $qWo->whereIn('pl.ClinicNum', $clinics);
         }
         foreach ($qWo->groupBy('pl.ClinicNum', DB::raw($mProcDate))->get() as $r) {
-            $addVal((int) $r->ClinicNum, $r->month, $r->val);
+            $addVal((int) $r->ClinicNum, $r->month, -$r->val);
         }
 
         return ['by_clinic' => $byClinic, 'totals' => $totals];
@@ -3449,8 +3602,9 @@ class OperationsAnalyticsService
         $res = $qLogs->groupBy('pl.ClinicNum', 'pl.ProvNum')->get()->keyBy(fn ($item) => $item->ClinicNum.'|'.$item->ProvNum);
 
         $adj = $this->sumByClinicProvider('od_adjustments', 'AdjAmt', 'AdjDate', $start, $end, $clinics);
+        $wo = $this->sumByClinicProvider('od_claim_procs', 'WriteOff', 'ProcDate', $start, $end, $clinics);
 
-        $activeKeys = array_unique(array_merge($res->keys()->toArray(), array_keys($adj)));
+        $activeKeys = array_unique(array_merge($res->keys()->toArray(), array_keys($adj), array_keys($wo)));
 
         // Pre-fetch drill-down patient details for all providers
         $patTable = (new OdPatient)->getTable();
@@ -3520,7 +3674,7 @@ class OperationsAnalyticsService
             [$clinicNum, $provNum] = explode('|', $key);
             $l = $res->get($key);
             $gross = (float) ($l->gross ?? 0);
-            $adjustment = (float) ($adj[$key] ?? 0);
+            $adjustment = (float) ($adj[$key] ?? 0) - (float) ($wo[$key] ?? 0);
             $net = $gross + $adjustment;
             $c_visits = (int) ($l->c_visits ?? 0);
             $c_procs = (int) ($l->c_procs ?? 0);

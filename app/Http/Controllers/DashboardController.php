@@ -11,7 +11,6 @@ use App\Helpers\MetricDefinitions;
 use App\Models\ClaimProcs;
 use App\Models\OdAdjustment;
 use App\Models\OdProcedureLog;
-use App\Models\PaySplit;
 use App\Services\OpenDental\FinancialAnalyticsService;
 use App\Services\OpenDental\PatientAnalyticsService;
 use Carbon\Carbon;
@@ -246,9 +245,21 @@ class DashboardController extends Controller
             ->whereBetween('ProcDate', [$start, $end])
             ->groupBy('ProvNum');
 
-        $collSub = PaySplit::select('ProvNum', DB::raw('SUM(SplitAmt) AS collections'))
+        $patCollSub = DB::table('od_pay_splits')
+            ->select('ProvNum', DB::raw('SUM(SplitAmt) AS amt'))
             ->whereBetween('DatePay', [$start, $end])
             ->groupBy('ProvNum');
+
+        $insCollSub = DB::table('od_claim_procs')
+            ->select('ProvNum', DB::raw('SUM(InsPayAmt) AS amt'))
+            ->whereBetween('DateCP', [$start, $end])
+            ->where('Status', '!=', 0)
+            ->groupBy('ProvNum');
+
+        $collSub = DB::query()->fromSub(
+            $patCollSub->unionAll($insCollSub),
+            'c_unioned'
+        )->select('ProvNum', DB::raw('SUM(amt) AS collections'))->groupBy('ProvNum');
 
         $aptsSub = DB::table('od_appointments')
             ->select('ProvNum', DB::raw('COUNT(*) AS appointment_count'))
@@ -264,7 +275,7 @@ class DashboardController extends Controller
                 'p.Abbr',
                 'p.Specialty',
                 DB::raw('COALESCE(g.gross, 0) AS gross_production'),
-                DB::raw('COALESCE(a.adjustments, 0) AS adjustments'),
+                DB::raw('(COALESCE(a.adjustments, 0) - COALESCE(w.writeoffs, 0)) AS adjustments'),
                 DB::raw('COALESCE(w.writeoffs, 0) AS writeoffs'),
                 DB::raw('COALESCE(c.collections, 0) AS collections'),
                 DB::raw('COALESCE(apt.appointment_count, 0) AS appointment_count')
@@ -274,12 +285,12 @@ class DashboardController extends Controller
             ->leftJoinSub($writeoffSub, 'w', 'p.ProvNum', '=', 'w.ProvNum')
             ->leftJoinSub($collSub, 'c', 'p.ProvNum', '=', 'c.ProvNum')
             ->leftJoinSub($aptsSub, 'apt', 'p.ProvNum', '=', 'apt.ProvNum')
-            ->whereIn('p.IsHidden', ['false', '0', 0, false])
             ->where(function ($q) {
                 $q->whereRaw('COALESCE(g.gross, 0) != 0')
                     ->orWhereRaw('COALESCE(a.adjustments, 0) != 0')
                     ->orWhereRaw('COALESCE(w.writeoffs, 0) != 0')
-                    ->orWhereRaw('COALESCE(c.collections, 0) != 0');
+                    ->orWhereRaw('COALESCE(c.collections, 0) != 0')
+                    ->orWhereRaw('COALESCE(apt.appointment_count, 0) != 0');
             })
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($q2) use ($search) {
@@ -291,6 +302,31 @@ class DashboardController extends Controller
             ->orderByDesc('gross_production')
             ->get();
 
+        // Check if there are unassigned transactions (ProvNum = 0 or null) not associated with a named provider
+        $knownProvNums = $providers->pluck('ProvNum')->map(fn ($id) => (int) $id)->toArray();
+        $unassignedGross = (float) OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('ProcFee');
+        $unassignedAdj = (float) OdAdjustment::whereBetween('AdjDate', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('AdjAmt');
+        $unassignedWo = (float) ClaimProcs::whereBetween('ProcDate', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('WriteOff');
+        $unassignedPatColl = (float) DB::table('od_pay_splits')->whereBetween('DatePay', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('SplitAmt');
+        $unassignedInsColl = (float) DB::table('od_claim_procs')->whereBetween('DateCP', [$start, $end])->where('Status', '!=', 0)->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('InsPayAmt');
+        $unassignedColl = $unassignedPatColl + $unassignedInsColl;
+        $unassignedApts = (int) DB::table('od_appointments')->whereIn('AptStatus', [1, 2])->whereBetween('AptDateTime', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->count();
+
+        if (! in_array(0, $knownProvNums) && ($unassignedGross != 0 || $unassignedAdj != 0 || $unassignedWo != 0 || $unassignedColl != 0 || $unassignedApts != 0)) {
+            $providers->push((object) [
+                'ProvNum' => 0,
+                'LName' => 'Unassigned',
+                'PName' => '',
+                'Abbr' => 'UNASSIGNED',
+                'Specialty' => 0,
+                'gross_production' => $unassignedGross,
+                'adjustments' => $unassignedAdj - $unassignedWo,
+                'writeoffs' => $unassignedWo,
+                'collections' => $unassignedColl,
+                'appointment_count' => $unassignedApts,
+            ]);
+        }
+
         $mappedProviders = $providers->map(function ($p) {
             $p->specialty = $this->specialtyMap[(int) $p->Specialty] ?? 'General Dentistry';
             $p->location = $this->clinics->name((int) ($p->ClinicNum ?? 0));
@@ -298,7 +334,7 @@ class DashboardController extends Controller
             $p->net_production = $this->production->netFrom(
                 (float) $p->gross_production,
                 (float) $p->adjustments,
-                (float) $p->writeoffs
+                0.0
             );
 
             return $p;
@@ -331,10 +367,21 @@ class DashboardController extends Controller
                 ->whereBetween('ProcDate', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
-            $coll = DB::table('od_pay_splits')
-                ->selectRaw('ClinicNum, '.MetricDefinitions::collections('val'))
+            $patColl = DB::table('od_pay_splits')
+                ->selectRaw('ClinicNum, SUM(SplitAmt) as val')
                 ->whereBetween('DatePay', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
+
+            $insColl = DB::table('od_claim_procs')
+                ->selectRaw('ClinicNum, SUM(InsPayAmt) as val')
+                ->whereBetween('DateCP', [$s, $e])
+                ->where('Status', '!=', 0)
+                ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
+
+            $coll = collect();
+            foreach ($patColl->keys()->merge($insColl->keys())->unique() as $cNum) {
+                $coll->put($cNum, (float) ($patColl->get($cNum, 0) + $insColl->get($cNum, 0)));
+            }
 
             return compact('gross', 'adj', 'writeoffs', 'coll');
         };
@@ -356,19 +403,15 @@ class DashboardController extends Controller
 
         $result = [];
         foreach ($allClinicNums as $cNum) {
-            $cg = $currentStats['gross']->get($cNum, 0);
-            $ca = $currentStats['adj']->get($cNum, 0);
-            $cw = $currentStats['writeoffs']->get($cNum, 0);
-            $cc = $currentStats['coll']->get($cNum, 0);
-            // $cn = $cg - abs($ca) - abs($cw);
-            $cn = $cg + $ca + $cw;
+            $cg = (float) $currentStats['gross']->get($cNum, 0);
+            $ca = (float) $currentStats['adj']->get($cNum, 0) - (float) $currentStats['writeoffs']->get($cNum, 0);
+            $cc = (float) $currentStats['coll']->get($cNum, 0);
+            $cn = $cg + $ca;
 
-            $lg = $lastYearStats['gross']->get($cNum, 0);
-            $la = $lastYearStats['adj']->get($cNum, 0);
-            $lw = $lastYearStats['writeoffs']->get($cNum, 0);
-            $lc = $lastYearStats['coll']->get($cNum, 0);
-            // $ln = $lg - abs($la) - abs($lw);
-            $ln = $lg + $la + $lw;
+            $lg = (float) $lastYearStats['gross']->get($cNum, 0);
+            $la = (float) $lastYearStats['adj']->get($cNum, 0) - (float) $lastYearStats['writeoffs']->get($cNum, 0);
+            $lc = (float) $lastYearStats['coll']->get($cNum, 0);
+            $ln = $lg + $la;
 
             $result[] = [
                 'clinic_num' => $cNum,
@@ -376,6 +419,7 @@ class DashboardController extends Controller
                 'gross_production' => round($cg, 2),
                 'gross_production_last' => round($lg, 2),
                 'adjustments' => round($ca, 2),
+                'adjustments_last' => round($la, 2),
                 'collections' => round($cc, 2),
                 'collections_last' => round($lc, 2),
                 'net_production' => round($cn, 2),

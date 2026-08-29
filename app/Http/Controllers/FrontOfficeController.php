@@ -920,17 +920,25 @@ class FrontOfficeController extends Controller
                 ->groupBy(DB::raw('DATE(ProcDate)'))
                 ->pluck('val', 'd_date');
 
-            $collByDate = DB::table('od_pay_splits')
+            $collPatByDate = DB::table('od_pay_splits')
                 ->selectRaw('DATE(DatePay) as d_date, SUM(SplitAmt) as val')
                 ->whereBetween('DatePay', [$startDateStr, $endDateStr])
                 ->groupBy(DB::raw('DATE(DatePay)'))
+                ->pluck('val', 'd_date');
+
+            $collInsByDate = DB::table('od_claim_procs')
+                ->selectRaw('DATE(DateCP) as d_date, SUM(InsPayAmt) as val')
+                ->whereBetween('DateCP', [$startDateStr, $endDateStr])
+                ->where('Status', '!=', 0)
+                ->groupBy(DB::raw('DATE(DateCP)'))
                 ->pluck('val', 'd_date');
 
             $allDates = array_unique(array_merge(
                 $grossByDate->keys()->toArray(),
                 $adjByDate->keys()->toArray(),
                 $woByDate->keys()->toArray(),
-                $collByDate->keys()->toArray()
+                $collPatByDate->keys()->toArray(),
+                $collInsByDate->keys()->toArray()
             ));
             sort($allDates);
 
@@ -940,7 +948,7 @@ class FrontOfficeController extends Controller
                 $adj = (float) ($adjByDate[$d] ?? 0);
                 $wo = (float) ($woByDate[$d] ?? 0);
                 $net = $gross + $adj + $wo;
-                $coll = (float) ($collByDate[$d] ?? 0);
+                $coll = (float) ($collPatByDate[$d] ?? 0) + (float) ($collInsByDate[$d] ?? 0);
                 $pct = $net > 0 ? round(($coll / $net) * 100, 2) : ($coll > 0 ? 100.0 : 0.0);
 
                 $rows[] = [

@@ -390,15 +390,23 @@ class OperationsController extends Controller
                 ->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt', 'AdjType')
                 ->whereBetween('AdjDate', [$start, $end]);
 
+            $wosQuery = DB::table('od_claim_procs')
+                ->select('PatNum', 'ProvNum', 'ProcDate as AdjDate', 'WriteOff')
+                ->whereBetween('ProcDate', [$start, $end])
+                ->where('WriteOff', '!=', 0);
+
             if ($provNum) {
                 $adjsQuery->where('ProvNum', $provNum);
+                $wosQuery->where('ProvNum', $provNum);
             } elseif ($clinicNum) {
                 $adjsQuery->where('ClinicNum', $clinicNum);
+                $wosQuery->where('ClinicNum', $clinicNum);
             }
 
             $adjs = $adjsQuery->get();
+            $wos = $wosQuery->get();
 
-            $patMap = $mapPatients($adjs->pluck('PatNum')->unique());
+            $patMap = $mapPatients($adjs->pluck('PatNum')->merge($wos->pluck('PatNum'))->unique());
             $defMap = DB::table('od_definitions')->where('Category', 1)->pluck('ItemName', 'DefNum')->toArray();
 
             $totalAdj = 0;
@@ -440,6 +448,42 @@ class OperationsController extends Controller
                 $rows[] = $row;
             }
 
+            foreach ($wos as $wo) {
+                $amt = -(float) $wo->WriteOff;
+                if ($amt == 0) {
+                    continue;
+                }
+                $totalAdj += $amt;
+
+                $row = [
+                    'pat_id' => $wo->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$wo->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'date' => date('M d, Y', strtotime($wo->AdjDate)),
+                    'adj_type' => 'WriteOff',
+                    'adj_amt' => $amt,
+                ];
+                if (! $provNum) {
+                    $row['prov_id'] = $wo->ProvNum;
+                    $row['provider'] = ['label' => $provMap[$wo->ProvNum] ?? 'Unknown', 'link' => true];
+                }
+
+                if ($metric === 'adj_production') {
+                    $gross = (float) DB::table('od_procedure_logs')
+                        ->where('PatNum', $wo->PatNum)
+                        ->where('ProcDate', 'like', substr($wo->AdjDate, 0, 10).'%')
+                        ->whereIn('ProcStatus', ProcStatus::completed())
+                        ->sum('ProcFee');
+
+                    $totalGrossAll += $gross;
+                    $row['gross'] = $gross;
+                    $row['adj_pct'] = $gross > 0 ? abs($amt) / $gross * 100 : 0;
+                }
+                $rows[] = $row;
+            }
+
             $totals = ['adj_amt' => $totalAdj];
             if ($metric === 'adj_production') {
                 $totals['gross'] = $totalGrossAll;
@@ -465,15 +509,26 @@ class OperationsController extends Controller
                 ->select('s.PatNum', 's.ProvNum', 's.DatePay', 's.SplitAmt', 'p.PayType')
                 ->whereBetween('s.DatePay', [$start.' 00:00:00', $end.' 23:59:59']);
 
+            $claimsQuery = DB::table('od_claim_procs as cp')
+                ->leftJoin('od_claim_payments as cpay', 'cpay.ClaimPaymentNum', '=', 'cp.ClaimPaymentNum')
+                ->select('cp.PatNum', 'cp.ProvNum', 'cp.DateCP as DatePay', 'cp.InsPayAmt as SplitAmt', 'cpay.CarrierName')
+                ->whereBetween('cp.DateCP', [$start.' 00:00:00', $end.' 23:59:59'])
+                ->where('cp.Status', '!=', 0)
+                ->where('cp.InsPayAmt', '!=', 0);
+
             if ($provNum) {
                 $splitsQuery->where('s.ProvNum', $provNum);
+                $claimsQuery->where('cp.ProvNum', $provNum);
             } elseif ($clinicNum) {
                 $splitsQuery->where('s.ClinicNum', $clinicNum);
+                $claimsQuery->where('cp.ClinicNum', $clinicNum);
             }
 
             $splits = $splitsQuery->get();
+            $claims = $claimsQuery->get();
 
-            $patMap = $mapPatients($splits->pluck('PatNum')->unique());
+            $allPatIds = $splits->pluck('PatNum')->merge($claims->pluck('PatNum'))->filter()->unique();
+            $patMap = $mapPatients($allPatIds);
             $defMap = DB::table('od_definitions')->where('Category', 10)->pluck('ItemName', 'DefNum')->toArray();
 
             $totalCol = 0;
@@ -500,6 +555,30 @@ class OperationsController extends Controller
                 }
                 $rows[] = $r;
             }
+
+            foreach ($claims as $cp) {
+                $amt = (float) $cp->SplitAmt;
+                if ($amt == 0) {
+                    continue;
+                }
+                $totalCol += $amt;
+
+                $r = [
+                    'date' => date('M d, Y', strtotime($cp->DatePay)),
+                    'pat_id' => $cp->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$cp->PatNum] ?? 'Insurance Payment',
+                        'link' => true,
+                    ],
+                    'amount' => $amt,
+                ];
+                if (! $provNum) {
+                    $r['prov_id'] = $cp->ProvNum;
+                    $r['provider'] = ['label' => $provMap[$cp->ProvNum] ?? 'Unknown', 'link' => true];
+                    $r['method'] = $cp->CarrierName ?: 'Insurance Claim';
+                }
+                $rows[] = $r;
+            }
             $totals = ['amount' => $totalCol];
 
         } elseif ($metric === 'net' || $metric === 'coll_pct') {
@@ -523,23 +602,29 @@ class OperationsController extends Controller
             $adjsQuery = DB::table('od_adjustments')->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt')->whereBetween('AdjDate', [$start, $end]);
             $wosQuery = DB::table('od_claim_procs')->select('PatNum', 'ProvNum', 'ProcDate', 'WriteOff')->whereBetween('ProcDate', [$start, $end]);
             $splitsQuery = DB::table('od_pay_splits')->select('PatNum', 'ProvNum', 'DatePay', 'SplitAmt')->whereBetween('DatePay', [$start, $end]);
+            $insSplitsQuery = DB::table('od_claim_procs')
+                ->select('PatNum', 'ProvNum', 'DateCP as DatePay', 'InsPayAmt as SplitAmt')
+                ->whereBetween('DateCP', [$start, $end])
+                ->where('Status', '!=', 0);
 
             if ($provNum) {
                 $logsQuery->where('ProvNum', $provNum);
                 $adjsQuery->where('ProvNum', $provNum);
                 $wosQuery->where('ProvNum', $provNum);
                 $splitsQuery->where('ProvNum', $provNum);
+                $insSplitsQuery->where('ProvNum', $provNum);
             } elseif ($clinicNum) {
                 $logsQuery->where('ClinicNum', $clinicNum);
                 $adjsQuery->where('ClinicNum', $clinicNum);
                 $wosQuery->where('ClinicNum', $clinicNum);
                 $splitsQuery->where('ClinicNum', $clinicNum);
+                $insSplitsQuery->where('ClinicNum', $clinicNum);
             }
 
             $logs = $logsQuery->get();
             $adjs = $adjsQuery->get();
             $wos = $wosQuery->get();
-            $splits = $metric === 'coll_pct' ? $splitsQuery->get() : [];
+            $splits = $metric === 'coll_pct' ? $splitsQuery->get()->merge($insSplitsQuery->get()) : [];
 
             $map = [];
             $allPats = [];

@@ -193,7 +193,7 @@ class OperationsTest extends TestCase
 
         // Assert By Payor totals
         $this->assertEquals(1500.00, $total['gross']);
-        $this->assertEquals(0.00, $total['adjustment']);
+        $this->assertEquals(-300.00, $total['adjustment']);
         $this->assertEquals(100.00, $total['pct_ttl']);
         $this->assertEquals(1200.00, $total['net']);
         $this->assertEquals(1200.00, $total['collection']);
