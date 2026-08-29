@@ -141,7 +141,7 @@ class DashboardAnalyticsService
 
         $start =
             now()
-                ->subMonths(24)
+                ->subMonths(25)
                 ->format('Y-m-d');
 
         $procedures = collect(

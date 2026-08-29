@@ -556,7 +556,7 @@ class OperationsTest extends TestCase
             'PatStatus' => '0',
         ]);
 
-        // Patient 2: Inactive PatStatus '1' but had procedure in 24 months
+        // Patient 2: Inactive PatStatus '1' but had procedure in 25 months
         DB::table('od_patients')->insert([
             'PatNum' => 502,
             'LName' => 'Doe',
@@ -1404,5 +1404,103 @@ class OperationsTest extends TestCase
         $specActive = $responseActive->original->getData()['spec'] ?? null;
         $this->assertNotNull($specActive);
         $this->assertEquals('number', $specActive['columns'][1]['type']);
+
+        $responseActivePct = $this->get(route('operations.data', [
+            'tab' => 'trends',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+            'metric' => 'BYO Active Pts',
+        ]));
+
+        $responseActivePct->assertOk();
+        $specActivePct = $responseActivePct->original->getData()['spec'] ?? null;
+        $this->assertNotNull($specActivePct);
+        $this->assertEquals('percent', $specActivePct['columns'][1]['type']);
+
+        $responseRetention = $this->get(route('operations.data', [
+            'tab' => 'trends',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+            'metric' => 'BYO Patient Retention',
+        ]));
+
+        $responseRetention->assertOk();
+        $specRetention = $responseRetention->original->getData()['spec'] ?? null;
+        $this->assertNotNull($specRetention);
+        $this->assertEquals('percent', $specRetention['columns'][1]['type']);
+
+        $responseCopay = $this->get(route('operations.data', [
+            'tab' => 'trends',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+            'metric' => 'BYO Co Pay Coll',
+        ]));
+
+        $responseCopay->assertOk();
+        $specCopay = $responseCopay->original->getData()['spec'] ?? null;
+        $this->assertNotNull($specCopay);
+        $this->assertEquals('percent', $specCopay['columns'][1]['type']);
+    }
+
+    public function test_retention_drilldown_renders_36m_and_18m_cohorts(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        DB::table('od_procedures')->insert([
+            ['CodeNum' => 101, 'ProcCode' => 'D0120'],
+            ['CodeNum' => 102, 'ProcCode' => 'D0140'],
+        ]);
+
+        DB::table('od_patients')->insert([
+            ['PatNum' => 8001, 'LName' => 'Taylor', 'FName' => 'James'],
+            ['PatNum' => 8002, 'LName' => 'Miller', 'FName' => 'Emily'],
+        ]);
+
+        // Patient 1: Exam in 36m and also in 18m
+        // Patient 2: Exam in 36m only (not in 18m)
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 12001,
+                'PatNum' => 8001,
+                'ClinicNum' => 1,
+                'CodeNum' => 101,
+                'ProcFee' => 100.00,
+                'ProcStatus' => '2',
+                'ProcDate' => '2024-05-10 10:00:00',
+            ],
+            [
+                'ProcNum' => 12002,
+                'PatNum' => 8001,
+                'ClinicNum' => 1,
+                'CodeNum' => 101,
+                'ProcFee' => 100.00,
+                'ProcStatus' => '2',
+                'ProcDate' => '2026-07-15 10:00:00',
+            ],
+            [
+                'ProcNum' => 12003,
+                'PatNum' => 8002,
+                'ClinicNum' => 1,
+                'CodeNum' => 102,
+                'ProcFee' => 120.00,
+                'ProcStatus' => '2',
+                'ProcDate' => '2024-01-10 10:00:00',
+            ],
+        ]);
+
+        $response = $this->get(route('operations.drilldown', [
+            'metric' => 'retention',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+            'clinic_num' => 1,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Retention Breakdown');
+        $response->assertSee('Taylor, James');
+        $response->assertSee('Miller, Emily');
+        $response->assertSee('Yes');
+        $response->assertSee('No');
     }
 }

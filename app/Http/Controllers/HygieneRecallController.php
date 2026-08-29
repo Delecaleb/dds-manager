@@ -12,6 +12,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HygieneRecallController extends Controller
 {
+    /**
+     * Jarvis standard base definition for Hygiene Service Codes.
+     */
+    public const HYGIENE_CODES = ['D1110', 'D1120', 'D4910', 'D4341', 'D4342', 'D4346', 'D4355'];
+
     public function __construct(
         private readonly ClinicRegistry $clinics,
     ) {}
@@ -84,6 +89,8 @@ class HygieneRecallController extends Controller
         $start = $request->get('start_date') ?: Carbon::now()->startOfMonth()->toDateString();
         $end = $request->get('end_date') ?: Carbon::now()->endOfMonth()->toDateString();
 
+        $hygieneTypeNums = $this->getHygieneRecallTypeNums();
+
         $query = DB::table('od_recalls as r')
             ->join('od_patients as p', 'r.PatNum', '=', 'p.PatNum')
             ->leftJoin('od_recall_types as rt', 'r.RecallTypeNum', '=', 'rt.RecallTypeNum')
@@ -91,6 +98,7 @@ class HygieneRecallController extends Controller
                 $q->whereNull('r.IsDisabled')
                     ->orWhereIn('r.IsDisabled', ['false', '0', 0, false]);
             })
+            ->whereIn('r.RecallTypeNum', $hygieneTypeNums)
             ->whereBetween('r.DateDue', [$start, $end]);
 
         if ($provNum) {
@@ -317,9 +325,13 @@ class HygieneRecallController extends Controller
 
     /**
      * Compute aggregated recall metrics by provider.
+    /**
+     * Compute recall rows aggregated by provider and clinic.
      */
     protected function computeRecallData(string $start, string $end, ?string $clinic)
     {
+        $hygieneTypeNums = $this->getHygieneRecallTypeNums();
+
         $query = DB::table('od_recalls as r')
             ->join('od_patients as p', 'r.PatNum', '=', 'p.PatNum')
             ->join('od_providers as prov', 'p.PriProv', '=', 'prov.ProvNum')
@@ -327,6 +339,7 @@ class HygieneRecallController extends Controller
                 $q->whereNull('r.IsDisabled')
                     ->orWhereIn('r.IsDisabled', ['false', '0', 0, false]);
             })
+            ->whereIn('r.RecallTypeNum', $hygieneTypeNums)
             ->whereBetween('r.DateDue', [$start, $end]);
 
         if ($clinic !== null && $clinic !== '' && $clinic !== 'all') {
@@ -438,5 +451,29 @@ class HygieneRecallController extends Controller
         }
 
         return $result->sortBy('provider_name')->values();
+    }
+
+    /**
+     * Get valid hygiene RecallTypeNum values from Open Dental.
+     *
+     * @return int[]
+     */
+    protected function getHygieneRecallTypeNums(): array
+    {
+        $types = DB::table('od_recall_types')
+            ->where(function ($q) {
+                $q->whereIn('RecallTypeNum', [1, 2, 3])
+                    ->orWhere('AppendToSpecial', 0)
+                    ->orWhere('Description', 'LIKE', '%Prophy%')
+                    ->orWhere('Description', 'LIKE', '%Perio%');
+                foreach (self::HYGIENE_CODES as $code) {
+                    $q->orWhere('Procedures', 'LIKE', "%{$code}%");
+                }
+            })
+            ->pluck('RecallTypeNum')
+            ->map(fn ($n) => (int) $n)
+            ->toArray();
+
+        return ! empty($types) ? $types : [1, 2, 3];
     }
 }

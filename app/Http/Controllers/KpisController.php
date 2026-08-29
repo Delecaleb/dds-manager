@@ -454,17 +454,24 @@ class KpisController extends Controller
         $txPlansPerDay = ($tpDays->work_days ?? 0) > 0 ? round(($tpDays->tp_count ?? 0) / $tpDays->work_days, 2) : 0;
 
         // 3. Co-Pay Collection
-        $coPay = DB::selectOne("
-            SELECT
-                COALESCE(SUM(ps.SplitAmt), 0) AS collected,
-                COALESCE(SUM(pl.ProcFee * 0.2), 0) AS expected
-            FROM od_procedure_logs pl
-            JOIN od_pay_splits ps ON pl.ProcNum = ps.ProcNum
-            WHERE pl.ProcStatus IN ({$this->completedIn})
-              AND pl.ProcDate BETWEEN ? AND ?
-              AND ps.SplitAmt > 0
-        ", [$start, $end]);
-        $coPayCollection = ($coPay->expected ?? 0) > 0 ? round(($coPay->collected / $coPay->expected) * 100, 2) : 0;
+        $procFee = (float) DB::table('od_procedure_logs')
+            ->whereIn('ProcStatus', ProcStatus::completed())
+            ->whereBetween('ProcDate', [$start, $end])
+            ->sum('ProcFee');
+
+        $insEstimates = (float) DB::table('od_claim_procs')
+            ->whereBetween('ProcDate', [$start, $end])
+            ->whereIn('Status', [0, 1, 4, 6])
+            ->selectRaw('SUM(COALESCE(InsPayEst, InsEstTotal, 0) + COALESCE(CASE WHEN WriteOff > 0 THEN WriteOff ELSE WriteOffEst END, 0)) as ins_portion')
+            ->value('ins_portion');
+
+        $expectedPatPortion = max(0, $procFee - $insEstimates);
+
+        $collectedPat = (float) DB::table('od_pay_splits')
+            ->whereBetween('DatePay', [$start, $end])
+            ->sum('SplitAmt');
+
+        $coPayCollection = $expectedPatPortion > 0 ? round(($collectedPat / $expectedPatPortion) * 100, 2) : 0;
 
         // 4. Unscheduled Tx
         $unscheduled = (float) (DB::selectOne("

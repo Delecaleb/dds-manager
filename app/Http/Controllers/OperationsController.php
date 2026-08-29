@@ -1122,7 +1122,7 @@ class OperationsController extends Controller
                 ['key' => 'visited', 'label' => 'Visited', 'type' => 'text'],
             ];
 
-            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($start))).' 00:00:00';
+            $startWindow = date('Y-m-d', strtotime('-25 months', strtotime($start))).' 00:00:00';
 
             $firstVisitSubQ = $this->patients->firstVisitCohort();
 
@@ -1174,7 +1174,7 @@ class OperationsController extends Controller
                 ['key' => 'visits', 'label' => 'Visits', 'type' => 'number', 'agg' => 'sum'],
             ];
 
-            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($start))).' 00:00:00';
+            $startWindow = date('Y-m-d', strtotime('-25 months', strtotime($start))).' 00:00:00';
 
             $logs = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ProvNum', 'ProcDate')
@@ -1249,34 +1249,44 @@ class OperationsController extends Controller
             $columns = [
                 ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
                 ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
-                ['key' => 'visited', 'label' => 'Visited', 'type' => 'text'],
+                ['key' => 'first_exam', 'label' => 'Exam Date (36m)', 'type' => 'text'],
+                ['key' => 'recent_exam', 'label' => 'Recent Exam Date (18m)', 'type' => 'text'],
+                ['key' => 'visited', 'label' => 'Retained (18m)', 'type' => 'text'],
             ];
 
-            $prior18m = date('Y-m-d', strtotime('-18 months', strtotime($start)));
-            $priorEnd = date('Y-m-d', strtotime('-1 day', strtotime($start)));
+            $start36m = date('Y-m-d', strtotime('-36 months', strtotime($end)));
+            $start18m = date('Y-m-d', strtotime('-18 months', strtotime($end)));
 
-            $activePts = DB::table('od_procedure_logs as pl')
-                ->leftJoin('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
+            $examCodes = ['D0120', 'D0140', 'D0150'];
+
+            $cohortA = DB::table('od_procedure_logs as pl')
+                ->join('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
                 ->selectRaw("
                     pl.PatNum,
-                    MAX(CASE WHEN pc.ProcCode IN ('D0120','D0140','D0150') THEN 1 ELSE 0 END) AS had_exam
+                    MIN(pl.ProcDate) AS first_exam_date,
+                    MAX(CASE WHEN pl.ProcDate >= '{$start18m} 00:00:00' THEN pl.ProcDate ELSE NULL END) AS recent_exam_date,
+                    MAX(CASE WHEN pl.ProcDate >= '{$start18m} 00:00:00' THEN 1 ELSE 0 END) AS returned_in_18m
                 ")
                 ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereBetween('pl.ProcDate', [$prior18m.' 00:00:00', $priorEnd.' 23:59:59'])
+                ->whereIn('pc.ProcCode', $examCodes)
+                ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $end.' 23:59:59'])
                 ->groupBy('pl.PatNum')
                 ->get();
 
-            $patMap = $mapPatients($activePts->pluck('PatNum')->unique());
+            $patMap = $mapPatients($cohortA->pluck('PatNum')->unique());
 
-            foreach ($activePts as $pt) {
+            foreach ($cohortA as $pt) {
+                $isRetained = (bool) $pt->returned_in_18m;
                 $rows[] = [
                     'pat_id' => $pt->PatNum,
                     'patient' => [
                         'label' => $patMap[$pt->PatNum] ?? 'Unknown',
                         'link' => true,
                     ],
-                    'visited' => $pt->had_exam ? 'Yes' : 'No',
+                    'first_exam' => date('M d, Y', strtotime($pt->first_exam_date)),
+                    'recent_exam' => $pt->recent_exam_date ? date('M d, Y', strtotime($pt->recent_exam_date)) : '—',
+                    'visited' => $isRetained ? 'Yes' : 'No',
                 ];
             }
             $totals = [];
