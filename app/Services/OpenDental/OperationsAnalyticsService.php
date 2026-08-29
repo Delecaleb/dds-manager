@@ -2754,71 +2754,57 @@ class OperationsAnalyticsService
             return ['by_clinic' => $byClinic, 'totals' => $totals];
         }
 
-        // 5b. Co-Pay Collection % (BYO Co Pay Coll)
+        // 5b. Co-Pay Collection % (BYO Co Pay Coll) -> Point-of-Service / OTC Patient Collections / Gross Production
         if (str_contains(strtolower($metricNorm), 'co pay') || str_contains(strtolower($metricNorm), 'copay')) {
-            $fees = DB::table('od_procedure_logs as pl')
-                ->selectRaw("pl.ClinicNum, {$mProcDate} as month, SUM(pl.ProcFee) as total_fee")
+            $gross = DB::table('od_procedure_logs as pl')
+                ->selectRaw("pl.ClinicNum, {$mProcDate} as month, SUM(pl.ProcFee) as total_gross")
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereBetween('pl.ProcDate', [$start.' 00:00:00', $end.' 23:59:59'])
                 ->when($clinics, fn ($q) => $q->whereIn('pl.ClinicNum', $clinics))
                 ->groupBy('pl.ClinicNum', DB::raw($mProcDate))
                 ->get();
 
-            $insEst = DB::table('od_claim_procs as cp')
-                ->selectRaw("
-                    cp.ClinicNum, 
-                    {$mCpDate} as month, 
-                    SUM(
-                        (CASE WHEN cp.InsPayEst > 0 THEN cp.InsPayEst WHEN cp.InsEstTotal > 0 THEN cp.InsEstTotal ELSE 0 END) +
-                        (CASE WHEN cp.WriteOff > 0 THEN cp.WriteOff WHEN cp.WriteOffEst > 0 THEN cp.WriteOffEst ELSE 0 END)
-                    ) as total_ins
-                ")
-                ->whereIn('cp.Status', [0, 1, 4, 6])
-                ->whereBetween('cp.ProcDate', [$start, $end])
-                ->when($clinics, fn ($q) => $q->whereIn('cp.ClinicNum', $clinics))
-                ->groupBy('cp.ClinicNum', DB::raw($mCpDate))
-                ->get();
+            $otcDefNums = DB::table('od_definitions')
+                ->where('Category', 10)
+                ->where('ItemName', 'LIKE', 'OTC%')
+                ->pluck('DefNum')
+                ->toArray();
 
-            $colls = DB::table('od_pay_splits as ps')
-                ->selectRaw("ps.ClinicNum, {$mDatePay} as month, SUM(ps.SplitAmt) as total_collected")
+            $otcColls = DB::table('od_pay_splits as ps')
+                ->join('od_payments as p', 'ps.PayNum', '=', 'p.PayNum')
+                ->selectRaw("ps.ClinicNum, {$mDatePay} as month, SUM(ps.SplitAmt) as total_otc")
                 ->whereBetween('ps.DatePay', [$start, $end])
+                ->whereIn('p.PayType', ! empty($otcDefNums) ? $otcDefNums : [400, 401, 402, 403, 404])
                 ->when($clinics, fn ($q) => $q->whereIn('ps.ClinicNum', $clinics))
                 ->groupBy('ps.ClinicNum', DB::raw($mDatePay))
                 ->get();
 
-            $feeMap = [];
-            foreach ($fees as $r) {
-                $feeMap[(int) $r->ClinicNum][$r->month] = (float) $r->total_fee;
+            $grossMap = [];
+            foreach ($gross as $r) {
+                $grossMap[(int) $r->ClinicNum][$r->month] = (float) $r->total_gross;
             }
 
-            $insMap = [];
-            foreach ($insEst as $r) {
-                $insMap[(int) $r->ClinicNum][$r->month] = (float) $r->total_ins;
+            $otcMap = [];
+            foreach ($otcColls as $r) {
+                $otcMap[(int) $r->ClinicNum][$r->month] = (float) $r->total_otc;
             }
 
-            $collMap = [];
-            foreach ($colls as $r) {
-                $collMap[(int) $r->ClinicNum][$r->month] = (float) $r->total_collected;
-            }
-
-            $locList = array_unique(array_merge(array_keys($feeMap), array_keys($collMap), $clinics ?: [0]));
+            $locList = array_unique(array_merge(array_keys($grossMap), array_keys($otcMap), $clinics ?: [0]));
 
             foreach ($monthKeys as $mKey) {
-                $totExp = 0.0;
-                $totColl = 0.0;
+                $totGross = 0.0;
+                $totOtc = 0.0;
                 foreach ($locList as $cNum) {
                     $initClinic($cNum);
-                    $f = $feeMap[$cNum][$mKey] ?? 0.0;
-                    $i = $insMap[$cNum][$mKey] ?? 0.0;
-                    $exp = max(0, $f - $i);
-                    $c = $collMap[$cNum][$mKey] ?? 0.0;
-                    $rate = $exp > 0 ? round(($c / $exp) * 100, 2) : 0.0;
+                    $g = $grossMap[$cNum][$mKey] ?? 0.0;
+                    $o = $otcMap[$cNum][$mKey] ?? 0.0;
+                    $rate = $g > 0 ? round(($o / $g) * 100, 2) : 0.0;
                     $byClinic[$cNum][$mKey] = $rate;
 
-                    $totExp += $exp;
-                    $totColl += $c;
+                    $totGross += $g;
+                    $totOtc += $o;
                 }
-                $totals[$mKey] = $totExp > 0 ? round(($totColl / $totExp) * 100, 2) : 0.0;
+                $totals[$mKey] = $totGross > 0 ? round(($totOtc / $totGross) * 100, 2) : 0.0;
             }
 
             return ['by_clinic' => $byClinic, 'totals' => $totals];
