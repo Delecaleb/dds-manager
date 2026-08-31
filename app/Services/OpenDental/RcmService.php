@@ -3,7 +3,6 @@
 namespace App\Services\OpenDental;
 
 use App\Domain\Support\ClinicRegistry;
-use App\Domain\Support\ProcStatus;
 use App\Models\Office;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
@@ -543,93 +542,79 @@ class RcmService
         int $page = 1,
         int $perPage = 30,
         string $sortKey = 'statement_date',
-        string $sortDir = 'desc'
+        string $sortDir = 'asc'
     ): array {
-        $query = DB::table('od_patients as p')
-            ->join('od_procedure_logs as pl', 'p.PatNum', '=', 'pl.PatNum')
-            ->leftJoin('offices as o', 'p.office_id', '=', 'o.id')
-            ->whereIn('pl.ProcStatus', ProcStatus::completed());
+        $query = DB::table('od_statements as s')
+            ->leftJoin('od_patients as p', 's.PatNum', '=', 'p.PatNum')
+            ->leftJoin('offices as o', 's.office_id', '=', 'o.id');
 
         if ($officeId && $officeId > 0) {
-            $query->where('p.office_id', $officeId);
+            $query->where('s.office_id', $officeId);
         }
 
         if ($startDate && $endDate) {
-            $query->whereBetween('pl.ProcDate', [$startDate.' 00:00:00', $endDate.' 23:59:59']);
+            $query->whereBetween('s.DateSent', [$startDate.' 00:00:00', $endDate.' 23:59:59']);
         } elseif ($startDate) {
-            $query->where('pl.ProcDate', '>=', $startDate.' 00:00:00');
+            $query->where('s.DateSent', '>=', $startDate.' 00:00:00');
         } elseif ($endDate) {
-            $query->where('pl.ProcDate', '<=', $endDate.' 23:59:59');
+            $query->where('s.DateSent', '<=', $endDate.' 23:59:59');
         }
 
         if ($search = trim((string) $search)) {
             $query->where(function (Builder $q) use ($search) {
                 $q->where('p.FName', 'like', "%{$search}%")
                     ->orWhere('p.LName', 'like', "%{$search}%")
-                    ->orWhere('p.PatNum', 'like', "%{$search}%");
+                    ->orWhere('s.PatNum', 'like', "%{$search}%");
             });
         }
 
         $query->select([
-            'p.PatNum as patient_id',
+            's.StatementNum as statement_id',
+            's.PatNum as patient_id',
             'p.FName as patient_fname',
             'p.LName as patient_lname',
-            'p.office_id',
+            's.office_id',
             'o.name as office_name',
+            's.DateSent as statement_date',
+            DB::raw('COALESCE(CAST(p.EstBalance AS DECIMAL(10,2)), CAST(p.BalTotal AS DECIMAL(10,2)), 0) as balance_due_now'),
             DB::raw('COALESCE(CAST(p.BalTotal AS DECIMAL(10,2)), 0) as bal_total'),
-            DB::raw('COALESCE(CAST(p.Bal_0_30 AS DECIMAL(10,2)), 0) as bal_0_30'),
-            DB::raw('COALESCE(CAST(p.Bal_31_60 AS DECIMAL(10,2)), 0) as bal_31_60'),
-            DB::raw('COALESCE(CAST(p.Bal_61_90 AS DECIMAL(10,2)), 0) as bal_61_90'),
-            DB::raw('COALESCE(CAST(p.BalOver90 AS DECIMAL(10,2)), 0) as bal_over_90'),
-            DB::raw('COALESCE(CAST(p.InsEst AS DECIMAL(10,2)), 0) as ins_est'),
-            DB::raw('MAX(pl.ProcDate) as max_stmt_date'),
-        ])->groupBy([
-            'p.PatNum',
-            'p.FName',
-            'p.LName',
-            'p.office_id',
-            'o.name',
-            'p.BalTotal',
-            'p.Bal_0_30',
-            'p.Bal_31_60',
-            'p.Bal_61_90',
-            'p.BalOver90',
-            'p.InsEst',
+            DB::raw('COALESCE(CAST(p.EstBalance AS DECIMAL(10,2)), 0) as est_balance'),
         ]);
 
         if ($tier === 'top_20') {
-            $query->havingRaw('bal_total >= 300');
+            $query->where(DB::raw('COALESCE(CAST(p.EstBalance AS DECIMAL(10,2)), CAST(p.BalTotal AS DECIMAL(10,2)), 0)'), '>=', 300);
         } elseif ($tier === 'mid_tier') {
-            $query->havingRaw('bal_total >= 50 AND bal_total < 300');
+            $query->whereBetween(DB::raw('COALESCE(CAST(p.EstBalance AS DECIMAL(10,2)), CAST(p.BalTotal AS DECIMAL(10,2)), 0)'), [50, 299.99]);
         } elseif ($tier === 'bottom_20') {
-            $query->havingRaw('bal_total < 50');
+            $query->where(DB::raw('COALESCE(CAST(p.EstBalance AS DECIMAL(10,2)), CAST(p.BalTotal AS DECIMAL(10,2)), 0)'), '<', 50);
         }
 
         $sortMap = [
-            'patient' => 'patient_lname',
-            'patient_id' => 'p.PatNum',
-            'office' => 'office_name',
-            'statement_date' => 'max_stmt_date',
-            'balance_due_now' => 'bal_total',
-            'due_date' => 'max_stmt_date',
+            'patient' => 'p.LName',
+            'patient_id' => 's.PatNum',
+            'office' => 'o.name',
+            'statement_date' => 's.DateSent',
+            'balance_due_now' => 'balance_due_now',
+            'due_date' => 's.DateSent',
         ];
 
-        $orderCol = $sortMap[$sortKey] ?? 'max_stmt_date';
+        $orderCol = $sortMap[$sortKey] ?? 's.DateSent';
         $orderDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
 
-        if ($orderCol === 'patient_lname') {
-            $query->orderBy('patient_lname', $orderDir)->orderBy('patient_fname', $orderDir);
+        if ($orderCol === 'p.LName') {
+            $query->orderBy('p.LName', $orderDir)->orderBy('p.FName', $orderDir);
         } else {
             $query->orderBy($orderCol, $orderDir);
         }
+        $query->orderBy('s.StatementNum', $orderDir);
 
         $countQuery = clone $query;
         $totalItems = DB::query()->fromSub($countQuery, 'sub')->count();
 
         // Calculate summary statistics from the filtered query
         $summaryRow = DB::query()->fromSub($countQuery, 'sub')->selectRaw('
-            COALESCE(AVG(bal_total), 0) as avg_bal,
-            COALESCE(SUM(bal_total), 0) as tot_bal
+            COALESCE(AVG(balance_due_now), 0) as avg_bal,
+            COALESCE(SUM(balance_due_now), 0) as tot_bal
         ')->first();
 
         $avgBal = (float) ($summaryRow->avg_bal ?? 0);
@@ -644,11 +629,11 @@ class RcmService
                 $patientName = 'Patient #'.$row->patient_id;
             }
 
-            $bal = (float) $row->bal_total;
+            $bal = (float) $row->balance_due_now;
             $balBgClass = $bal >= 300 ? 'bg-[#dcfce7] text-[#15803d]' : ($bal > 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
 
-            $statementDate = ($row->max_stmt_date && $row->max_stmt_date > '0001-01-01')
-                ? Carbon::parse($row->max_stmt_date)->format('Y-m-d')
+            $statementDate = ($row->statement_date && $row->statement_date > '0001-01-01')
+                ? Carbon::parse($row->statement_date)->format('Y-m-d')
                 : '-';
             $dueDate = $statementDate;
 

@@ -47,8 +47,10 @@ class RcmController extends Controller
         $search = $request->input('search');
         $page = max((int) $request->input('page', 1), 1);
         $perPage = max((int) $request->input('per_page', 30), 5);
-        $sortKey = $request->input('sort_key', 'date_created');
-        $sortDir = $request->input('sort_dir', 'desc');
+        $defaultSortKey = $tab === 'patients_statements' ? 'statement_date' : 'date_created';
+        $defaultSortDir = $tab === 'patients_statements' ? 'asc' : 'desc';
+        $sortKey = $request->input('sort_key', $defaultSortKey);
+        $sortDir = $request->input('sort_dir', $defaultSortDir);
 
         $data = match ($tab) {
             'payment_arrangement' => $this->rcmService->getPaymentArrangements($startDate, $endDate, $officeId, $tier, $search, $page, $perPage, $sortKey, $sortDir),
@@ -197,16 +199,20 @@ class RcmController extends Controller
                 }
             } else {
                 fputcsv($handle, ['Patient', 'Patient ID', 'Office', 'Statement Date', 'Balance Due Now', 'Due Date']);
-                $result = $this->rcmService->getPatientsStatements($startDate, $endDate, $officeId, $tier, $search, 1, 5000);
+                $result = $this->rcmService->getPatientsStatements($startDate, $endDate, $officeId, $tier, $search, 1, 5000, 'statement_date', 'asc');
                 foreach ($result['items'] as $row) {
                     fputcsv($handle, [
                         $row['patient_name'],
                         $row['patient_id'],
                         $row['office_name'],
                         $row['statement_date'],
-                        $row['balance_due_now'],
+                        $row['balance_due_now_formatted'] ?? $row['balance_due_now'],
                         $row['due_date'],
                     ]);
+                }
+                if (! empty($result['summary'])) {
+                    fputcsv($handle, ['Average:', '-', '-', '-', $result['summary']['average_formatted'] ?? '-', '-']);
+                    fputcsv($handle, ['Total:', '-', '-', '-', $result['summary']['total_formatted'] ?? '-', '-']);
                 }
             }
 

@@ -394,14 +394,11 @@ class RcmTest extends TestCase
             'office_id' => $this->office->id,
         ]);
 
-        \DB::table('od_procedure_logs')->insert([
-            'ProcNum' => 9501,
+        \DB::table('od_statements')->insert([
+            'StatementNum' => 801,
             'PatNum' => 201,
-            'ProcDate' => '2024-06-15',
-            'ProcFee' => '120.00',
-            'ProcStatus' => '2',
-            'CodeNum' => 1,
-            'ProvNum' => 10,
+            'DateSent' => '2024-06-15 10:00:00',
+            'DateTStamp' => '2024-06-15 10:00:00',
             'office_id' => $this->office->id,
         ]);
 
@@ -413,14 +410,11 @@ class RcmTest extends TestCase
             'office_id' => $this->office->id,
         ]);
 
-        \DB::table('od_procedure_logs')->insert([
-            'ProcNum' => 9502,
+        \DB::table('od_statements')->insert([
+            'StatementNum' => 802,
             'PatNum' => 202,
-            'ProcDate' => '2026-08-20',
-            'ProcFee' => '300.00',
-            'ProcStatus' => '2',
-            'CodeNum' => 1,
-            'ProvNum' => 10,
+            'DateSent' => '2026-08-20 10:00:00',
+            'DateTStamp' => '2026-08-20 10:00:00',
             'office_id' => $this->office->id,
         ]);
 
