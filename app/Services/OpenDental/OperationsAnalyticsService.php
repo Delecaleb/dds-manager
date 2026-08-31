@@ -3439,20 +3439,19 @@ class OperationsAnalyticsService
             ];
         }
 
-        // We leverage od_procedure_logs generically simulating daily batch volume checks to secure structural stability
-        // since explicit claim table mappings might throw SQL offline missing exceptions.
         $monthStart = $monthDt->format('Y-m-01');
         $monthEnd = $monthDt->format('Y-m-t');
 
-        $qTab = DB::table('od_procedure_logs')
-            ->selectRaw('ClinicNum, SUBSTRING(ProcDate, 9, 2) as d_day, COUNT(*) as c')
-            ->whereIn('ProcStatus', ProcStatus::completed())
-            ->whereBetween('ProcDate', [$monthStart.' 00:00:00', $monthEnd.' 23:59:59']);
+        $qTab = DB::table('od_claim_procs as cp')
+            ->join('od_procedure_logs as pl', 'cp.ProcNum', '=', 'pl.ProcNum')
+            ->selectRaw('cp.ClinicNum, SUBSTRING(cp.ProcDate, 9, 2) as d_day, COUNT(*) as c')
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereBetween('cp.ProcDate', [$monthStart, $monthEnd]);
 
         if ($clinics) {
-            $qTab->whereIn('ClinicNum', $clinics);
+            $qTab->whereIn('cp.ClinicNum', $clinics);
         }
-        $tabData = $qTab->groupBy('ClinicNum', DB::raw('SUBSTRING(ProcDate, 9, 2)'))->get();
+        $tabData = $qTab->groupBy('cp.ClinicNum', DB::raw('SUBSTRING(cp.ProcDate, 9, 2)'))->get();
 
         $grouped = [];
         foreach ($tabData as $row) {

@@ -36,11 +36,6 @@ class ClaimProcSyncService extends BaseQuerySyncService
         return 'ClaimProcNum';
     }
 
-    protected function module(): string
-    {
-        return 'claimprocs';
-    }
-
     protected function transformRow(array $row): array
     {
         $dateCols = ['DateCP', 'ProcDate', 'DateEntry', 'SecDateEntry', 'DateSuppReceived', 'DateInsFinalized'];

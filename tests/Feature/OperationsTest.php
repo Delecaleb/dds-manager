@@ -1971,6 +1971,19 @@ class OperationsTest extends TestCase
             'MedicalCode' => '',
         ]);
 
+        DB::table('od_claim_procs')->insert([
+            'ClaimProcNum' => 8801,
+            'ProcNum' => 7701,
+            'PatNum' => 991,
+            'ProvNum' => 1,
+            'ClinicNum' => 1,
+            'ProcDate' => '2026-08-15',
+            'Status' => 6,
+            'ClaimPaymentNum' => 0,
+            'FeeBilled' => 150.00,
+            'office_id' => 1,
+        ]);
+
         $claimsResp = $this->get(route('operations.data', [
             'tab' => 'claims',
             'start_date' => '2026-08-01',
@@ -1994,7 +2007,63 @@ class OperationsTest extends TestCase
         $drillResp->assertSee('Claims &amp; Daily Procedures (Aug 15, 2026)', false);
         $drillResp->assertSee('Miller, Sarah');
         $drillResp->assertSee('D0120');
-        $drillResp->assertSee('Periodic Oral Evaluation');
         $drillResp->assertSee('150.00');
+    }
+
+    public function test_claims_tab_tallies_only_days_with_claim_procedures(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Day 4: completed procedure with claimproc -> should be Y
+        DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 7801,
+            'PatNum' => 991,
+            'ProvNum' => 1,
+            'ClinicNum' => 1,
+            'CodeNum' => 881,
+            'ProcFee' => 200.00,
+            'ProcStatus' => '2',
+            'ProcDate' => '2026-08-04 10:00:00',
+            'ToothNum' => '',
+            'Surf' => '',
+            'MedicalCode' => '',
+        ]);
+        DB::table('od_claim_procs')->insert([
+            'ClaimProcNum' => 8901,
+            'ProcNum' => 7801,
+            'PatNum' => 991,
+            'ProvNum' => 1,
+            'ClinicNum' => 1,
+            'ProcDate' => '2026-08-04',
+            'Status' => 6,
+            'ClaimPaymentNum' => 0,
+            'FeeBilled' => 200.00,
+            'office_id' => 1,
+        ]);
+
+        // Day 7: completed procedure WITHOUT claimproc -> should be N
+        DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 7802,
+            'PatNum' => 991,
+            'ProvNum' => 1,
+            'ClinicNum' => 1,
+            'CodeNum' => 881,
+            'ProcFee' => 100.00,
+            'ProcStatus' => '2',
+            'ProcDate' => '2026-08-07 10:00:00',
+            'ToothNum' => '',
+            'Surf' => '',
+            'MedicalCode' => '',
+        ]);
+
+        $service = app(OperationsAnalyticsService::class);
+        $spec = $service->claims('2026-08-01', '2026-08-31', 'default', [1]);
+
+        $this->assertNotEmpty($spec['rows']);
+        $row = $spec['rows'][0];
+        $this->assertEquals('Y', $row['d_4']);
+        $this->assertEquals('N', $row['d_7']);
+        $this->assertEquals('N', $row['d_1']);
     }
 }

@@ -2247,14 +2247,15 @@ class OperationsController extends Controller
                 ['key' => 'status', 'label' => 'Status', 'type' => 'text'],
             ];
 
-            $procsQuery = DB::table('od_procedure_logs as pl')
+            $procsQuery = DB::table('od_claim_procs as cp')
+                ->join('od_procedure_logs as pl', 'cp.ProcNum', '=', 'pl.ProcNum')
                 ->leftJoin('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
                 ->select(
                     'pl.ProcNum',
                     'pl.PatNum',
                     'pl.ProvNum',
-                    'pl.ClinicNum',
-                    'pl.ProcDate',
+                    'cp.ClinicNum',
+                    'cp.ProcDate',
                     'pl.ProcFee',
                     'pl.ToothNum',
                     'pl.Surf',
@@ -2262,11 +2263,11 @@ class OperationsController extends Controller
                     'pc.ProcCode',
                     'pc.Descript'
                 )
-                ->whereBetween('pl.ProcDate', [$start.' 00:00:00', $end.' 23:59:59'])
+                ->whereBetween('cp.ProcDate', [$start, $end])
                 ->whereIn('pl.ProcStatus', ProcStatus::completed());
 
             if (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) {
-                $procsQuery->where('pl.ClinicNum', $clinicNum);
+                $procsQuery->where('cp.ClinicNum', $clinicNum);
             }
             if ($provNum) {
                 $procsQuery->where('pl.ProvNum', $provNum);
