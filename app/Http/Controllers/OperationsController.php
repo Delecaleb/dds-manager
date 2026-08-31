@@ -314,6 +314,28 @@ class OperationsController extends Controller
             })->toArray();
         };
 
+        $formatProv = function ($pNum) use ($providers, $provMap) {
+            if (! $pNum) {
+                return ['id' => '—', 'name' => ['label' => 'Unknown', 'link' => false, 'prov_num' => 0]];
+            }
+            $p = $providers->get($pNum);
+            $abbr = $p ? ($p->Abbr ?? '') : '';
+            $provIdStr = $pNum.($abbr ? ' - '.strtoupper($abbr) : '');
+            $provName = $p ? trim(($p->LName ?? '').(($p->LName && $p->PName) ? ', ' : '').($p->PName ?? '')) : ($provMap[$pNum] ?? 'Unknown');
+            if (! $provName) {
+                $provName = $provMap[$pNum] ?? ('Provider '.$pNum);
+            }
+
+            return [
+                'id' => $provIdStr,
+                'name' => [
+                    'label' => $provName,
+                    'link' => true,
+                    'prov_num' => $pNum,
+                ],
+            ];
+        };
+
         if ($metric === 'gross') {
             $title = 'Gross Production Breakdown';
             $columns = [
@@ -490,19 +512,15 @@ class OperationsController extends Controller
                 $totals['adj_pct'] = $totalGrossAll > 0 ? abs($totalAdj) / $totalGrossAll * 100 : 0;
             }
 
-        } elseif ($metric === 'collection') {
-            $title = 'Collection Breakdown';
+        } elseif ($metric === 'collection' || $metric === 'actual_collection') {
+            $title = $metric === 'actual_collection' ? 'Actual Collection Breakdown' : 'Collection Breakdown';
             $columns = [
                 ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
                 ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'collection', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'],
             ];
-            if (! $provNum) {
-                $columns[] = ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'];
-                $columns[] = ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'];
-                $columns[] = ['key' => 'method', 'label' => 'Payment Method', 'type' => 'text'];
-            }
-            $columns[] = ['key' => 'date', 'label' => 'Dates', 'type' => 'text'];
-            $columns[] = ['key' => 'amount', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum'];
 
             $splitsQuery = DB::table('od_pay_splits as s')
                 ->leftJoin('od_payments as p', 'p.PayNum', '=', 's.PayNum')
@@ -529,7 +547,6 @@ class OperationsController extends Controller
 
             $allPatIds = $splits->pluck('PatNum')->merge($claims->pluck('PatNum'))->filter()->unique();
             $patMap = $mapPatients($allPatIds);
-            $defMap = DB::table('od_definitions')->where('Category', 10)->pluck('ItemName', 'DefNum')->toArray();
 
             $totalCol = 0;
             foreach ($splits as $sp) {
@@ -538,6 +555,7 @@ class OperationsController extends Controller
                     continue;
                 }
                 $totalCol += $amt;
+                $provInfo = $formatProv($sp->ProvNum);
 
                 $r = [
                     'date' => date('M d, Y', strtotime($sp->DatePay)),
@@ -546,13 +564,11 @@ class OperationsController extends Controller
                         'label' => $patMap[$sp->PatNum] ?? 'Unknown',
                         'link' => true,
                     ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'collection' => $amt,
                     'amount' => $amt,
                 ];
-                if (! $provNum) {
-                    $r['prov_id'] = $sp->ProvNum;
-                    $r['provider'] = ['label' => $provMap[$sp->ProvNum] ?? 'Unknown', 'link' => true];
-                    $r['method'] = $defMap[$sp->PayType] ?? 'Type '.$sp->PayType;
-                }
                 $rows[] = $r;
             }
 
@@ -562,6 +578,7 @@ class OperationsController extends Controller
                     continue;
                 }
                 $totalCol += $amt;
+                $provInfo = $formatProv($cp->ProvNum);
 
                 $r = [
                     'date' => date('M d, Y', strtotime($cp->DatePay)),
@@ -570,16 +587,14 @@ class OperationsController extends Controller
                         'label' => $patMap[$cp->PatNum] ?? 'Insurance Payment',
                         'link' => true,
                     ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'collection' => $amt,
                     'amount' => $amt,
                 ];
-                if (! $provNum) {
-                    $r['prov_id'] = $cp->ProvNum;
-                    $r['provider'] = ['label' => $provMap[$cp->ProvNum] ?? 'Unknown', 'link' => true];
-                    $r['method'] = $cp->CarrierName ?: 'Insurance Claim';
-                }
                 $rows[] = $r;
             }
-            $totals = ['amount' => $totalCol];
+            $totals = ['collection' => $totalCol, 'amount' => $totalCol];
 
         } elseif ($metric === 'net' || $metric === 'coll_pct') {
             $title = $metric === 'coll_pct' ? 'Collection % Breakdown' : 'Net Production Breakdown';
@@ -1334,58 +1349,880 @@ class OperationsController extends Controller
             $columns = [
                 ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
                 ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
-                ['key' => 'first_exam', 'label' => 'Prior Exam (19-36m)', 'type' => 'text'],
-                ['key' => 'recent_exam', 'label' => 'Returned Exam (1-18m)', 'type' => 'text'],
-                ['key' => 'visited', 'label' => 'Retained', 'type' => 'text'],
+                ['key' => 'first_visit', 'label' => 'First Ever Visit', 'type' => 'text'],
+                ['key' => 'last_visit', 'label' => 'Recent Visit (0-18m)', 'type' => 'text'],
+                ['key' => 'status', 'label' => 'Patient Type', 'type' => 'text'],
             ];
 
-            $start36m = date('Y-m-d', strtotime('-36 months', strtotime($end)));
             $start18m = date('Y-m-d', strtotime('-18 months', strtotime($end)));
+            $start36m = date('Y-m-d', strtotime('-36 months', strtotime($end)));
 
-            $examCodes = ['D0120', 'D0140', 'D0150'];
+            $firstProcs = DB::table('od_procedure_logs as pl')
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+                ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
+                ->groupBy('pl.PatNum')
+                ->pluck('first_date', 'PatNum')
+                ->all();
 
-            $cohortA = DB::table('od_procedure_logs as pl')
-                ->join('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
-                ->selectRaw('
-                    pl.PatNum,
-                    MAX(pl.ProcDate) AS prior_exam_date
-                ')
+            $patsAll = DB::table('od_procedure_logs as pl')
+                ->selectRaw('pl.PatNum, MAX(pl.ProcDate) as last_date')
                 ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereIn('pc.ProcCode', $examCodes)
-                ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $start18m.' 00:00:00'])
+                ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+                ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $end.' 23:59:59'])
                 ->groupBy('pl.PatNum')
                 ->get();
 
-            $cohortB = DB::table('od_procedure_logs as pl')
-                ->join('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
-                ->selectRaw('
-                    pl.PatNum,
-                    MAX(pl.ProcDate) AS recent_exam_date
-                ')
-                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
-                ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereIn('pc.ProcCode', $examCodes)
-                ->whereBetween('pl.ProcDate', [$start18m.' 00:00:00', $end.' 23:59:59'])
-                ->whereIn('pl.PatNum', $cohortA->pluck('PatNum')->unique())
-                ->groupBy('pl.PatNum')
-                ->get()
-                ->keyBy('PatNum');
+            $patMap = $mapPatients($patsAll->pluck('PatNum')->unique());
 
-            $patMap = $mapPatients($cohortA->pluck('PatNum')->unique());
+            foreach ($patsAll as $pt) {
+                $fDate = isset($firstProcs[$pt->PatNum]) ? substr($firstProcs[$pt->PatNum], 0, 10) : null;
+                $lastDate = substr($pt->last_date, 0, 10);
+                $isRecent = $lastDate >= $start18m && $lastDate <= $end;
+                $isNew = $fDate && $fDate >= $start18m && $fDate <= $end;
 
-            foreach ($cohortA as $pt) {
-                $ret = $cohortB->get($pt->PatNum);
-                $isRetained = $ret !== null;
+                if ($isRecent && ! $isNew) {
+                    $status = 'Retained Patient';
+                } elseif ($isNew) {
+                    $status = 'New Patient';
+                } else {
+                    $status = 'Inactive / Lost';
+                }
+
                 $rows[] = [
                     'pat_id' => $pt->PatNum,
                     'patient' => [
                         'label' => $patMap[$pt->PatNum] ?? 'Unknown',
                         'link' => true,
                     ],
-                    'first_exam' => date('M d, Y', strtotime($pt->prior_exam_date)),
-                    'recent_exam' => $isRetained ? date('M d, Y', strtotime($ret->recent_exam_date)) : '—',
-                    'visited' => $isRetained ? 'Yes' : 'No',
+                    'first_visit' => $fDate ? date('M d, Y', strtotime($fDate)) : '—',
+                    'last_visit' => date('M d, Y', strtotime($pt->last_date)),
+                    'status' => $status,
+                ];
+            }
+            $totals = [];
+        } elseif ($metric === 'actual_production') {
+            $title = 'Actual Production Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
+            ];
+
+            $logsQuery = DB::table('od_procedure_logs')
+                ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$start, $end]);
+
+            $adjsQuery = DB::table('od_adjustments')
+                ->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt')
+                ->whereBetween('AdjDate', [$start, $end]);
+
+            $wosQuery = DB::table('od_claim_procs')
+                ->select('PatNum', 'ProvNum', 'ProcDate', 'WriteOff')
+                ->whereBetween('ProcDate', [$start, $end]);
+
+            if ($provNum) {
+                $logsQuery->where('ProvNum', $provNum);
+                $adjsQuery->where('ProvNum', $provNum);
+                $wosQuery->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $logsQuery->where('ClinicNum', $clinicNum);
+                $adjsQuery->where('ClinicNum', $clinicNum);
+                $wosQuery->where('ClinicNum', $clinicNum);
+            }
+
+            $logs = $logsQuery->get();
+            $adjs = $adjsQuery->get();
+            $wos = $wosQuery->get();
+
+            $allPatIds = $logs->pluck('PatNum')->merge($adjs->pluck('PatNum'))->merge($wos->pluck('PatNum'))->filter()->unique();
+            $patMap = $mapPatients($allPatIds);
+
+            $map = [];
+            foreach ($logs as $l) {
+                $k = $l->PatNum.'|'.$l->ProvNum;
+                if (! isset($map[$k])) {
+                    $map[$k] = ['pat' => $l->PatNum, 'prov' => $l->ProvNum, 'gross' => 0, 'adj' => 0, 'wo' => 0];
+                }
+                $map[$k]['gross'] += (float) $l->ProcFee;
+            }
+            foreach ($adjs as $a) {
+                $k = $a->PatNum.'|'.$a->ProvNum;
+                if (! isset($map[$k])) {
+                    $map[$k] = ['pat' => $a->PatNum, 'prov' => $a->ProvNum, 'gross' => 0, 'adj' => 0, 'wo' => 0];
+                }
+                $map[$k]['adj'] += (float) $a->AdjAmt;
+            }
+            foreach ($wos as $w) {
+                $k = $w->PatNum.'|'.$w->ProvNum;
+                if (! isset($map[$k])) {
+                    $map[$k] = ['pat' => $w->PatNum, 'prov' => $w->ProvNum, 'gross' => 0, 'adj' => 0, 'wo' => 0];
+                }
+                $map[$k]['wo'] += (float) $w->WriteOff;
+            }
+
+            $totalNet = 0;
+            foreach ($map as $m) {
+                $net = $this->production->netFrom((float) $m['gross'], (float) $m['adj'], (float) $m['wo']);
+                if (round($net, 2) == 0) {
+                    continue;
+                }
+                $totalNet += $net;
+                $provInfo = $formatProv($m['prov']);
+
+                $rows[] = [
+                    'pat_id' => $m['pat'],
+                    'patient' => [
+                        'label' => $patMap[$m['pat']] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'production' => $net,
+                ];
+            }
+            $totals = ['production' => $totalNet];
+
+        } elseif ($metric === 'actual_pts_visit') {
+            $title = 'Actual Pts Visits Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'gross', 'label' => 'Gross production', 'type' => 'money', 'agg' => 'sum'],
+                ['key' => 'adjustment', 'label' => 'Adjustment', 'type' => 'money', 'agg' => 'sum'],
+                ['key' => 'writeoff', 'label' => 'Writeoff', 'type' => 'money', 'agg' => 'sum'],
+                ['key' => 'visited', 'label' => 'Visited', 'type' => 'number', 'agg' => 'sum'],
+                ['key' => 'production', 'label' => 'Production ($)', 'type' => 'money', 'agg' => 'sum'],
+            ];
+
+            $logsQuery = DB::table('od_procedure_logs')
+                ->select('PatNum', 'ProcDate', 'ProcFee')
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$start, $end]);
+
+            if ($provNum) {
+                $logsQuery->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $logsQuery->where('ClinicNum', $clinicNum);
+            }
+
+            $logs = $logsQuery->get();
+            $patIds = $logs->pluck('PatNum')->unique()->filter()->values();
+            $patMap = $mapPatients($patIds);
+
+            $adjsQuery = DB::table('od_adjustments')
+                ->select('PatNum', 'AdjAmt')
+                ->whereIn('PatNum', $patIds)
+                ->whereBetween('AdjDate', [$start, $end]);
+
+            $wosQuery = DB::table('od_claim_procs')
+                ->select('PatNum', 'WriteOff')
+                ->whereIn('PatNum', $patIds)
+                ->whereBetween('ProcDate', [$start, $end]);
+
+            if ($provNum) {
+                $adjsQuery->where('ProvNum', $provNum);
+                $wosQuery->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $adjsQuery->where('ClinicNum', $clinicNum);
+                $wosQuery->where('ClinicNum', $clinicNum);
+            }
+
+            $adjs = $patIds->isNotEmpty() ? $adjsQuery->get() : collect();
+            $wos = $patIds->isNotEmpty() ? $wosQuery->get() : collect();
+
+            $patData = [];
+            foreach ($logs as $l) {
+                $patNum = (int) $l->PatNum;
+                $fee = (float) $l->ProcFee;
+                $d = substr((string) $l->ProcDate, 0, 10);
+
+                if (! isset($patData[$patNum])) {
+                    $patData[$patNum] = [
+                        'pat_id' => $patNum,
+                        'gross' => 0.0,
+                        'adj' => 0.0,
+                        'wo' => 0.0,
+                        'days' => [],
+                    ];
+                }
+                $patData[$patNum]['gross'] += $fee;
+                $patData[$patNum]['days'][$d] = true;
+            }
+
+            foreach ($adjs as $a) {
+                $patNum = (int) $a->PatNum;
+                if (isset($patData[$patNum])) {
+                    $patData[$patNum]['adj'] += (float) $a->AdjAmt;
+                }
+            }
+
+            foreach ($wos as $w) {
+                $patNum = (int) $w->PatNum;
+                if (isset($patData[$patNum])) {
+                    $patData[$patNum]['wo'] += (float) $w->WriteOff;
+                }
+            }
+
+            $totGross = 0;
+            $totAdj = 0;
+            $totWo = 0;
+            $totVisited = 0;
+            $totProd = 0;
+
+            foreach ($patData as $patNum => $data) {
+                $gross = $data['gross'];
+                $adj = $data['adj'];
+                $wo = $data['wo'];
+                $visited = count($data['days']);
+                $net = $this->production->netFrom($gross, $adj, $wo);
+
+                $totGross += $gross;
+                $totAdj += $adj;
+                $totWo += $wo;
+                $totVisited += $visited;
+                $totProd += $net;
+
+                $rows[] = [
+                    'pat_id' => $patNum,
+                    'patient' => [
+                        'label' => $patMap[$patNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'gross' => $gross,
+                    'adjustment' => $adj,
+                    'writeoff' => $wo,
+                    'visited' => $visited,
+                    'production' => $net,
+                ];
+            }
+
+            $totals = [
+                'gross' => $totGross,
+                'adjustment' => $totAdj,
+                'writeoff' => $totWo,
+                'visited' => $totVisited,
+                'production' => $totProd,
+            ];
+
+        } elseif ($metric === 'actual_npt_visit') {
+            $title = 'Actual New Patient Visits Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'visits', 'label' => 'Visits', 'type' => 'number', 'agg' => 'sum'],
+            ];
+
+            $clinicNums = (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) ? [$clinicNum] : [];
+            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums);
+
+            $totalVisits = 0;
+            foreach ($nptVisits as $visit) {
+                $totalVisits += 1;
+                $pNum = $visit['prov_num'] ?? 0;
+                $provInfo = $formatProv($pNum);
+
+                $rows[] = [
+                    'pat_id' => $visit['patient_id'],
+                    'patient' => [
+                        'label' => $visit['patient_name'] ?: 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'visits' => 1,
+                ];
+            }
+            $totals = ['visits' => $totalVisits];
+
+        } elseif ($metric === 'sched_production') {
+            $title = 'Scheduled Production Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'appt_date', 'label' => 'Appt Date', 'type' => 'text'],
+                ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
+            ];
+
+            $schedProdQuery = DB::table('od_procedure_logs')
+                ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
+                ->whereNotIn('ProcStatus', ProcStatus::completed())
+                ->where('ProcFee', '>', 0)
+                ->whereBetween('ProcDate', [$start, $end]);
+
+            if ($provNum) {
+                $schedProdQuery->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $schedProdQuery->where('ClinicNum', $clinicNum);
+            }
+
+            $logs = $schedProdQuery->get();
+            $patMap = $mapPatients($logs->pluck('PatNum')->unique());
+
+            $patData = [];
+            foreach ($logs as $l) {
+                $patNum = (int) $l->PatNum;
+                $fee = (float) $l->ProcFee;
+                $d = substr((string) $l->ProcDate, 0, 10);
+                $pNum = (int) $l->ProvNum;
+
+                if (! isset($patData[$patNum])) {
+                    $patData[$patNum] = [
+                        'pat_id' => $patNum,
+                        'total_production' => 0.0,
+                        'dates' => [],
+                        'provs' => [],
+                    ];
+                }
+                $patData[$patNum]['total_production'] += $fee;
+                $patData[$patNum]['dates'][$d] = true;
+                if ($pNum) {
+                    $patData[$patNum]['provs'][$pNum] = true;
+                }
+            }
+
+            $totalProd = 0;
+            foreach ($patData as $patNum => $data) {
+                $production = $data['total_production'];
+                $totalProd += $production;
+
+                $provNums = array_keys($data['provs']);
+                if (count($provNums) === 1) {
+                    $provInfo = $formatProv($provNums[0]);
+                    $provId = $provInfo['id'];
+                    $provName = $provInfo['name'];
+                } elseif (count($provNums) > 1) {
+                    $provIdStrs = [];
+                    $provNames = [];
+                    foreach ($provNums as $pNum) {
+                        $pInfo = $formatProv($pNum);
+                        $provIdStrs[] = $pInfo['id'];
+                        $provNames[] = is_array($pInfo['name']) ? $pInfo['name']['label'] : $pInfo['name'];
+                    }
+                    $provId = implode(', ', array_unique($provIdStrs));
+                    $provName = implode(', ', array_unique($provNames));
+                } else {
+                    $provInfo = $formatProv(0);
+                    $provId = $provInfo['id'];
+                    $provName = $provInfo['name'];
+                }
+
+                $formattedDates = array_map(fn ($d) => date('M d, Y', strtotime($d)), array_keys($data['dates']));
+                $apptDateStr = implode(', ', $formattedDates);
+
+                $rows[] = [
+                    'pat_id' => $patNum,
+                    'patient' => [
+                        'label' => $patMap[$patNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provId,
+                    'provider' => $provName,
+                    'appt_date' => $apptDateStr,
+                    'production' => $production,
+                ];
+            }
+            $totals = ['production' => $totalProd];
+
+        } elseif ($metric === 'sched_pts_visit') {
+            $title = 'Scheduled Patient Visits Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'appt_date', 'label' => 'Appt Date', 'type' => 'text'],
+                ['key' => 'status', 'label' => 'Status', 'type' => 'text'],
+            ];
+
+            $query = DB::table('od_appointments')
+                ->select('PatNum', 'ProvNum', 'AptDateTime', 'AptStatus')
+                ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
+
+            if ($provNum) {
+                $query->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $query->where('ClinicNum', $clinicNum);
+            }
+
+            $appts = $query->orderBy('AptDateTime', 'asc')->get();
+            $patMap = $mapPatients($appts->pluck('PatNum')->unique());
+
+            $statusMap = [
+                '1' => 'Scheduled',
+                '2' => 'Complete',
+                '3' => 'Unscheduled',
+                '4' => 'ASAP',
+                '5' => 'Broken',
+                '6' => 'Planned',
+            ];
+
+            foreach ($appts as $apt) {
+                $provInfo = $formatProv($apt->ProvNum);
+
+                $rows[] = [
+                    'pat_id' => $apt->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$apt->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'appt_date' => date('M d, Y h:i A', strtotime($apt->AptDateTime)),
+                    'status' => $statusMap[(string) $apt->AptStatus] ?? ('Status '.$apt->AptStatus),
+                ];
+            }
+            $totals = [];
+
+        } elseif ($metric === 'sched_new_pts_visit') {
+            $title = 'Scheduled New Patients Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'appt_date', 'label' => 'Appt Date', 'type' => 'text'],
+                ['key' => 'status', 'label' => 'Status', 'type' => 'text'],
+            ];
+
+            $query = DB::table('od_appointments')
+                ->select('PatNum', 'ProvNum', 'AptDateTime', 'AptStatus')
+                ->where('IsNewPatient', 1)
+                ->whereIn('AptStatus', [1, 2])
+                ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
+
+            if ($provNum) {
+                $query->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $query->where('ClinicNum', $clinicNum);
+            }
+
+            $appts = $query->orderBy('AptDateTime', 'asc')->get();
+            $patMap = $mapPatients($appts->pluck('PatNum')->unique());
+
+            $statusMap = [
+                '1' => 'Scheduled',
+                '2' => 'Complete',
+            ];
+
+            foreach ($appts as $apt) {
+                $provInfo = $formatProv($apt->ProvNum);
+
+                $rows[] = [
+                    'pat_id' => $apt->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$apt->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'appt_date' => date('M d, Y h:i A', strtotime($apt->AptDateTime)),
+                    'status' => $statusMap[(string) $apt->AptStatus] ?? ('Status '.$apt->AptStatus),
+                ];
+            }
+            $totals = [];
+
+        } elseif ($metric === 'open_appt_hours') {
+            $title = 'Open Appointment Hours Breakdown';
+            $columns = [
+                ['key' => 'date', 'label' => 'Date', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'sched_hours', 'label' => 'Scheduled Hours', 'type' => 'number_2', 'agg' => 'sum'],
+                ['key' => 'booked_hours', 'label' => 'Booked Hours', 'type' => 'number_2', 'agg' => 'sum'],
+                ['key' => 'open_hours', 'label' => 'Open Hours', 'type' => 'number_2', 'agg' => 'sum'],
+            ];
+
+            $schedQuery = DB::table('od_schedules')
+                ->select('ProvNum', 'SchedDate', 'StartTime', 'StopTime')
+                ->where('SchedType', 1)
+                ->whereBetween('SchedDate', [$start, $end]);
+            if ($clinicNum) {
+                $schedQuery->where('ClinicNum', $clinicNum);
+            }
+            $scheds = $schedQuery->get();
+
+            $apptQuery = DB::table('od_appointments')
+                ->select('ProvNum', 'AptDateTime', 'Pattern')
+                ->whereIn('AptStatus', [1, 2])
+                ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
+            if ($clinicNum) {
+                $apptQuery->where('ClinicNum', $clinicNum);
+            }
+            $appts = $apptQuery->get();
+
+            $schedMins = [];
+            foreach ($scheds as $s) {
+                $d = substr((string) $s->SchedDate, 0, 10);
+                $pNum = (int) $s->ProvNum;
+                $mins = max(0, (strtotime('1970-01-01 '.(string) $s->StopTime) - strtotime('1970-01-01 '.(string) $s->StartTime)) / 60);
+                $k = $d.'|'.$pNum;
+                $schedMins[$k] = ($schedMins[$k] ?? 0) + $mins;
+            }
+
+            $bookedMins = [];
+            foreach ($appts as $apt) {
+                $d = substr((string) $apt->AptDateTime, 0, 10);
+                $pNum = (int) $apt->ProvNum;
+                $pattern = (string) ($apt->Pattern ?? '');
+                $dur = strlen($pattern) > 0 ? strlen($pattern) * 5 : 60;
+                $k = $d.'|'.$pNum;
+                $bookedMins[$k] = ($bookedMins[$k] ?? 0) + $dur;
+            }
+
+            $allKeys = array_unique(array_merge(array_keys($schedMins), array_keys($bookedMins)));
+            $totSchedH = 0;
+            $totBookedH = 0;
+            $totOpenH = 0;
+
+            foreach ($allKeys as $k) {
+                [$d, $pNumStr] = explode('|', $k);
+                $pNum = (int) $pNumStr;
+                $sH = round(($schedMins[$k] ?? 0) / 60, 2);
+                $bH = round(($bookedMins[$k] ?? 0) / 60, 2);
+                $oH = max(0, round($sH - $bH, 2));
+
+                $totSchedH += $sH;
+                $totBookedH += $bH;
+                $totOpenH += $oH;
+
+                $provInfo = $formatProv($pNum);
+
+                $rows[] = [
+                    'date' => date('M d, Y', strtotime($d)),
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'sched_hours' => $sH,
+                    'booked_hours' => $bH,
+                    'open_hours' => $oH,
+                ];
+            }
+            $totals = ['sched_hours' => $totSchedH, 'booked_hours' => $totBookedH, 'open_hours' => $totOpenH];
+
+        } elseif ($metric === 'unscheduled_tx') {
+            $title = 'Unscheduled Treatment Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'procedure', 'label' => 'Procedure', 'type' => 'text'],
+                ['key' => 'amount', 'label' => 'Amount', 'type' => 'money', 'agg' => 'sum'],
+            ];
+
+            $query = DB::table('od_procedure_logs as pl')
+                ->leftJoin('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
+                ->select('pl.PatNum', 'pl.ProvNum', 'pl.ProcDate', 'pl.ProcFee', 'pc.ProcCode', 'pc.Descript')
+                ->whereIn('pl.ProcStatus', [1, '1', 'TP'])
+                ->whereRaw('(pl.AptNum IS NULL OR pl.AptNum = 0)')
+                ->whereBetween('pl.ProcDate', [$start, $end]);
+
+            if ($provNum) {
+                $query->where('pl.ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $query->where('pl.ClinicNum', $clinicNum);
+            }
+
+            $logs = $query->get();
+            $patMap = $mapPatients($logs->pluck('PatNum')->unique());
+
+            $totAmt = 0;
+            foreach ($logs as $l) {
+                $amt = (float) $l->ProcFee;
+                $totAmt += $amt;
+                $provInfo = $formatProv($l->ProvNum);
+                $procDesc = trim(($l->ProcCode ? $l->ProcCode.' - ' : '').($l->Descript ?? 'Procedure'));
+
+                $rows[] = [
+                    'pat_id' => $l->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$l->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'procedure' => $procDesc,
+                    'amount' => $amt,
+                ];
+            }
+            $totals = ['amount' => $totAmt];
+
+        } elseif ($metric === 'booked_production') {
+            $title = 'Booked Production Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'type', 'label' => 'Type', 'type' => 'text'],
+                ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
+            ];
+
+            $completedLogs = DB::table('od_procedure_logs')
+                ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$start, $end])
+                ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
+                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->get();
+
+            $isCompleted = $completedLogs->isNotEmpty();
+            $targetLogs = $isCompleted ? $completedLogs : DB::table('od_procedure_logs')
+                ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
+                ->whereNotIn('ProcStatus', ProcStatus::completed())
+                ->where('ProcFee', '>', 0)
+                ->whereBetween('ProcDate', [$start, $end])
+                ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
+                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->get();
+
+            $patMap = $mapPatients($targetLogs->pluck('PatNum')->unique());
+            $totProd = 0;
+            $typeLabel = $isCompleted ? 'Actual' : 'Scheduled';
+
+            foreach ($targetLogs as $l) {
+                $fee = (float) $l->ProcFee;
+                $totProd += $fee;
+                $provInfo = $formatProv($l->ProvNum);
+
+                $rows[] = [
+                    'pat_id' => $l->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$l->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'type' => $typeLabel,
+                    'production' => $fee,
+                ];
+            }
+            $totals = ['production' => $totProd];
+
+        } elseif ($metric === 'actual_prod_vs_goal') {
+            $title = 'Actual Prod VS Goal Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'production', 'label' => 'Actual Production', 'type' => 'money', 'agg' => 'sum'],
+            ];
+
+            $logs = DB::table('od_procedure_logs')
+                ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$start, $end])
+                ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
+                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->get();
+
+            $patMap = $mapPatients($logs->pluck('PatNum')->unique());
+            $totProd = 0;
+            foreach ($logs as $l) {
+                $fee = (float) $l->ProcFee;
+                $totProd += $fee;
+                $provInfo = $formatProv($l->ProvNum);
+
+                $rows[] = [
+                    'pat_id' => $l->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$l->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'production' => $fee,
+                ];
+            }
+            $totals = ['production' => $totProd];
+
+        } elseif ($metric === 'actual_vs_sched_prod') {
+            $title = 'Actual VS Sched Prod Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'type', 'label' => 'Type', 'type' => 'text'],
+                ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
+            ];
+
+            $completedLogs = DB::table('od_procedure_logs')
+                ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$start, $end])
+                ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
+                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->get();
+
+            $schedLogs = DB::table('od_procedure_logs')
+                ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
+                ->whereNotIn('ProcStatus', ProcStatus::completed())
+                ->where('ProcFee', '>', 0)
+                ->whereBetween('ProcDate', [$start, $end])
+                ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
+                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->get();
+
+            $patMap = $mapPatients($completedLogs->pluck('PatNum')->merge($schedLogs->pluck('PatNum'))->unique());
+            $totProd = 0;
+
+            foreach ($completedLogs as $l) {
+                $fee = (float) $l->ProcFee;
+                $totProd += $fee;
+                $provInfo = $formatProv($l->ProvNum);
+
+                $rows[] = [
+                    'pat_id' => $l->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$l->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'type' => 'Actual',
+                    'production' => $fee,
+                ];
+            }
+
+            foreach ($schedLogs as $l) {
+                $fee = (float) $l->ProcFee;
+                $provInfo = $formatProv($l->ProvNum);
+
+                $rows[] = [
+                    'pat_id' => $l->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$l->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'type' => 'Scheduled',
+                    'production' => $fee,
+                ];
+            }
+            $totals = ['production' => $totProd];
+
+        } elseif ($metric === 'act_vs_sched_pts') {
+            $title = 'Act VS Sched PTS Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'type', 'label' => 'Type', 'type' => 'text'],
+            ];
+
+            $completedLogs = DB::table('od_procedure_logs')
+                ->select('PatNum', 'ProvNum', 'ProcDate')
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$start, $end])
+                ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
+                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->get();
+
+            $appts = DB::table('od_appointments')
+                ->select('PatNum', 'ProvNum', 'AptDateTime')
+                ->whereIn('AptStatus', [1, 2])
+                ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59'])
+                ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
+                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->get();
+
+            $patMap = $mapPatients($completedLogs->pluck('PatNum')->merge($appts->pluck('PatNum'))->unique());
+
+            foreach ($completedLogs->unique('PatNum') as $l) {
+                $provInfo = $formatProv($l->ProvNum);
+
+                $rows[] = [
+                    'pat_id' => $l->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$l->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'type' => 'Actual Visit',
+                ];
+            }
+
+            foreach ($appts->unique('PatNum') as $apt) {
+                $provInfo = $formatProv($apt->ProvNum);
+
+                $rows[] = [
+                    'pat_id' => $apt->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$apt->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'type' => 'Scheduled Appt',
+                ];
+            }
+            $totals = [];
+
+        } elseif ($metric === 'act_vs_sched_npts') {
+            $title = 'Act VS Sched NPTS Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider Ids', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Providers', 'type' => 'text'],
+                ['key' => 'type', 'label' => 'Type', 'type' => 'text'],
+            ];
+
+            $clinicNums = (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) ? [$clinicNum] : [];
+            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums);
+
+            $schedNptAppts = DB::table('od_appointments')
+                ->select('PatNum', 'ProvNum', 'AptDateTime')
+                ->where('IsNewPatient', 1)
+                ->whereIn('AptStatus', [1, 2])
+                ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59'])
+                ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
+                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->get();
+
+            $patMap = $mapPatients(collect($nptVisits)->pluck('patient_id')->merge($schedNptAppts->pluck('PatNum'))->unique());
+
+            foreach ($nptVisits as $visit) {
+                $pNum = $visit['prov_num'] ?? 0;
+                $provInfo = $formatProv($pNum);
+
+                $rows[] = [
+                    'pat_id' => $visit['patient_id'],
+                    'patient' => [
+                        'label' => $visit['patient_name'] ?: 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'type' => 'Actual New Patient',
+                ];
+            }
+
+            foreach ($schedNptAppts as $apt) {
+                $provInfo = $formatProv($apt->ProvNum);
+
+                $rows[] = [
+                    'pat_id' => $apt->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$apt->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'type' => 'Scheduled New Patient',
                 ];
             }
             $totals = [];

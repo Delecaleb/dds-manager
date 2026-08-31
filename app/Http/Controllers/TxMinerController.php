@@ -56,19 +56,69 @@ class TxMinerController extends Controller
             ? "strftime('%Y-%m', pl.ProcDate)"
             : "DATE_FORMAT(pl.ProcDate, '%Y-%m')";
 
-        $query = $this->baseQuery($request)
-            ->selectRaw("{$monthGroupSql} as month_group")
-            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
-            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
-            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
-            ->selectRaw("COUNT(CASE WHEN pl.ProcStatus IN ({$tp}) THEN 1 END) as tx_presented_count")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.PatNum END) as patients_seen")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.PatNum END) as patients_with_tp")
-            ->groupBy('month_group')
-            ->orderBy('month_group', 'desc');
+        $hasMonth = $request->filled('month');
+        $hasCustomRange = ! $hasMonth && $request->filled('start_date') && $request->filled('end_date');
 
-        $totalRecords = DB::query()->fromSub($query, 'sub')->count();
-        $records = $query->skip($start)->take($length)->get();
+        if (! $hasCustomRange) {
+            $monthInput = $request->input('month', now()->format('Y-m'));
+            try {
+                $targetMonth = Carbon::parse($monthInput);
+            } catch (\Exception $e) {
+                $targetMonth = now();
+            }
+
+            $startDate = $targetMonth->copy()->subMonths(12)->startOfMonth()->toDateString();
+            $endDate = $targetMonth->copy()->endOfMonth()->toDateString();
+
+            $monthList = [];
+            for ($i = 0; $i <= 12; $i++) {
+                $m = $targetMonth->copy()->subMonths($i)->format('Y-m');
+                $monthList[$m] = (object) [
+                    'month_group' => $m,
+                    'total_tx_plan' => 0,
+                    'tx_scheduled' => 0,
+                    'completed_tx' => 0,
+                    'tx_presented_count' => 0,
+                    'patients_seen' => 0,
+                    'patients_with_tp' => 0,
+                ];
+            }
+
+            $query = $this->baseQuery($request, $startDate, $endDate)
+                ->selectRaw("{$monthGroupSql} as month_group")
+                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
+                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
+                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
+                ->selectRaw("COUNT(CASE WHEN pl.ProcStatus IN ({$tp}) THEN 1 END) as tx_presented_count")
+                ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.PatNum END) as patients_seen")
+                ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.PatNum END) as patients_with_tp")
+                ->groupBy('month_group')
+                ->orderBy('month_group', 'desc');
+
+            $dbRecords = $query->get();
+            foreach ($dbRecords as $r) {
+                if (isset($monthList[$r->month_group])) {
+                    $monthList[$r->month_group] = $r;
+                }
+            }
+
+            $records = array_values($monthList);
+            $totalRecords = count($records);
+        } else {
+            $query = $this->baseQuery($request)
+                ->selectRaw("{$monthGroupSql} as month_group")
+                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
+                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
+                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
+                ->selectRaw("COUNT(CASE WHEN pl.ProcStatus IN ({$tp}) THEN 1 END) as tx_presented_count")
+                ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.PatNum END) as patients_seen")
+                ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.PatNum END) as patients_with_tp")
+                ->groupBy('month_group')
+                ->orderBy('month_group', 'desc');
+
+            $totalRecords = DB::query()->fromSub($query, 'sub')->count();
+            $records = $query->skip($start)->take($length)->get();
+        }
 
         $stagedRows = [];
         foreach ($records as $r) {
@@ -616,15 +666,15 @@ class TxMinerController extends Controller
     /**
      * Shared Base Query with comprehensive multi-parameter filtering.
      */
-    protected function baseQuery(Request $request): Builder
+    protected function baseQuery(Request $request, ?string $overrideStartDate = null, ?string $overrideEndDate = null): Builder
     {
         $query = DB::table('od_procedure_logs as pl')
             ->whereNotNull('pl.ProcDate')
             ->whereYear('pl.ProcDate', '>=', 2000);
 
         // Date Range filter
-        $start = $request->input('start_date');
-        $end = $request->input('end_date');
+        $start = $overrideStartDate ?? $request->input('start_date');
+        $end = $overrideEndDate ?? $request->input('end_date');
         if ($start && $end) {
             $query->whereBetween('pl.ProcDate', [$start, $end]);
         }

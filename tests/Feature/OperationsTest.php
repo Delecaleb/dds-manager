@@ -2,7 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\OdPatient;
+use App\Models\OdProcedureLog;
+use App\Models\OdProvider;
 use App\Models\User;
+use App\Services\OpenDental\OperationsAnalyticsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -142,8 +146,10 @@ class OperationsTest extends TestCase
                 'ProcNum' => 101,
                 'PatNum' => 101,
                 'ProcDate' => '2026-07-05',
+                'DateTP' => null,
                 'ProcFee' => 1000.00,
                 'ProcStatus' => 'C',
+                'AptNum' => 0,
                 'ClinicNum' => 1,
             ],
             [
@@ -151,8 +157,21 @@ class OperationsTest extends TestCase
                 'ProcNum' => 102,
                 'PatNum' => 102,
                 'ProcDate' => '2026-07-06',
+                'DateTP' => null,
                 'ProcFee' => 500.00,
                 'ProcStatus' => 'C',
+                'AptNum' => 0,
+                'ClinicNum' => 1,
+            ],
+            [
+                'office_id' => 1,
+                'ProcNum' => 103,
+                'PatNum' => 101,
+                'ProcDate' => '2026-07-07',
+                'DateTP' => '2026-07-07',
+                'ProcFee' => 500.00,
+                'ProcStatus' => '1',
+                'AptNum' => 5501,
                 'ClinicNum' => 1,
             ],
         ]);
@@ -771,8 +790,14 @@ class OperationsTest extends TestCase
         ];
         $this->assertSame($expectedKeys, $columnKeys);
 
-        // Verify headers are flat (no grouped header row)
-        $this->assertEmpty($spec['header_groups']);
+        // Verify grouped headers (Actual, Scheduled, Booked, Variance)
+        $this->assertNotEmpty($spec['groups']);
+        $this->assertSame([
+            ['label' => 'Actual', 'span' => 4],
+            ['label' => 'Scheduled', 'span' => 5],
+            ['label' => 'Booked', 'span' => 2],
+            ['label' => 'Variance', 'span' => 4],
+        ], $spec['groups']);
 
         // Check rows
         $rows = $spec['rows'];
@@ -1442,7 +1467,7 @@ class OperationsTest extends TestCase
         $this->assertEquals('percent', $specCopay['columns'][1]['type']);
     }
 
-    public function test_retention_drilldown_renders_36m_and_18m_cohorts(): void
+    public function test_retention_drilldown_renders_retention_cohort(): void
     {
         $user = User::factory()->create();
         $this->actingAs($user);
@@ -1457,8 +1482,8 @@ class OperationsTest extends TestCase
             ['PatNum' => 8002, 'LName' => 'Miller', 'FName' => 'Emily'],
         ]);
 
-        // Patient 1: Exam in 36m and also in 18m
-        // Patient 2: Exam in 36m only (not in 18m)
+        // Patient 1: Visit in 36m and also in 18m -> Retained
+        // Patient 2: Visit in 36m only (not in 18m) -> Inactive / Lost
         DB::table('od_procedure_logs')->insert([
             [
                 'ProcNum' => 12001,
@@ -1500,7 +1525,417 @@ class OperationsTest extends TestCase
         $response->assertSee('Retention Breakdown');
         $response->assertSee('Taylor, James');
         $response->assertSee('Miller, Emily');
-        $response->assertSee('Yes');
-        $response->assertSee('No');
+        $response->assertSee('Retained Patient');
+        $response->assertSee('Inactive / Lost');
+    }
+
+    public function test_trends_tab_renders_two_tables_for_patient_retention(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        DB::table('od_procedures')->insert([
+            ['CodeNum' => 101, 'ProcCode' => 'D0120'],
+        ]);
+
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 13001,
+                'PatNum' => 8101,
+                'ClinicNum' => 1,
+                'CodeNum' => 101,
+                'ProcFee' => 100.00,
+                'ProcStatus' => '2',
+                'ProcDate' => '2025-05-10 10:00:00',
+            ],
+            [
+                'ProcNum' => 13002,
+                'PatNum' => 8102,
+                'ClinicNum' => 1,
+                'CodeNum' => 101,
+                'ProcFee' => 100.00,
+                'ProcStatus' => '2',
+                'ProcDate' => '2025-10-15 10:00:00',
+            ],
+        ]);
+
+        $response = $this->get(route('operations.data', [
+            'tab' => 'trends',
+            'start_date' => '2025-01-01',
+            'end_date' => '2025-12-31',
+            'metric' => 'BYO Patient Retention',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Patient Retention Rate (%)');
+        $response->assertSee('Patient Retention Breakdown');
+        $response->assertSee('Active Patient count');
+        $response->assertSee('New Patient count');
+        $response->assertSee('Retention count');
+    }
+
+    public function test_performance_columns_have_drilldown_types_and_rows_have_date_raw(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $service = app(OperationsAnalyticsService::class);
+        $spec = $service->performance('2026-08-01', '2026-08-07');
+
+        $this->assertArrayHasKey('columns', $spec);
+        $cols = collect($spec['columns'])->keyBy('key');
+
+        $this->assertEquals('actual_production', $cols['actual_production']['drilldown_type'] ?? null);
+        $this->assertEquals('actual_collection', $cols['actual_collection']['drilldown_type'] ?? null);
+        $this->assertEquals('actual_pts_visit', $cols['actual_pts_visit']['drilldown_type'] ?? null);
+        $this->assertEquals('actual_npt_visit', $cols['actual_npt_visit']['drilldown_type'] ?? null);
+        $this->assertEquals('sched_production', $cols['sched_production']['drilldown_type'] ?? null);
+        $this->assertEquals('sched_pts_visit', $cols['sched_pts_visit']['drilldown_type'] ?? null);
+        $this->assertEquals('sched_new_pts_visit', $cols['sched_new_pts_visit']['drilldown_type'] ?? null);
+        $this->assertEquals('open_appt_hours', $cols['open_appt_hours']['drilldown_type'] ?? null);
+        $this->assertEquals('unscheduled_tx', $cols['unscheduled_tx']['drilldown_type'] ?? null);
+        $this->assertEquals('booked_production', $cols['booked_production']['drilldown_type'] ?? null);
+
+        $this->assertNotEmpty($spec['rows']);
+        $firstRow = $spec['rows'][0];
+        $this->assertArrayHasKey('date_raw', $firstRow);
+        $this->assertEquals('2026-08-01', $firstRow['date_raw']);
+    }
+
+    public function test_actual_collection_drilldown_returns_patient_and_provider_links_and_totals(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $patient = OdPatient::create([
+            'PatNum' => 8801,
+            'LName' => 'Smith',
+            'FName' => 'John',
+            'PatStatus' => '0',
+            'ClinicNum' => 1,
+        ]);
+
+        $provider = OdProvider::create([
+            'ProvNum' => 9901,
+            'Abbr' => 'JSM',
+            'LName' => 'Smith',
+            'FName' => 'Jane',
+        ]);
+
+        DB::table('od_pay_splits')->insert([
+            'SplitNum' => 7701,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'DatePay' => '2026-08-04 10:00:00',
+            'SplitAmt' => 1250.00,
+            'ClinicNum' => 1,
+        ]);
+
+        $response = $this->get(route('operations.drilldown', [
+            'metric' => 'actual_collection',
+            'start_date' => '2026-08-04',
+            'end_date' => '2026-08-04',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Actual Collection Breakdown');
+        $response->assertSee('Patient ID');
+        $response->assertSee('Provider Ids');
+        $response->assertSee('Providers');
+        $response->assertSee('Collection');
+        $response->assertSee('Smith, John');
+        $response->assertSee('9901 - JSM');
+        $response->assertSee("openPatient('8801')", false);
+        $response->assertSee("openProviderModal('9901')", false);
+        $response->assertSee('1,250.00');
+    }
+
+    public function test_actual_production_drilldown_returns_breakdown_with_patient_link(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $patient = OdPatient::create([
+            'PatNum' => 8802,
+            'LName' => 'Doe',
+            'FName' => 'Alice',
+            'PatStatus' => '0',
+            'ClinicNum' => 1,
+        ]);
+
+        $provider = OdProvider::create([
+            'ProvNum' => 9902,
+            'Abbr' => 'ADOE',
+            'LName' => 'Doe',
+            'FName' => 'Arthur',
+        ]);
+
+        OdProcedureLog::create([
+            'ProcNum' => 6601,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ProcDate' => '2026-08-04',
+            'ProcFee' => 750.00,
+            'ProcStatus' => '2',
+            'ClinicNum' => 1,
+            'CodeNum' => 10,
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+
+        $response = $this->get(route('operations.drilldown', [
+            'metric' => 'actual_production',
+            'start_date' => '2026-08-04',
+            'end_date' => '2026-08-04',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Actual Production Breakdown');
+        $response->assertSee('Doe, Alice');
+        $response->assertSee('9902 - ADOE');
+        $response->assertSee("openPatient('8802')", false);
+        $response->assertSee('750.00');
+    }
+
+    public function test_actual_pts_visit_drilldown_renders_correctly(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $patient = OdPatient::create([
+            'PatNum' => 8809,
+            'LName' => 'Miller',
+            'FName' => 'Sarah',
+            'PatStatus' => '0',
+            'ClinicNum' => 1,
+        ]);
+
+        $provider = OdProvider::create([
+            'ProvNum' => 9909,
+            'Abbr' => 'SMIL',
+            'LName' => 'Miller',
+            'FName' => 'Steve',
+        ]);
+
+        // 2 completed procedures across 2 different dates ($300 and $200) -> Gross = $500, Visited = 2
+        DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 7791,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ProcDate' => '2026-08-01',
+            'ProcFee' => 300.00,
+            'ProcStatus' => '2',
+            'ClinicNum' => 1,
+            'CodeNum' => 10,
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+        DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 7792,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ProcDate' => '2026-08-02',
+            'ProcFee' => 200.00,
+            'ProcStatus' => '2',
+            'ClinicNum' => 1,
+            'CodeNum' => 11,
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+
+        // Adjustment of $50
+        DB::table('od_adjustments')->insert([
+            'AdjNum' => 4401,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ClinicNum' => 1,
+            'AdjDate' => '2026-08-01',
+            'AdjAmt' => 50.00,
+            'AdjType' => 1,
+        ]);
+
+        // WriteOff of $100
+        DB::table('od_claim_procs')->insert([
+            'ClaimProcNum' => 3301,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ClinicNum' => 1,
+            'ProcDate' => '2026-08-02',
+            'WriteOff' => 100.00,
+            'Status' => 1,
+            'ClaimPaymentNum' => 0,
+            'PlanNum' => 1,
+            'InsPayAmt' => 0,
+            'InsPayEst' => 0,
+            'FeeBilled' => 0,
+        ]);
+
+        $response = $this->get(route('operations.drilldown', [
+            'metric' => 'actual_pts_visit',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-03',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Actual Pts Visits Breakdown');
+        $response->assertSee('Patient ID');
+        $response->assertSee('Patient');
+        $response->assertSee('Gross production');
+        $response->assertSee('Adjustment');
+        $response->assertSee('Writeoff');
+        $response->assertSee('Visited');
+        $response->assertSee('Production ($)');
+        $response->assertSee('Miller, Sarah');
+        $response->assertSee("openPatient('8809')", false);
+        $response->assertSee('500.00'); // Gross
+        $response->assertSee('50.00');  // Adj
+        $response->assertSee('100.00'); // WriteOff
+        $response->assertSee('450.00'); // Net Production: 500 + 50 - 100
+    }
+
+    public function test_scheduled_production_and_visits_drilldown_renders_correctly(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $patient = OdPatient::create([
+            'PatNum' => 8803,
+            'LName' => 'Taylor',
+            'FName' => 'Robert',
+            'PatStatus' => '0',
+            'ClinicNum' => 1,
+        ]);
+
+        $provider = OdProvider::create([
+            'ProvNum' => 9903,
+            'Abbr' => 'RTAY',
+            'LName' => 'Taylor',
+            'FName' => 'Rachel',
+        ]);
+
+        DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 7702,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ProcDate' => '2026-08-05',
+            'ProcFee' => 450.00,
+            'ProcStatus' => '1',
+            'ClinicNum' => 1,
+            'CodeNum' => 11,
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+
+        // Second procedure for same patient ($50.00) to verify grouping into $500.00
+        DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 7703,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ProcDate' => '2026-08-05',
+            'ProcFee' => 50.00,
+            'ProcStatus' => '1',
+            'ClinicNum' => 1,
+            'CodeNum' => 12,
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+
+        DB::table('od_appointments')->insert([
+            'AptNum' => 5501,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'AptDateTime' => '2026-08-05 14:00:00',
+            'AptStatus' => 1,
+            'ClinicNum' => 1,
+            'IsNewPatient' => 0,
+            'Pattern' => '///',
+        ]);
+
+        $respProd = $this->get(route('operations.drilldown', [
+            'metric' => 'sched_production',
+            'start_date' => '2026-08-05',
+            'end_date' => '2026-08-05',
+        ]));
+        $respProd->assertOk();
+        $respProd->assertSee('Scheduled Production Breakdown');
+        $respProd->assertSee('Taylor, Robert');
+        $respProd->assertSee('9903 - RTAY');
+        $respProd->assertSee("openPatient('8803')", false);
+        $respProd->assertSee('500.00');
+
+        $respVisit = $this->get(route('operations.drilldown', [
+            'metric' => 'sched_pts_visit',
+            'start_date' => '2026-08-05',
+            'end_date' => '2026-08-05',
+        ]));
+        $respVisit->assertOk();
+        $respVisit->assertSee('Scheduled Patient Visits Breakdown');
+        $respVisit->assertSee('Taylor, Robert');
+        $respVisit->assertSee('Scheduled');
+    }
+
+    public function test_open_appt_hours_and_unscheduled_tx_drilldown_render_correctly(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $patient = OdPatient::create([
+            'PatNum' => 8804,
+            'LName' => 'Clark',
+            'FName' => 'David',
+            'PatStatus' => '0',
+            'ClinicNum' => 1,
+        ]);
+
+        $provider = OdProvider::create([
+            'ProvNum' => 9904,
+            'Abbr' => 'DCLK',
+            'LName' => 'Clark',
+            'FName' => 'Diana',
+        ]);
+
+        DB::table('od_schedules')->insert([
+            'ScheduleNum' => 4401,
+            'SchedDate' => '2026-08-06',
+            'StartTime' => '08:00:00',
+            'StopTime' => '17:00:00',
+            'SchedType' => 1,
+            'ProvNum' => $provider->ProvNum,
+            'ClinicNum' => 1,
+        ]);
+
+        OdProcedureLog::create([
+            'ProcNum' => 6603,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ProcDate' => '2026-08-06',
+            'ProcFee' => 920.00,
+            'ProcStatus' => '1',
+            'AptNum' => null,
+            'ClinicNum' => 1,
+            'CodeNum' => 12,
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+
+        $respHours = $this->get(route('operations.drilldown', [
+            'metric' => 'open_appt_hours',
+            'start_date' => '2026-08-06',
+            'end_date' => '2026-08-06',
+        ]));
+        $respHours->assertOk();
+        $respHours->assertSee('Open Appointment Hours Breakdown');
+        $respHours->assertSee('9904 - DCLK');
+        $respHours->assertSee('9.00'); // 9 hours scheduled
+
+        $respUnsched = $this->get(route('operations.drilldown', [
+            'metric' => 'unscheduled_tx',
+            'start_date' => '2026-08-06',
+            'end_date' => '2026-08-06',
+        ]));
+        $respUnsched->assertOk();
+        $respUnsched->assertSee('Unscheduled Treatment Breakdown');
+        $respUnsched->assertSee('Clark, David');
+        $respUnsched->assertSee('920.00');
     }
 }

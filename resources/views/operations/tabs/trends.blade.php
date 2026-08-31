@@ -146,8 +146,24 @@
     </div>
 
     {{-- Datatable wrapper --}}
-    <div class="mt-8">
-        @include('operations.tabs.table', ['spec' => $spec, 'subtabs' => [], 'tab' => $tab, 'activeSubtab' => $activeSubtab ?? 'default'])
+    <div class="mt-8 space-y-8">
+        <div>
+            @if (!empty($spec['breakdown_spec']))
+                <div class="mb-3 flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Patient Retention Rate (%)</h3>
+                </div>
+            @endif
+            @include('operations.tabs.table', ['spec' => $spec, 'subtabs' => [], 'tab' => $tab, 'activeSubtab' => $activeSubtab ?? 'default'])
+        </div>
+
+        @if (!empty($spec['breakdown_spec']))
+            <div>
+                <div class="mb-3 flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Patient Retention Breakdown</h3>
+                </div>
+                @include('operations.tabs.table', ['spec' => $spec['breakdown_spec'], 'subtabs' => [], 'tab' => $tab, 'activeSubtab' => $activeSubtab ?? 'default'])
+            </div>
+        @endif
     </div>
 
 </div>

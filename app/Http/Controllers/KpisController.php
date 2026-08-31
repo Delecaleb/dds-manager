@@ -433,37 +433,28 @@ class KpisController extends Controller
         // 1 & 10. Patient Retention + Active Patients
         $retentionData = DB::selectOne("
             SELECT
-                COUNT(DISTINCT CASE WHEN pl.ProcDate >= ? AND pc.ProcCode NOT IN ('D9986', 'D9987') THEN pl.PatNum END) AS active_18m
+                COUNT(DISTINCT CASE WHEN pl.ProcDate >= ? AND pc.ProcCode NOT IN ('D9986', 'D9987') THEN pl.PatNum END) AS active_18m,
+                COUNT(DISTINCT CASE WHEN pl.ProcDate BETWEEN ? AND ? AND pc.ProcCode NOT IN ('D9986', 'D9987') THEN pl.PatNum END) AS active_36m_prior
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
             WHERE pl.ProcStatus IN ({$this->completedIn})
-        ", [$cutoff18m]);
+        ", [$cutoff18m, $cutoff36m, $cutoff18m]);
 
         $activePatients = (int) ($retentionData->active_18m ?? 0);
+        $priorActivePatients = (int) ($retentionData->active_36m_prior ?? 0);
 
-        $examCodes = ['D0120', 'D0140', 'D0150', 'D0160', 'D0170', 'D0180'];
-        $codeNums = DB::table('od_procedures')->whereIn('ProcCode', $examCodes)->pluck('CodeNum')->toArray();
-
-        $pats19_36 = DB::table('od_procedure_logs as pl')
+        // New patients in last 18 months
+        $newPatientsCount = DB::table('od_procedure_logs as pl')
             ->whereIn('pl.ProcStatus', [2, '2', 'C'])
-            ->whereIn('pl.CodeNum', $codeNums)
-            ->whereBetween('pl.ProcDate', [$cutoff36m.' 00:00:00', $cutoff18m.' 00:00:00'])
-            ->pluck('pl.PatNum')
-            ->unique()
-            ->toArray();
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
+            ->groupBy('pl.PatNum')
+            ->havingRaw('MIN(pl.ProcDate) >= ?', [$cutoff18m.' 00:00:00'])
+            ->pluck('PatNum')
+            ->count();
 
-        $pats18 = DB::table('od_procedure_logs as pl')
-            ->whereIn('pl.ProcStatus', [2, '2', 'C'])
-            ->whereIn('pl.CodeNum', $codeNums)
-            ->whereBetween('pl.ProcDate', [$cutoff18m.' 00:00:00', now()->toDateString().' 23:59:59'])
-            ->pluck('pl.PatNum')
-            ->unique()
-            ->toArray();
-
-        $retained = array_intersect($pats19_36, $pats18);
-        $cntA = count($pats19_36);
-        $cntB = count($retained);
-        $patientRetention = $cntA > 0 ? round(($cntB / $cntA) * 100, 2) : 0;
+        $retainedPatients = max(0, $activePatients - $newPatientsCount);
+        $patientRetention = $priorActivePatients > 0 ? round(($retainedPatients / $priorActivePatients) * 100, 2) : 0;
 
         // 2. Treatment Plans per Day
         $tpDays = DB::selectOne("

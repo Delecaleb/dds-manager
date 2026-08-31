@@ -18,7 +18,7 @@
                     @foreach ($columns as $col)
                         @php
                             $val = $row[$col['key']] ?? null;
-                            $align = ($col['type'] ?? 'text') === 'money' || ($col['type'] ?? 'text') === 'percent' ? 'text-right' : 'text-left';
+                            $align = ($col['type'] ?? 'text') === 'money' || ($col['type'] ?? 'text') === 'percent' || ($col['type'] ?? 'text') === 'number_2' || ($col['type'] ?? 'text') === 'number' ? 'text-right' : 'text-left';
 
                             $isLink = is_array($val) && !empty($val['link']);
                             $displayStr = $isLink ? $val['label'] : $val;
@@ -32,6 +32,12 @@
                             } elseif ($col['type'] === 'percent') {
                                 $orderAttr = 'data-order="' . (float) $displayStr . '"';
                                 $displayStr = number_format((float) $displayStr, 2) . '%';
+                            } elseif ($col['type'] === 'number_2') {
+                                $orderAttr = 'data-order="' . (float) $displayStr . '"';
+                                $displayStr = number_format((float) $displayStr, 2);
+                            } elseif ($col['type'] === 'number') {
+                                $orderAttr = 'data-order="' . (float) $displayStr . '"';
+                                $displayStr = number_format((float) $displayStr);
                             }
                         @endphp
                         <td {!! $orderAttr !!} class="py-3 px-4 {{ $align }} font-medium">
@@ -49,7 +55,7 @@
                                 {!! e($displayStr) !!}
                                 <button type="button"
                                     class="text-[#00bfa5] ml-1 hover:text-[#009688] focus:outline-none shrink-0 inline-block align-middle"
-                                    onclick="if(typeof openProviderModal === 'function') openProviderModal('{{ $row['prov_num'] ?? $row['prov_id'] }}'); else alert('Provider dig-deep must be imported globally.');">
+                                    onclick="if(typeof openProviderModal === 'function') openProviderModal('{{ $row['prov_num'] ?? (is_array($val) && !empty($val['prov_num']) ? $val['prov_num'] : $row['prov_id']) }}'); else alert('Provider dig-deep must be imported globally.');">
                                     <svg class="h-3.5 w-3.5 stroke-current cursor-pointer" fill="none" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
                                             d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
@@ -84,7 +90,7 @@
                 <tr class="font-bold text-gray-900 border-t border-gray-300">
                     @foreach ($columns as $index => $col)
                         @php
-                            $align = ($col['type'] ?? 'text') === 'money' || ($col['type'] ?? 'text') === 'percent' ? 'text-right' : 'text-left';
+                            $align = ($col['type'] ?? 'text') === 'money' || ($col['type'] ?? 'text') === 'percent' || ($col['type'] ?? 'text') === 'number_2' || ($col['type'] ?? 'text') === 'number' ? 'text-right' : 'text-left';
                         @endphp
                         @if ($index === 0)
                             <td class="py-3 px-4">Total:</td>
@@ -95,6 +101,10 @@
                                     $totVal = '$ ' . number_format((float) $totVal, 2);
                                 } elseif ($col['type'] === 'percent') {
                                     $totVal = number_format((float) $totVal, 2) . '%';
+                                } elseif ($col['type'] === 'number_2') {
+                                    $totVal = number_format((float) $totVal, 2);
+                                } elseif ($col['type'] === 'number') {
+                                    $totVal = number_format((float) $totVal);
                                 }
                             @endphp
                             <td class="py-3 px-4 {{ $align }}">{!! e($totVal) !!}</td>

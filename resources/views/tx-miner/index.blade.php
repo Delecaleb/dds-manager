@@ -19,7 +19,24 @@
                 </select>
             </div>
 
-            <x-daterange-picker id="txMinerDateRange" />
+            <!-- Month & Year Selector (for By Month tab) -->
+            <div id="txMinerMonthPickerWrap" class="relative flex items-center border border-slate-200 rounded-lg bg-slate-50 px-3 py-1.5 gap-2 hover:border-emerald-400 hover:bg-white transition-colors cursor-pointer">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     class="text-slate-400 flex-shrink-0">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <input type="month" id="txMinerMonth" value="{{ request('month', date('Y-m')) }}"
+                    class="bg-transparent text-sm font-semibold text-slate-700 focus:outline-none cursor-pointer">
+            </div>
+
+            <!-- Date Range Picker (for Provider & Location tabs) -->
+            <div id="txMinerDateRangeWrap" class="hidden">
+                <x-daterange-picker id="txMinerDateRange" />
+            </div>
         </div>
     </header>
 
@@ -732,21 +749,28 @@
             let activeTabMode = 'month';
 
             function getFilters(tab) {
-                let startDate = null;
-                let endDate = null;
-                const drpInput = $('#txMinerDateRange').data('daterangepicker');
-                if (drpInput && drpInput.startDate && drpInput.endDate) {
-                    startDate = drpInput.startDate.format('YYYY-MM-DD');
-                    endDate = drpInput.endDate.format('YYYY-MM-DD');
-                }
-
                 const clinic = $('#txMinerLocation').val();
 
                 let params = {
-                    start_date: startDate,
-                    end_date: endDate,
                     clinic: clinic
                 };
+
+                if (tab === 'month') {
+                    const monthVal = $('#txMinerMonth').val();
+                    if (monthVal) {
+                        params.month = monthVal;
+                    }
+                } else {
+                    let startDate = null;
+                    let endDate = null;
+                    const drpInput = $('#txMinerDateRange').data('daterangepicker');
+                    if (drpInput && drpInput.startDate && drpInput.endDate) {
+                        startDate = drpInput.startDate.format('YYYY-MM-DD');
+                        endDate = drpInput.endDate.format('YYYY-MM-DD');
+                    }
+                    params.start_date = startDate;
+                    params.end_date = endDate;
+                }
 
                 if (tab === 'provider') {
                     // Providers filter
@@ -836,6 +860,8 @@
                         serverSide: true,
                         searching: false,
                         ordering: false,
+                        paging: false,
+                        pageLength: 25,
                         ajax: {
                             url: baseUrl + '/tx-miner/data',
                             type: 'GET',
@@ -1047,6 +1073,15 @@
                 var target = document.querySelector(targetSelect);
                 if (target) { target.classList.remove('hidden'); target.classList.add('active'); }
 
+                // Toggle Date Selectors based on active tab
+                if (tab === 'month') {
+                    $('#txMinerMonthPickerWrap').removeClass('hidden');
+                    $('#txMinerDateRangeWrap').addClass('hidden');
+                } else {
+                    $('#txMinerMonthPickerWrap').addClass('hidden');
+                    $('#txMinerDateRangeWrap').removeClass('hidden');
+                }
+
                 // Initialize table for active tab
                 const table = initTable(tab);
                 if (table) {
@@ -1067,6 +1102,13 @@
 
             // Location Change & Date Range change
             $('#txMinerLocation').on('change', reloadActiveTable);
+
+            // Month Picker change handler
+            $('#txMinerMonth').on('change', function () {
+                if (activeTabMode === 'month') {
+                    reloadActiveTable();
+                }
+            });
 
             // Hook onto DateRangePicker apply event and DDS canonical event
             $('#txMinerDateRange').on('apply.daterangepicker', function () {

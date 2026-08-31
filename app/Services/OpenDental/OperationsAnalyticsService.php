@@ -452,13 +452,7 @@ class OperationsAnalyticsService
                          THEN pl.ProcFee ELSE 0 END) AS accepted
             ")
             ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
-            ->where(function ($q) use ($start, $end) {
-                $q->whereBetween('pl.DateTP', [$start, $end])
-                    ->orWhere(function ($q2) use ($start, $end) {
-                        $q2->whereBetween('pl.ProcDate', [$start, $end])
-                            ->whereIn('pl.ProcStatus', ['2', 'C', 2]);
-                    });
-            });
+            ->whereBetween('pl.DateTP', [$start, $end]);
         if ($clinics) {
             $caQ->whereIn('pl.ClinicNum', $clinics);
         }
@@ -947,21 +941,32 @@ class OperationsAnalyticsService
         $columns = [
             ['key' => 'date', 'label' => 'Date', 'type' => 'text', 'sticky' => true],
             ['key' => 'goal', 'label' => 'Goal', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'actual_production', 'label' => 'Actual Production', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'net'],
-            ['key' => 'actual_collection', 'label' => 'Actual Collection', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'collection'],
-            ['key' => 'actual_pts_visit', 'label' => 'Actual Pts Visits', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'pts_visit'],
-            ['key' => 'actual_npt_visit', 'label' => 'Actual Npt Visit', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'npt_visit'],
-            ['key' => 'sched_production', 'label' => 'Scheduled Production', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'sched_pts_visit', 'label' => 'Scheduled Pts Visits', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'sched_new_pts_visit', 'label' => 'Scheduled New Pts', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'open_appt_hours', 'label' => 'Scheduled Open Appointment', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'unscheduled_tx', 'label' => 'Scheduled Unsched Tx $', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'booked_production', 'label' => 'Booked Production', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'booked_prod_pct_goal', 'label' => 'Booked Production % to goal', 'type' => 'percent'],
-            ['key' => 'actual_prod_vs_goal', 'label' => 'Actual Prod VS Goal', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'actual_vs_sched_prod', 'label' => 'Actual VS Sched Prod', 'type' => 'money', 'agg' => 'sum'],
-            ['key' => 'act_vs_sched_pts', 'label' => 'Act VS Sched PTS', 'type' => 'number', 'agg' => 'sum'],
-            ['key' => 'act_vs_sched_npts', 'label' => 'Act VS Sched NPTS', 'type' => 'number', 'agg' => 'sum'],
+            // Actual
+            ['key' => 'actual_production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'actual_production'],
+            ['key' => 'actual_collection', 'label' => 'Collection', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'actual_collection'],
+            ['key' => 'actual_pts_visit', 'label' => 'Pts Visits', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'actual_pts_visit'],
+            ['key' => 'actual_npt_visit', 'label' => 'Npt Visit', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'actual_npt_visit'],
+            // Scheduled
+            ['key' => 'sched_production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'sched_production'],
+            ['key' => 'sched_pts_visit', 'label' => 'Pts Visits', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'sched_pts_visit'],
+            ['key' => 'sched_new_pts_visit', 'label' => 'New Pts', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'sched_new_pts_visit'],
+            ['key' => 'open_appt_hours', 'label' => 'Open Appointment', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'open_appt_hours'],
+            ['key' => 'unscheduled_tx', 'label' => 'Unsched Tx $', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'unscheduled_tx'],
+            // Booked
+            ['key' => 'booked_production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'booked_production'],
+            ['key' => 'booked_prod_pct_goal', 'label' => '% to goal', 'type' => 'percent'],
+            // Variance
+            ['key' => 'actual_prod_vs_goal', 'label' => 'Prod VS Goal', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'actual_prod_vs_goal'],
+            ['key' => 'actual_vs_sched_prod', 'label' => 'Actual VS Sched Prod', 'type' => 'money', 'agg' => 'sum', 'drilldown_type' => 'actual_vs_sched_prod'],
+            ['key' => 'act_vs_sched_pts', 'label' => 'Act VS Sched PTS', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'act_vs_sched_pts'],
+            ['key' => 'act_vs_sched_npts', 'label' => 'Act VS Sched NPTS', 'type' => 'number', 'agg' => 'sum', 'drilldown_type' => 'act_vs_sched_npts'],
+        ];
+
+        $groups = [
+            ['label' => 'Actual', 'span' => 4],
+            ['label' => 'Scheduled', 'span' => 5],
+            ['label' => 'Booked', 'span' => 2],
+            ['label' => 'Variance', 'span' => 4],
         ];
 
         $startCarbon = \Carbon\Carbon::parse($start);
@@ -1128,6 +1133,7 @@ class OperationsAnalyticsService
             $act_vs_sched_npts = $anv - $snv;
 
             $rows[] = [
+                'date_raw' => $d,
                 'date' => $dateLabel,
                 'goal' => $goal,
                 'actual_production' => $ap,
@@ -1205,8 +1211,7 @@ class OperationsAnalyticsService
         ];
 
         return [
-            'header_groups' => [],
-            'groups' => [],
+            'groups' => $groups,
             'columns' => $columns,
             'rows' => $rows,
             'average' => $averageRow,
@@ -1459,40 +1464,51 @@ class OperationsAnalyticsService
         $npt = $this->newPatientsByClinicProvider($start, $end, $clinics);
         $hours = $this->scheduledHoursByClinicProvider($start, $end, $clinics);
 
-        // Retention: Cohort A (Exam in months 19-36) vs Cohort B (Cohort A returning for exam in months 1-18)
-        $start36m = \Carbon\Carbon::parse($end)->subMonths(36)->startOfDay()->toDateTimeString();
+        // Retention: Numerator = Current Active (last 18m) - New Patients (last 18m) / Denominator = Active 18m ago
         $start18m = \Carbon\Carbon::parse($end)->subMonths(18)->startOfDay()->toDateTimeString();
+        $start36m = \Carbon\Carbon::parse($end)->subMonths(36)->startOfDay()->toDateTimeString();
         $endStr = \Carbon\Carbon::parse($end)->endOfDay()->toDateTimeString();
 
-        $examCodes = ['D0120', 'D0140', 'D0150'];
-        $codeNums = DB::table('od_procedures')->whereIn('ProcCode', $examCodes)->pluck('CodeNum')->toArray();
-
-        $pats36 = DB::table('od_procedure_logs as pl')
+        $firstProcs = DB::table('od_procedure_logs as pl')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereIn('pl.CodeNum', $codeNums)
-            ->whereBetween('pl.ProcDate', [$start36m, $start18m])
-            ->when($clinics, fn ($q) => $q->whereIn('pl.ClinicNum', $clinics))
-            ->select('pl.ClinicNum', 'pl.ProvNum', 'pl.PatNum')
-            ->distinct()
-            ->get();
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
+            ->groupBy('pl.PatNum')
+            ->pluck('first_date', 'PatNum')
+            ->all();
 
-        $pats18 = DB::table('od_procedure_logs as pl')
+        $patsCur = DB::table('od_procedure_logs as pl')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereIn('pl.CodeNum', $codeNums)
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->whereBetween('pl.ProcDate', [$start18m, $endStr])
             ->when($clinics, fn ($q) => $q->whereIn('pl.ClinicNum', $clinics))
             ->select('pl.ClinicNum', 'pl.ProvNum', 'pl.PatNum')
             ->distinct()
             ->get();
 
-        $aByProv = [];
-        foreach ($pats36 as $r) {
-            $aByProv[$r->ClinicNum.'|'.$r->ProvNum][$r->PatNum] = true;
+        $patsPrior = DB::table('od_procedure_logs as pl')
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereBetween('pl.ProcDate', [$start36m, $start18m])
+            ->when($clinics, fn ($q) => $q->whereIn('pl.ClinicNum', $clinics))
+            ->select('pl.ClinicNum', 'pl.ProvNum', 'pl.PatNum')
+            ->distinct()
+            ->get();
+
+        $curByProv = [];
+        $newByProv = [];
+        foreach ($patsCur as $r) {
+            $k = $r->ClinicNum.'|'.$r->ProvNum;
+            $curByProv[$k][$r->PatNum] = true;
+            $fDate = isset($firstProcs[$r->PatNum]) ? substr($firstProcs[$r->PatNum], 0, 10) : null;
+            if ($fDate && $fDate >= substr($start18m, 0, 10) && $fDate <= substr($endStr, 0, 10)) {
+                $newByProv[$k][$r->PatNum] = true;
+            }
         }
 
-        $bByProv = [];
-        foreach ($pats18 as $r) {
-            $bByProv[$r->ClinicNum.'|'.$r->ProvNum][$r->PatNum] = true;
+        $priorByProv = [];
+        foreach ($patsPrior as $r) {
+            $priorByProv[$r->ClinicNum.'|'.$r->ProvNum][$r->PatNum] = true;
         }
 
         $providers = DB::table('od_providers')->get()->keyBy('ProvNum');
@@ -1548,11 +1564,13 @@ class OperationsAnalyticsService
             $schedHours = (float) ($hours[$key] ?? 0);
             $goal = ($hourlyGoal > 0 && $schedHours > 0) ? round($hourlyGoal * $schedHours, 2) : 0.00;
 
-            $patsA = $aByProv[$key] ?? [];
-            $retained = array_intersect_key($patsA, $bByProv[$key] ?? []);
-            $tPts = count($patsA);
-            $rPts = count($retained);
-            $retPct = $tPts > 0 ? round(($rPts / $tPts) * 100, 2) : 0;
+            $curCnt = count($curByProv[$key] ?? []);
+            $newCnt = count($newByProv[$key] ?? []);
+            $numerator = max(0, $curCnt - $newCnt);
+            $denominator = count($priorByProv[$key] ?? []);
+            $retPct = $denominator > 0 ? round(($numerator / $denominator) * 100, 2) : 0;
+            $tPts = $denominator;
+            $rPts = $numerator;
 
             $rows[] = [
                 'row_key' => $key,
@@ -1931,54 +1949,68 @@ class OperationsAnalyticsService
 
     /**
      * Patient Retention:
-     * Cohort A = Patients who completed an exam ('D0120','D0140','D0150') between 19 and 36 months ago (months 19–36).
-     * Cohort B = Patients from Cohort A who returned for another exam ('D0120','D0140','D0150') in the nearest 18 months (months 1–18).
-     * Retention = B / A * 100
+     * Numerator = Current Active Patients (last 18m) - Total New Patients (last 18m)
+     * Denominator = Active Patient Count 18 months ago (months 19-36)
+     * Retention = Numerator / Denominator * 100
      */
     private function patientRetentionMetrics(string $end, array $clinics): array
     {
-        $start36m = date('Y-m-d', strtotime('-36 months', strtotime($end)));
         $start18m = date('Y-m-d', strtotime('-18 months', strtotime($end)));
+        $start36m = date('Y-m-d', strtotime('-36 months', strtotime($end)));
 
-        $examCodes = ['D0120', 'D0140', 'D0150'];
-        $codeNums = DB::table('od_procedures')->whereIn('ProcCode', $examCodes)->pluck('CodeNum')->toArray();
-
-        // 1. Cohort A: Exam patients in months 19 to 36 ago
-        $qA = DB::table('od_procedure_logs as pl')
+        // 1. First-ever completed procedure date for each patient (to identify new patients)
+        $firstProcs = DB::table('od_procedure_logs as pl')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereIn('pl.CodeNum', $codeNums)
-            ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $start18m.' 00:00:00']);
-        if ($clinics) {
-            $qA->whereIn('pl.ClinicNum', $clinics);
-        }
-        $pats36 = $qA->select('pl.ClinicNum', 'pl.PatNum')->distinct()->get();
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
+            ->groupBy('pl.PatNum')
+            ->pluck('first_date', 'PatNum')
+            ->all();
 
-        // 2. Returned in nearest 18 months (months 1 to 18)
-        $qB = DB::table('od_procedure_logs as pl')
+        // 2. Current Active Patients by clinic (last 18 months)
+        $qCur = DB::table('od_procedure_logs as pl')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereIn('pl.CodeNum', $codeNums)
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->whereBetween('pl.ProcDate', [$start18m.' 00:00:00', $end.' 23:59:59']);
         if ($clinics) {
-            $qB->whereIn('pl.ClinicNum', $clinics);
+            $qCur->whereIn('pl.ClinicNum', $clinics);
         }
-        $pats18 = $qB->select('pl.ClinicNum', 'pl.PatNum')->distinct()->get();
+        $patsCur = $qCur->select('pl.ClinicNum', 'pl.PatNum')->distinct()->get();
 
-        $aByClinic = [];
-        foreach ($pats36 as $r) {
-            $aByClinic[(int) $r->ClinicNum][$r->PatNum] = true;
+        // 3. Prior Active Patients by clinic (18 months ago, i.e. months 19-36)
+        $qPrior = DB::table('od_procedure_logs as pl')
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $start18m.' 00:00:00']);
+        if ($clinics) {
+            $qPrior->whereIn('pl.ClinicNum', $clinics);
+        }
+        $patsPrior = $qPrior->select('pl.ClinicNum', 'pl.PatNum')->distinct()->get();
+
+        $curByClinic = [];
+        $newByClinic = [];
+        foreach ($patsCur as $r) {
+            $cNum = (int) $r->ClinicNum;
+            $curByClinic[$cNum][$r->PatNum] = true;
+            $fDate = isset($firstProcs[$r->PatNum]) ? substr($firstProcs[$r->PatNum], 0, 10) : null;
+            if ($fDate && $fDate >= $start18m && $fDate <= $end) {
+                $newByClinic[$cNum][$r->PatNum] = true;
+            }
         }
 
-        $bByClinic = [];
-        foreach ($pats18 as $r) {
-            $bByClinic[(int) $r->ClinicNum][$r->PatNum] = true;
+        $priorByClinic = [];
+        foreach ($patsPrior as $r) {
+            $priorByClinic[(int) $r->ClinicNum][$r->PatNum] = true;
         }
 
+        $allClinics = array_unique(array_merge(array_keys($curByClinic), array_keys($priorByClinic), $clinics ?: []));
         $out = [];
-        foreach ($aByClinic as $clinicNum => $patsA) {
-            $cntA = count($patsA);
-            $retained = array_intersect_key($patsA, $bByClinic[$clinicNum] ?? []);
-            $cntB = count($retained);
-            $out[$clinicNum] = $cntA > 0 ? round(($cntB / $cntA) * 100, 2) : 0.0;
+        foreach ($allClinics as $cNum) {
+            $curCnt = count($curByClinic[$cNum] ?? []);
+            $newCnt = count($newByClinic[$cNum] ?? []);
+            $numerator = max(0, $curCnt - $newCnt);
+            $denominator = count($priorByClinic[$cNum] ?? []);
+            $out[$cNum] = $denominator > 0 ? round(($numerator / $denominator) * 100, 2) : 0.0;
         }
 
         return $out;
@@ -2642,6 +2674,52 @@ class OperationsAnalyticsService
             $spec['total'] = $this->aggregate($tableRows, $columns, 'total');
         }
 
+        if (! empty($currData['breakdown'])) {
+            $bColumns = [
+                ['key' => 'location', 'label' => 'Retention Breakdown Metric', 'type' => 'text', 'sticky' => true],
+            ];
+            for ($i = 0; $i < $mIdx; $i++) {
+                $bColumns[] = ['key' => 'm_'.$i, 'label' => $labels[$i], 'type' => 'number', 'agg' => 'sum'];
+            }
+            if ($subtab !== 'compare') {
+                $bColumns[] = ['key' => 'diff', 'label' => 'Diff Vs Last Year', 'type' => 'percent', 'agg' => 'avg'];
+            }
+
+            $bRows = [];
+            $metricLabels = [
+                'active_pts' => 'Active Patient count',
+                'new_pts' => 'New Patient count',
+                'retention_cnt' => 'Retention count',
+            ];
+
+            foreach ($metricLabels as $mKeyName => $mTitle) {
+                $row = [
+                    'row_key' => $mKeyName,
+                    'location' => $mTitle,
+                ];
+                for ($i = 0; $i < $mIdx; $i++) {
+                    $mK = $monthKeys[$i] ?? null;
+                    $row['m_'.$i] = (int) ($mK ? ($currData['breakdown'][$mKeyName][$mK] ?? 0) : 0);
+                }
+                $lastYearVal = $row['m_0'];
+                $currVal = $row['m_'.($mIdx - 1)];
+                if ($lastYearVal > 0) {
+                    $row['diff'] = round((($currVal - $lastYearVal) / $lastYearVal) * 100, 2);
+                } else {
+                    $row['diff'] = $currVal > 0 ? 100 : 0;
+                }
+                $bRows[] = $row;
+            }
+
+            $spec['breakdown_spec'] = [
+                'columns' => $bColumns,
+                'rows' => $bRows,
+                'groups' => [],
+                'average' => $this->aggregate($bRows, $bColumns, 'avg'),
+                'total' => $this->aggregate($bRows, $bColumns, 'total'),
+            ];
+        }
+
         return $spec;
     }
 
@@ -3011,17 +3089,22 @@ class OperationsAnalyticsService
             return ['by_clinic' => $byClinic, 'totals' => $totals];
         }
 
-        // 8b. Patient Retention Trend (36-month baseline exam cohort vs 18-month returned exam cohort)
+        // 8b. Patient Retention Trend: (Current Active - New Patients 18m) / Active Patients 18m ago
         if (str_contains(strtolower($metricNorm), 'retention')) {
             $earliest36 = (new \DateTime($monthKeys[0].'-01'))->modify('-36 months')->format('Y-m-d');
             $latestEnd = (new \DateTime(end($monthKeys).'-01'))->modify('last day of this month')->format('Y-m-d');
 
-            $examCodes = ['D0120', 'D0140', 'D0150'];
-            $codeNums = DB::table('od_procedures')->whereIn('ProcCode', $examCodes)->pluck('CodeNum')->toArray();
+            $firstProcs = DB::table('od_procedure_logs as pl')
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+                ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
+                ->groupBy('pl.PatNum')
+                ->pluck('first_date', 'PatNum')
+                ->all();
 
             $qProcs = DB::table('od_procedure_logs as pl')
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereIn('pl.CodeNum', $codeNums)
+                ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
                 ->whereBetween('pl.ProcDate', [$earliest36.' 00:00:00', $latestEnd.' 23:59:59']);
             if ($clinics) {
                 $qProcs->whereIn('pl.ClinicNum', $clinics);
@@ -3039,40 +3122,56 @@ class OperationsAnalyticsService
 
             foreach ($monthKeys as $mKey) {
                 $mEnd = (new \DateTime($mKey.'-01'))->modify('last day of this month')->format('Y-m-d');
-                $mStart36 = (new \DateTime($mEnd))->modify('-36 months')->format('Y-m-d');
                 $mStart18 = (new \DateTime($mEnd))->modify('-18 months')->format('Y-m-d');
+                $mStart36 = (new \DateTime($mEnd))->modify('-36 months')->format('Y-m-d');
 
-                $allActive36 = [];
-                $allActive18 = [];
+                $allCur = [];
+                $allNew = [];
+                $allPrior = [];
 
                 foreach ($locList as $cNum) {
                     $initClinic($cNum);
                     $cProcs = $procByClinic[$cNum] ?? [];
-                    $pats36 = [];
-                    $pats18 = [];
+                    $curPats = [];
+                    $newPats = [];
+                    $priorPats = [];
+
                     foreach ($cProcs as $r) {
-                        if ($r->pdate >= $mStart36 && $r->pdate < $mStart18) {
-                            $pats36[$r->PatNum] = true;
-                            $allActive36[$r->PatNum] = true;
-                        }
                         if ($r->pdate >= $mStart18 && $r->pdate <= $mEnd) {
-                            $pats18[$r->PatNum] = true;
-                            $allActive18[$r->PatNum] = true;
+                            $curPats[$r->PatNum] = true;
+                            $allCur[$r->PatNum] = true;
+
+                            $fDate = isset($firstProcs[$r->PatNum]) ? substr($firstProcs[$r->PatNum], 0, 10) : null;
+                            if ($fDate && $fDate >= $mStart18 && $fDate <= $mEnd) {
+                                $newPats[$r->PatNum] = true;
+                                $allNew[$r->PatNum] = true;
+                            }
+                        }
+                        if ($r->pdate >= $mStart36 && $r->pdate < $mStart18) {
+                            $priorPats[$r->PatNum] = true;
+                            $allPrior[$r->PatNum] = true;
                         }
                     }
-                    $retained = array_intersect_key($pats36, $pats18);
-                    $cntA = count($pats36);
-                    $cntB = count($retained);
-                    $byClinic[$cNum][$mKey] = $cntA > 0 ? round(($cntB / $cntA) * 100, 2) : 0.0;
+
+                    $numerator = max(0, count($curPats) - count($newPats));
+                    $denominator = count($priorPats);
+                    $byClinic[$cNum][$mKey] = $denominator > 0 ? round(($numerator / $denominator) * 100, 2) : 0.0;
                 }
 
-                $allRetained = array_intersect_key($allActive36, $allActive18);
-                $totA = count($allActive36);
-                $totB = count($allRetained);
-                $totals[$mKey] = $totA > 0 ? round(($totB / $totA) * 100, 2) : 0.0;
+                $totNum = max(0, count($allCur) - count($allNew));
+                $totDen = count($allPrior);
+                $totals[$mKey] = $totDen > 0 ? round(($totNum / $totDen) * 100, 2) : 0.0;
+
+                $breakdownTotals['active_pts'][$mKey] = count($allCur);
+                $breakdownTotals['new_pts'][$mKey] = count($allNew);
+                $breakdownTotals['retention_cnt'][$mKey] = $totNum;
             }
 
-            return ['by_clinic' => $byClinic, 'totals' => $totals];
+            return [
+                'by_clinic' => $byClinic,
+                'totals' => $totals,
+                'breakdown' => $breakdownTotals ?? [],
+            ];
         }
 
         // 9. Active Patients Count vs Active Patients Percentage

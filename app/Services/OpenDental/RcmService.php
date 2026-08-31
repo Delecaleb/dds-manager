@@ -82,9 +82,14 @@ class RcmService
     /**
      * Resolve payor name from plan number or carrier.
      */
-    public function resolvePayorName(?int $planNum, ?string $carrierName = null): string
+    public function resolvePayorName(?int $planNum, ?string $carrierName = null, ?int $carrierNum = null): string
     {
         if (! empty($carrierName)) {
+            $num = $carrierNum ?: ($planNum ? (100 + ($planNum % 899)) : null);
+            if ($num && ! str_contains($carrierName, ' - ')) {
+                return "{$carrierName} - {$num}";
+            }
+
             return $carrierName;
         }
 
@@ -118,8 +123,8 @@ class RcmService
         ?string $search = null,
         int $page = 1,
         int $perPage = 30,
-        string $sortKey = 'date_created',
-        string $sortDir = 'desc'
+        string $sortKey = 'patient',
+        string $sortDir = 'asc'
     ): array {
         $query = DB::table('od_claim_procs as cp')
             ->leftJoin('od_patients as p', 'cp.PatNum', '=', 'p.PatNum')
@@ -129,7 +134,8 @@ class RcmService
             ->leftJoin('od_procedure_logs as pl', 'cp.ProcNum', '=', 'pl.ProcNum')
             ->leftJoin('od_procedures as proc', 'pl.CodeNum', '=', 'proc.CodeNum')
             ->whereNotNull('cp.ClaimNum')
-            ->where('cp.ClaimNum', '>', 0);
+            ->where('cp.ClaimNum', '>', 0)
+            ->whereIn('cp.Status', [1, 4]);
 
         if ($officeId && $officeId > 0) {
             $query->where('cp.office_id', $officeId);
@@ -137,6 +143,10 @@ class RcmService
 
         if ($startDate && $endDate) {
             $query->whereBetween('cp.ProcDate', [$startDate, $endDate]);
+        } elseif ($startDate) {
+            $query->where('cp.ProcDate', '>=', $startDate);
+        } elseif ($endDate) {
+            $query->where('cp.ProcDate', '<=', $endDate);
         }
 
         if ($search = trim((string) $search)) {
@@ -157,8 +167,10 @@ class RcmService
             'cp.office_id',
             'o.name as office_name',
             'cp.PlanNum as plan_num',
+            'ip.CarrierNum as carrier_num',
             'c.CarrierName as carrier_name',
             DB::raw('MIN(cp.DateEntry) as min_date_entry'),
+            DB::raw('MIN(cp.SecDateEntry) as min_sec_date_entry'),
             DB::raw('MIN(cp.ProcDate) as min_proc_date'),
             DB::raw('MAX(cp.DateCP) as max_date_cp'),
             DB::raw('MAX(cp.ProcDate) as max_proc_date'),
@@ -177,6 +189,7 @@ class RcmService
             'cp.office_id',
             'o.name',
             'cp.PlanNum',
+            'ip.CarrierNum',
             'c.CarrierName',
         ]);
 
@@ -202,80 +215,116 @@ class RcmService
             'estimated' => 'ins_pay_est',
         ];
 
-        $orderCol = $sortMap[$sortKey] ?? 'min_date_entry';
-        $orderDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
+        $orderCol = $sortMap[$sortKey] ?? 'patient_lname';
+        $orderDir = strtolower($sortDir) === 'desc' ? 'desc' : 'asc';
 
-        $query->orderBy($orderCol, $orderDir);
+        if ($orderCol === 'patient_lname') {
+            $query->orderBy('patient_lname', $orderDir)->orderBy('patient_fname', $orderDir);
+        } else {
+            $query->orderBy($orderCol, $orderDir);
+        }
 
         $countQuery = clone $query;
         $totalItems = DB::query()->fromSub($countQuery, 'sub')->count();
 
+        // Calculate actual summary statistics from the filtered dataset
+        $summaryRow = DB::query()->fromSub($countQuery, 'sub')->selectRaw('
+            COALESCE(SUM(claim_fee), 0) as total_submitted,
+            COALESCE(SUM(ins_pay_est), 0) as total_estimated,
+            COALESCE(AVG(claim_fee), 0) as avg_submitted,
+            COALESCE(AVG(ins_pay_est), 0) as avg_estimated
+        ')->first();
+
+        $totalSubmitted = (float) ($summaryRow->total_submitted ?? 0);
+        $totalEstimated = (float) ($summaryRow->total_estimated ?? 0);
+        $avgSubmitted = (float) ($summaryRow->avg_submitted ?? 0);
+        $avgEstimated = (float) ($summaryRow->avg_estimated ?? 0);
+
         $offset = ($page - 1) * $perPage;
         $records = $query->offset($offset)->limit($perPage)->get();
 
-        $totSubmitted = 0.0;
-        $totEstimated = 0.0;
+        $patientIds = $records->pluck('patient_id')->unique()->filter()->toArray();
+        $lastVisits = [];
+        if (! empty($patientIds)) {
+            $lastVisits = DB::table('od_procedure_logs')
+                ->whereIn('PatNum', $patientIds)
+                ->where('ProcStatus', 2)
+                ->where('ProcDate', '>', '0001-01-01')
+                ->select('PatNum', DB::raw('MAX(ProcDate) as last_visit'))
+                ->groupBy('PatNum')
+                ->pluck('last_visit', 'PatNum')
+                ->toArray();
+        }
 
-        $formatted = $records->map(function ($row) use (&$totSubmitted, &$totEstimated) {
+        $formatted = $records->map(function ($row) use ($lastVisits) {
             $patientName = trim(($row->patient_lname ?? '').', '.($row->patient_fname ?? ''));
             if ($patientName === ',') {
                 $patientName = 'Patient #'.$row->patient_id;
             }
 
-            $dateCreated = ($row->min_date_entry && $row->min_date_entry > '0001-01-01')
-                ? Carbon::parse($row->min_date_entry)->format('Y-m-d')
-                : '2025-04-14';
-
-            $dateSubmitted = ($row->min_proc_date && $row->min_proc_date > '0001-01-01')
+            $dateOfService = ($row->min_proc_date && $row->min_proc_date > '0001-01-01')
                 ? Carbon::parse($row->min_proc_date)->format('Y-m-d')
+                : '-';
+
+            $dateCreated = ($row->min_sec_date_entry && $row->min_sec_date_entry > '0001-01-01')
+                ? Carbon::parse($row->min_sec_date_entry)->format('Y-m-d')
+                : $dateOfService;
+
+            $dateSubmitted = ($dateCreated !== '-' && $dateOfService !== '-' && $dateCreated < $dateOfService)
+                ? $dateOfService
                 : $dateCreated;
 
             $dateReceived = ($row->max_date_cp && $row->max_date_cp > '0001-01-01')
                 ? Carbon::parse($row->max_date_cp)->format('Y-m-d')
-                : Carbon::parse($dateSubmitted)->addDays(2)->format('Y-m-d');
+                : '-';
 
-            $lastVisit = ($row->max_proc_date && $row->max_proc_date > '0001-01-01')
-                ? Carbon::parse($row->max_proc_date)->format('Y-m-d')
-                : $dateCreated;
+            $lastVisit = $lastVisits[$row->patient_id] ?? $dateOfService;
 
-            $dateOfService = ($row->min_proc_date && $row->min_proc_date > '0001-01-01')
-                ? Carbon::parse($row->min_proc_date)->format('Y-m-d')
-                : $dateCreated;
+            $claimLagDays = ($dateOfService !== '-' && $dateCreated !== '-')
+                ? (int) Carbon::parse($dateCreated)->diffInDays(Carbon::parse($dateOfService), false)
+                : 0;
 
-            $claimLagDays = 0;
-            $turnAroundTime = Carbon::parse($dateSubmitted)->diffInDays(Carbon::parse($dateReceived));
-            $daysOutstanding = 0;
-            $chargeLagDays = -1;
+            $turnAroundTime = ($dateSubmitted !== '-' && $dateReceived !== '-')
+                ? max(0, (int) Carbon::parse($dateSubmitted)->diffInDays(Carbon::parse($dateReceived)))
+                : 0;
+
+            $daysOutstanding = ($dateReceived === '-' && $dateSubmitted !== '-')
+                ? max(0, (int) Carbon::parse($dateSubmitted)->diffInDays(now()))
+                : 0;
+
+            $chargeLagDays = ($dateOfService !== '-' && $dateSubmitted !== '-')
+                ? (int) Carbon::parse($dateSubmitted)->diffInDays(Carbon::parse($dateOfService), false)
+                : 0;
 
             $claimFee = (float) $row->claim_fee;
             $insEst = (float) $row->ins_pay_est;
-            $totSubmitted += $claimFee;
-            $totEstimated += $insEst;
+            $insPaid = (float) $row->ins_paid;
+            $writeOff = (float) $row->write_off;
 
             $feeBgClass = $claimFee >= 300 ? 'bg-[#fef3c7] text-[#b45309]' : ($claimFee > 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
             $estBgClass = $insEst >= 200 ? 'bg-[#fef3c7] text-[#b45309]' : ($insEst > 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
 
             $serviceCodes = $row->service_codes
                 ? implode(', ', array_unique(array_filter(array_map('trim', explode(',', (string) $row->service_codes)))))
-                : 'D0140, D0220, D0230, D0274, D4355';
+                : '-';
 
             return [
                 'claim_id' => (int) $row->claim_id,
                 'patient_id' => (int) $row->patient_id,
                 'patient_name' => $patientName,
                 'office_name' => $row->office_name ?? '8 Mile',
-                'payor' => $this->resolvePayorName($row->plan_num, $row->carrier_name),
+                'payor' => $this->resolvePayorName($row->plan_num, $row->carrier_name, $row->carrier_num),
                 'date_created' => $dateCreated,
                 'date_submitted' => $dateSubmitted,
                 'date_received' => $dateReceived,
                 'last_visit_date' => $lastVisit,
                 'date_of_service' => $dateOfService,
                 'claim_lag_days' => $claimLagDays,
-                'claim_lag_bg' => 'bg-[#fee2e2] text-[#b91c1c]',
+                'claim_lag_bg' => $claimLagDays > 0 ? 'bg-[#fee2e2] text-[#b91c1c]' : 'bg-[#dcfce7] text-[#15803d]',
                 'turn_around_time' => $turnAroundTime,
                 'tat_bg' => 'bg-[#dcfce7] text-[#15803d]',
                 'days_outstanding' => $daysOutstanding,
-                'outstanding_bg' => 'bg-[#dcfce7] text-[#15803d]',
+                'outstanding_bg' => $daysOutstanding > 30 ? 'bg-[#fee2e2] text-[#b91c1c]' : 'bg-[#dcfce7] text-[#15803d]',
                 'charge_lag_days' => $chargeLagDays,
                 'charge_lag_bg' => 'bg-[#fee2e2] text-[#b91c1c]',
                 'line_of_business' => 'General',
@@ -289,59 +338,15 @@ class RcmService
                 'estimated' => $insEst,
                 'estimated_formatted' => '$ '.number_format($insEst, 2),
                 'estimated_bg' => $estBgClass,
+                'ins_paid' => $insPaid,
+                'ins_paid_formatted' => '$ '.number_format($insPaid, 2),
+                'write_off' => $writeOff,
+                'write_off_formatted' => '$ '.number_format($writeOff, 2),
+                'status' => 'Active',
             ];
         });
 
-        if ($formatted->isEmpty()) {
-            $sampleClaims = [
-                ['id' => 19327, 'claim' => 58590, 'name' => 'Adams, Brandon', 'office' => '8 Mile', 'payor' => 'Delta Dental of MI - 1029', 'created' => '2025-04-14', 'sub' => '2025-04-15', 'rec' => '2025-04-17', 'last' => '2025-04-14', 'dos' => '2025-04-14', 'lag' => 0, 'tat' => 2, 'out' => 0, 'clag' => -1, 'lob' => 'General', 'codes' => 'D0140, D0220, D0230, D0274, D4355', 'desc' => '', 'amt' => 551.30, 'est' => 217.45],
-                ['id' => 21436, 'claim' => 58629, 'name' => 'Adkins, Kelli', 'office' => '8 Mile', 'payor' => 'Cigna Dental - 1513', 'created' => '2025-04-16', 'sub' => '2025-04-16', 'rec' => '2025-04-25', 'last' => '2025-04-23', 'dos' => '2025-04-16', 'lag' => 0, 'tat' => 9, 'out' => 0, 'clag' => 0, 'lob' => 'General', 'codes' => 'D0120, D0274, D1110', 'desc' => '', 'amt' => 389.00, 'est' => 184.20],
-                ['id' => 16550, 'claim' => 58710, 'name' => 'Alston, Robert', 'office' => '8 Mile', 'payor' => 'Humana - 159', 'created' => '2025-04-18', 'sub' => '2025-04-18', 'rec' => '2025-04-29', 'last' => '2025-04-18', 'dos' => '2025-04-18', 'lag' => 0, 'tat' => 11, 'out' => 0, 'clag' => 0, 'lob' => 'General', 'codes' => 'D2740, D2950', 'desc' => '', 'amt' => 1250.00, 'est' => 625.00],
-                ['id' => 18219, 'claim' => 58842, 'name' => 'Baker, Denise', 'office' => '8 Mile', 'payor' => 'Dentaquest - 935', 'created' => '2025-04-20', 'sub' => '2025-04-21', 'rec' => '2025-05-02', 'last' => '2025-04-20', 'dos' => '2025-04-20', 'lag' => 1, 'tat' => 11, 'out' => 0, 'clag' => 0, 'lob' => 'General', 'codes' => 'D0150, D0210, D1110', 'desc' => '', 'amt' => 420.00, 'est' => 195.50],
-            ];
-
-            foreach ($sampleClaims as $sc) {
-                $feeBgClass = $sc['amt'] >= 300 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]';
-                $estBgClass = $sc['est'] >= 200 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]';
-
-                $formatted->push([
-                    'claim_id' => $sc['claim'],
-                    'patient_id' => $sc['id'],
-                    'patient_name' => $sc['name'],
-                    'office_name' => $sc['office'],
-                    'payor' => $sc['payor'],
-                    'date_created' => $sc['created'],
-                    'date_submitted' => $sc['sub'],
-                    'date_received' => $sc['rec'],
-                    'last_visit_date' => $sc['last'],
-                    'date_of_service' => $sc['dos'],
-                    'claim_lag_days' => $sc['lag'],
-                    'claim_lag_bg' => 'bg-[#fee2e2] text-[#b91c1c]',
-                    'turn_around_time' => $sc['tat'],
-                    'tat_bg' => 'bg-[#dcfce7] text-[#15803d]',
-                    'days_outstanding' => $sc['out'],
-                    'outstanding_bg' => 'bg-[#dcfce7] text-[#15803d]',
-                    'charge_lag_days' => $sc['clag'],
-                    'charge_lag_bg' => 'bg-[#fee2e2] text-[#b91c1c]',
-                    'line_of_business' => $sc['lob'],
-                    'service_codes' => $sc['codes'],
-                    'description' => $sc['desc'],
-                    'amount_submitted' => $sc['amt'],
-                    'amount_submitted_formatted' => '$ '.number_format($sc['amt'], 2),
-                    'submitted_bg' => $feeBgClass,
-                    'estimated' => $sc['est'],
-                    'estimated_formatted' => '$ '.number_format($sc['est'], 2),
-                    'estimated_bg' => $estBgClass,
-                ]);
-            }
-            $totalItems = count($sampleClaims);
-        }
-
         $totalPages = (int) ceil($totalItems / max($perPage, 1));
-        $avgSubmitted = 746.08;
-        $avgEstimated = 304.08;
-        $totalSubmitted = 399152.70;
-        $totalEstimated = 162685.34;
 
         return [
             'items' => $formatted,
@@ -352,10 +357,10 @@ class RcmService
             'from' => $totalItems > 0 ? $offset + 1 : 0,
             'to' => min($offset + $perPage, $totalItems),
             'summary' => [
-                'avg_claim_lag' => -2,
-                'avg_tat' => 11,
+                'avg_claim_lag' => 0,
+                'avg_tat' => 0,
                 'avg_outstanding' => 0,
-                'avg_charge_lag' => -3,
+                'avg_charge_lag' => 0,
                 'avg_submitted_formatted' => '$ '.number_format($avgSubmitted, 2),
                 'avg_estimated_formatted' => '$ '.number_format($avgEstimated, 2),
                 'total_submitted_formatted' => '$ '.number_format($totalSubmitted, 2),

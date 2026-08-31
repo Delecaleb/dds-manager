@@ -82,7 +82,7 @@ class RcmTest extends TestCase
             'InsPayEst' => '220.00',
             'InsPayAmt' => '220.00',
             'WriteOff' => '50.00',
-            'Status' => 0,
+            'Status' => 1,
             'ProcDate' => '2025-01-10',
             'DateEntry' => '2025-01-09',
             'DateCP' => '2025-01-30',
@@ -106,6 +106,99 @@ class RcmTest extends TestCase
         $response->assertJsonPath('data.items.0.patient_id', 101);
         $response->assertJsonPath('data.items.0.patient_name', 'Al Harazi, Stacey');
         $response->assertJsonPath('data.items.0.claim_fee_formatted', '$ 345.00');
+    }
+
+    public function test_rcm_claim_submissions_strictly_filters_by_selected_date_range(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $patient = OdPatient::create([
+            'PatNum' => 101,
+            'FName' => 'Stacey',
+            'LName' => 'Al Harazi',
+            'office_id' => $this->office->id,
+        ]);
+
+        // Claim in January 2025
+        ClaimProcs::create([
+            'ClaimProcNum' => 5001,
+            'ClaimNum' => 57853,
+            'PatNum' => 101,
+            'FeeBilled' => '300.00',
+            'InsPayEst' => '200.00',
+            'InsPayAmt' => '200.00',
+            'WriteOff' => '0.00',
+            'Status' => 1,
+            'ProcDate' => '2025-01-15',
+            'DateEntry' => '2025-01-15',
+            'PlanNum' => 2,
+            'ClaimPaymentNum' => 0,
+            'office_id' => $this->office->id,
+        ]);
+
+        // Claim in July 2025
+        ClaimProcs::create([
+            'ClaimProcNum' => 5002,
+            'ClaimNum' => 57854,
+            'PatNum' => 101,
+            'FeeBilled' => '500.00',
+            'InsPayEst' => '350.00',
+            'InsPayAmt' => '350.00',
+            'WriteOff' => '0.00',
+            'Status' => 1,
+            'ProcDate' => '2025-07-20',
+            'DateEntry' => '2025-07-20',
+            'PlanNum' => 2,
+            'ClaimPaymentNum' => 0,
+            'office_id' => $this->office->id,
+        ]);
+
+        // Query only January 2025
+        $response = $this->actingAs($user)->getJson(route('rcm.data', [
+            'tab' => 'claim_submissions',
+            'start_date' => '2025-01-01',
+            'end_date' => '2025-01-31',
+            'office_id' => $this->office->id,
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.total', 1);
+        $response->assertJsonPath('data.items.0.claim_id', 57853);
+        $response->assertJsonPath('data.summary.total_submitted_formatted', '$ 300.00');
+        $response->assertJsonPath('data.summary.total_estimated_formatted', '$ 200.00');
+
+        // Query only July 2025
+        $responseJuly = $this->actingAs($user)->getJson(route('rcm.data', [
+            'tab' => 'claim_submissions',
+            'start_date' => '2025-07-01',
+            'end_date' => '2025-07-31',
+            'office_id' => $this->office->id,
+        ]));
+
+        $responseJuly->assertStatus(200);
+        $responseJuly->assertJsonPath('data.total', 1);
+        $responseJuly->assertJsonPath('data.items.0.claim_id', 57854);
+        $responseJuly->assertJsonPath('data.summary.total_submitted_formatted', '$ 500.00');
+        $responseJuly->assertJsonPath('data.summary.total_estimated_formatted', '$ 350.00');
+    }
+
+    public function test_rcm_claim_submissions_returns_empty_when_no_data_in_date_range(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        // Query an empty date range
+        $response = $this->actingAs($user)->getJson(route('rcm.data', [
+            'tab' => 'claim_submissions',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-01-31',
+            'office_id' => $this->office->id,
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.total', 0);
+        $response->assertJsonCount(0, 'data.items');
+        $response->assertJsonPath('data.summary.total_submitted_formatted', '$ 0.00');
+        $response->assertJsonPath('data.summary.total_estimated_formatted', '$ 0.00');
     }
 
     public function test_rcm_data_endpoint_supports_all_tabs(): void
@@ -243,5 +336,49 @@ class RcmTest extends TestCase
             $response->assertStatus(200);
             $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
         }
+    }
+
+    public function test_rcm_export_claim_submissions_includes_headers_and_rows(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $patient = OdPatient::create([
+            'PatNum' => 101,
+            'FName' => 'Stacey',
+            'LName' => 'Al Harazi',
+            'office_id' => $this->office->id,
+        ]);
+
+        ClaimProcs::create([
+            'ClaimProcNum' => 5001,
+            'ClaimNum' => 57853,
+            'PatNum' => 101,
+            'FeeBilled' => '345.00',
+            'InsPayEst' => '220.00',
+            'InsPayAmt' => '220.00',
+            'WriteOff' => '50.00',
+            'Status' => 1,
+            'ProcDate' => '2025-01-10',
+            'DateEntry' => '2025-01-09',
+            'PlanNum' => 2,
+            'ClaimPaymentNum' => 0,
+            'office_id' => $this->office->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('rcm.export', [
+            'tab' => 'claim_submissions',
+            'start_date' => '2025-01-01',
+            'end_date' => '2025-12-31',
+            'office_id' => $this->office->id,
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+        $content = $response->streamedContent();
+        $this->assertStringContainsString('Patient', $content);
+        $this->assertStringContainsString('Claim ID', $content);
+        $this->assertStringContainsString('Al Harazi, Stacey', $content);
+        $this->assertStringContainsString('57853', $content);
     }
 }

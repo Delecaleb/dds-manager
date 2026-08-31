@@ -207,23 +207,26 @@
                                         </svg>
                                     </button>
                                 </div>
-                            @elseif (!empty($col['drilldown_type']) && (isset($row['clinic_num']) || isset($row['prov_num'])))
+                            @elseif (!empty($col['drilldown_type']))
                                 @php
+                                    $hasVal = $rawValue !== null && $rawValue !== '--' && (float) $rawValue != 0;
                                     $ddUrl = route('operations.drilldown', array_filter([
                                         'metric' => $col['drilldown_type'],
-                                        'clinic_num' => $row['clinic_num'] ?? null,
-                                        'prov_num' => $row['prov_num'] ?? null,
-                                        'start_date' => request('start_date', now()->startOfMonth()->toDateString()),
-                                        'end_date' => request('end_date', now()->toDateString()),
+                                        'clinic_num' => $row['clinic_num'] ?? request('clinic_num'),
+                                        'prov_num' => $row['prov_num'] ?? request('prov_num'),
+                                        'start_date' => $row['date_raw'] ?? request('start_date', now()->startOfMonth()->toDateString()),
+                                        'end_date' => $row['date_raw'] ?? request('end_date', now()->toDateString()),
                                         'subtab' => $activeSubtab ?? 'default',
                                     ], fn ($v) => $v !== null && $v !== ''));
                                 @endphp
                                 <div class="flex items-center justify-end gap-1.5 {{ $type === 'text' ? 'justify-start' : '' }}">
                                     {!! $cellContent !!}
-                                    <button type="button" class="dds-accent hover:text-[#009688] focus:outline-none shrink-0"
-                                            onclick="DDS.modal.open('{{ $ddUrl }}')">
-                                        <svg class="h-3 w-3 stroke-current" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                                    </button>
+                                    @if ($hasVal)
+                                        <button type="button" class="dds-accent hover:text-[#009688] focus:outline-none shrink-0"
+                                                onclick="DDS.modal.open('{{ $ddUrl }}')">
+                                            <svg class="h-3 w-3 stroke-current" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                                        </button>
+                                    @endif
                                 </div>
                             @elseif (!empty($col['drilldown']) && (float) ($row[$col['key']] ?? 0) > 0)
                                 <div class="flex items-center justify-end gap-1.5 {{ $type === 'text' ? 'justify-start' : '' }}">

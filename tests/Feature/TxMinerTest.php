@@ -371,4 +371,128 @@ class TxMinerTest extends TestCase
         $json = $response->json();
         $this->assertEquals('$ 800.00', $json['data'][0]['total_tx_plan']);
     }
+
+    public function test_tx_miner_index_contains_month_selector_and_date_range_picker(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+
+        $response = $this->actingAs($superAdmin)->get(route('tx-miner.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('id="txMinerMonth"', false);
+        $response->assertSee('id="txMinerDateRange"', false);
+        $response->assertSee('id="txMinerMonthPickerWrap"', false);
+        $response->assertSee('id="txMinerDateRangeWrap"', false);
+    }
+
+    public function test_tx_miner_month_data_returns_13_months_from_selected_month_to_prior_12_months(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $provider = OdProvider::create([
+            'ProvNum' => 30,
+            'LName' => 'Doctor',
+            'FName' => 'Jane',
+            'Abbr' => 'JD',
+            'IsHidden' => 'false',
+        ]);
+
+        $patient = OdPatient::create([
+            'PatNum' => 200,
+            'LName' => 'Smith',
+            'FName' => 'John',
+        ]);
+
+        $proc = OdProcedure::create([
+            'CodeNum' => 90,
+            'ProcCode' => 'D0120',
+            'Descript' => 'Periodic Oral Eval',
+            'IsHygiene' => 'false',
+        ]);
+
+        // Procedure in target month: July 2025
+        OdProcedureLog::create([
+            'ProcNum' => 71,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ClinicNum' => 1,
+            'CodeNum' => $proc->CodeNum,
+            'ProcDate' => '2025-07-10',
+            'ProcFee' => '500.00',
+            'ProcStatus' => 'TP',
+            'AptNum' => '100',
+        ]);
+
+        // Procedure in 12 months prior: July 2024
+        OdProcedureLog::create([
+            'ProcNum' => 72,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ClinicNum' => 1,
+            'CodeNum' => $proc->CodeNum,
+            'ProcDate' => '2024-07-05',
+            'ProcFee' => '750.00',
+            'ProcStatus' => 'TP',
+            'AptNum' => '101',
+        ]);
+
+        // Procedure before window: June 2024 (should be excluded)
+        OdProcedureLog::create([
+            'ProcNum' => 73,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ClinicNum' => 1,
+            'CodeNum' => $proc->CodeNum,
+            'ProcDate' => '2024-06-30',
+            'ProcFee' => '999.00',
+            'ProcStatus' => 'TP',
+            'AptNum' => '102',
+        ]);
+
+        // Procedure after window: August 2025 (should be excluded)
+        OdProcedureLog::create([
+            'ProcNum' => 74,
+            'PatNum' => $patient->PatNum,
+            'ProvNum' => $provider->ProvNum,
+            'ClinicNum' => 1,
+            'CodeNum' => $proc->CodeNum,
+            'ProcDate' => '2025-08-01',
+            'ProcFee' => '999.00',
+            'ProcStatus' => 'TP',
+            'AptNum' => '103',
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('tx-miner.data', [
+            'month' => '2025-07',
+        ]));
+
+        $response->assertStatus(200);
+        $json = $response->json();
+
+        // Must return exactly 13 months (July 2025 down to July 2024)
+        $this->assertCount(13, $json['data']);
+        $this->assertEquals('2025-07', $json['data'][0]['month_group']);
+        $this->assertEquals('Jul 25', $json['data'][0]['month']);
+        $this->assertEquals('$ 500.00', $json['data'][0]['total_tx_plan']);
+
+        $this->assertEquals('2024-07', $json['data'][12]['month_group']);
+        $this->assertEquals('Jul 24', $json['data'][12]['month']);
+        $this->assertEquals('$ 750.00', $json['data'][12]['total_tx_plan']);
+
+        // Sum across the 13 months
+        $this->assertEquals('$ 1,250.00', $json['total']['total_tx_plan']);
+    }
+
+    public function test_tx_miner_export_csv_with_month_selector(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $response = $this->actingAs($user)->get(route('tx-miner.export', [
+            'tab' => 'month',
+            'month' => '2025-07',
+        ]));
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString('text/csv', $response->headers->get('content-type'));
+    }
 }

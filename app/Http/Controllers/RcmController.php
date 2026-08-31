@@ -94,25 +94,29 @@ class RcmController extends Controller
             $handle = fopen('php://output', 'w');
 
             if ($tab === 'claim_submissions') {
-                fputcsv($handle, ['Patient', 'Patient ID', 'Claim ID', 'Office', 'Payor', 'Date Created', 'Date Submitted', 'Date Received', 'Last Visit Date', 'Date of Service', 'Claim Fee', 'Ins Pay Est', 'Ins Paid', 'WriteOff', 'Status']);
-                $result = $this->rcmService->getClaimSubmissions($startDate, $endDate, $officeId, $tier, $search, 1, 5000);
+                fputcsv($handle, ['Patient', 'Patient ID', 'Claim ID', 'Office', 'Payor', 'Date Created', 'Date Submitted', 'Date Received', 'Last Visit Date', 'Date of Service', 'Claim Lag Days', 'Turn Around Time', 'Days Outstanding', 'Charge Lag Days', 'Line of Business', 'Service Codes', 'Description', 'Amount Submitted', 'Estimated']);
+                $result = $this->rcmService->getClaimSubmissions($startDate, $endDate, $officeId, $tier, $search, 1, 5000, 'patient', 'asc');
                 foreach ($result['items'] as $row) {
                     fputcsv($handle, [
-                        $row['patient_name'],
-                        $row['patient_id'],
-                        $row['claim_id'],
-                        $row['office_name'],
-                        $row['payor'],
-                        $row['date_created'],
-                        $row['date_submitted'],
-                        $row['date_received'],
-                        $row['last_visit_date'],
-                        $row['date_of_service'],
-                        $row['claim_fee'],
-                        $row['ins_pay_est'],
-                        $row['ins_paid'],
-                        $row['write_off'],
-                        $row['status'] ?? 'Active',
+                        $row['patient_name'] ?? '',
+                        $row['patient_id'] ?? '',
+                        $row['claim_id'] ?? '',
+                        $row['office_name'] ?? '',
+                        $row['payor'] ?? '',
+                        $row['date_created'] ?? '',
+                        $row['date_submitted'] ?? '',
+                        $row['date_received'] ?? '',
+                        $row['last_visit_date'] ?? '',
+                        $row['date_of_service'] ?? '',
+                        (string) ($row['claim_lag_days'] ?? 0),
+                        (string) ($row['turn_around_time'] ?? 0),
+                        (string) ($row['days_outstanding'] ?? 0),
+                        (string) ($row['charge_lag_days'] ?? 0),
+                        $row['line_of_business'] ?? 'General',
+                        $row['service_codes'] ?? '',
+                        $row['description'] ?? '',
+                        $row['amount_submitted_formatted'] ?? '$ 0.00',
+                        $row['estimated_formatted'] ?? '$ 0.00',
                     ]);
                 }
             } elseif ($tab === 'point_of_service') {

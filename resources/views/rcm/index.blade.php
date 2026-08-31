@@ -372,6 +372,18 @@
             loadTabData();
         };
 
+        document.addEventListener('daterange:changed', function (e) {
+            if (e.detail && e.detail.id === 'rcmDateRange') {
+                window.onRcmDateRangeApply(e.detail.start, e.detail.end);
+            }
+        });
+
+        if (typeof $ !== 'undefined') {
+            $(document).on('apply.daterangepicker', '#rcmDateRange', function (ev, picker) {
+                window.onRcmDateRangeApply(picker.startDate.format('YYYY-MM-DD'), picker.endDate.format('YYYY-MM-DD'));
+            });
+        }
+
         function loadTabData() {
             const loading = document.getElementById('rcmLoading');
             loading.classList.remove('hidden');
