@@ -55,6 +55,7 @@ class DeduplicateSyncedTables extends Command
         'od_procedures' => 'CodeNum',
         'od_clinics' => 'ClinicNum',
         'od_statements' => 'StatementNum',
+        'od_histappointments' => 'HistApptNum',
     ];
 
     /**

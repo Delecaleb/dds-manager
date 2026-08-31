@@ -36,6 +36,7 @@ Schedule::command('sync:payment')->cron('3-59/5 * * * *')->withoutOverlapping()-
 Schedule::command('sync:procedurelogs-range')->cron('4-59/5 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:appointments-range')->cron('4-59/5 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:patients-range')->cron('4-59/5 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
+Schedule::command('sync:histappointments-range')->cron('4-59/5 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 /*
 | MEDIUM FREQUENCY (every 30 minutes) — data that changes occasionally.
 */
