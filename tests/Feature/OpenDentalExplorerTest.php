@@ -6,6 +6,7 @@ use App\Models\OdAppointment;
 use App\Models\Office;
 use App\Models\User;
 use App\Services\OpenDental\QueryService;
+use Illuminate\Support\Facades\DB;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -324,6 +325,90 @@ class OpenDentalExplorerTest extends TestCase
         ]);
         $this->assertDatabaseHas('od_appointments', [
             'AptNum' => 5001,
+        ]);
+    }
+
+    public function test_od_explorer_supports_histappointment_diff_and_prune(): void
+    {
+        $user = User::factory()->create();
+        $office = Office::updateOrCreate(['id' => 1], [
+            'name' => 'Main Test Office',
+            'is_default' => true,
+            'api_base_url' => 'https://api.opendental.com',
+            'developer_key' => 'dev_test',
+            'customer_key' => 'cust_test',
+        ]);
+
+        DB::table('od_histappointments')->insert([
+            [
+                'office_id' => $office->id,
+                'HistApptNum' => 9001,
+                'AptNum' => 5001,
+                'PatNum' => 101,
+                'AptDateTime' => '2026-08-10 10:00:00',
+                'HistDateTStamp' => '2026-08-09 10:00:00',
+                'AptStatus' => 1,
+            ],
+            [
+                'office_id' => $office->id,
+                'HistApptNum' => 9002,
+                'AptNum' => 5002,
+                'PatNum' => 102,
+                'AptDateTime' => '2026-08-10 11:00:00',
+                'HistDateTStamp' => '2026-08-09 11:00:00',
+                'AptStatus' => 1,
+            ],
+        ]);
+
+        $mockQueryService = $this->mock(QueryService::class);
+        $mockQueryService->shouldReceive('forOffice')->andReturnSelf();
+        $mockQueryService->shouldReceive('shortQuery')->andReturn([
+            [
+                'HistApptNum' => 9001,
+                'AptNum' => 5001,
+                'PatNum' => 101,
+                'AptDateTime' => '2026-08-10 10:00:00',
+                'HistDateTStamp' => '2026-08-09 10:00:00',
+                'AptStatus' => 1,
+            ],
+        ]);
+
+        $res = $this->actingAs($user)->postJson('/open-dental-explorer/reconcile-diff', [
+            'table' => 'histappointment',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-19',
+        ]);
+
+        $res->assertStatus(200);
+        $res->assertJson([
+            'success' => true,
+            'summary' => [
+                'live_count' => 1,
+                'local_count' => 2,
+                'matched_count' => 1,
+                'orphan_count' => 1,
+                'missing_count' => 0,
+            ],
+            'orphan_keys' => ['9002'],
+        ]);
+
+        // Prune orphan 9002
+        $pruneRes = $this->actingAs($user)->postJson('/open-dental-explorer/prune-orphans', [
+            'table' => 'histappointment',
+            'keys' => [9002],
+        ]);
+
+        $pruneRes->assertStatus(200);
+        $pruneRes->assertJson([
+            'success' => true,
+            'deleted_count' => 1,
+        ]);
+
+        $this->assertDatabaseMissing('od_histappointments', [
+            'HistApptNum' => 9002,
+        ]);
+        $this->assertDatabaseHas('od_histappointments', [
+            'HistApptNum' => 9001,
         ]);
     }
 }

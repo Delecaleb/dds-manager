@@ -42,6 +42,8 @@ class OpenDentalExplorerController extends Controller
         'clinic' => 'od_clinics',
         'operatory' => 'od_operatories',
         'userod' => 'od_user_ods',
+        'histappointment' => 'od_histappointments',
+        'statement' => 'od_statements',
     ];
 
     /**
@@ -150,6 +152,22 @@ class OpenDentalExplorerController extends Controller
         'od_user_od' => 'userod',
         'od_user_ods' => 'userod',
         'user_ods' => 'userod',
+
+        'od_histappointment' => 'histappointment',
+        'od_histappointments' => 'histappointment',
+        'histappointment' => 'histappointment',
+        'histappointments' => 'histappointment',
+        'historyappointment' => 'histappointment',
+        'historyappointments' => 'histappointment',
+        'od_historyappointment' => 'histappointment',
+        'od_historyappointments' => 'histappointment',
+        'hist_appointment' => 'histappointment',
+        'hist_appointments' => 'histappointment',
+
+        'od_statement' => 'statement',
+        'od_statements' => 'statement',
+        'statements' => 'statement',
+        'statement' => 'statement',
     ];
 
     public function __construct(
@@ -572,6 +590,10 @@ class OpenDentalExplorerController extends Controller
             'od_clinics' => 'ClinicNum',
             'od_operatories' => 'OperatoryNum',
             'od_user_ods' => 'UserNum',
+            'od_histappointments' => 'HistApptNum',
+            'histappointment' => 'HistApptNum',
+            'od_statements' => 'StatementNum',
+            'statement' => 'StatementNum',
         ];
 
         if (isset($primaryKeyMap[$table])) {
@@ -973,6 +995,10 @@ class OpenDentalExplorerController extends Controller
             'payplancharge' => 'ChargeDate',
             'od_deposits' => 'DateDeposit',
             'deposit' => 'DateDeposit',
+            'od_histappointments' => 'AptDateTime',
+            'histappointment' => 'AptDateTime',
+            'od_statements' => 'DateSent',
+            'statement' => 'DateSent',
         ];
 
         if (isset($map[$table])) {

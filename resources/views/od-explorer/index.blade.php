@@ -52,6 +52,7 @@
           <select id="activeTableSelect" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 focus:border-slate-400 shadow-2xs">
             <optgroup label="📅 Appointments & Schedules">
               <option value="appointment" selected>appointment (od_appointments)</option>
+              <option value="histappointment">histappointment (od_histappointments)</option>
               <option value="schedule">schedule (od_schedules)</option>
               <option value="recall">recall (od_recalls)</option>
               <option value="recalltype">recalltype (od_recall_types)</option>
@@ -68,6 +69,7 @@
               <option value="claimproc">claimproc (od_claim_procs)</option>
               <option value="claim">claim (od_claims)</option>
               <option value="claimpayment">claimpayment (od_claim_payments)</option>
+              <option value="statement">statement (od_statements)</option>
               <option value="payplan">payplan (od_pay_plans)</option>
               <option value="payplancharge">payplancharge (od_pay_plan_charges)</option>
               <option value="deposit">deposit (od_deposits)</option>
@@ -367,7 +369,7 @@
       });
 
       tableSelect.addEventListener('change', function () {
-        var isApt = (this.value === 'appointment' || this.value === 'od_appointments');
+        var isApt = (this.value === 'appointment' || this.value === 'od_appointments' || this.value === 'histappointment' || this.value === 'od_histappointments');
         var statusWrapper = document.getElementById('statusFilterWrapper');
         if (statusWrapper) {
           statusWrapper.style.display = isApt ? 'block' : 'none';
