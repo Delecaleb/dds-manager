@@ -324,13 +324,102 @@
             function exportCsv() {
                 const table = content.querySelector('table');
                 if (!table) return;
-                const rows = [...table.querySelectorAll('tr')].map(tr =>
-                    [...tr.querySelectorAll('th,td')]
-                        .map(c => `"${c.textContent.trim().replace(/\s+/g, ' ').replace(/"/g, '""')}"`)
-                        .join(',')
-                ).join('\n');
+
+                const thead = table.querySelector('thead');
+                const tbody = table.querySelector('tbody');
+                const tfoot = table.querySelector('tfoot');
+
+                let headerRow = [];
+
+                if (thead) {
+                    const theadRows = [...thead.querySelectorAll('tr')];
+                    if (theadRows.length > 1) {
+                        // Multi-row header (e.g. Group header + sub-column header)
+                        const groupCells = [...theadRows[0].querySelectorAll('th')];
+                        const subCells = [...theadRows[theadRows.length - 1].querySelectorAll('th')];
+
+                        // Expand group names by their colspan
+                        const groupNames = [];
+                        groupCells.forEach(th => {
+                            const span = parseInt(th.getAttribute('colspan') || '1', 10);
+                            const text = th.textContent.trim().replace(/\s+/g, ' ');
+                            for (let i = 0; i < span; i++) {
+                                groupNames.push(text);
+                            }
+                        });
+
+                        headerRow = subCells.map((th, idx) => {
+                            const subText = th.textContent.trim().replace(/\s+/g, ' ');
+                            const grpText = groupNames[idx] || '';
+
+                            if (!grpText) {
+                                return subText;
+                            }
+
+                            if (grpText.toLowerCase() === 'variance') {
+                                if (subText.toLowerCase().startsWith('actual') || subText.toLowerCase().startsWith('act ')) {
+                                    return subText;
+                                }
+                                if (subText === 'Prod VS Goal') {
+                                    return 'Actual Prod VS Goal';
+                                }
+                                return subText.toLowerCase().startsWith(grpText.toLowerCase())
+                                    ? subText
+                                    : `${grpText} ${subText}`;
+                            }
+
+                            if (grpText.toLowerCase() === 'booked') {
+                                if (subText === '% to goal' || subText === 'Production % to goal') {
+                                    return 'Booked Production % to goal';
+                                }
+                                if (subText === 'Production') {
+                                    return 'Booked Production';
+                                }
+                                return `${grpText} ${subText}`;
+                            }
+
+                            if (subText.toLowerCase().startsWith(grpText.toLowerCase())) {
+                                return subText;
+                            }
+
+                            return `${grpText} ${subText}`;
+                        });
+                    } else if (theadRows.length === 1) {
+                        headerRow = [...theadRows[0].querySelectorAll('th')].map(th => th.textContent.trim().replace(/\s+/g, ' '));
+                    }
+                }
+
+                const csvLines = [];
+                if (headerRow.length > 0) {
+                    csvLines.push(headerRow.map(c => {
+                        return (c.includes(',') || c.includes('"') || c.includes('\n'))
+                            ? `"${c.replace(/"/g, '""')}"`
+                            : c;
+                    }).join(','));
+                }
+
+                // Process tbody and tfoot rows
+                const bodyRows = [
+                    ...(tbody ? tbody.querySelectorAll('tr') : []),
+                    ...(tfoot ? tfoot.querySelectorAll('tr') : [])
+                ];
+
+                bodyRows.forEach(tr => {
+                    const cells = [...tr.querySelectorAll('th,td')];
+                    if (cells.length === 0) return;
+                    if (cells.length === 1 && cells[0].getAttribute('colspan')) return;
+
+                    const rowData = cells.map(c => {
+                        const txt = c.textContent.trim().replace(/\s+/g, ' ');
+                        return (txt.includes(',') || txt.includes('"') || txt.includes('\n'))
+                            ? `"${txt.replace(/"/g, '""')}"`
+                            : txt;
+                    });
+                    csvLines.push(rowData.join(','));
+                });
+
                 const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([rows], { type: 'text/csv' }));
+                a.href = URL.createObjectURL(new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' }));
                 a.download = `operations-${current.tab}-${current.subtab}.csv`;
                 a.click();
             }
