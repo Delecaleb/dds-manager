@@ -1031,18 +1031,19 @@ class OperationsAnalyticsService
         $actualNpt = collect($newVisits)->groupBy('dates')->map(fn ($g) => $g->count());
 
         // --- SCHEDULE METRICS ---
-        $schedProdQuery = DB::table('od_procedure_logs')
-            ->selectRaw('ProcDate as d, SUM(ProcFee) as total')
-            ->whereNotIn('ProcStatus', ProcStatus::completed())
-            ->where('ProcFee', '>', 0)
-            ->whereBetween('ProcDate', [$start, $end]);
+        $schedProdQuery = DB::table('od_appointments as a')
+            ->join('od_procedure_logs as pl', 'a.AptNum', '=', 'pl.AptNum')
+            ->selectRaw('DATE(a.AptDateTime) as d, SUM(pl.ProcFee) as total')
+            ->whereNotIn('a.AptStatus', [6])
+            ->whereBetween('a.AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
         if ($clinics) {
-            $schedProdQuery->whereIn('ClinicNum', $clinics);
+            $schedProdQuery->whereIn('a.ClinicNum', $clinics);
         }
-        $schedProd = $schedProdQuery->groupBy('ProcDate')->pluck('total', 'd');
+        $schedProd = $schedProdQuery->groupByRaw('DATE(a.AptDateTime)')->pluck('total', 'd');
 
         $schedApptsQuery = DB::table('od_appointments')
             ->selectRaw('DATE(AptDateTime) as d, COUNT(DISTINCT PatNum) as total')
+            ->whereNotIn('AptStatus', [6])
             ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
         if ($clinics) {
             $schedApptsQuery->whereIn('ClinicNum', $clinics);
@@ -1050,7 +1051,7 @@ class OperationsAnalyticsService
         $schedAppts = $schedApptsQuery->groupByRaw('DATE(AptDateTime)')->pluck('total', 'd');
 
         $schedNptQuery = DB::table('od_appointments')
-            ->selectRaw('DATE(AptDateTime) as d, COUNT(*) as total')
+            ->selectRaw('DATE(AptDateTime) as d, COUNT(DISTINCT PatNum) as total')
             ->where('IsNewPatient', 1)
             ->whereIn('AptStatus', [1, 2])
             ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
@@ -1098,16 +1099,35 @@ class OperationsAnalyticsService
             $openApptHours[$d] = $sMins > 0 ? max(0, round(($sMins - $bMins) / 60, 2)) : 0.0;
         }
 
-        // Unscheduled Tx $
-        $unschedTxQuery = DB::table('od_procedure_logs')
-            ->selectRaw('ProcDate as d, SUM(ProcFee) as total')
-            ->whereIn('ProcStatus', [1, '1', 'TP'])
-            ->whereRaw('(AptNum IS NULL OR AptNum = 0)')
-            ->whereBetween('ProcDate', [$start, $end]);
+        // Unscheduled Tx $ for scheduled patients
+        $apptsWithPat = DB::table('od_appointments')
+            ->select('PatNum', DB::raw('DATE(AptDateTime) as d'))
+            ->whereNotIn('AptStatus', [6])
+            ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
         if ($clinics) {
-            $unschedTxQuery->whereIn('ClinicNum', $clinics);
+            $apptsWithPat->whereIn('ClinicNum', $clinics);
         }
-        $unschedTx = $unschedTxQuery->groupBy('ProcDate')->pluck('total', 'd');
+        $patsByDate = $apptsWithPat->get()->groupBy('d')->map(fn ($g) => $g->pluck('PatNum')->unique()->toArray());
+
+        $allPatsInPeriod = $patsByDate->flatten()->unique()->values()->toArray();
+        $unschedProcsByPat = DB::table('od_procedure_logs')
+            ->whereIn('PatNum', $allPatsInPeriod)
+            ->whereIn('ProcStatus', [1, '1', 6, '6', 'TP'])
+            ->whereRaw('(AptNum IS NULL OR AptNum = 0)')
+            ->select('PatNum', 'ProcFee', 'ProcDate')
+            ->get()
+            ->groupBy('PatNum');
+
+        $unschedTx = [];
+        foreach ($patsByDate as $d => $pats) {
+            $daySum = 0.0;
+            foreach ($pats as $pNum) {
+                if (isset($unschedProcsByPat[$pNum])) {
+                    $daySum += (float) $unschedProcsByPat[$pNum]->where('ProcDate', '<=', $d)->sum('ProcFee');
+                }
+            }
+            $unschedTx[$d] = $daySum;
+        }
 
         $rows = [];
         foreach ($dates as $d => $dateLabel) {

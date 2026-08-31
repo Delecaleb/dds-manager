@@ -54,6 +54,7 @@ class DeduplicateSyncedTables extends Command
         'od_pay_plan_charges' => 'PayPlanChargeNum',
         'od_procedures' => 'CodeNum',
         'od_clinics' => 'ClinicNum',
+        'od_statements' => 'StatementNum',
     ];
 
     /**
