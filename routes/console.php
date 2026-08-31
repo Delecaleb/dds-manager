@@ -48,6 +48,7 @@ Schedule::command('sync:recalls')->cron('20,50 * * * *')->withoutOverlapping()->
 Schedule::command('sync:schedules')->cron('25,55 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:deposit')->cron('12,42 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 Schedule::command('sync:statements')->cron('18,48 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
+Schedule::command('sync:histappointments')->cron('22,52 * * * *')->withoutOverlapping()->runInBackground()->onOneServer();
 
 /*
 | LOW FREQUENCY (daily) — reference tables that rarely change.
