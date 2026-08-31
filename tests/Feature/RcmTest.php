@@ -381,4 +381,75 @@ class RcmTest extends TestCase
         $this->assertStringContainsString('Al Harazi, Stacey', $content);
         $this->assertStringContainsString('57853', $content);
     }
+
+    public function test_patients_statements_respects_date_filtering(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $patient2024 = OdPatient::create([
+            'PatNum' => 201,
+            'FName' => 'Eric',
+            'LName' => 'Hudson',
+            'BalTotal' => '120.00',
+            'office_id' => $this->office->id,
+        ]);
+
+        \DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 9501,
+            'PatNum' => 201,
+            'ProcDate' => '2024-06-15',
+            'ProcFee' => '120.00',
+            'ProcStatus' => '2',
+            'CodeNum' => 1,
+            'ProvNum' => 10,
+            'office_id' => $this->office->id,
+        ]);
+
+        $patient2026 = OdPatient::create([
+            'PatNum' => 202,
+            'FName' => 'Pierre',
+            'LName' => 'Kelso',
+            'BalTotal' => '300.00',
+            'office_id' => $this->office->id,
+        ]);
+
+        \DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 9502,
+            'PatNum' => 202,
+            'ProcDate' => '2026-08-20',
+            'ProcFee' => '300.00',
+            'ProcStatus' => '2',
+            'CodeNum' => 1,
+            'ProvNum' => 10,
+            'office_id' => $this->office->id,
+        ]);
+
+        // Filter by 2024
+        $res2024 = $this->actingAs($user)->getJson(route('rcm.data', [
+            'tab' => 'patients_statements',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'office_id' => $this->office->id,
+        ]));
+
+        $res2024->assertOk();
+        $res2024->assertJsonPath('data.total', 1);
+        $res2024->assertJsonPath('data.items.0.patient_id', 201);
+        $res2024->assertJsonPath('data.items.0.statement_date', '2024-06-15');
+        $res2024->assertJsonPath('data.items.0.due_date', '2024-06-15');
+
+        // Filter by 2026
+        $res2026 = $this->actingAs($user)->getJson(route('rcm.data', [
+            'tab' => 'patients_statements',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'office_id' => $this->office->id,
+        ]));
+
+        $res2026->assertOk();
+        $res2026->assertJsonPath('data.total', 1);
+        $res2026->assertJsonPath('data.items.0.patient_id', 202);
+        $res2026->assertJsonPath('data.items.0.statement_date', '2026-08-20');
+        $res2026->assertJsonPath('data.items.0.due_date', '2026-08-20');
+    }
 }

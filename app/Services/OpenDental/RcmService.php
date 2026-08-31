@@ -3,6 +3,7 @@
 namespace App\Services\OpenDental;
 
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\ProcStatus;
 use App\Models\Office;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
@@ -545,10 +546,20 @@ class RcmService
         string $sortDir = 'desc'
     ): array {
         $query = DB::table('od_patients as p')
-            ->leftJoin('offices as o', 'p.office_id', '=', 'o.id');
+            ->join('od_procedure_logs as pl', 'p.PatNum', '=', 'pl.PatNum')
+            ->leftJoin('offices as o', 'p.office_id', '=', 'o.id')
+            ->whereIn('pl.ProcStatus', ProcStatus::completed());
 
         if ($officeId && $officeId > 0) {
             $query->where('p.office_id', $officeId);
+        }
+
+        if ($startDate && $endDate) {
+            $query->whereBetween('pl.ProcDate', [$startDate.' 00:00:00', $endDate.' 23:59:59']);
+        } elseif ($startDate) {
+            $query->where('pl.ProcDate', '>=', $startDate.' 00:00:00');
+        } elseif ($endDate) {
+            $query->where('pl.ProcDate', '<=', $endDate.' 23:59:59');
         }
 
         if ($search = trim((string) $search)) {
@@ -571,43 +582,74 @@ class RcmService
             DB::raw('COALESCE(CAST(p.Bal_61_90 AS DECIMAL(10,2)), 0) as bal_61_90'),
             DB::raw('COALESCE(CAST(p.BalOver90 AS DECIMAL(10,2)), 0) as bal_over_90'),
             DB::raw('COALESCE(CAST(p.InsEst AS DECIMAL(10,2)), 0) as ins_est'),
+            DB::raw('MAX(pl.ProcDate) as max_stmt_date'),
+        ])->groupBy([
+            'p.PatNum',
+            'p.FName',
+            'p.LName',
+            'p.office_id',
+            'o.name',
+            'p.BalTotal',
+            'p.Bal_0_30',
+            'p.Bal_31_60',
+            'p.Bal_61_90',
+            'p.BalOver90',
+            'p.InsEst',
         ]);
 
         if ($tier === 'top_20') {
-            $query->where('p.BalTotal', '>=', 300);
+            $query->havingRaw('bal_total >= 300');
         } elseif ($tier === 'mid_tier') {
-            $query->whereBetween('p.BalTotal', [50, 299.99]);
+            $query->havingRaw('bal_total >= 50 AND bal_total < 300');
         } elseif ($tier === 'bottom_20') {
-            $query->where('p.BalTotal', '<', 50);
+            $query->havingRaw('bal_total < 50');
         }
 
         $sortMap = [
             'patient' => 'patient_lname',
             'patient_id' => 'p.PatNum',
             'office' => 'office_name',
-            'statement_date' => 'p.PatNum',
+            'statement_date' => 'max_stmt_date',
             'balance_due_now' => 'bal_total',
-            'due_date' => 'p.PatNum',
+            'due_date' => 'max_stmt_date',
         ];
 
-        $orderCol = $sortMap[$sortKey] ?? 'bal_total';
+        $orderCol = $sortMap[$sortKey] ?? 'max_stmt_date';
         $orderDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
-        $query->orderBy($orderCol, $orderDir);
 
-        $totalItems = $query->count();
+        if ($orderCol === 'patient_lname') {
+            $query->orderBy('patient_lname', $orderDir)->orderBy('patient_fname', $orderDir);
+        } else {
+            $query->orderBy($orderCol, $orderDir);
+        }
+
+        $countQuery = clone $query;
+        $totalItems = DB::query()->fromSub($countQuery, 'sub')->count();
+
+        // Calculate summary statistics from the filtered query
+        $summaryRow = DB::query()->fromSub($countQuery, 'sub')->selectRaw('
+            COALESCE(AVG(bal_total), 0) as avg_bal,
+            COALESCE(SUM(bal_total), 0) as tot_bal
+        ')->first();
+
+        $avgBal = (float) ($summaryRow->avg_bal ?? 0);
+        $totBal = (float) ($summaryRow->tot_bal ?? 0);
+
         $offset = ($page - 1) * $perPage;
         $records = $query->offset($offset)->limit($perPage)->get();
 
         $formatted = $records->map(function ($row) {
             $patientName = trim(($row->patient_lname ?? '').', '.($row->patient_fname ?? ''));
             if ($patientName === ',') {
-                $patientName = 'Brown, Cicely';
+                $patientName = 'Patient #'.$row->patient_id;
             }
 
             $bal = (float) $row->bal_total;
             $balBgClass = $bal >= 300 ? 'bg-[#dcfce7] text-[#15803d]' : ($bal > 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
 
-            $statementDate = now()->subDays(($row->patient_id % 45) + 1)->format('Y-m-d');
+            $statementDate = ($row->max_stmt_date && $row->max_stmt_date > '0001-01-01')
+                ? Carbon::parse($row->max_stmt_date)->format('Y-m-d')
+                : '-';
             $dueDate = $statementDate;
 
             return [
@@ -622,39 +664,7 @@ class RcmService
             ];
         });
 
-        if ($formatted->isEmpty()) {
-            $sampleStatements = [
-                ['id' => 21125, 'name' => 'Brown, Cicely', 'office' => '8 Mile', 'stmt_date' => '2025-01-06', 'bal' => 0.0, 'due_date' => '2025-01-06'],
-                ['id' => 14127, 'name' => 'Billings, Paul', 'office' => '8 Mile', 'stmt_date' => '2025-01-14', 'bal' => 0.0, 'due_date' => '2025-01-14'],
-                ['id' => 5952, 'name' => 'Johnson, Marvin', 'office' => '8 Mile', 'stmt_date' => '2025-01-16', 'bal' => -0.32, 'due_date' => '2025-01-16'],
-                ['id' => 21188, 'name' => 'Allen, Martenique', 'office' => '8 Mile', 'stmt_date' => '2025-01-16', 'bal' => 0.0, 'due_date' => '2025-01-16'],
-                ['id' => 14127, 'name' => 'Billings, Paul', 'office' => '8 Mile', 'stmt_date' => '2025-01-22', 'bal' => 0.0, 'due_date' => '2025-01-22'],
-                ['id' => 21125, 'name' => 'Brown, Cicely', 'office' => '8 Mile', 'stmt_date' => '2025-01-22', 'bal' => 0.0, 'due_date' => '2025-01-22'],
-                ['id' => 21229, 'name' => 'Dodson, Maravilla', 'office' => '8 Mile', 'stmt_date' => '2025-02-12', 'bal' => 0.0, 'due_date' => '2025-02-12'],
-                ['id' => 21310, 'name' => 'Foster, Terrance', 'office' => '8 Mile', 'stmt_date' => '2025-02-18', 'bal' => 450.00, 'due_date' => '2025-02-18'],
-                ['id' => 21450, 'name' => 'Harris, Danielle', 'office' => '8 Mile', 'stmt_date' => '2025-03-01', 'bal' => 125.50, 'due_date' => '2025-03-01'],
-                ['id' => 19820, 'name' => 'Williams, Kevin', 'office' => '8 Mile', 'stmt_date' => '2025-04-10', 'bal' => -6.00, 'due_date' => '2025-04-10'],
-            ];
-
-            foreach ($sampleStatements as $st) {
-                $balBgClass = $st['bal'] >= 300 ? 'bg-[#dcfce7] text-[#15803d]' : ($st['bal'] > 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
-                $formatted->push([
-                    'patient_id' => $st['id'],
-                    'patient_name' => $st['name'],
-                    'office_name' => $st['office'],
-                    'statement_date' => $st['stmt_date'],
-                    'balance_due_now' => $st['bal'],
-                    'balance_due_now_formatted' => $this->formatAccountingMoney($st['bal']),
-                    'bal_bg' => $balBgClass,
-                    'due_date' => $st['due_date'],
-                ]);
-            }
-            $totalItems = count($sampleStatements);
-        }
-
         $totalPages = (int) ceil($totalItems / max($perPage, 1));
-        $avgBal = 1508.06;
-        $totBal = 674100.97;
 
         return [
             'items' => $formatted,
@@ -665,8 +675,8 @@ class RcmService
             'from' => $totalItems > 0 ? $offset + 1 : 0,
             'to' => min($offset + $perPage, $totalItems),
             'summary' => [
-                'average_formatted' => '$ '.number_format($avgBal, 2),
-                'total_formatted' => '$ '.number_format($totBal, 2),
+                'average_formatted' => $this->formatAccountingMoney($avgBal),
+                'total_formatted' => $this->formatAccountingMoney($totBal),
             ],
         ];
     }
