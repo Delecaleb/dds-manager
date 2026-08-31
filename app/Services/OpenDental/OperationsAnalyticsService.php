@@ -2022,7 +2022,7 @@ class OperationsAnalyticsService
      */
     private function activePatientMetrics(string $end, array $clinics): array
     {
-        $startWindow = date('Y-m-d', strtotime('-25 months', strtotime($end)));
+        $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($end)));
 
         $totalBase = DB::table('od_procedure_logs')
             ->selectRaw('ClinicNum, COUNT(DISTINCT PatNum) as total_ever_pts')
@@ -2321,13 +2321,13 @@ class OperationsAnalyticsService
         $nptYtdVisits = array_sum(array_column($metricsYtd, 'npt_visit'));
         $nptYtdGoal = $nptYtdVisits > 0 ? (int) ceil($nptYtdVisits * 1.5) : 300;
 
-        // 3. Age Brackets (Active patients with completed procedures in the last 25 months)
-        $start25Months = date('Y-m-d', strtotime('-25 months', strtotime($end)));
+        // 3. Age Brackets (Active patients with completed procedures in the last 24 months)
+        $start24Months = date('Y-m-d', strtotime('-24 months', strtotime($end)));
         $qAct = DB::table('od_patients as pt')
             ->join('od_procedure_logs as pl', 'pt.PatNum', '=', 'pl.PatNum')
             ->select('pt.PatNum', 'pt.Birthdate')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereBetween('pl.ProcDate', [$start25Months.' 00:00:00', $end.' 23:59:59']);
+            ->whereBetween('pl.ProcDate', [$start24Months.' 00:00:00', $end.' 23:59:59']);
 
         if ($clinics) {
             $qAct->whereIn('pl.ClinicNum', $clinics);
@@ -2687,9 +2687,10 @@ class OperationsAnalyticsService
 
             $bRows = [];
             $metricLabels = [
-                'active_pts' => 'Active Patient count',
-                'new_pts' => 'New Patient count',
-                'retention_cnt' => 'Retention count',
+                'active_pts' => 'Current Active Patient count (last 18m)',
+                'new_pts' => 'Total New Patient count (last 18m)',
+                'retention_cnt' => 'Retention count (Numerator: Active - New)',
+                'prior_active_pts' => 'Active Patient count 18m ago (Denominator)',
             ];
 
             foreach ($metricLabels as $mKeyName => $mTitle) {
@@ -2715,8 +2716,8 @@ class OperationsAnalyticsService
                 'columns' => $bColumns,
                 'rows' => $bRows,
                 'groups' => [],
-                'average' => $this->aggregate($bRows, $bColumns, 'avg'),
-                'total' => $this->aggregate($bRows, $bColumns, 'total'),
+                'average' => null,
+                'total' => null,
             ];
         }
 
@@ -3165,6 +3166,7 @@ class OperationsAnalyticsService
                 $breakdownTotals['active_pts'][$mKey] = count($allCur);
                 $breakdownTotals['new_pts'][$mKey] = count($allNew);
                 $breakdownTotals['retention_cnt'][$mKey] = $totNum;
+                $breakdownTotals['prior_active_pts'][$mKey] = $totDen;
             }
 
             return [
@@ -3191,12 +3193,12 @@ class OperationsAnalyticsService
                 $totalCompletedOverall = array_sum($totalMap);
             }
 
-            $earliest25 = (new \DateTime($monthKeys[0].'-01'))->modify('-25 months')->format('Y-m-d');
+            $earliest24 = (new \DateTime($monthKeys[0].'-01'))->modify('-24 months')->format('Y-m-d');
             $latestEnd = (new \DateTime(end($monthKeys).'-01'))->modify('last day of this month')->format('Y-m-d');
 
             $qProcs = DB::table('od_procedure_logs as pl')
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereBetween('pl.ProcDate', [$earliest25.' 00:00:00', $latestEnd.' 23:59:59']);
+                ->whereBetween('pl.ProcDate', [$earliest24.' 00:00:00', $latestEnd.' 23:59:59']);
             if ($clinics) {
                 $qProcs->whereIn('pl.ClinicNum', $clinics);
             }
@@ -3213,7 +3215,7 @@ class OperationsAnalyticsService
 
             foreach ($monthKeys as $mKey) {
                 $mEnd = (new \DateTime($mKey.'-01'))->modify('last day of this month')->format('Y-m-d');
-                $mStart25 = (new \DateTime($mEnd))->modify('-25 months')->format('Y-m-d');
+                $mStart24 = (new \DateTime($mEnd))->modify('-24 months')->format('Y-m-d');
 
                 $totActiveMonth = 0;
 
@@ -3222,7 +3224,7 @@ class OperationsAnalyticsService
                     $cProcs = $procByClinic[$cNum] ?? [];
                     $activePats = [];
                     foreach ($cProcs as $r) {
-                        if ($r->pdate >= $mStart25 && $r->pdate <= $mEnd) {
+                        if ($r->pdate >= $mStart24 && $r->pdate <= $mEnd) {
                             $activePats[$r->PatNum] = true;
                         }
                     }
@@ -3420,13 +3422,21 @@ class OperationsAnalyticsService
     {
         $monthDt = new \DateTime($start);
         $daysNum = (int) $monthDt->format('t');
+        $yearMonth = $monthDt->format('Y-m');
 
         $columns = [
             ['key' => 'location', 'label' => 'Location', 'type' => 'text', 'sticky' => true],
         ];
 
         for ($i = 1; $i <= $daysNum; $i++) {
-            $columns[] = ['key' => 'd_'.$i, 'label' => (string) $i, 'type' => 'yn_badge'];
+            $dayStr = sprintf('%02d', $i);
+            $columns[] = [
+                'key' => 'd_'.$i,
+                'label' => (string) $i,
+                'type' => 'yn_badge',
+                'drilldown_type' => 'claims_day',
+                'date' => $yearMonth.'-'.$dayStr,
+            ];
         }
 
         // We leverage od_procedure_logs generically simulating daily batch volume checks to secure structural stability
@@ -3435,32 +3445,34 @@ class OperationsAnalyticsService
         $monthEnd = $monthDt->format('Y-m-t');
 
         $qTab = DB::table('od_procedure_logs')
-            ->selectRaw('ClinicNum, DAY(ProcDate) as d_day, COUNT(*) as c')
+            ->selectRaw('ClinicNum, SUBSTRING(ProcDate, 9, 2) as d_day, COUNT(*) as c')
             ->whereIn('ProcStatus', ProcStatus::completed())
-            ->whereBetween('ProcDate', [$monthStart, $monthEnd]);
+            ->whereBetween('ProcDate', [$monthStart.' 00:00:00', $monthEnd.' 23:59:59']);
 
         if ($clinics) {
             $qTab->whereIn('ClinicNum', $clinics);
         }
-        $tabData = $qTab->groupBy('ClinicNum', DB::raw('DAY(ProcDate)'))->get();
+        $tabData = $qTab->groupBy('ClinicNum', DB::raw('SUBSTRING(ProcDate, 9, 2)'))->get();
 
         $grouped = [];
         foreach ($tabData as $row) {
             $loc = (int) $row->ClinicNum;
+            $dayInt = (int) $row->d_day;
             if (! isset($grouped[$loc])) {
                 $grouped[$loc] = [];
             }
-            if ($row->c > 0) {
-                $grouped[$loc][$row->d_day] = 'Y';
+            if ($row->c > 0 && $dayInt > 0) {
+                $grouped[$loc][$dayInt] = 'Y';
             }
         }
 
         $tableRows = [];
-        $locs = $clinics ?: array_keys($this->clinicNames);
+        $locs = array_unique(array_merge(array_keys($grouped), $clinics ?: array_keys($this->clinicNames)));
         foreach ($locs as $loc) {
             $vals = $grouped[$loc] ?? [];
             $r = [
                 'row_key' => 'loc_'.$loc,
+                'clinic_num' => $loc,
                 'location' => $this->clinicNames[$loc] ?? ('Location '.$loc),
             ];
             for ($i = 1; $i <= $daysNum; $i++) {
@@ -3957,14 +3969,14 @@ class OperationsAnalyticsService
                 'Other' => (int) ($gendersData[2] ?? 0), // Assuming OpenDental 2=Unknown/Other
             ];
 
-            // 2. Age Brackets (18 vs 25 Months active patients)
-            $start25 = $endCarbon->clone()->subMonthsNoOverflow(25)->format('Y-m-d H:i:s');
+            // 2. Age Brackets (18 vs 24 Months active patients)
+            $start24 = $endCarbon->clone()->subMonthsNoOverflow(24)->format('Y-m-d H:i:s');
             $start18 = $endCarbon->clone()->subMonthsNoOverflow(18)->format('Y-m-d H:i:s');
 
             $ageQuery = DB::table('od_procedure_logs as pl')
                 ->join('od_patients as p', 'p.PatNum', '=', 'pl.PatNum')
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->where('pl.ProcDate', '>=', $start25)
+                ->where('pl.ProcDate', '>=', $start24)
                 ->where('pl.ProcDate', '<=', $end);
             $baseFilter($ageQuery);
 

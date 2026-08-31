@@ -513,7 +513,7 @@
                                 <th class="pb-1 px-2 font-extrabold text-[11px] text-center border-b border-gray-100 border-r"
                                     colspan="2">18 months</th>
                                 <th class="pb-1 px-2 font-extrabold text-[11px] text-center border-b border-gray-100"
-                                    colspan="2">25 months</th>
+                                    colspan="2">24 months</th>
                             </tr>
                             <tr>
                                 <th class="py-1 px-2 font-extrabold text-[10px] text-center border-b border-gray-100"># of

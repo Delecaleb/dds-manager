@@ -575,7 +575,7 @@ class OperationsTest extends TestCase
             'PatStatus' => '0',
         ]);
 
-        // Patient 2: Inactive PatStatus '1' but had procedure in 25 months
+        // Patient 2: Inactive PatStatus '1' but had procedure in 24 months
         DB::table('od_patients')->insert([
             'PatNum' => 502,
             'LName' => 'Doe',
@@ -1937,5 +1937,64 @@ class OperationsTest extends TestCase
         $respUnsched->assertSee('Unscheduled Treatment Breakdown');
         $respUnsched->assertSee('Clark, David');
         $respUnsched->assertSee('920.00');
+    }
+
+    public function test_claims_tab_has_drilldown_columns_and_drilldown_works(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        DB::table('od_patients')->insert([
+            'PatNum' => 991,
+            'LName' => 'Miller',
+            'FName' => 'Sarah',
+            'PatStatus' => '0',
+        ]);
+
+        DB::table('od_procedures')->insert([
+            'CodeNum' => 881,
+            'ProcCode' => 'D0120',
+            'Descript' => 'Periodic Oral Evaluation',
+        ]);
+
+        DB::table('od_procedure_logs')->insert([
+            'ProcNum' => 7701,
+            'PatNum' => 991,
+            'ProvNum' => 1,
+            'ClinicNum' => 1,
+            'CodeNum' => 881,
+            'ProcFee' => 150.00,
+            'ProcStatus' => '2',
+            'ProcDate' => '2026-08-15 10:00:00',
+            'ToothNum' => '14',
+            'Surf' => 'MOD',
+            'MedicalCode' => '',
+        ]);
+
+        $claimsResp = $this->get(route('operations.data', [
+            'tab' => 'claims',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+        ]));
+        $claimsResp->assertOk();
+        $spec = $claimsResp->original->getData()['spec'] ?? null;
+        $this->assertNotEmpty($spec);
+        $this->assertEquals('claims_day', $spec['columns'][15]['drilldown_type'] ?? null);
+        $this->assertEquals('2026-08-15', $spec['columns'][15]['date'] ?? null);
+        $this->assertEquals('Y', $spec['rows'][0]['d_15'] ?? null);
+
+        // Test drilldown endpoint
+        $drillResp = $this->get(route('operations.drilldown', [
+            'metric' => 'claims_day',
+            'clinic_num' => 1,
+            'start_date' => '2026-08-15',
+            'end_date' => '2026-08-15',
+        ]));
+        $drillResp->assertOk();
+        $drillResp->assertSee('Claims &amp; Daily Procedures (Aug 15, 2026)', false);
+        $drillResp->assertSee('Miller, Sarah');
+        $drillResp->assertSee('D0120');
+        $drillResp->assertSee('Periodic Oral Evaluation');
+        $drillResp->assertSee('150.00');
     }
 }

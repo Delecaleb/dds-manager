@@ -1222,7 +1222,7 @@ class OperationsController extends Controller
                 ['key' => 'visited', 'label' => 'Visited', 'type' => 'text'],
             ];
 
-            $startWindow = date('Y-m-d', strtotime('-25 months', strtotime($start))).' 00:00:00';
+            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($start))).' 00:00:00';
 
             $firstVisitSubQ = $this->patients->firstVisitCohort();
 
@@ -1274,7 +1274,7 @@ class OperationsController extends Controller
                 ['key' => 'visits', 'label' => 'Visits', 'type' => 'number', 'agg' => 'sum'],
             ];
 
-            $startWindow = date('Y-m-d', strtotime('-25 months', strtotime($start))).' 00:00:00';
+            $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($start))).' 00:00:00';
 
             $logs = DB::table('od_procedure_logs')
                 ->select('PatNum', 'ProvNum', 'ProcDate')
@@ -2226,6 +2226,82 @@ class OperationsController extends Controller
                 ];
             }
             $totals = [];
+        } elseif ($metric === 'claims_day' || $metric === 'claims') {
+            $clinicName = null;
+            if (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) {
+                $clinicName = $this->clinics->name((int) $clinicNum);
+            }
+            $dayLabel = date('M d, Y', strtotime($start));
+            $title = ($clinicName ? ($clinicName.' - ') : '').'Claims & Daily Procedures ('.$dayLabel.')';
+
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'],
+                ['key' => 'code', 'label' => 'Procedure Code', 'type' => 'text'],
+                ['key' => 'description', 'label' => 'Description', 'type' => 'text'],
+                ['key' => 'tooth', 'label' => 'Tooth', 'type' => 'text'],
+                ['key' => 'surf', 'label' => 'Surf', 'type' => 'text'],
+                ['key' => 'fee', 'label' => 'Fee ($)', 'type' => 'money', 'agg' => 'sum'],
+                ['key' => 'status', 'label' => 'Status', 'type' => 'text'],
+            ];
+
+            $procsQuery = DB::table('od_procedure_logs as pl')
+                ->leftJoin('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
+                ->select(
+                    'pl.ProcNum',
+                    'pl.PatNum',
+                    'pl.ProvNum',
+                    'pl.ClinicNum',
+                    'pl.ProcDate',
+                    'pl.ProcFee',
+                    'pl.ToothNum',
+                    'pl.Surf',
+                    'pl.ProcStatus',
+                    'pc.ProcCode',
+                    'pc.Descript'
+                )
+                ->whereBetween('pl.ProcDate', [$start.' 00:00:00', $end.' 23:59:59'])
+                ->whereIn('pl.ProcStatus', ProcStatus::completed());
+
+            if (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) {
+                $procsQuery->where('pl.ClinicNum', $clinicNum);
+            }
+            if ($provNum) {
+                $procsQuery->where('pl.ProvNum', $provNum);
+            }
+
+            $procs = $procsQuery->orderBy('pl.PatNum')->get();
+
+            $patMap = $mapPatients($procs->pluck('PatNum')->unique());
+
+            $totalFee = 0;
+            foreach ($procs as $proc) {
+                $fee = (float) $proc->ProcFee;
+                $totalFee += $fee;
+                $provInfo = $formatProv($proc->ProvNum);
+                $code = $proc->ProcCode ?: 'Unknown';
+                $desc = $proc->Descript ?: 'Procedure';
+
+                $rows[] = [
+                    'pat_id' => $proc->PatNum,
+                    'patient' => [
+                        'label' => $patMap[$proc->PatNum] ?? 'Unknown',
+                        'link' => true,
+                    ],
+                    'prov_id' => $provInfo['id'],
+                    'provider' => $provInfo['name'],
+                    'code' => $code,
+                    'description' => $desc,
+                    'tooth' => $proc->ToothNum ?: '-',
+                    'surf' => $proc->Surf ?: '-',
+                    'fee' => $fee,
+                    'status' => 'Complete',
+                ];
+            }
+
+            $totals = ['fee' => $totalFee];
         }
 
         return view('components.app-components.drilldown.table-content', compact('title', 'columns', 'rows', 'totals', 'providerInfo'));

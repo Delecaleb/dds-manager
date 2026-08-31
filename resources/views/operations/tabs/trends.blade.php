@@ -1,8 +1,8 @@
 @php
     $metricDescriptions = [
         'BYO Production' => 'The total production presented by office (BYO) based on a given date range.',
-        'BYO Active Pts' => 'The number of patients with completed procedures in the last 25 months divided by the total number of patients with completed procedures, based on a given date range.',
-        'BYO Active Pts Count' => 'The number of patients with completed procedures in the last 25 months, based on a given date range.',
+        'BYO Active Pts' => 'The number of patients with completed procedures in the last 24 months divided by the total number of patients with completed procedures, based on a given date range.',
+        'BYO Active Pts Count' => 'The number of patients with completed procedures in the last 24 months, based on a given date range.',
         'BYO Avg # of Tx Plans Presented' => 'Total number of tx plans presented divided by the working day amount.',
         'BYO Close Percent' => 'The number of treatment plans accepted divided by the number of treatment plans presented (must be greater than $10).',
         'BYO Collection' => 'The total collection presented by office (BYO).',
@@ -16,7 +16,7 @@
         'BYO No Show Rate' => 'The count of all deleted/cancelled appointments divided by the count of all appointments.',
         'BYO Number of Treatment Plans Presented' => 'Total number of tx plans divided by total number of working days per provider.',
         'BYO Pts Appointment' => 'The total number of appointments in a given date range.',
-        'BYO Patient Retention' => 'The percentage of patients who completed an exam (D0120, D0140, D0150) in the nearest 18 months out of those who completed an exam in the 36-month window.',
+        'BYO Patient Retention' => 'Displays the percentage of retained active patients: (Current Active Patients last 18 months - Total New Patients last 18 months) / (Active Patients 18 months ago).',
         'BYO Pts Visits' => 'The total number of patient visits presented by office (BYO).',
         'Cancellation Rate' => 'The rate of cancelled and broken appointments compared to total scheduled appointments.',
         'Coll per Doc' => 'Total collection amount per doctor provider.',
