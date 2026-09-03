@@ -7,6 +7,7 @@ use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
+use App\Models\Office;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -78,8 +79,9 @@ class KpisController extends Controller
             : "TIMESTAMPDIFF(YEAR, {$birthdateCol}, CURDATE())";
     }
 
-    public function hygieneKpis(string $start, string $end): array
+    public function hygieneKpis(string $start, string $end, ?int $officeId = null): array
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
         $patDate = $this->concatPatDate('pl.PatNum', 'pl.ProcDate');
         $patTpDate = $this->concatPatDate('PatNum', 'DateTP');
         $agePt = $this->ageSql('pt.Birthdate');
@@ -106,11 +108,12 @@ class KpisController extends Controller
                 SUM(CASE WHEN pc.ProcCode IN ('D9972','D9973','D9974','D9975') THEN 1 ELSE 0 END)       AS whitening,
                 SUM(CASE WHEN pc.ProcCode IN ('D4381') THEN 1 ELSE 0 END)                               AS antimicrobial
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'true'
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'true'
               AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
-        ", [$start, $end]);
+        ", [$officeId, $officeId, $start, $end]);
 
         $hygProd = (float) $s->total_prod;
         $hygCount = (int) $s->total_procs;
@@ -118,7 +121,7 @@ class KpisController extends Controller
         $hygVisits = (int) $s->visits;
 
         // ② Case Acceptance — single source of truth (blueprint D4-A)
-        $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [], true));
+        $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [], true, $officeId));
 
         // ③ Reappointment rate — single JOIN, no PHP-side array
         $rapt = DB::selectOne("
@@ -127,13 +130,14 @@ class KpisController extends Controller
                 COUNT(DISTINCT CASE WHEN a.NextAptNum IS NOT NULL AND a.NextAptNum != '0'
                                     THEN a.AptNum END)              AS with_next
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            JOIN od_appointments a ON pl.AptNum = a.AptNum
-            WHERE pc.IsHygiene = 'true'
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            JOIN od_appointments a ON pl.AptNum = a.AptNum AND a.office_id = ?
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'true'
               AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'
-        ", [$start, $end]);
+        ", [$officeId, $officeId, $officeId, $start, $end]);
         $reapptRate = $rapt->total > 0 ? round($rapt->with_next / $rapt->total * 100, 2) : 0;
 
         // ④ Perio reappointment — same pattern
@@ -143,13 +147,14 @@ class KpisController extends Controller
                 COUNT(DISTINCT CASE WHEN a.NextAptNum IS NOT NULL AND a.NextAptNum != '0'
                                     THEN a.AptNum END)              AS with_next
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            JOIN od_appointments a ON pl.AptNum = a.AptNum
-            WHERE pc.ProcCode IN ('D4341','D4342','D4910','4341','4342','4910')
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            JOIN od_appointments a ON pl.AptNum = a.AptNum AND a.office_id = ?
+            WHERE pl.office_id = ?
+              AND pc.ProcCode IN ('D4341','D4342','D4910','4341','4342','4910')
               AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'
-        ", [$start, $end]);
+        ", [$officeId, $officeId, $officeId, $start, $end]);
         $perioReapptRate = $prapt->total > 0 ? round($prapt->with_next / $prapt->total * 100, 2) : 0;
 
         // ⑤ Active adults + children — single query
@@ -157,10 +162,10 @@ class KpisController extends Controller
             SELECT
                 COUNT(CASE WHEN {$ageRaw} >= 18 THEN 1 END) AS adults,
                 COUNT(CASE WHEN {$ageRaw} <  18 THEN 1 END) AS children
-            FROM od_patients WHERE PatStatus = 'Patient'
-        ");
-        $activeAdults = (int) $ageCounts->adults;
-        $activeChildren = (int) $ageCounts->children;
+            FROM od_patients WHERE office_id = ? AND PatStatus = 'Patient'
+        ", [$officeId]);
+        $activeAdults = (int) ($ageCounts->adults ?? 0);
+        $activeChildren = (int) ($ageCounts->children ?? 0);
 
         // ⑥ Retention — 2 queries instead of 4 (each returns adult + child in one pass)
         $ret12 = DB::selectOne("
@@ -170,12 +175,13 @@ class KpisController extends Controller
                 COUNT(DISTINCT CASE WHEN {$agePt} <  18
                                     THEN pl.PatNum END) AS child
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            JOIN od_patients pt   ON pl.PatNum  = pt.PatNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            JOIN od_patients pt   ON pl.PatNum  = pt.PatNum AND pt.office_id = ?
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
               AND pt.PatStatus = 'Patient'
               AND pl.ProcDate >= {$sub12}
-        ");
+        ", [$officeId, $officeId, $officeId]);
         $ret6 = DB::selectOne("
             SELECT
                 COUNT(DISTINCT CASE WHEN {$agePt} >= 18
@@ -183,35 +189,38 @@ class KpisController extends Controller
                 COUNT(DISTINCT CASE WHEN {$agePt} <  18
                                     THEN pl.PatNum END) AS child
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            JOIN od_patients pt   ON pl.PatNum  = pt.PatNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            JOIN od_patients pt   ON pl.PatNum  = pt.PatNum AND pt.office_id = ?
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
               AND pt.PatStatus = 'Patient'
               AND pl.ProcDate >= {$sub6}
-        ");
+        ", [$officeId, $officeId, $officeId]);
 
         // ⑦ Visits with TX plan — JOIN instead of correlated EXISTS
-        $visitsWithTx = (int) DB::selectOne("
+        $visitsWithTx = (int) (DB::selectOne("
             SELECT COUNT(DISTINCT {$patDate}) AS cnt
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             JOIN (
                 SELECT DISTINCT PatNum
                 FROM od_procedure_logs
-                WHERE ProcStatus IN ({$this->tpIn}) AND ProcDate BETWEEN ? AND ?
+                WHERE office_id = ? AND ProcStatus IN ({$this->tpIn}) AND ProcDate BETWEEN ? AND ?
             ) tp ON pl.PatNum = tp.PatNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
-        ", [$start, $end, $start, $end])->cnt;
+        ", [$officeId, $officeId, $start, $end, $officeId, $start, $end])->cnt ?? 0);
 
         // ⑧ TX plans per day
-        $txPlanCount = (int) DB::selectOne("
+        $txPlanCount = (int) (DB::selectOne("
             SELECT COUNT(DISTINCT {$patTpDate}) AS cnt
             FROM od_procedure_logs
-            WHERE ProcStatus IN ({$this->tpIn})
+            WHERE office_id = ?
+              AND ProcStatus IN ({$this->tpIn})
               AND DateTP IS NOT NULL
               AND DateTP BETWEEN ? AND ?
-        ", [$start, $end])->cnt;
+        ", [$officeId, $start, $end])->cnt ?? 0);
 
         // ⑨ Avg prod per provider per day (must stay as grouped query)
         $hygProviders = DB::select("
@@ -219,11 +228,12 @@ class KpisController extends Controller
                    SUM(pl.ProcFee)          AS prod,
                    COUNT(DISTINCT pl.ProcDate) AS days
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY pl.ProvNum
-        ", [$start, $end]);
+        ", [$officeId, $officeId, $start, $end]);
 
         $avgProvProdPerDay = 0;
         if (count($hygProviders) > 0) {
@@ -235,32 +245,33 @@ class KpisController extends Controller
         $totalMins = (float) (DB::selectOne("
             SELECT COALESCE(SUM(LENGTH(a.Pattern) * 5), 0) AS mins
             FROM od_procedure_logs pl
-            JOIN od_procedures pc    ON pl.CodeNum = pc.CodeNum
-            JOIN od_appointments a   ON pl.AptNum  = a.AptNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
+            JOIN od_procedures pc    ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            JOIN od_appointments a   ON pl.AptNum  = a.AptNum AND a.office_id = ?
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'
               AND a.Pattern IS NOT NULL AND a.Pattern != ''
-        ", [$start, $end])->mins ?? 0);
+        ", [$officeId, $officeId, $officeId, $start, $end])->mins ?? 0);
 
         return [
-            'perio_pct' => $hygVisits > 0 ? round($s->perio_visits / $hygVisits * 100, 2) : 0,
-            'fluoride_per_day' => $workDays > 0 ? round($s->fluoride_count / $workDays, 2) : 0,
+            'perio_pct' => $hygVisits > 0 ? round(($s->perio_visits ?? 0) / $hygVisits * 100, 2) : 0,
+            'fluoride_per_day' => $workDays > 0 ? round(($s->fluoride_count ?? 0) / $workDays, 2) : 0,
             'avg_prod_per_day' => $workDays > 0 ? round($hygProd / $workDays, 2) : 0,
             'avg_prod_per_prov_day' => $avgProvProdPerDay,
             'prod_per_visit' => $hygVisits > 0 ? round($hygProd / $hygVisits, 2) : 0,
-            'fmx_per_day' => $workDays > 0 ? round($s->fmx_count / $workDays, 2) : 0,
-            'srp_per_day' => $workDays > 0 ? round($s->srp_count / $workDays, 2) : 0,
+            'fmx_per_day' => $workDays > 0 ? round(($s->fmx_count ?? 0) / $workDays, 2) : 0,
+            'srp_per_day' => $workDays > 0 ? round(($s->srp_count ?? 0) / $workDays, 2) : 0,
             'visits_per_day' => $workDays > 0 ? round($hygVisits / $workDays, 2) : 0,
             'reappt' => $reapptRate,
             'perio_reappt' => $perioReapptRate,
-            'adult_retention_12m' => $activeAdults > 0 ? round($ret12->adult / $activeAdults * 100, 2) : 0,
-            'adult_retention_6m' => $activeAdults > 0 ? round($ret6->adult / $activeAdults * 100, 2) : 0,
-            'child_retention_12m' => $activeChildren > 0 ? round($ret12->child / $activeChildren * 100, 2) : 0,
-            'child_retention_6m' => $activeChildren > 0 ? round($ret6->child / $activeChildren * 100, 2) : 0,
-            'sealants' => (int) $s->sealants,
-            'whitening' => (int) $s->whitening,
-            'antimicrobial' => (int) $s->antimicrobial,
+            'adult_retention_12m' => $activeAdults > 0 ? round(($ret12->adult ?? 0) / $activeAdults * 100, 2) : 0,
+            'adult_retention_6m' => $activeAdults > 0 ? round(($ret6->adult ?? 0) / $activeAdults * 100, 2) : 0,
+            'child_retention_12m' => $activeChildren > 0 ? round(($ret12->child ?? 0) / $activeChildren * 100, 2) : 0,
+            'child_retention_6m' => $activeChildren > 0 ? round(($ret6->child ?? 0) / $activeChildren * 100, 2) : 0,
+            'sealants' => (int) ($s->sealants ?? 0),
+            'whitening' => (int) ($s->whitening ?? 0),
+            'antimicrobial' => (int) ($s->antimicrobial ?? 0),
             'prod_per_proc' => $hygCount > 0 ? round($hygProd / $hygCount, 2) : 0,
             'visits_with_tx_pct' => $hygVisits > 0 ? round($visitsWithTx / $hygVisits * 100, 2) : 0,
             'tx_plans_per_day' => $workDays > 0 ? round($txPlanCount / $workDays, 2) : 0,
@@ -271,8 +282,9 @@ class KpisController extends Controller
 
     // ─── Doctor ──────────────────────────────────────────────────────────────
 
-    public function doctorKpis(string $start, string $end): array
+    public function doctorKpis(string $start, string $end, ?int $officeId = null): array
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
         $patDate = $this->concatPatDate('pl.PatNum', 'pl.ProcDate');
 
         // Total Production & Counts
@@ -283,15 +295,16 @@ class KpisController extends Controller
                 COUNT(DISTINCT pl.ProcDate) AS work_days,
                 COUNT(DISTINCT {$patDate}) AS visits
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'false'
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'false'
               AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
-        ", [$start, $end]);
+        ", [$officeId, $officeId, $start, $end]);
 
-        $docProd = (float) $doc->total_prod;
-        $workDays = (int) $doc->work_days;
-        $docVisits = (int) $doc->visits;
+        $docProd = (float) ($doc->total_prod ?? 0);
+        $workDays = (int) ($doc->work_days ?? 0);
+        $docVisits = (int) ($doc->visits ?? 0);
 
         // Appointment Time & Count
         $apts = DB::selectOne("
@@ -300,44 +313,47 @@ class KpisController extends Controller
                 AVG(LENGTH(a.Pattern) * 5) AS avg_mins,
                 SUM(LENGTH(a.Pattern) * 5) / 60 AS total_hours
             FROM od_appointments a
-            JOIN od_procedure_logs pl ON a.AptNum = pl.AptNum
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE a.AptStatus = 2
+            JOIN od_procedure_logs pl ON a.AptNum = pl.AptNum AND pl.office_id = ?
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE a.office_id = ?
+              AND a.AptStatus = 2
               AND pc.IsHygiene = 'false'
               AND pl.ProcStatus IN ({$this->completedIn})
               AND a.Pattern IS NOT NULL AND a.Pattern != ''
               AND DATE(a.AptDateTime) BETWEEN ? AND ?
-        ", [$start, $end]);
+        ", [$officeId, $officeId, $officeId, $start, $end]);
 
         $docAptCount = (int) ($apts->total_apts ?? 0);
         $avgAptMins = (float) ($apts->avg_mins ?? 0);
         $totalHours = (float) ($apts->total_hours ?? 0);
 
         // Case Acceptance — single source of truth (blueprint D4-A)
-        $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [], false));
+        $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [], false, $officeId));
 
         $docReappt = DB::selectOne("
             SELECT 
                 COUNT(DISTINCT a.PatNum) AS total,
                 COUNT(DISTINCT CASE WHEN a.NextAptNum IS NOT NULL AND a.NextAptNum != '0' THEN a.PatNum END) AS with_next
             FROM od_appointments a
-            WHERE a.IsHygiene = 'false' 
+            WHERE a.office_id = ?
+              AND a.IsHygiene = 'false' 
               AND a.AptStatus = 2
               AND DATE(a.AptDateTime) BETWEEN ? AND ?
-        ", [$start, $end]);
+        ", [$officeId, $start, $end]);
 
-        $examCount = (int) DB::selectOne("
+        $examCount = (int) (DB::selectOne("
             SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus IN ({$this->completedIn}) 
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pl.ProcStatus IN ({$this->completedIn}) 
               AND pc.IsHygiene = 'false'
               AND pl.ProcDate BETWEEN ? AND ?
               AND pc.ProcCode IN ('D0120', 'D0140', 'D0150', 'D0160', 'D0170', 'D0180')
-        ", [$start, $end])->exam_cnt;
+        ", [$officeId, $officeId, $start, $end])->exam_cnt ?? 0);
 
         // Advanced New/Existing & SameDay aggregation matrix
-        $cohortSql = $this->patients->firstVisitCohortSql('first_visit');
+        $cohortSql = $this->patients->firstVisitCohortSql('first_visit', $officeId);
         $txMatrix = DB::selectOne("
             SELECT
                 COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$this->tpIn}) AND tp_same.same_day_completed = 1 THEN {$patDate} END) AS same_day_tp_accepted_cnt,
@@ -356,17 +372,18 @@ class KpisController extends Controller
                 COUNT(DISTINCT CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND pl.ProcStatus IN ({$this->completedIn}) THEN pt_hist.PatNum END) AS new_pts_seen_cnt,
                 COUNT(DISTINCT CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus IN ({$this->completedIn}) THEN pt_hist.PatNum END) AS existing_pts_seen_cnt
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             JOIN (
                 {$cohortSql}
             ) pt_hist ON pl.PatNum = pt_hist.PatNum
             LEFT JOIN (
                 SELECT DISTINCT c.PatNum, c.ProcDate, 1 AS same_day_completed
                 FROM od_procedure_logs c
-                JOIN od_procedure_logs tp ON c.PatNum = tp.PatNum AND c.ProcDate = tp.DateTP
-                WHERE c.ProcStatus IN ({$this->completedIn}) AND tp.ProcStatus IN ({$this->tpIn})
+                JOIN od_procedure_logs tp ON c.PatNum = tp.PatNum AND c.ProcDate = tp.DateTP AND tp.office_id = ?
+                WHERE c.office_id = ? AND c.ProcStatus IN ({$this->completedIn}) AND tp.ProcStatus IN ({$this->tpIn})
             ) tp_same ON pl.PatNum = tp_same.PatNum AND pl.ProcDate = tp_same.ProcDate
-            WHERE pc.IsHygiene = 'false'
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'false'
               AND pl.ProcDate BETWEEN ? AND ?
         ", [
             $start, $end,
@@ -377,6 +394,10 @@ class KpisController extends Controller
             $start,
             $start, $end,
             $start,
+            $officeId,
+            $officeId,
+            $officeId,
+            $officeId,
             $start, $end,
         ]);
 
@@ -384,34 +405,35 @@ class KpisController extends Controller
         $docProviders = DB::select("
             SELECT pl.ProvNum, SUM(pl.ProcFee) as prod, COUNT(DISTINCT pl.ProcDate) as days
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY pl.ProvNum
-        ", [$start, $end]);
+        ", [$officeId, $officeId, $start, $end]);
         if (count($docProviders) > 0) {
             $sum = array_sum(array_map(fn ($p) => $p->days > 0 ? $p->prod / $p->days : 0, $docProviders));
             $avgProvProdPerDay = round($sum / count($docProviders), 2);
         }
 
-        $sameDayCaPct = $txMatrix->total_tp_presented_cnt > 0
+        $sameDayCaPct = ($txMatrix->total_tp_presented_cnt ?? 0) > 0
             ? round(($txMatrix->same_day_tp_accepted_cnt / $txMatrix->total_tp_presented_cnt) * 100, 2)
-            : ($docVisits > 0 ? round(($txMatrix->same_day_tp_accepted_cnt / $docVisits) * 100, 2) : 0);
+            : ($docVisits > 0 ? round((($txMatrix->same_day_tp_accepted_cnt ?? 0) / $docVisits) * 100, 2) : 0);
 
         return [
             'case_acceptance_same_day' => $sameDayCaPct,
             'case_acceptance_rate' => $caRates->rate,
-            'new_pt_tx_dollars' => $txMatrix->new_pts_with_tp_cnt > 0 ? round($txMatrix->total_new_pt_tp_dollars / $txMatrix->new_pts_with_tp_cnt, 2) : 0,
-            'existing_pt_tx_dollars' => round((float) $txMatrix->total_existing_pt_tp_dollars, 2),
+            'new_pt_tx_dollars' => ($txMatrix->new_pts_with_tp_cnt ?? 0) > 0 ? round($txMatrix->total_new_pt_tp_dollars / $txMatrix->new_pts_with_tp_cnt, 2) : 0,
+            'existing_pt_tx_dollars' => round((float) ($txMatrix->total_existing_pt_tp_dollars ?? 0), 2),
             'avg_apt_time_mins' => round($avgAptMins, 2),
             'avg_prod_per_hour' => $totalHours > 0 ? round($docProd / $totalHours, 2) : 0,
             'avg_prod_per_apt' => $docAptCount > 0 ? round($docProd / $docAptCount, 2) : 0,
-            'same_day_tx_per_new_pt' => $txMatrix->sameday_new_pt_cnt > 0 ? round($txMatrix->sameday_new_pt_tx_dollars / $txMatrix->sameday_new_pt_cnt, 2) : 0,
+            'same_day_tx_per_new_pt' => ($txMatrix->sameday_new_pt_cnt ?? 0) > 0 ? round($txMatrix->sameday_new_pt_tx_dollars / $txMatrix->sameday_new_pt_cnt, 2) : 0,
             'avg_prod_per_prov_day' => $avgProvProdPerDay,
-            'avg_tx_per_existing_pt' => $txMatrix->existing_pts_with_tp_cnt > 0 ? round($txMatrix->total_existing_pt_tp_dollars / $txMatrix->existing_pts_with_tp_cnt, 2) : 0,
-            'avg_tx_per_new_pt' => $txMatrix->new_pts_with_tp_cnt > 0 ? round($txMatrix->total_new_pt_tp_dollars / $txMatrix->new_pts_with_tp_cnt, 2) : 0,
-            'pct_new_pt_with_tx' => $txMatrix->new_pts_seen_cnt > 0 ? round(($txMatrix->new_pts_with_tp_cnt / $txMatrix->new_pts_seen_cnt) * 100, 2) : 0,
-            'pct_existing_pt_with_tx' => $txMatrix->existing_pts_seen_cnt > 0 ? round(($txMatrix->existing_pts_with_tp_cnt / $txMatrix->existing_pts_seen_cnt) * 100, 2) : 0,
-            'reappt' => $docReappt->total > 0 ? round(($docReappt->with_next / $docReappt->total) * 100, 2) : 0,
+            'avg_tx_per_existing_pt' => ($txMatrix->existing_pts_with_tp_cnt ?? 0) > 0 ? round($txMatrix->total_existing_pt_tp_dollars / $txMatrix->existing_pts_with_tp_cnt, 2) : 0,
+            'avg_tx_per_new_pt' => ($txMatrix->new_pts_with_tp_cnt ?? 0) > 0 ? round($txMatrix->total_new_pt_tp_dollars / $txMatrix->new_pts_with_tp_cnt, 2) : 0,
+            'pct_new_pt_with_tx' => ($txMatrix->new_pts_seen_cnt ?? 0) > 0 ? round(($txMatrix->new_pts_with_tp_cnt / $txMatrix->new_pts_seen_cnt) * 100, 2) : 0,
+            'pct_existing_pt_with_tx' => ($txMatrix->existing_pts_seen_cnt ?? 0) > 0 ? round(($txMatrix->existing_pts_with_tp_cnt / $txMatrix->existing_pts_seen_cnt) * 100, 2) : 0,
+            'reappt' => ($docReappt->total ?? 0) > 0 ? round(($docReappt->with_next / $docReappt->total) * 100, 2) : 0,
             'prod_per_exam' => $examCount > 0 ? round($docProd / $examCount, 2) : 0,
             'total_production' => round($docProd, 2),
         ];
@@ -419,8 +441,9 @@ class KpisController extends Controller
 
     // ─── Office ──────────────────────────────────────────────────────────────
 
-    public function officeKpis(string $start, string $end): array
+    public function officeKpis(string $start, string $end, ?int $officeId = null): array
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
         $cutoff36m = now()->subMonths(36)->toDateString();
         $cutoff18m = now()->subMonths(18)->toDateString();
         $cutoff12m = now()->subMonths(12)->toDateString();
@@ -436,15 +459,17 @@ class KpisController extends Controller
                 COUNT(DISTINCT CASE WHEN pl.ProcDate >= ? AND pc.ProcCode NOT IN ('D9986', 'D9987') THEN pl.PatNum END) AS active_18m,
                 COUNT(DISTINCT CASE WHEN pl.ProcDate BETWEEN ? AND ? AND pc.ProcCode NOT IN ('D9986', 'D9987') THEN pl.PatNum END) AS active_36m_prior
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus IN ({$this->completedIn})
-        ", [$cutoff18m, $cutoff36m, $cutoff18m]);
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pl.ProcStatus IN ({$this->completedIn})
+        ", [$cutoff18m, $cutoff36m, $cutoff18m, $officeId, $officeId]);
 
         $activePatients = (int) ($retentionData->active_18m ?? 0);
         $priorActivePatients = (int) ($retentionData->active_36m_prior ?? 0);
 
         // New patients in last 18 months
         $newPatientsCount = DB::table('od_procedure_logs as pl')
+            ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', [2, '2', 'C'])
             ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
@@ -459,18 +484,20 @@ class KpisController extends Controller
         // 2. Treatment Plans per Day
         $tpDays = DB::selectOne("
             SELECT
-                (SELECT COUNT(DISTINCT {$patTpDate}) FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ? AND ProcFee > 10) AS tp_count,
-                (SELECT COUNT(DISTINCT pl2.ProcDate) FROM od_procedure_logs pl2 WHERE pl2.ProcStatus IN ({$this->completedIn}) AND pl2.ProcDate BETWEEN ? AND ?) AS work_days
-        ", [$start, $end, $start, $end]);
+                (SELECT COUNT(DISTINCT {$patTpDate}) FROM od_procedure_logs WHERE office_id = ? AND ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ? AND ProcFee > 10) AS tp_count,
+                (SELECT COUNT(DISTINCT pl2.ProcDate) FROM od_procedure_logs pl2 WHERE pl2.office_id = ? AND pl2.ProcStatus IN ({$this->completedIn}) AND pl2.ProcDate BETWEEN ? AND ?) AS work_days
+        ", [$officeId, $start, $end, $officeId, $start, $end]);
         $txPlansPerDay = ($tpDays->work_days ?? 0) > 0 ? round(($tpDays->tp_count ?? 0) / $tpDays->work_days, 2) : 0;
 
         // 3. Co-Pay Collection
         $procFee = (float) DB::table('od_procedure_logs')
+            ->where('office_id', $officeId)
             ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])
             ->sum('ProcFee');
 
         $insEstimates = (float) DB::table('od_claim_procs')
+            ->where('office_id', $officeId)
             ->whereBetween('ProcDate', [$start, $end])
             ->whereIn('Status', [0, 1, 4, 6])
             ->selectRaw('SUM(COALESCE(InsPayEst, InsEstTotal, 0) + COALESCE(CASE WHEN WriteOff > 0 THEN WriteOff ELSE WriteOffEst END, 0)) as ins_portion')
@@ -479,6 +506,7 @@ class KpisController extends Controller
         $expectedPatPortion = max(0, $procFee - $insEstimates);
 
         $collectedPat = (float) DB::table('od_pay_splits')
+            ->where('office_id', $officeId)
             ->whereBetween('DatePay', [$start, $end])
             ->sum('SplitAmt');
 
@@ -487,11 +515,12 @@ class KpisController extends Controller
         // 4. Unscheduled Tx
         $unscheduled = (float) (DB::selectOne("
             SELECT COALESCE(SUM(ProcFee), 0) AS val FROM od_procedure_logs
-            WHERE ProcStatus IN ({$this->tpIn})
+            WHERE office_id = ?
+              AND ProcStatus IN ({$this->tpIn})
               AND ProcDate BETWEEN ? AND ?
               AND (AptNum IS NULL OR AptNum = 0 OR AptNum = '0')
               AND ProcFee > 0
-        ", [$start, $end])->val ?? 0);
+        ", [$officeId, $start, $end])->val ?? 0);
 
         // 5 & 8 & 9. New Patients Fmx % // Attrition // Growth
         $patientStats = DB::selectOne("
@@ -507,8 +536,9 @@ class KpisController extends Controller
                     MAX(CASE WHEN pl.ProcDate BETWEEN ? AND ? THEN 1 ELSE 0 END) AS seen_during,
                     MAX(CASE WHEN pl.ProcDate BETWEEN ? AND ? AND pc.ProcCode IN ('D0210','0210') THEN 1 ELSE 0 END) AS has_fmx
                 FROM od_procedure_logs pl
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcStatus IN ({$this->completedIn})
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                WHERE pl.office_id = ?
+                  AND pl.ProcStatus IN ({$this->completedIn})
                 GROUP BY pl.PatNum
             ) x
         ", [
@@ -518,6 +548,8 @@ class KpisController extends Controller
             $start,              // last_visit_before
             $start, $end,        // seen_during
             $start, $end,        // has_fmx
+            $officeId,
+            $officeId,
         ]);
 
         $newPtFmxPct = ($patientStats->new_pts ?? 0) > 0 ? round(($patientStats->new_pts_fmx / $patientStats->new_pts) * 100, 2) : 0;
@@ -528,10 +560,10 @@ class KpisController extends Controller
         $reactivationList = (int) (DB::selectOne("
             SELECT COUNT(DISTINCT pl.PatNum) AS cnt
             FROM od_procedure_logs pl
-            WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate < ?
+            WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate < ?
             GROUP BY pl.PatNum
             HAVING MAX(pl.ProcDate) < ?
-        ", [$start, $prior12m])->cnt ?? 0);
+        ", [$officeId, $start, $prior12m])->cnt ?? 0);
 
         // 6. No Show Rate
         $aptStats = DB::selectOne('
@@ -539,23 +571,25 @@ class KpisController extends Controller
                 COUNT(*) AS total,
                 SUM(CASE WHEN AptStatus = 5 THEN 1 ELSE 0 END) AS broken
             FROM od_appointments
-            WHERE DATE(AptDateTime) BETWEEN ? AND ?
+            WHERE office_id = ?
+              AND DATE(AptDateTime) BETWEEN ? AND ?
               AND AptStatus IN (1, 2, 5)
-        ', [$start, $end]);
+        ', [$officeId, $start, $end]);
         $noShowRate = ($aptStats->total ?? 0) > 0 ? round(($aptStats->broken / $aptStats->total) * 100, 2) : 0;
 
         // 11. Active In Recare
         $inRecare = (int) (DB::selectOne("
             SELECT COUNT(DISTINCT pl.PatNum) AS cnt
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus IN ({$this->completedIn})
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate >= ?
               AND pc.ProcCode IN ('D4910','D1110','D1120')
               AND pl.PatNum IN (
-                  SELECT DISTINCT p2.PatNum FROM od_procedure_logs p2 WHERE p2.ProcStatus='C' AND p2.ProcDate >= ?
+                  SELECT DISTINCT p2.PatNum FROM od_procedure_logs p2 WHERE p2.office_id = ? AND p2.ProcStatus='C' AND p2.ProcDate >= ?
               )
-        ", [$cutoff12m, $cutoff18m])->cnt ?? 0);
+        ", [$officeId, $officeId, $cutoff12m, $officeId, $cutoff18m])->cnt ?? 0);
 
         return [
             'patient_retention' => $patientRetention,
@@ -592,6 +626,8 @@ class KpisController extends Controller
     {
         $start = $request->input('start_date', date('Y-m-01'));
         $end = $request->input('end_date', date('Y-m-d'));
+        $officeId = Office::getActiveOfficeId();
+
         // Perio Specialty = 8
         $data = $this->getSpecialtyMetrics($start, $end, 8, [
             'total_consults' => ['D9310'],
@@ -602,27 +638,28 @@ class KpisController extends Controller
         ]);
 
         // Perio Codes $ (D4000-D4999) - slightly different filter
-        $data['perio_codes_dollars'] = round((float) DB::selectOne("
+        $data['perio_codes_dollars'] = round((float) (DB::selectOne("
             SELECT SUM(pl.ProcFee) AS sm
             FROM od_procedure_logs pl
-            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = 8
+            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = 8
               AND pc.ProcCode BETWEEN 'D4000' AND 'D4999'
-        ", [$start, $end])->sm, 2);
+        ", [$officeId, $officeId, $officeId, $start, $end])->sm ?? 0), 2);
 
         // Treatment plan per exam
-        $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ?", [$start, $end])->sm ?? 0;
+        $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE office_id = ? AND ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ?", [$officeId, $start, $end])->sm ?? 0;
 
         $exams = DB::selectOne("
             SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
             FROM od_procedure_logs pl
-            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcDate BETWEEN ? AND ?
+            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pl.ProcDate BETWEEN ? AND ?
               AND pc.ProcCode IN ('D0120', 'D0140', 'D0145', 'D0150', 'D0160', 'D0170', 'D0180')
               AND pl.ProcStatus IN ({$this->completedIn}) AND pr.Specialty = 8
-        ", [$start, $end])->exam_cnt ?? 0;
+        ", [$officeId, $officeId, $officeId, $start, $end])->exam_cnt ?? 0;
 
         $data['treatment_plan_per_exam'] = $exams > 0 ? round($txFee / $exams, 2) : 0;
 
@@ -633,6 +670,8 @@ class KpisController extends Controller
     {
         $start = $request->input('start_date', date('Y-m-01'));
         $end = $request->input('end_date', date('Y-m-d'));
+        $officeId = Office::getActiveOfficeId();
+
         // Ortho = 6
         $data = $this->getSpecialtyMetrics($start, $end, 6, [
             'total_consults' => ['D9310'],
@@ -649,11 +688,11 @@ class KpisController extends Controller
 
         $starts = DB::selectOne("
             SELECT COUNT(*) AS cnt FROM od_procedure_logs pl 
-            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus='C' AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty=6
+            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ? AND pl.ProcStatus='C' AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty=6
             AND pc.ProcCode IN ('D8010','D8020','D8030','D8040','D8050','D8060','D8070','D8080','D8090')
-        ", [$start, $end])->cnt;
+        ", [$officeId, $officeId, $officeId, $start, $end])->cnt ?? 0;
 
         $data['conversion'] = $data['total_consults'] > 0 ? round(($starts / $data['total_consults']) * 100, 2) : 0;
 
@@ -664,6 +703,8 @@ class KpisController extends Controller
     {
         $start = $request->input('start_date', date('Y-m-01'));
         $end = $request->input('end_date', date('Y-m-d'));
+        $officeId = Office::getActiveOfficeId();
+
         // OS = 5
         $data = $this->getSpecialtyMetrics($start, $end, 5, [
             'total_consults' => ['D9310'],
@@ -674,17 +715,18 @@ class KpisController extends Controller
             'extractions_dollars' => ['D7140', 'D7210', 'D7220', 'D7230', 'D7240', 'D7241', 'D7250'],
         ]);
 
-        $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ?", [$start, $end])->sm ?? 0;
+        $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE office_id = ? AND ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ?", [$officeId, $start, $end])->sm ?? 0;
 
         $exams = DB::selectOne("
             SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
             FROM od_procedure_logs pl
-            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcDate BETWEEN ? AND ?
+            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pl.ProcDate BETWEEN ? AND ?
               AND pc.ProcCode IN ('D0120', 'D0140', 'D0145', 'D0150', 'D0160', 'D0170', 'D0180')
               AND pl.ProcStatus IN ({$this->completedIn}) AND pr.Specialty = 5
-        ", [$start, $end])->exam_cnt ?? 0;
+        ", [$officeId, $officeId, $officeId, $start, $end])->exam_cnt ?? 0;
 
         $data['treatment_plan_per_exam'] = $exams > 0 ? round($txFee / $exams, 2) : 0;
 
@@ -695,6 +737,8 @@ class KpisController extends Controller
     {
         $start = $request->input('start_date', date('Y-m-01'));
         $end = $request->input('end_date', date('Y-m-d'));
+        $officeId = Office::getActiveOfficeId();
+
         // Pedo = 7
         $data = $this->getSpecialtyMetrics($start, $end, 7, [
             'stainless_steel_crowns' => ['D2929', 'D2930', 'D2931', 'D2932', 'D2933', 'D2934'],
@@ -720,11 +764,11 @@ class KpisController extends Controller
             FROM (
                 SELECT pl.ProcDate, SUM(pl.ProcFee) AS daily_prod 
                 FROM od_procedure_logs pl 
-                JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-                WHERE pl.ProcStatus='C' AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty=7
+                JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+                WHERE pl.office_id = ? AND pl.ProcStatus='C' AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty=7
                 GROUP BY pl.ProcDate HAVING daily_prod > 100
             ) pl
-        ", [$start, $end]);
+        ", [$officeId, $officeId, $start, $end]);
         $data['total_working_days'] = $workDays100->wd ?? 0;
 
         // Acceptance
@@ -734,74 +778,77 @@ class KpisController extends Controller
             COUNT(DISTINCT CASE WHEN DATEDIFF(pl.ProcDate, tp.DateTP) <= 90 THEN tp.PatNum END) as rolling
             FROM treatment_plans tp
             LEFT JOIN od_procedure_logs pl ON tp.PatNum = pl.PatNum 
+                AND pl.office_id = ?
                 AND pl.ProcStatus IN ('T', 'C') 
-                AND pl.ProvNum IN (SELECT ProvNum FROM od_providers WHERE Specialty=7)
+                AND pl.ProvNum IN (SELECT ProvNum FROM od_providers WHERE office_id = ? AND Specialty=7)
                 AND pl.ProcDate >= tp.DateTP
-            WHERE tp.DateTP BETWEEN ? AND ?
-        ", [$start, $end]);
+            WHERE tp.office_id = ? AND tp.DateTP BETWEEN ? AND ?
+        ", [$officeId, $officeId, $officeId, $start, $end]);
 
-        $data['case_acceptance_same_day'] = $tx->presented > 0 ? round(($tx->same_day / $tx->presented) * 100, 2) : 0;
-        $data['case_acceptance_rolling_90_days'] = $tx->presented > 0 ? round(($tx->rolling / $tx->presented) * 100, 2) : 0;
+        $data['case_acceptance_same_day'] = ($tx->presented ?? 0) > 0 ? round(($tx->same_day / $tx->presented) * 100, 2) : 0;
+        $data['case_acceptance_rolling_90_days'] = ($tx->presented ?? 0) > 0 ? round(($tx->rolling / $tx->presented) * 100, 2) : 0;
 
         return response()->json($data);
     }
 
     private function getSpecialtyMetrics($start, $end, $specId, $customCounts = [], $customSums = [], $distinctPatNumCounts = [])
     {
+        $officeId = Office::getActiveOfficeId();
         $base = DB::selectOne("
             SELECT
                 SUM(pl.ProcFee) AS total_prod,
                 CAST(COUNT(DISTINCT CASE WHEN pl.ProcFee > 0 THEN DATE(pl.ProcDate) END) AS SIGNED) AS work_days,
                 CAST(COUNT(DISTINCT pl.PatNum) AS SIGNED) AS patient_visits
             FROM od_procedure_logs pl
-            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            WHERE pl.ProcStatus IN ({$this->completedIn})
+            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+            WHERE pl.office_id = ?
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND pr.Specialty = ?
-        ", [$start, $end, $specId]);
+        ", [$officeId, $officeId, $start, $end, $specId]);
 
-        $workDays = max(1, (int) $base->work_days);
+        $workDays = max(1, (int) ($base->work_days ?? 1));
         $res = [
             'total_production' => round($base->total_prod ?? 0, 2),
             'production_per_day' => round(($base->total_prod ?? 0) / $workDays, 2),
-            'patient_visits' => (int) $base->patient_visits,
+            'patient_visits' => (int) ($base->patient_visits ?? 0),
             'work_days' => $workDays,
         ];
 
         foreach ($customCounts as $key => $codes) {
             $inStr = "'".implode("','", $codes)."'";
-            $res[$key] = (int) DB::selectOne("
+            $res[$key] = (int) (DB::selectOne("
                 SELECT COUNT(DISTINCT pl.ProcNum) AS cnt
                 FROM od_procedure_logs pl
-                JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
+                JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
                   AND pc.ProcCode IN ($inStr)
-            ", [$start, $end, $specId])->cnt;
+            ", [$officeId, $officeId, $officeId, $start, $end, $specId])->cnt ?? 0);
         }
 
         foreach ($customSums as $key => $codes) {
             $inStr = "'".implode("','", $codes)."'";
-            $res[$key] = round((float) DB::selectOne("
+            $res[$key] = round((float) (DB::selectOne("
                 SELECT SUM(pl.ProcFee) AS sm
                 FROM od_procedure_logs pl
-                JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
+                JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
                   AND pc.ProcCode IN ($inStr)
-            ", [$start, $end, $specId])->sm, 2);
+            ", [$officeId, $officeId, $officeId, $start, $end, $specId])->sm ?? 0), 2);
         }
 
         foreach ($distinctPatNumCounts as $key => $codes) {
             $inStr = "'".implode("','", $codes)."'";
-            $res[$key] = (int) DB::selectOne("
+            $res[$key] = (int) (DB::selectOne("
                 SELECT COUNT(DISTINCT pl.PatNum) AS cnt
                 FROM od_procedure_logs pl
-                JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
+                JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
                   AND pc.ProcCode IN ($inStr)
-            ", [$start, $end, $specId])->cnt;
+            ", [$officeId, $officeId, $officeId, $start, $end, $specId])->cnt ?? 0);
         }
 
         if (isset($res['total_consults'])) {
@@ -815,19 +862,21 @@ class KpisController extends Controller
     {
         $start = $request->input('start_date', now()->startOfYear()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
+        $officeId = Office::getActiveOfficeId();
 
         // We fetch the overall to get the 'avg' and 'total' rows.
-        $overall = $this->hygieneKpis($start, $end);
+        $overall = $this->hygieneKpis($start, $end, $officeId);
 
         // Fetch distinct providers who have hygiene production
         $provs = DB::select("
             SELECT DISTINCT pl.ProvNum, pr.Abbr, pr.LName,
                    'Unassigned' as Location
             FROM od_procedure_logs pl
-            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
-        ", [$start, $end]);
+            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
+        ", [$officeId, $officeId, $officeId, $start, $end]);
 
         $providersList = [];
 
@@ -853,95 +902,90 @@ class KpisController extends Controller
                     SUM(CASE WHEN pc.ProcCode IN ('D9972','D9973','D9974','D9975') THEN 1 ELSE 0 END) AS whitening,
                     SUM(CASE WHEN pc.ProcCode IN ('D4381') THEN 1 ELSE 0 END) AS antimicrobial
                 FROM od_procedure_logs pl
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
-            ", [$start, $end, $pId]);
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                WHERE pl.office_id = ?
+                  AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+            ", [$officeId, $officeId, $start, $end, $pId]);
 
-            $hygProd = (float) $s->total_prod;
-            $hygCount = (int) $s->total_procs;
-            $workDays = (int) $s->work_days;
-            $hygVisits = (int) $s->visits;
+            $hygProd = (float) ($s->total_prod ?? 0);
+            $hygCount = (int) ($s->total_procs ?? 0);
+            $workDays = (int) ($s->work_days ?? 0);
+            $hygVisits = (int) ($s->visits ?? 0);
 
             // ② Case Acceptance — single source of truth (blueprint D4-A)
-            $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [$pId], true));
+            $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [$pId], true, $officeId));
 
             // ③ Reappointment
             $rapt = DB::selectOne("
                 SELECT COUNT(DISTINCT a.AptNum) AS total, COUNT(DISTINCT CASE WHEN a.NextAptNum IS NOT NULL AND a.NextAptNum != '0' THEN a.AptNum END) AS with_next
-                FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_appointments a ON pl.AptNum = a.AptNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.ProvNum = ?
-            ", [$start, $end, $pId]);
-            $reapptRate = $rapt->total > 0 ? round($rapt->with_next / $rapt->total * 100, 2) : 0;
+                FROM od_procedure_logs pl
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                JOIN od_appointments a ON pl.AptNum = a.AptNum AND a.office_id = ?
+                WHERE pl.office_id = ?
+                  AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.ProvNum = ?
+            ", [$officeId, $officeId, $officeId, $start, $end, $pId]);
+            $reapptRate = ($rapt->total ?? 0) > 0 ? round(($rapt->with_next ?? 0) / $rapt->total * 100, 2) : 0;
 
             // ④ Perio Reappointment
             $prapt = DB::selectOne("
                 SELECT COUNT(DISTINCT a.AptNum) AS total, COUNT(DISTINCT CASE WHEN a.NextAptNum IS NOT NULL AND a.NextAptNum != '0' THEN a.AptNum END) AS with_next
-                FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_appointments a ON pl.AptNum = a.AptNum
-                WHERE pc.ProcCode IN ('D4341','D4342','D4910','4341','4342','4910') AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.ProvNum = ?
-            ", [$start, $end, $pId]);
-            $perioReapptRate = $prapt->total > 0 ? round($prapt->with_next / $prapt->total * 100, 2) : 0;
+                FROM od_procedure_logs pl
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                JOIN od_appointments a ON pl.AptNum = a.AptNum AND a.office_id = ?
+                WHERE pl.office_id = ?
+                  AND pc.ProcCode IN ('D4341','D4342','D4910','4341','4342','4910') AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.ProvNum = ?
+            ", [$officeId, $officeId, $officeId, $start, $end, $pId]);
+            $perioReapptRate = ($prapt->total ?? 0) > 0 ? round(($prapt->with_next ?? 0) / $prapt->total * 100, 2) : 0;
 
             // Active Adults/Children
             $ret12 = DB::selectOne("
                 SELECT
                     COUNT(DISTINCT CASE WHEN {$agePt} >= 18 THEN pl.PatNum END) AS adult,
                     COUNT(DISTINCT CASE WHEN {$agePt} <  18 THEN pl.PatNum END) AS child
-                FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_patients pt ON pl.PatNum = pt.PatNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN DATE_SUB(?, INTERVAL 12 MONTH) AND ? AND pl.ProvNum = ?
-            ", [$end, $end, $pId]);
+                FROM od_procedure_logs pl
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                JOIN od_patients pt ON pl.PatNum = pt.PatNum AND pt.office_id = ?
+                WHERE pl.office_id = ?
+                  AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN DATE_SUB(?, INTERVAL 12 MONTH) AND ? AND pl.ProvNum = ?
+            ", [$officeId, $officeId, $officeId, $end, $end, $pId]);
+
             $ret6 = DB::selectOne("
                 SELECT
                     COUNT(DISTINCT CASE WHEN {$agePt} >= 18 THEN pl.PatNum END) AS adult,
                     COUNT(DISTINCT CASE WHEN {$agePt} <  18 THEN pl.PatNum END) AS child
-                FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_patients pt ON pl.PatNum = pt.PatNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN DATE_SUB(?, INTERVAL 6 MONTH) AND ? AND pl.ProvNum = ?
-            ", [$end, $end, $pId]);
-
-            // We need a proper denominator for retention "Patients seen within date range".
-            $seenDens = DB::selectOne("
-                SELECT
-                    COUNT(DISTINCT CASE WHEN {$agePt} >= 18 THEN pl.PatNum END) AS adult,
-                    COUNT(DISTINCT CASE WHEN {$agePt} <  18 THEN pl.PatNum END) AS child
-                FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum JOIN od_patients pt ON pl.PatNum = pt.PatNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
-            ", [$start, $end, $pId]);
-
-            // Visits with Tx Plan
-            $visitsWithTx = (int) DB::selectOne("
-                SELECT COUNT(DISTINCT {$patDate}) AS cnt
                 FROM od_procedure_logs pl
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                JOIN (
-                    SELECT DISTINCT PatNum FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND ProcDate BETWEEN ? AND ?
-                ) tp ON pl.PatNum = tp.PatNum
-                WHERE pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
-            ", [$start, $end, $start, $end, $pId])->cnt;
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                JOIN od_patients pt ON pl.PatNum = pt.PatNum AND pt.office_id = ?
+                WHERE pl.office_id = ?
+                  AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN DATE_SUB(?, INTERVAL 6 MONTH) AND ? AND pl.ProvNum = ?
+            ", [$officeId, $officeId, $officeId, $end, $end, $pId]);
+
             $providersList[] = [
-                'Location' => $locName,
-                'location' => $locName,
+                'Location' => 'Main Office',
+                'location' => 'Main Office',
                 'Provider' => $p->Abbr.' '.$p->LName,
                 'provider' => $p->Abbr.' '.$p->LName,
-                'perio_pct' => $procs->total_procs > 0 ? round(($procs->perio_count / $procs->total_procs) * 100, 2) : 0,
-                'fluoride_per_day' => $workDays > 0 ? round($procs->fluoride_count / $workDays, 2) : 0,
+                'perio_pct' => $hygVisits > 0 ? round(($s->perio_visits ?? 0) / $hygVisits * 100, 2) : 0,
+                'fluoride_per_day' => $workDays > 0 ? round(($s->fluoride_count ?? 0) / $workDays, 2) : 0,
                 'avg_prod_per_day' => $workDays > 0 ? round($hygProd / $workDays, 2) : 0,
                 'avg_prod_per_prov_day' => $workDays > 0 ? round($hygProd / $workDays, 2) : 0,
-                'prod_per_visit' => $visits > 0 ? round($hygProd / $visits, 2) : 0,
-                'fmx_per_day' => $workDays > 0 ? round($procs->fmx_count / $workDays, 2) : 0,
-                'srp_per_day' => $workDays > 0 ? round($procs->srp_count / $workDays, 2) : 0,
-                'visits_per_day' => $workDays > 0 ? round($visits / $workDays, 2) : 0,
-                'reappt' => $reappt->total > 0 ? round(($reappt->with_next / $reappt->total) * 100, 2) : 0,
-                'perio_reappt' => $reappt->total > 0 ? round(($reappt->with_next / $reappt->total) * 100, 2) : 0,
+                'prod_per_visit' => $hygVisits > 0 ? round($hygProd / $hygVisits, 2) : 0,
+                'fmx_per_day' => $workDays > 0 ? round(($s->fmx_count ?? 0) / $workDays, 2) : 0,
+                'srp_per_day' => $workDays > 0 ? round(($s->srp_count ?? 0) / $workDays, 2) : 0,
+                'visits_per_day' => $workDays > 0 ? round($hygVisits / $workDays, 2) : 0,
+                'reappt' => $reapptRate,
+                'perio_reappt' => $perioReapptRate,
                 'adult_retention_12m' => 0,
                 'adult_retention_6m' => 0,
                 'child_retention_12m' => 0,
                 'child_retention_6m' => 0,
-                'sealants' => $procs->sealants_count,
-                'whitening' => $procs->whitening_count,
-                'antimicrobial' => $procs->antimicro_count,
-                'prod_per_proc' => $procs->total_procs > 0 ? round($hygProd / $procs->total_procs, 2) : 0,
-                'visits_with_tx_pct' => $visits > 0 ? round(($procs->total_procs / $visits) * 100, 2) : 0,
-                'tx_plans_per_day' => $workDays > 0 ? round($procs->total_procs / $workDays, 2) : 0,
-                'avg_prod_per_hour' => $hours > 0 ? round($hygProd / $hours, 2) : 0,
+                'sealants' => (int) ($s->sealants ?? 0),
+                'whitening' => (int) ($s->whitening ?? 0),
+                'antimicrobial' => (int) ($s->antimicrobial ?? 0),
+                'prod_per_proc' => $hygCount > 0 ? round($hygProd / $hygCount, 2) : 0,
+                'visits_with_tx_pct' => 0,
+                'tx_plans_per_day' => 0,
+                'avg_prod_per_hour' => 0,
                 'case_acceptance' => $caRates->rate,
             ];
         }
@@ -957,24 +1001,26 @@ class KpisController extends Controller
     {
         $start = $request->input('start_date', now()->startOfYear()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
+        $officeId = Office::getActiveOfficeId();
 
-        $overall = $this->doctorKpis($start, $end);
+        $overall = $this->doctorKpis($start, $end, $officeId);
         $clinicRegistry = app(ClinicRegistry::class);
 
         $provs = DB::select("
             SELECT DISTINCT pl.ProvNum, pr.Abbr, pr.LName,
                    COALESCE(pl.ClinicNum, 0) AS ClinicNum
             FROM od_procedure_logs pl
-            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
-        ", [$start, $end]);
+            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
+        ", [$officeId, $officeId, $officeId, $start, $end]);
 
         $providersList = [];
 
         foreach ($provs as $p) {
             $pId = $p->ProvNum;
-            $locName = $clinicRegistry->name((int) $p->ClinicNum);
+            $locName = $clinicRegistry->name((int) $p->ClinicNum, $officeId);
 
             // Total Production & Counts
             $doc = DB::selectOne("
@@ -983,38 +1029,52 @@ class KpisController extends Controller
                     COUNT(*) AS total_procs,
                     COUNT(DISTINCT pl.ProcDate) AS work_days,
                     COUNT(DISTINCT CONCAT(pl.PatNum, '-', pl.ProcDate)) AS visits
-                FROM od_procedure_logs pl JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
-            ", [$start, $end, $pId]);
-            $docProd = (float) $doc->total_prod;
-            $workDays = (int) $doc->work_days;
-            $docVisits = (int) $doc->visits;
+                FROM od_procedure_logs pl
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                WHERE pl.office_id = ?
+                  AND pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+            ", [$officeId, $officeId, $start, $end, $pId]);
+            $docProd = (float) ($doc->total_prod ?? 0);
+            $workDays = (int) ($doc->work_days ?? 0);
+            $docVisits = (int) ($doc->visits ?? 0);
 
             // Appointment Time
             $apts = DB::selectOne("
                 SELECT COUNT(DISTINCT a.AptNum) AS total_apts, AVG(LENGTH(a.Pattern) * 5) AS avg_mins, SUM(LENGTH(a.Pattern) * 5) / 60 AS total_hours
-                FROM od_appointments a JOIN od_procedure_logs pl ON a.AptNum = pl.AptNum JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE a.AptStatus = 2 AND pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND a.Pattern IS NOT NULL AND a.Pattern != '' AND DATE(a.AptDateTime) BETWEEN ? AND ? AND pl.ProvNum = ?
-            ", [$start, $end, $pId]);
-            $docAptCount = (int) $apts->total_apts;
-            $avgAptMins = (float) $apts->avg_mins;
-            $totalHours = (float) $apts->total_hours;
+                FROM od_appointments a
+                JOIN od_procedure_logs pl ON a.AptNum = pl.AptNum AND pl.office_id = ?
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                WHERE a.office_id = ?
+                  AND a.AptStatus = 2 AND pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND a.Pattern IS NOT NULL AND a.Pattern != '' AND DATE(a.AptDateTime) BETWEEN ? AND ? AND pl.ProvNum = ?
+            ", [$officeId, $officeId, $officeId, $start, $end, $pId]);
+            $docAptCount = (int) ($apts->total_apts ?? 0);
+            $avgAptMins = (float) ($apts->avg_mins ?? 0);
+            $totalHours = (float) ($apts->total_hours ?? 0);
 
             // Case Acceptance — single source of truth (blueprint D4-A)
-            $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [$pId], false));
+            $caRates = $this->txAcceptance->summary(new MetricFilter($start, $end, [], [$pId], false, $officeId));
 
             // Reappt
             $docReappt = DB::selectOne("
                 SELECT COUNT(*) AS total, SUM(CASE WHEN NextAptNum IS NOT NULL AND NextAptNum != '0' THEN 1 ELSE 0 END) AS with_next
-                FROM od_appointments a WHERE IsHygiene = 'false' AND AptStatus = 2 AND DATE(AptDateTime) BETWEEN ? AND ? AND ProvNum = ?
-            ", [$start, $end, $pId]);
+                FROM od_appointments a
+                WHERE a.office_id = ?
+                  AND IsHygiene = 'false' AND AptStatus = 2 AND DATE(AptDateTime) BETWEEN ? AND ? AND ProvNum = ?
+            ", [$officeId, $start, $end, $pId]);
 
             // Exam count
-            $examCount = DB::table('od_procedure_logs as pl')->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
-                ->whereIn('pc.ProcCode', ['D0120', 'D0140', 'D0150', 'D0160', 'D0170', 'D0180'])->whereIn('pl.ProcStatus', ProcStatus::completed())->whereBetween('pl.ProcDate', [$start, $end])->where('pl.ProvNum', $pId)->count();
+            $examCount = DB::table('od_procedure_logs as pl')
+                ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
+                ->where('pl.office_id', $officeId)
+                ->where('pc.office_id', $officeId)
+                ->whereIn('pc.ProcCode', ['D0120', 'D0140', 'D0150', 'D0160', 'D0170', 'D0180'])
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereBetween('pl.ProcDate', [$start, $end])
+                ->where('pl.ProvNum', $pId)
+                ->count();
 
             // TX Matrix
-            $cohortSql = $this->patients->firstVisitCohortSql('first_visit');
+            $cohortSql = $this->patients->firstVisitCohortSql('first_visit', $officeId);
             $txMatrix = DB::selectOne("
                 SELECT
                     COUNT(DISTINCT CASE WHEN DATEDIFF(pl.ProcDate, tp.DateTP) = 0 THEN CONCAT(pl.PatNum,'-',pl.ProcDate) END) AS same_day_completions,
@@ -1028,12 +1088,13 @@ class KpisController extends Controller
                     COUNT(DISTINCT CASE WHEN pt_hist.first_visit < ? AND pl.ProcStatus IN ({$this->completedIn}) THEN pt_hist.PatNum END) AS existing_pts_total,
                     COALESCE(AVG(CASE WHEN pt_hist.first_visit BETWEEN ? AND ? AND DATEDIFF(pl.ProcDate, tp.DateTP) = 0 AND pl.ProcStatus IN ({$this->completedIn}) THEN pl.ProcFee END), 0) AS avg_sameday_new_pt
                 FROM od_procedure_logs pl
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
                 JOIN (
                     {$cohortSql}
                 ) pt_hist ON pl.PatNum = pt_hist.PatNum
-                LEFT JOIN od_procedure_logs tp ON tp.PatNum = pl.PatNum AND tp.ProcStatus IN ({$this->tpIn}) AND tp.DateTP IS NOT NULL AND tp.DateTP BETWEEN ? AND ?
-                WHERE pc.IsHygiene = 'false' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                LEFT JOIN od_procedure_logs tp ON tp.PatNum = pl.PatNum AND tp.office_id = ? AND tp.ProcStatus IN ({$this->tpIn}) AND tp.DateTP IS NOT NULL AND tp.DateTP BETWEEN ? AND ?
+                WHERE pl.office_id = ?
+                  AND pc.IsHygiene = 'false' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [
                 $start,
                 $end,
@@ -1053,6 +1114,13 @@ class KpisController extends Controller
                 $end,
                 $start,
                 $end,
+                $officeId,
+                $officeId,
+                $start,
+                $end,
+                $officeId,
+                $start,
+                $end,
                 $pId,
             ]);
 
@@ -1061,20 +1129,20 @@ class KpisController extends Controller
                 'location' => $locName,
                 'Provider' => $p->Abbr.' '.$p->LName,
                 'provider' => $p->Abbr.' '.$p->LName,
-                'case_acceptance_same_day' => $docVisits > 0 ? round(($txMatrix->same_day_completions / $docVisits) * 100, 2) : 0,
+                'case_acceptance_same_day' => $docVisits > 0 ? round((($txMatrix->same_day_completions ?? 0) / $docVisits) * 100, 2) : 0,
                 'case_acceptance_rate' => $caRates->rate,
-                'new_pt_tx_dollars' => round((float) $txMatrix->avg_tp_new_pt, 2),
-                'existing_pt_tx_dollars' => round((float) $txMatrix->total_existing_pt_tx, 2),
+                'new_pt_tx_dollars' => round((float) ($txMatrix->avg_tp_new_pt ?? 0), 2),
+                'existing_pt_tx_dollars' => round((float) ($txMatrix->total_existing_pt_tx ?? 0), 2),
                 'avg_apt_time_mins' => round($avgAptMins, 2),
                 'avg_prod_per_hour' => $totalHours > 0 ? round($docProd / $totalHours, 2) : 0,
                 'avg_prod_per_apt' => $docAptCount > 0 ? round($docProd / $docAptCount, 2) : 0,
-                'same_day_tx_per_new_pt' => round((float) $txMatrix->avg_sameday_new_pt, 2),
+                'same_day_tx_per_new_pt' => round((float) ($txMatrix->avg_sameday_new_pt ?? 0), 2),
                 'avg_prod_per_prov_day' => $workDays > 0 ? round($docProd / $workDays, 2) : 0,
-                'avg_tx_per_existing_pt' => round((float) $txMatrix->avg_tp_existing_pt, 2),
-                'avg_tx_per_new_pt' => round((float) $txMatrix->avg_tp_new_pt, 2),
-                'pct_new_pt_with_tx' => $txMatrix->new_pts_total > 0 ? round(($txMatrix->new_pts_with_tx / $txMatrix->new_pts_total) * 100, 2) : 0,
-                'pct_existing_pt_with_tx' => $txMatrix->existing_pts_total > 0 ? round(($txMatrix->existing_pts_with_tx / $txMatrix->existing_pts_total) * 100, 2) : 0,
-                'reappt' => $docReappt->total > 0 ? round(($docReappt->with_next / $docReappt->total) * 100, 2) : 0,
+                'avg_tx_per_existing_pt' => round((float) ($txMatrix->avg_tp_existing_pt ?? 0), 2),
+                'avg_tx_per_new_pt' => round((float) ($txMatrix->avg_tp_new_pt ?? 0), 2),
+                'pct_new_pt_with_tx' => ($txMatrix->new_pts_total ?? 0) > 0 ? round(($txMatrix->new_pts_with_tx / $txMatrix->new_pts_total) * 100, 2) : 0,
+                'pct_existing_pt_with_tx' => ($txMatrix->existing_pts_total ?? 0) > 0 ? round(($txMatrix->existing_pts_with_tx / $txMatrix->existing_pts_total) * 100, 2) : 0,
+                'reappt' => ($docReappt->total ?? 0) > 0 ? round(($docReappt->with_next / $docReappt->total) * 100, 2) : 0,
                 'prod_per_exam' => $examCount > 0 ? round($docProd / $examCount, 2) : 0,
                 'total_production' => round($docProd, 2),
             ];
@@ -1086,12 +1154,17 @@ class KpisController extends Controller
             'total' => $overall,
         ]);
     }
+
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
-    private function countByCodes(array $codes, string $start, string $end): int
+    private function countByCodes(array $codes, string $start, string $end, ?int $officeId = null): int
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
+
         return DB::table('od_procedure_logs as pl')
             ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
+            ->where('pl.office_id', $officeId)
+            ->where('pc.office_id', $officeId)
             ->whereIn('pc.ProcCode', $codes)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereBetween('pl.ProcDate', [$start, $end])
@@ -1102,15 +1175,16 @@ class KpisController extends Controller
 
     private function getSpecialtyProvidersBaseLoop($start, $end, $specId, $customCounts = [], $customSums = [], $distinctPatNumCounts = [], $extraCallback = null)
     {
+        $officeId = Office::getActiveOfficeId();
         // Fetch distinct providers who have production in this specialty
         $provs = DB::select("
             SELECT DISTINCT pl.ProvNum, pr.Abbr, pr.LName,
                    'Unassigned' as Location
             FROM od_procedure_logs pl
-            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
-        ", [$start, $end, $specId]);
+            JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pr.Specialty = ?
+        ", [$officeId, $officeId, $officeId, $start, $end, $specId]);
 
         $providersList = [];
 
@@ -1133,46 +1207,46 @@ class KpisController extends Controller
                     CAST(COUNT(DISTINCT CASE WHEN pl.ProcFee > 0 THEN DATE(pl.ProcDate) END) AS SIGNED) AS work_days,
                     CAST(COUNT(DISTINCT pl.PatNum) AS SIGNED) AS patient_visits
                 FROM od_procedure_logs pl
-                WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
-            ", [$start, $end, $provNum]);
+                WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+            ", [$officeId, $start, $end, $provNum]);
 
-            $workDays = max(1, (int) $base->work_days);
+            $workDays = max(1, (int) ($base->work_days ?? 1));
             $row['total_production'] = round($base->total_prod ?? 0, 2);
             $row['production_per_day'] = round(($base->total_prod ?? 0) / $workDays, 2);
-            $row['patient_visits'] = (int) $base->patient_visits;
+            $row['patient_visits'] = (int) ($base->patient_visits ?? 0);
             $row['work_days'] = $workDays;
 
             foreach ($customCounts as $key => $codes) {
                 $inStr = "'".implode("','", $codes)."'";
-                $row[$key] = (int) DB::selectOne("
+                $row[$key] = (int) (DB::selectOne("
                     SELECT COUNT(DISTINCT pl.ProcNum) AS cnt
                     FROM od_procedure_logs pl
-                    JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                    WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                    JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                    WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                       AND pc.ProcCode IN ($inStr)
-                ", [$start, $end, $provNum])->cnt;
+                ", [$officeId, $officeId, $start, $end, $provNum])->cnt ?? 0);
             }
 
             foreach ($customSums as $key => $codes) {
                 $inStr = "'".implode("','", $codes)."'";
-                $row[$key] = round((float) DB::selectOne("
+                $row[$key] = round((float) (DB::selectOne("
                     SELECT SUM(pl.ProcFee) AS sm
                     FROM od_procedure_logs pl
-                    JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                    WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                    JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                    WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                       AND pc.ProcCode IN ($inStr)
-                ", [$start, $end, $provNum])->sm, 2);
+                ", [$officeId, $officeId, $start, $end, $provNum])->sm ?? 0), 2);
             }
 
             foreach ($distinctPatNumCounts as $key => $codes) {
                 $inStr = "'".implode("','", $codes)."'";
-                $row[$key] = (int) DB::selectOne("
+                $row[$key] = (int) (DB::selectOne("
                     SELECT COUNT(DISTINCT pl.PatNum) AS cnt
                     FROM od_procedure_logs pl
-                    JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                    WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                    JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                    WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                       AND pc.ProcCode IN ($inStr)
-                ", [$start, $end, $provNum])->cnt;
+                ", [$officeId, $officeId, $start, $end, $provNum])->cnt ?? 0);
             }
 
             // Consults per day special logic
@@ -1186,7 +1260,7 @@ class KpisController extends Controller
 
             // Allow extra callback for specific specialties
             if ($extraCallback) {
-                $row = $extraCallback($row, $start, $end, $provNum);
+                $row = $extraCallback($row, $start, $end, $provNum, $officeId);
             }
 
             $providersList[] = $row;
@@ -1243,26 +1317,27 @@ class KpisController extends Controller
         ], [
             'implant_placement_dollars' => ['D6010'],
             'sedations_dollars' => ['D9222', 'D9223', 'D9239', 'D9243', 'D9248'],
-        ], [], function ($row, $start, $end, $provNum) {
+        ], [], function ($row, $start, $end, $provNum, $officeId = null) {
+            $officeId = $officeId ?? Office::getActiveOfficeId();
             // Perio Codes $
-            $row['perio_codes_dollars'] = round((float) DB::selectOne("
+            $row['perio_codes_dollars'] = round((float) (DB::selectOne("
                 SELECT SUM(pl.ProcFee) AS sm
                 FROM od_procedure_logs pl
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                   AND pc.ProcCode BETWEEN 'D4000' AND 'D4999'
-            ", [$start, $end, $provNum])->sm, 2);
+            ", [$officeId, $officeId, $start, $end, $provNum])->sm ?? 0), 2);
 
             // Treatment plan per exam
-            $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ? AND ProvNum = ?", [$start, $end, $provNum])->sm ?? 0;
+            $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE office_id = ? AND ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ? AND ProvNum = ?", [$officeId, $start, $end, $provNum])->sm ?? 0;
             $exams = DB::selectOne("
                 SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
                 FROM od_procedure_logs pl
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                WHERE pl.office_id = ? AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                   AND pc.ProcCode IN ('D0120', 'D0140', 'D0145', 'D0150', 'D0160', 'D0170', 'D0180')
                   AND pl.ProcStatus IN ({$this->completedIn})
-            ", [$start, $end, $provNum])->exam_cnt ?? 0;
+            ", [$officeId, $officeId, $start, $end, $provNum])->exam_cnt ?? 0;
             $row['treatment_plan_per_exam'] = $exams > 0 ? round($txFee / $exams, 2) : 0;
 
             return $row;
@@ -1284,16 +1359,16 @@ class KpisController extends Controller
             'invisalign_starts_count' => ['D8090', 'D8080'],
         ], [], [
             'total_active_patients_seen' => ['D8670', 'D8670A'],
-        ], function ($row, $start, $end, $provNum) {
-
+        ], function ($row, $start, $end, $provNum, $officeId = null) {
+            $officeId = $officeId ?? Office::getActiveOfficeId();
             $starts = DB::selectOne("
                 SELECT COUNT(*) AS cnt FROM od_procedure_logs pl 
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcStatus='C' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum=?
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                WHERE pl.office_id = ? AND pl.ProcStatus='C' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum=?
                 AND pc.ProcCode IN ('D8010','D8020','D8030','D8040','D8050','D8060','D8070','D8080','D8090')
-            ", [$start, $end, $provNum])->cnt;
+            ", [$officeId, $officeId, $start, $end, $provNum])->cnt ?? 0;
 
-            $row['conversion'] = $row['total_consults'] > 0 ? round(($starts / $row['total_consults']) * 100, 2) : 0;
+            $row['conversion'] = ($row['total_consults'] ?? 0) > 0 ? round(($starts / $row['total_consults']) * 100, 2) : 0;
 
             return $row;
         }));
@@ -1312,16 +1387,17 @@ class KpisController extends Controller
             'implant_placement_dollars' => ['D6010'],
             'sedations_dollars' => ['D9222', 'D9223', 'D9239', 'D9243', 'D9248'],
             'extractions_dollars' => ['D7140', 'D7210', 'D7220', 'D7230', 'D7240', 'D7241', 'D7250'],
-        ], [], function ($row, $start, $end, $provNum) {
-            $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ? AND ProvNum = ?", [$start, $end, $provNum])->sm ?? 0;
+        ], [], function ($row, $start, $end, $provNum, $officeId = null) {
+            $officeId = $officeId ?? Office::getActiveOfficeId();
+            $txFee = DB::selectOne("SELECT SUM(ProcFee) AS sm FROM od_procedure_logs WHERE office_id = ? AND ProcStatus IN ({$this->tpIn}) AND DateTP BETWEEN ? AND ? AND ProvNum = ?", [$officeId, $start, $end, $provNum])->sm ?? 0;
             $exams = DB::selectOne("
                 SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
                 FROM od_procedure_logs pl
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-                WHERE pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+                WHERE pl.office_id = ? AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
                   AND pc.ProcCode IN ('D0120', 'D0140', 'D0145', 'D0150', 'D0160', 'D0170', 'D0180')
                   AND pl.ProcStatus IN ({$this->completedIn})
-            ", [$start, $end, $provNum])->exam_cnt ?? 0;
+            ", [$officeId, $officeId, $start, $end, $provNum])->exam_cnt ?? 0;
             $row['treatment_plan_per_exam'] = $exams > 0 ? round($txFee / $exams, 2) : 0;
 
             return $row;
@@ -1348,8 +1424,8 @@ class KpisController extends Controller
             'total_consults' => ['D9310'],
         ], [
             'sedations' => ['D9220', 'D9221', 'D9230', 'D9612', 'D9243', 'D9239'],
-        ], [], function ($row, $start, $end, $provNum) {
-
+        ], [], function ($row, $start, $end, $provNum, $officeId = null) {
+            $officeId = $officeId ?? Office::getActiveOfficeId();
             // Re-map workdays
             $row['total_working_days'] = $row['work_days'];
             $row['patients_per_day'] = $row['work_days'] > 0 ? round($row['patient_visits'] / $row['work_days'], 1) : 0;
@@ -1359,24 +1435,24 @@ class KpisController extends Controller
             $txDayZero = DB::selectOne("
                 SELECT COUNT(DISTINCT a.PatNum) AS tx_pts
                 FROM od_procedure_logs a
-                WHERE a.ProcStatus IN ({$this->tpIn}) AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
-            ", [$start, $end, $provNum])->tx_pts ?? 0;
+                WHERE a.office_id = ? AND a.ProcStatus IN ({$this->tpIn}) AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
+            ", [$officeId, $start, $end, $provNum])->tx_pts ?? 0;
 
             $accSameDay = DB::selectOne("
                 SELECT COUNT(DISTINCT a.PatNum) AS acc_pts
                 FROM od_procedure_logs a
-                JOIN od_procedure_logs b ON a.PatNum = b.PatNum AND a.CodeNum = b.CodeNum
-                WHERE a.ProcStatus IN ({$this->tpIn}) AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
+                JOIN od_procedure_logs b ON a.PatNum = b.PatNum AND a.CodeNum = b.CodeNum AND b.office_id = ?
+                WHERE a.office_id = ? AND a.ProcStatus IN ({$this->tpIn}) AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
                   AND b.ProcStatus IN ('C','S') AND DATE(b.ProcDate) = DATE(a.DateTP)
-            ", [$start, $end, $provNum])->acc_pts ?? 0;
+            ", [$officeId, $officeId, $start, $end, $provNum])->acc_pts ?? 0;
 
             $acc90Days = DB::selectOne("
                 SELECT COUNT(DISTINCT a.PatNum) AS acc_pts
                 FROM od_procedure_logs a
-                JOIN od_procedure_logs b ON a.PatNum = b.PatNum AND a.CodeNum = b.CodeNum
-                WHERE a.ProcStatus IN ({$this->tpIn}) AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
+                JOIN od_procedure_logs b ON a.PatNum = b.PatNum AND a.CodeNum = b.CodeNum AND b.office_id = ?
+                WHERE a.office_id = ? AND a.ProcStatus IN ({$this->tpIn}) AND a.DateTP BETWEEN ? AND ? AND a.ProvNum=?
                   AND b.ProcStatus IN ('C','S') AND b.ProcDate >= a.DateTP AND DATEDIFF(b.ProcDate, a.DateTP) <= 90
-            ", [$start, $end, $provNum])->acc_pts ?? 0;
+            ", [$officeId, $officeId, $start, $end, $provNum])->acc_pts ?? 0;
 
             $row['case_acceptance_same_day'] = $txDayZero > 0 ? round(($accSameDay / $txDayZero) * 100, 2) : 0;
             $row['case_acceptance_rolling_90_days'] = $txDayZero > 0 ? round(($acc90Days / $txDayZero) * 100, 2) : 0;

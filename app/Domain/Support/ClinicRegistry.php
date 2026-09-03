@@ -2,6 +2,7 @@
 
 namespace App\Domain\Support;
 
+use App\Models\Office;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -9,34 +10,34 @@ use Illuminate\Support\Facades\Schema;
  * The single source of truth for clinic (office) identity: ClinicNum -> display name.
  *
  * Multi-office readiness: the whole app filters by ClinicNum via MetricFilter already;
- * this registry removes the last single-office assumption — the hardcoded '8 Mile' label
- * scattered across controllers. When the `od_clinics` table is synced, names come straight
- * from OpenDental and new offices appear automatically with no code change. Until then it
- * falls back to the known single office.
- *
- * OpenDental convention: ClinicNum 0 means "unassigned / clinics-not-in-use", which for a
- * single-office practice IS the primary office — so 0 always maps to the primary name.
+ * this registry provides names for the active Office location.
  */
 class ClinicRegistry
 {
-    /** Primary office name used for ClinicNum 0 until od_clinics is synced. */
-    private const PRIMARY_NAME = '8 Mile';
+    /** @var array<int, array<int, string>> lazily-built officeId => (ClinicNum => name) */
+    private array $maps = [];
 
-    /** @var array<int,string>|null lazily-built ClinicNum => name */
-    private ?array $map = null;
-
-    /** @return array<int,string> ClinicNum => display name */
-    public function all(): array
+    /** @return array<int,string> ClinicNum => display name for the given office */
+    public function all(?int $officeId = null): array
     {
-        if ($this->map !== null) {
-            return $this->map;
+        $officeId = $officeId ?? Office::getActiveOfficeId();
+
+        if (isset($this->maps[$officeId])) {
+            return $this->maps[$officeId];
         }
 
-        $map = [0 => config('clinics.primary_name', self::PRIMARY_NAME)];
+        $activeOffice = Office::find($officeId);
+        $primaryName = $activeOffice?->name ?: config('clinics.primary_name', 'Main Office');
+
+        $map = [0 => $primaryName];
 
         if (Schema::hasTable('od_clinics')) {
-            $rows = DB::table('od_clinics')
-                ->get(['ClinicNum', 'Description', 'Abbr']);
+            $query = DB::table('od_clinics');
+            if (Schema::hasColumn('od_clinics', 'office_id')) {
+                $query->where('office_id', $officeId);
+            }
+
+            $rows = $query->get(['ClinicNum', 'Description', 'Abbr']);
             foreach ($rows as $r) {
                 $name = trim((string) ($r->Description ?: $r->Abbr));
                 if ($name !== '') {
@@ -45,29 +46,29 @@ class ClinicRegistry
             }
         }
 
-        return $this->map = $map;
+        return $this->maps[$officeId] = $map;
     }
 
     /** Display name for a clinic; falls back to "Location N" for unknown clinics. */
-    public function name(int $clinicNum): string
+    public function name(int $clinicNum, ?int $officeId = null): string
     {
-        return $this->all()[$clinicNum] ?? ('Location '.$clinicNum);
+        return $this->all($officeId)[$clinicNum] ?? ('Location '.$clinicNum);
     }
 
     /** @return int[] all known ClinicNums */
-    public function ids(): array
+    public function ids(?int $officeId = null): array
     {
-        return array_keys($this->all());
+        return array_keys($this->all($officeId));
     }
 
-    public function exists(int $clinicNum): bool
+    public function exists(int $clinicNum, ?int $officeId = null): bool
     {
-        return array_key_exists($clinicNum, $this->all());
+        return array_key_exists($clinicNum, $this->all($officeId));
     }
 
     /** True once real offices are configured (od_clinics synced with >1 clinic). */
-    public function isMultiOffice(): bool
+    public function isMultiOffice(?int $officeId = null): bool
     {
-        return count($this->all()) > 1;
+        return count($this->all($officeId)) > 1;
     }
 }

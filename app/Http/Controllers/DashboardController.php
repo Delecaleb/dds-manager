@@ -11,6 +11,7 @@ use App\Helpers\MetricDefinitions;
 use App\Models\ClaimProcs;
 use App\Models\OdAdjustment;
 use App\Models\OdProcedureLog;
+use App\Models\Office;
 use App\Services\OpenDental\FinancialAnalyticsService;
 use App\Services\OpenDental\PatientAnalyticsService;
 use Carbon\Carbon;
@@ -25,12 +26,7 @@ class DashboardController extends Controller
         private readonly PatientService $patients,
         private readonly ClinicRegistry $clinics,
         private readonly PatientVisitService $patientVisits,
-    ) {
-        $this->clinicNames = $this->clinics->all();
-    }
-
-    /** ClinicNum => display name, sourced from the multi-office ClinicRegistry. */
-    private array $clinicNames = [];
+    ) {}
 
     private array $specialtyMap = [
         0 => 'General',
@@ -54,10 +50,11 @@ class DashboardController extends Controller
     {
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
+        $officeId = Office::getActiveOfficeId();
 
         return response()->json(array_merge(
-            $financial->filterAnalysis($start, $end),
-            $patients->getPatientAnalytics($start, $end)
+            $financial->filterAnalysis($start, $end, $officeId),
+            $patients->getPatientAnalytics($start, $end, $officeId)
         ));
     }
 
@@ -65,8 +62,10 @@ class DashboardController extends Controller
     {
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
+        $officeId = Office::getActiveOfficeId();
 
         $rows = DB::table('od_procedure_logs')
+            ->where('office_id', $officeId)
             ->selectRaw(
                 'ClinicNum, '.
                 MetricDefinitions::grossProduction('total_production').', '.
@@ -79,19 +78,23 @@ class DashboardController extends Controller
             ->get();
 
         $adjustments = DB::table('od_adjustments')
+            ->where('office_id', $officeId)
             ->selectRaw('ClinicNum, '.MetricDefinitions::adjustments('val'))
             ->whereBetween('AdjDate', [$start, $end])
             ->groupBy('ClinicNum')
             ->pluck('val', 'ClinicNum');
 
         $writeoffs = DB::table('od_claim_procs')
+            ->where('office_id', $officeId)
             ->selectRaw('ClinicNum, '.MetricDefinitions::writeOffs('val'))
             ->whereBetween('ProcDate', [$start, $end])
             ->groupBy('ClinicNum')
             ->pluck('val', 'ClinicNum');
 
+        $clinicNames = $this->clinics->all($officeId);
+
         return response()->json(
-            $rows->map(function ($row, $i) use ($adjustments, $writeoffs) {
+            $rows->map(function ($row, $i) use ($adjustments, $writeoffs, $clinicNames) {
                 $gross = (float) $row->total_production;
                 $adj = (float) ($adjustments[$row->ClinicNum] ?? 0);
                 $wo = (float) ($writeoffs[$row->ClinicNum] ?? 0);
@@ -105,7 +108,7 @@ class DashboardController extends Controller
                 return [
                     'rank' => $i + 1,
                     'clinic_num' => (int) $row->ClinicNum,
-                    'location' => $this->clinicNames[(int) $row->ClinicNum] ?? 'Location '.$row->ClinicNum,
+                    'location' => $clinicNames[(int) $row->ClinicNum] ?? 'Location '.$row->ClinicNum,
                     'total_production' => round($gross, 2),
                     'net_production' => $net,
                     'patient_count' => (int) $row->patient_count,
@@ -119,8 +122,13 @@ class DashboardController extends Controller
     {
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
+        $officeId = Office::getActiveOfficeId();
 
-        $provider = DB::table('od_providers')->where('ProvNum', $id)->first();
+        $provider = DB::table('od_providers')
+            ->where('office_id', $officeId)
+            ->where('ProvNum', $id)
+            ->first();
+
         if (! $provider) {
             return response()->json(['error' => 'Provider not found'], 404);
         }
@@ -129,22 +137,26 @@ class DashboardController extends Controller
 
         /* ── Aggregate stats ─────────────────────────── */
         $gross = DB::table('od_procedure_logs')
+            ->where('office_id', $officeId)
             ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])->sum('ProcFee');
 
         $adjustments = DB::table('od_adjustments')
+            ->where('office_id', $officeId)
             ->where('ProvNum', $id)->whereBetween('AdjDate', [$start, $end])->sum('AdjAmt');
 
         $writeoffs = DB::table('od_claim_procs')
+            ->where('office_id', $officeId)
             ->where('ProvNum', $id)->whereBetween('ProcDate', [$start, $end])->sum('WriteOff');
 
         $net = $this->production->netFrom((float) $gross, (float) $adjustments, (float) $writeoffs);
 
-        $patientVisits = $this->patientVisits->patientVisits($start, $end, [], [$id]);
-        $newPatientVisits = $this->patientVisits->newPatientCount($start, $end, [], [$id]);
+        $patientVisits = $this->patientVisits->patientVisits($start, $end, [], [$id], $officeId);
+        $newPatientVisits = $this->patientVisits->newPatientCount($start, $end, [], [$id], $officeId);
 
         // Avg per work-day (days this provider had completed procedures)
         $workDays = DB::table('od_procedure_logs')
+            ->where('office_id', $officeId)
             ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])
             ->distinct('ProcDate')->count('ProcDate');
@@ -154,14 +166,17 @@ class DashboardController extends Controller
 
         // TX accepted: completed / all (any status) procedures in range
         $txTotal = DB::table('od_procedure_logs')
+            ->where('office_id', $officeId)
             ->where('ProvNum', $id)->whereBetween('ProcDate', [$start, $end])->count();
         $txCompleted = DB::table('od_procedure_logs')
+            ->where('office_id', $officeId)
             ->where('ProvNum', $id)->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])->count();
         $txRate = $txTotal > 0 ? round($txCompleted / $txTotal * 100, 2) : 0;
 
         /* ── Daily production ────────────────────────── */
         $dailyProduction = DB::table('od_procedure_logs')
+            ->where('office_id', $officeId)
             ->selectRaw(
                 "DATE_FORMAT(ProcDate, '%Y-%m-%d') AS date, ".
                 MetricDefinitions::grossProduction('production').', '.
@@ -179,7 +194,7 @@ class DashboardController extends Controller
 
         /* ── Daily visits (with new-patient detection) ── */
         $completed = ProcStatus::inList(ProcStatus::completed());
-        $dailyVisitStats = $this->patientVisits->dailyStats($start, $end, [], [$id]);
+        $dailyVisitStats = $this->patientVisits->dailyStats($start, $end, [], [$id], $officeId);
         $dailyVisits = collect($dailyVisitStats['daily_visits'])->keys()
             ->merge(collect($dailyVisitStats['daily_new_visits'])->keys())
             ->unique()->sort()->values()->map(fn ($dStr) => (object) [
@@ -190,6 +205,7 @@ class DashboardController extends Controller
 
         /* ── Daily TX accepted rate ──────────────────── */
         $dailyTx = DB::table('od_procedure_logs')
+            ->where('office_id', $officeId)
             ->select(
                 DB::raw("DATE_FORMAT(ProcDate, '%Y-%m-%d') AS date"),
                 DB::raw("SUM(CASE WHEN ProcStatus IN ({$completed}) THEN 1 ELSE 0 END) AS completed"),
@@ -231,27 +247,33 @@ class DashboardController extends Controller
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
         $search = trim($request->input('search', ''));
+        $officeId = Office::getActiveOfficeId();
 
         $grossSub = OdProcedureLog::select('ProvNum', DB::raw('SUM(ProcFee) AS gross'))
+            ->where('office_id', $officeId)
             ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])
             ->groupBy('ProvNum');
 
         $adjSub = OdAdjustment::select('ProvNum', DB::raw('SUM(AdjAmt) AS adjustments'))
+            ->where('office_id', $officeId)
             ->whereBetween('AdjDate', [$start, $end])
             ->groupBy('ProvNum');
 
         $writeoffSub = ClaimProcs::select('ProvNum', DB::raw('SUM(WriteOff) AS writeoffs'))
+            ->where('office_id', $officeId)
             ->whereBetween('ProcDate', [$start, $end])
             ->groupBy('ProvNum');
 
         $patCollSub = DB::table('od_pay_splits')
             ->select('ProvNum', DB::raw('SUM(SplitAmt) AS amt'))
+            ->where('office_id', $officeId)
             ->whereBetween('DatePay', [$start, $end])
             ->groupBy('ProvNum');
 
         $insCollSub = DB::table('od_claim_procs')
             ->select('ProvNum', DB::raw('SUM(InsPayAmt) AS amt'))
+            ->where('office_id', $officeId)
             ->whereBetween('DateCP', [$start, $end])
             ->where('Status', '!=', 0)
             ->groupBy('ProvNum');
@@ -263,6 +285,7 @@ class DashboardController extends Controller
 
         $aptsSub = DB::table('od_appointments')
             ->select('ProvNum', DB::raw('COUNT(*) AS appointment_count'))
+            ->where('office_id', $officeId)
             ->whereIn('AptStatus', [1, 2])
             ->whereBetween('AptDateTime', [$start, $end])
             ->groupBy('ProvNum');
@@ -280,6 +303,7 @@ class DashboardController extends Controller
                 DB::raw('COALESCE(c.collections, 0) AS collections'),
                 DB::raw('COALESCE(apt.appointment_count, 0) AS appointment_count')
             )
+            ->where('p.office_id', $officeId)
             ->leftJoinSub($grossSub, 'g', 'p.ProvNum', '=', 'g.ProvNum')
             ->leftJoinSub($adjSub, 'a', 'p.ProvNum', '=', 'a.ProvNum')
             ->leftJoinSub($writeoffSub, 'w', 'p.ProvNum', '=', 'w.ProvNum')
@@ -304,13 +328,13 @@ class DashboardController extends Controller
 
         // Check if there are unassigned transactions (ProvNum = 0 or null) not associated with a named provider
         $knownProvNums = $providers->pluck('ProvNum')->map(fn ($id) => (int) $id)->toArray();
-        $unassignedGross = (float) OdProcedureLog::whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('ProcFee');
-        $unassignedAdj = (float) OdAdjustment::whereBetween('AdjDate', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('AdjAmt');
-        $unassignedWo = (float) ClaimProcs::whereBetween('ProcDate', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('WriteOff');
-        $unassignedPatColl = (float) DB::table('od_pay_splits')->whereBetween('DatePay', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('SplitAmt');
-        $unassignedInsColl = (float) DB::table('od_claim_procs')->whereBetween('DateCP', [$start, $end])->where('Status', '!=', 0)->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('InsPayAmt');
+        $unassignedGross = (float) OdProcedureLog::where('office_id', $officeId)->whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('ProcFee');
+        $unassignedAdj = (float) OdAdjustment::where('office_id', $officeId)->whereBetween('AdjDate', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('AdjAmt');
+        $unassignedWo = (float) ClaimProcs::where('office_id', $officeId)->whereBetween('ProcDate', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('WriteOff');
+        $unassignedPatColl = (float) DB::table('od_pay_splits')->where('office_id', $officeId)->whereBetween('DatePay', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('SplitAmt');
+        $unassignedInsColl = (float) DB::table('od_claim_procs')->where('office_id', $officeId)->whereBetween('DateCP', [$start, $end])->where('Status', '!=', 0)->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('InsPayAmt');
         $unassignedColl = $unassignedPatColl + $unassignedInsColl;
-        $unassignedApts = (int) DB::table('od_appointments')->whereIn('AptStatus', [1, 2])->whereBetween('AptDateTime', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->count();
+        $unassignedApts = (int) DB::table('od_appointments')->where('office_id', $officeId)->whereIn('AptStatus', [1, 2])->whereBetween('AptDateTime', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->count();
 
         if (! in_array(0, $knownProvNums) && ($unassignedGross != 0 || $unassignedAdj != 0 || $unassignedWo != 0 || $unassignedColl != 0 || $unassignedApts != 0)) {
             $providers->push((object) [
@@ -327,9 +351,9 @@ class DashboardController extends Controller
             ]);
         }
 
-        $mappedProviders = $providers->map(function ($p) {
+        $mappedProviders = $providers->map(function ($p) use ($officeId) {
             $p->specialty = $this->specialtyMap[(int) $p->Specialty] ?? 'General Dentistry';
-            $p->location = $this->clinics->name((int) ($p->ClinicNum ?? 0));
+            $p->location = $this->clinics->name((int) ($p->ClinicNum ?? 0), $officeId);
             // Net via the single source of truth (blueprint D3, signed adjustments).
             $p->net_production = $this->production->netFrom(
                 (float) $p->gross_production,
@@ -347,32 +371,38 @@ class DashboardController extends Controller
     {
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
+        $officeId = Office::getActiveOfficeId();
 
         $startLastYear = Carbon::parse($start)->subYear()->toDateString();
         $endLastYear = Carbon::parse($end)->subYear()->toDateString();
 
-        $buildLocationStats = function ($s, $e) {
+        $buildLocationStats = function ($s, $e) use ($officeId) {
             $gross = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->selectRaw('ClinicNum, '.MetricDefinitions::grossProduction('val'))
                 ->whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
             $adj = DB::table('od_adjustments')
+                ->where('office_id', $officeId)
                 ->selectRaw('ClinicNum, '.MetricDefinitions::adjustments('val'))
                 ->whereBetween('AdjDate', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
             $writeoffs = DB::table('od_claim_procs')
+                ->where('office_id', $officeId)
                 ->selectRaw('ClinicNum, '.MetricDefinitions::writeOffs('val'))
                 ->whereBetween('ProcDate', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
             $patColl = DB::table('od_pay_splits')
+                ->where('office_id', $officeId)
                 ->selectRaw('ClinicNum, SUM(SplitAmt) as val')
                 ->whereBetween('DatePay', [$s, $e])
                 ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
 
             $insColl = DB::table('od_claim_procs')
+                ->where('office_id', $officeId)
                 ->selectRaw('ClinicNum, SUM(InsPayAmt) as val')
                 ->whereBetween('DateCP', [$s, $e])
                 ->where('Status', '!=', 0)
@@ -401,6 +431,7 @@ class DashboardController extends Controller
             ->unique()
             ->sort();
 
+        $clinicNames = $this->clinics->all($officeId);
         $result = [];
         foreach ($allClinicNums as $cNum) {
             $cg = (float) $currentStats['gross']->get($cNum, 0);
@@ -415,7 +446,7 @@ class DashboardController extends Controller
 
             $result[] = [
                 'clinic_num' => $cNum,
-                'location' => $this->clinicNames[(int) $cNum] ?? 'Location '.$cNum,
+                'location' => $clinicNames[(int) $cNum] ?? 'Location '.$cNum,
                 'gross_production' => round($cg, 2),
                 'gross_production_last' => round($lg, 2),
                 'adjustments' => round($ca, 2),
@@ -434,9 +465,10 @@ class DashboardController extends Controller
     {
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
+        $officeId = Office::getActiveOfficeId();
 
         return response()->json(
-            $this->patientVisits->visitsPerLocation($start, $end, $this->clinicNames)
+            $this->patientVisits->visitsPerLocation($start, $end, $this->clinics->all($officeId), $officeId)
         );
     }
 }

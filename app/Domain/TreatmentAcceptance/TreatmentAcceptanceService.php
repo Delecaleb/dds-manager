@@ -107,6 +107,7 @@ class TreatmentAcceptanceService
     protected function baseQuery(MetricFilter $filter): Builder
     {
         $q = DB::table('od_procedure_logs as pl')
+            ->where('pl.office_id', $filter->officeId)
             ->whereBetween('pl.ProcDate', [$filter->start, $filter->end]);
 
         if ($filter->hygiene !== null) {

@@ -7,6 +7,7 @@ use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use App\Models\OdPatient;
 use App\Models\OdProvider;
+use App\Models\Office;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +19,7 @@ class TxMinerController extends Controller
 {
     public function index(ClinicRegistry $clinicRegistry)
     {
-        $clinics = $clinicRegistry->all();
+        $clinics = $clinicRegistry->all(Office::getActiveOfficeId());
         $providers = OdProvider::whereIn('IsHidden', ['false', '0', 0, false])
             ->orderBy('LName')
             ->get(['ProvNum', 'LName', 'PName', 'Abbr']);
@@ -310,10 +311,11 @@ class TxMinerController extends Controller
 
         $records = $query->get();
 
+        $officeId = Office::getActiveOfficeId();
         $stagedRows = [];
         foreach ($records as $r) {
             $clinicNum = (int) $r->ClinicNum;
-            $locationName = $clinicRegistry->name($clinicNum);
+            $locationName = $clinicRegistry->name($clinicNum, $officeId);
 
             $stagedRows[] = $this->mapRowMetrics($r, $txAcceptance) + [
                 'clinic_num' => $clinicNum,
@@ -652,7 +654,7 @@ class TxMinerController extends Controller
             }
 
             if (! $clinicNum || $clinicNum === 'all') {
-                $r['location'] = $clinicRegistry->name((int) $log->ClinicNum);
+                $r['location'] = $clinicRegistry->name((int) $log->ClinicNum, Office::getActiveOfficeId());
             }
 
             $rows[] = $r;
@@ -668,7 +670,9 @@ class TxMinerController extends Controller
      */
     protected function baseQuery(Request $request, ?string $overrideStartDate = null, ?string $overrideEndDate = null): Builder
     {
+        $officeId = Office::getActiveOfficeId();
         $query = DB::table('od_procedure_logs as pl')
+            ->where('pl.office_id', $officeId)
             ->whereNotNull('pl.ProcDate')
             ->whereYear('pl.ProcDate', '>=', 2000);
 
@@ -729,7 +733,10 @@ class TxMinerController extends Controller
             $lobArray = is_array($lobs) ? $lobs : explode(',', (string) $lobs);
             $lobArray = array_filter(array_map('trim', $lobArray));
             if (! empty($lobArray)) {
-                $query->join('od_procedures as pc_lob', 'pl.CodeNum', '=', 'pc_lob.CodeNum');
+                $query->join('od_procedures as pc_lob', function ($join) use ($officeId) {
+                    $join->on('pl.CodeNum', '=', 'pc_lob.CodeNum')
+                        ->where('pc_lob.office_id', '=', $officeId);
+                });
                 $query->where(function ($q) use ($lobArray) {
                     foreach ($lobArray as $lob) {
                         switch (strtolower($lob)) {

@@ -5,18 +5,13 @@ namespace App\Domain\Patient;
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
+use App\Models\Office;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-/**
- * Single source of truth for Patient Visits and New Patient Visits.
- *
- * Unifies all visit calculations across Financials, Dashboard, and Operations.
- */
 class PatientVisitService
 {
-    /** Pre-rendered completed-status IN-list for raw-SQL heredoc interpolation. */
     private readonly string $completedIn;
 
     public function __construct()
@@ -36,8 +31,9 @@ class PatientVisitService
      *
      * @return array<int, array{patient_id: string|int, patient_name: string, dates: string, service_codes: string, amount: float, clinic_num: string|int|null, prov_num: string|int|null}>
      */
-    public function newPatientVisits(string $start, string $end, array $clinics = [], array $providers = []): array
+    public function newPatientVisits(string $start, string $end, array $clinics = [], array $providers = [], ?int $officeId = null): array
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
         $isSqlite = DB::connection()->getDriverName() === 'sqlite';
         $groupConcat = $isSqlite
             ? 'GROUP_CONCAT(DISTINCT pc.ProcCode)'
@@ -64,23 +60,26 @@ class PatientVisitService
                     pl_inner.PatNum,
                     MIN(pl_inner.ProcDate) AS first_date
                 FROM od_procedure_logs pl_inner
-                WHERE pl_inner.ProcStatus IN ({$this->completedIn})
+                WHERE pl_inner.office_id = ?
+                  AND pl_inner.ProcStatus IN ({$this->completedIn})
                   AND COALESCE(pl_inner.CodeNum, '') != '626'
                   AND pl_inner.ProcDate BETWEEN ? AND ?
                   {$clinicFilter}
                   {$provFilter}
                   AND NOT EXISTS (
                       SELECT 1 FROM od_procedure_logs pl_prior
-                      WHERE pl_prior.PatNum = pl_inner.PatNum
+                      WHERE pl_prior.office_id = ?
+                        AND pl_prior.PatNum = pl_inner.PatNum
                         AND pl_prior.ProcStatus IN ({$this->completedIn})
                         AND COALESCE(pl_prior.CodeNum, '') != '626'
                         AND pl_prior.ProcDate < ?
                   )
                 GROUP BY pl_inner.PatNum
             ) fv
-            LEFT JOIN od_patients p ON fv.PatNum = p.PatNum
+            LEFT JOIN od_patients p ON fv.PatNum = p.PatNum AND p.office_id = ?
             -- Join only procedures completed on that specific first visit date
             JOIN od_procedure_logs pl ON fv.PatNum = pl.PatNum
+                AND pl.office_id = ?
                 AND pl.ProcDate = fv.first_date
                 AND pl.ProcStatus IN ({$this->completedIn})
                 AND COALESCE(pl.CodeNum, '') != '626'
@@ -88,7 +87,8 @@ class PatientVisitService
             -- Filter 1: Exclude patients who already had a completed appointment before this visit date
             WHERE NOT EXISTS (
                 SELECT 1 FROM od_appointments a_prev
-                WHERE a_prev.PatNum = fv.PatNum
+                WHERE a_prev.office_id = ?
+                  AND a_prev.PatNum = fv.PatNum
                   AND a_prev.AptStatus IN (2, 'Complete', 'Completed')
                   AND a_prev.AptDateTime < ".($isSqlite ? 'fv.first_date' : "CONCAT(fv.first_date, ' 00:00:00')").'
             )
@@ -96,19 +96,21 @@ class PatientVisitService
             AND NOT (
                 EXISTS (
                     SELECT 1 FROM od_appointments a_curr
-                    WHERE a_curr.PatNum = fv.PatNum
+                    WHERE a_curr.office_id = ?
+                      AND a_curr.PatNum = fv.PatNum
                       AND a_curr.AptDateTime BETWEEN '.($isSqlite ? "fv.first_date AND fv.first_date || ' 23:59:59'" : "CONCAT(fv.first_date, ' 00:00:00') AND CONCAT(fv.first_date, ' 23:59:59')")."
                       AND (a_curr.IsNewPatient = 0 OR a_curr.IsNewPatient = '0')
                 )
                 AND EXISTS (
                     SELECT 1 FROM od_appointments a_old
-                    WHERE a_old.PatNum = fv.PatNum
+                    WHERE a_old.office_id = ?
+                      AND a_old.PatNum = fv.PatNum
                       AND a_old.AptDateTime < ?
                 )
             )
             GROUP BY fv.PatNum, p.LName, p.FName, fv.first_date
             ORDER BY fv.first_date, p.LName
-        ", [$start, $end, $start, $start.' 00:00:00']);
+        ", [$officeId, $start, $end, $officeId, $start, $officeId, $officeId, $officeId, $officeId, $officeId, $start.' 00:00:00']);
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
@@ -124,15 +126,15 @@ class PatientVisitService
     /**
      * Get scalar count of New Patient Visits in the date range.
      */
-    public function newPatientCount(string $start, string $end, array $clinics = [], array $providers = []): int
+    public function newPatientCount(string $start, string $end, array $clinics = [], array $providers = [], ?int $officeId = null): int
     {
-        return count($this->newPatientVisits($start, $end, $clinics, $providers));
+        return count($this->newPatientVisits($start, $end, $clinics, $providers, $officeId));
     }
 
     /**
      * Get scalar count of distinct Patient Visits (patient x day) in the date range.
      */
-    public function patientVisits(string|MetricFilter $start, ?string $end = null, array $clinics = [], array $providers = []): int
+    public function patientVisits(string|MetricFilter $start, ?string $end = null, array $clinics = [], array $providers = [], ?int $officeId = null): int
     {
         if ($start instanceof MetricFilter) {
             $filter = $start;
@@ -140,12 +142,15 @@ class PatientVisitService
             $endDate = $filter->end;
             $clinics = $filter->clinics;
             $providers = $filter->providers;
+            $officeId = $filter->officeId;
         } else {
             $startDate = $start;
             $endDate = $end ?? $start;
+            $officeId = $officeId ?? Office::getActiveOfficeId();
         }
 
         $q = DB::table('od_procedure_logs as pl')
+            ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->whereBetween('pl.ProcDate', [$startDate, $endDate]);
@@ -167,8 +172,9 @@ class PatientVisitService
     /**
      * Get breakdown list of Patient Visits (patient, dates, visit count).
      */
-    public function patientVisitsBreakdown(string $start, string $end, array $clinics = [], array $providers = []): array
+    public function patientVisitsBreakdown(string $start, string $end, array $clinics = [], array $providers = [], ?int $officeId = null): array
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
         $isSqlite = DB::connection()->getDriverName() === 'sqlite';
         $dateConcat = $isSqlite
             ? "GROUP_CONCAT(DISTINCT strftime('%Y-%m-%d', pl.ProcDate))"
@@ -187,15 +193,16 @@ class PatientVisitService
                 {$dateConcat}                    AS dates,
                 COUNT(DISTINCT DATE(pl.ProcDate)) AS count
             FROM od_procedure_logs pl
-            JOIN od_patients p ON pl.PatNum = p.PatNum
-            WHERE pl.ProcStatus IN ({$this->completedIn})
+            JOIN od_patients p ON pl.PatNum = p.PatNum AND p.office_id = ?
+            WHERE pl.office_id = ?
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND COALESCE(pl.CodeNum, '') != '626'
               AND pl.ProcDate BETWEEN ? AND ?
               {$clinicFilter}
               {$provFilter}
             GROUP BY p.PatNum, p.LName, p.FName
             ORDER BY count DESC, p.LName
-        ", [$start, $end]);
+        ", [$officeId, $officeId, $start, $end]);
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
@@ -210,9 +217,12 @@ class PatientVisitService
      *
      * @return array{daily_visits: Collection<string, int>, daily_new_visits: Collection<string, int>}
      */
-    public function dailyStats(string $start, string $end, array $clinics = [], array $providers = []): array
+    public function dailyStats(string $start, string $end, array $clinics = [], array $providers = [], ?int $officeId = null): array
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
+
         $q = DB::table('od_procedure_logs as pl')
+            ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->whereBetween('pl.ProcDate', [$start, $end]);
@@ -228,7 +238,7 @@ class PatientVisitService
             ->groupByRaw('DATE(pl.ProcDate)')
             ->pluck('cnt', 'date');
 
-        $dailyNewVisits = collect($this->newPatientVisits($start, $end, $clinics, $providers))
+        $dailyNewVisits = collect($this->newPatientVisits($start, $end, $clinics, $providers, $officeId))
             ->groupBy('dates')
             ->map(fn ($group) => $group->count());
 
@@ -241,13 +251,15 @@ class PatientVisitService
     /**
      * Get patient visits and new patient visits grouped by ClinicNum for location cards.
      */
-    public function visitsPerLocation(string $start, string $end, array $clinicNames = []): array
+    public function visitsPerLocation(string $start, string $end, array $clinicNames = [], ?int $officeId = null): array
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
         $startLastYear = Carbon::parse($start)->subYear()->toDateString();
         $endLastYear = Carbon::parse($end)->subYear()->toDateString();
 
-        $getStats = function ($s, $e) {
+        $getStats = function ($s, $e) use ($officeId) {
             $patientVisits = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereRaw("COALESCE(CodeNum, '') != '626'")
                 ->whereBetween('ProcDate', [$s, $e])
@@ -255,7 +267,7 @@ class PatientVisitService
                 ->groupBy('ClinicNum')
                 ->pluck('val', 'ClinicNum');
 
-            $newVisits = collect($this->newPatientVisits($s, $e))
+            $newVisits = collect($this->newPatientVisits($s, $e, [], [], $officeId))
                 ->groupBy('clinic_num')
                 ->map(fn ($g) => $g->count());
 

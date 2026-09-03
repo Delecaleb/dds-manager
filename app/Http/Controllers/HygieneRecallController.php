@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Support\ClinicRegistry;
 use App\Models\OdProvider;
+use App\Models\Office;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,7 +28,7 @@ class HygieneRecallController extends Controller
     public function index()
     {
         return view('hygiene-recall.index', [
-            'clinics' => $this->clinics->all(),
+            'clinics' => $this->clinics->all(Office::getActiveOfficeId()),
         ]);
     }
 
@@ -88,12 +89,20 @@ class HygieneRecallController extends Controller
         $clinic = $request->get('clinic');
         $start = $request->get('start_date') ?: Carbon::now()->startOfMonth()->toDateString();
         $end = $request->get('end_date') ?: Carbon::now()->endOfMonth()->toDateString();
+        $officeId = ($clinic !== null && $clinic !== '' && $clinic !== 'all') ? (int) $clinic : Office::getActiveOfficeId();
 
-        $hygieneTypeNums = $this->getHygieneRecallTypeNums();
+        $hygieneTypeNums = $this->getHygieneRecallTypeNums($officeId);
 
         $query = DB::table('od_recalls as r')
-            ->join('od_patients as p', 'r.PatNum', '=', 'p.PatNum')
-            ->leftJoin('od_recall_types as rt', 'r.RecallTypeNum', '=', 'rt.RecallTypeNum')
+            ->join('od_patients as p', function ($join) use ($officeId) {
+                $join->on('r.PatNum', '=', 'p.PatNum')
+                    ->where('p.office_id', '=', $officeId);
+            })
+            ->leftJoin('od_recall_types as rt', function ($join) use ($officeId) {
+                $join->on('r.RecallTypeNum', '=', 'rt.RecallTypeNum')
+                    ->where('rt.office_id', '=', $officeId);
+            })
+            ->where('r.office_id', $officeId)
             ->where(function ($q) {
                 $q->whereNull('r.IsDisabled')
                     ->orWhereIn('r.IsDisabled', ['false', '0', 0, false]);
@@ -103,17 +112,6 @@ class HygieneRecallController extends Controller
 
         if ($provNum) {
             $query->where('p.PriProv', (int) $provNum);
-        }
-
-        if ($clinic !== null && $clinic !== '' && $clinic !== 'all') {
-            $query->where(function ($q) use ($clinic) {
-                $q->where('r.office_id', (int) $clinic)
-                    ->orWhere(function ($sub) use ($clinic) {
-                        if ((int) $clinic === 0) {
-                            $sub->whereNull('r.office_id');
-                        }
-                    });
-            });
         }
 
         $recalls = $query->select([
@@ -132,6 +130,7 @@ class HygieneRecallController extends Controller
 
         $futureApts = ! $patNums->isEmpty()
             ? DB::table('od_appointments')
+                ->where('office_id', $officeId)
                 ->whereIn('PatNum', $patNums)
                 ->whereDate('AptDateTime', '>=', Carbon::today()->toDateString())
                 ->whereIn('AptStatus', [1, 2, 4])
@@ -143,6 +142,7 @@ class HygieneRecallController extends Controller
         $futureAptNums = $futureApts->flatten(1)->pluck('AptNum')->filter()->unique();
         $futureAptFees = ! $futureAptNums->isEmpty()
             ? DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->whereIn('AptNum', $futureAptNums)
                 ->groupBy('AptNum')
                 ->selectRaw('AptNum, SUM(ProcFee) as total_fee')
@@ -245,7 +245,7 @@ class HygieneRecallController extends Controller
             }
 
             if (! $clinic || $clinic === 'all') {
-                $row['location'] = $this->clinics->name($clinicNum);
+                $row['location'] = $this->clinics->name($clinicNum, $officeId);
             }
 
             $rows[] = $row;
@@ -324,34 +324,29 @@ class HygieneRecallController extends Controller
     }
 
     /**
-     * Compute aggregated recall metrics by provider.
-    /**
      * Compute recall rows aggregated by provider and clinic.
      */
     protected function computeRecallData(string $start, string $end, ?string $clinic)
     {
-        $hygieneTypeNums = $this->getHygieneRecallTypeNums();
+        $officeId = ($clinic !== null && $clinic !== '' && $clinic !== 'all') ? (int) $clinic : Office::getActiveOfficeId();
+        $hygieneTypeNums = $this->getHygieneRecallTypeNums($officeId);
 
         $query = DB::table('od_recalls as r')
-            ->join('od_patients as p', 'r.PatNum', '=', 'p.PatNum')
-            ->join('od_providers as prov', 'p.PriProv', '=', 'prov.ProvNum')
+            ->join('od_patients as p', function ($join) use ($officeId) {
+                $join->on('r.PatNum', '=', 'p.PatNum')
+                    ->where('p.office_id', '=', $officeId);
+            })
+            ->join('od_providers as prov', function ($join) use ($officeId) {
+                $join->on('p.PriProv', '=', 'prov.ProvNum')
+                    ->where('prov.office_id', '=', $officeId);
+            })
+            ->where('r.office_id', $officeId)
             ->where(function ($q) {
                 $q->whereNull('r.IsDisabled')
                     ->orWhereIn('r.IsDisabled', ['false', '0', 0, false]);
             })
             ->whereIn('r.RecallTypeNum', $hygieneTypeNums)
             ->whereBetween('r.DateDue', [$start, $end]);
-
-        if ($clinic !== null && $clinic !== '' && $clinic !== 'all') {
-            $query->where(function ($q) use ($clinic) {
-                $q->where('r.office_id', (int) $clinic)
-                    ->orWhere(function ($sub) use ($clinic) {
-                        if ((int) $clinic === 0) {
-                            $sub->whereNull('r.office_id');
-                        }
-                    });
-            });
-        }
 
         $recalls = $query->select([
             'r.RecallNum',
@@ -371,6 +366,7 @@ class HygieneRecallController extends Controller
         $patNums = $recalls->pluck('PatNum')->unique();
 
         $futureApts = DB::table('od_appointments')
+            ->where('office_id', $officeId)
             ->whereIn('PatNum', $patNums)
             ->whereDate('AptDateTime', '>=', Carbon::today()->toDateString())
             ->whereIn('AptStatus', [1, 2, 4])
@@ -381,6 +377,7 @@ class HygieneRecallController extends Controller
         $futureAptNums = $futureApts->flatten(1)->pluck('AptNum')->filter()->unique();
         $futureAptFees = ! $futureAptNums->isEmpty()
             ? DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->whereIn('AptNum', $futureAptNums)
                 ->groupBy('AptNum')
                 ->selectRaw('AptNum, SUM(ProcFee) as total_fee')
@@ -404,7 +401,7 @@ class HygieneRecallController extends Controller
             $provName = trim(($first->ProvLName ?? '').(($first->ProvLName && $first->ProvFName) ? ', ' : '').($first->ProvFName ?? ''));
             $provAbbr = $first->ProvAbbr ? substr($first->ProvAbbr, 0, 4) : 'PRV';
             $provIdStr = $provNum.' - '.$provAbbr;
-            $officeName = $this->clinics->name($clinicNum);
+            $officeName = $this->clinics->name($clinicNum, $officeId);
 
             $patsInGroup = $group->pluck('PatNum')->unique();
             $totalDue = $patsInGroup->count();
@@ -458,9 +455,11 @@ class HygieneRecallController extends Controller
      *
      * @return int[]
      */
-    protected function getHygieneRecallTypeNums(): array
+    protected function getHygieneRecallTypeNums(?int $officeId = null): array
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
         $types = DB::table('od_recall_types')
+            ->where('office_id', $officeId)
             ->where(function ($q) {
                 $q->whereIn('RecallTypeNum', [1, 2, 3])
                     ->orWhere('AppendToSpecial', 0)

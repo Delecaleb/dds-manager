@@ -8,6 +8,7 @@ use App\Domain\Support\ClinicRegistry;
 use App\Models\OdAdjustment;
 use App\Models\OdAppointment;
 use App\Models\OdProcedureLog;
+use App\Models\Office;
 use App\Services\OpenDental\CalendarService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -64,6 +65,7 @@ class CalendarController extends Controller
     {
         $start = $request->get('start') ?? $request->get('date') ?? date('Y-m-d');
         $end = $request->get('end') ?? $request->get('date') ?? $start;
+        $officeId = Office::getActiveOfficeId();
 
         $gross = (float) OdProcedureLog::query()
             ->whereIn('ProcStatus', ['C', '2'])
@@ -77,6 +79,7 @@ class CalendarController extends Controller
             ->value('total');
 
         $writeoffs = (float) DB::table('od_claim_procs as c')
+            ->where('c.office_id', $officeId)
             ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
             ->selectRaw('COALESCE(SUM(CAST(c.WriteOff AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
@@ -149,11 +152,13 @@ class CalendarController extends Controller
     {
         $start = $request->input('start') ?: date('Y-m-d');
         $end = $request->input('end') ?: $start;
+        $officeId = Office::getActiveOfficeId();
 
         $startDateTime = substr($start, 0, 10).' 00:00:00';
         $endDateTime = substr($end, 0, 10).' 23:59:59';
 
         $confirmationDefs = DB::table('od_definitions')
+            ->where('office_id', $officeId)
             ->where('Category', 2)
             ->pluck('ItemName', 'DefNum')
             ->toArray();
@@ -199,7 +204,11 @@ class CalendarController extends Controller
         if (! empty($patNums) && ! empty($aptNums)) {
             foreach (array_chunk($patNums, 200) as $patChunk) {
                 $procLogs = DB::table('od_procedure_logs as pl')
-                    ->leftJoin('od_procedures as p', 'pl.CodeNum', '=', 'p.CodeNum')
+                    ->leftJoin('od_procedures as p', function ($join) use ($officeId) {
+                        $join->on('pl.CodeNum', '=', 'p.CodeNum')
+                            ->where('p.office_id', '=', $officeId);
+                    })
+                    ->where('pl.office_id', $officeId)
                     ->whereIn('pl.PatNum', $patChunk)
                     ->whereIn('pl.AptNum', $aptNums)
                     ->select('pl.AptNum', 'pl.ProcFee', 'pl.OldCode', 'p.ProcCode')
@@ -216,6 +225,7 @@ class CalendarController extends Controller
         if (! empty($patNums)) {
             foreach (array_chunk($patNums, 200) as $patChunk) {
                 $fees = DB::table('od_procedure_logs')
+                    ->where('office_id', $officeId)
                     ->whereIn('PatNum', $patChunk)
                     ->whereIn('ProcStatus', ['1', 'TP'])
                     ->where(function ($sub) {
@@ -237,6 +247,7 @@ class CalendarController extends Controller
         if (! empty($patNums)) {
             foreach (array_chunk($patNums, 200) as $patChunk) {
                 $dates = DB::table('od_procedure_logs')
+                    ->where('office_id', $officeId)
                     ->whereIn('PatNum', $patChunk)
                     ->whereIn('ProcStatus', ['2', 'C', 'D'])
                     ->where('ProcDate', '<=', $endDateTime)
@@ -256,7 +267,11 @@ class CalendarController extends Controller
         if (! empty($insPlanNums)) {
             foreach (array_chunk($insPlanNums, 200) as $planChunk) {
                 $carriers = DB::table('od_insplans as ip')
-                    ->join('od_carriers as c', 'ip.CarrierNum', '=', 'c.CarrierNum')
+                    ->join('od_carriers as c', function ($join) use ($officeId) {
+                        $join->on('ip.CarrierNum', '=', 'c.CarrierNum')
+                            ->where('c.office_id', '=', $officeId);
+                    })
+                    ->where('ip.office_id', $officeId)
                     ->whereIn('ip.PlanNum', $planChunk)
                     ->pluck('c.CarrierName', 'ip.PlanNum')
                     ->toArray();
@@ -325,7 +340,7 @@ class CalendarController extends Controller
             ->orderColumn('referral_source', 'od_appointments.AptNum $1')
             ->orderColumn('unscheduled_tx', 'od_appointments.AptNum $1')
             ->orderColumn('last_visit_date', 'od_appointments.AptNum $1')
-            ->addColumn('location', fn ($row) => $this->clinics->name((int) ($row->ClinicNum ?? 0)))
+            ->addColumn('location', fn ($row) => $this->clinics->name((int) ($row->ClinicNum ?? 0), $officeId))
             ->addColumn('patient_name', fn ($row) => preg_replace('/\s+/', ' ', trim(($row->patient?->FName ?? '').' '.($row->patient?->LName ?? ''))))
             ->addColumn('appointment_date', fn ($row) => $row->AptDateTime ? (new Carbon($row->AptDateTime))->format('Y-m-d') : '')
             ->addColumn('appointment_time', fn ($row) => $row->AptDateTime ? (new Carbon($row->AptDateTime))->format('H:i A') : '')
@@ -450,6 +465,7 @@ class CalendarController extends Controller
     {
         $start = $request->get('start') ?? date('Y-m-d');
         $end = $request->get('end') ?? $start;
+        $officeId = Office::getActiveOfficeId();
 
         $startDateTime = substr($start, 0, 10).' 00:00:00';
         $endDateTime = substr($end, 0, 10).' 23:59:59';
@@ -509,7 +525,7 @@ class CalendarController extends Controller
         // Mock tiers heavily matching the requested UI visually
         $data = [
             [
-                'location' => $this->clinics->name(0),
+                'location' => $this->clinics->name(0, $officeId),
                 'scheduled_appointments' => $scheduledApts,
                 'provider_count' => $providerCount,
                 'booked_hours' => number_format($bookedMinutes / 60, 2),
@@ -745,6 +761,7 @@ class CalendarController extends Controller
     {
         $start = $request->get('start') ?? date('Y-m-01');
         $end = $request->get('end') ?? date('Y-m-t');
+        $officeId = Office::getActiveOfficeId();
 
         // 1. Gross production per date
         $grossByDate = OdProcedureLog::query()
@@ -763,6 +780,7 @@ class CalendarController extends Controller
 
         // 3. Writeoffs per date
         $woByDate = DB::table('od_claim_procs as c')
+            ->where('c.office_id', $officeId)
             ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
             ->selectRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) as date_str, COALESCE(SUM(CAST(c.WriteOff AS DECIMAL(12,2))), 0) AS total")
             ->groupBy('date_str')
@@ -787,8 +805,9 @@ class CalendarController extends Controller
 
         // 5. New Patients (first completed procedure cohort) per date
         $newPtsByDate = DB::table('od_procedure_logs as pl')
+            ->where('pl.office_id', $officeId)
             ->joinSub(
-                $this->patients->firstVisitCohort(),
+                $this->patients->firstVisitCohort($officeId),
                 'fv',
                 'pl.PatNum',
                 '=',

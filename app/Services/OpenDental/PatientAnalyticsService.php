@@ -7,6 +7,7 @@ use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\MetricFilter;
 use App\Models\OdAppointment;
+use App\Models\Office;
 
 class PatientAnalyticsService
 {
@@ -16,19 +17,20 @@ class PatientAnalyticsService
         private readonly PatientVisitService $patientVisits,
     ) {}
 
-    public function getPatientAnalytics($start, $end)
+    public function getPatientAnalytics($start, $end, ?int $officeId = null)
     {
-        $filter = new MetricFilter($start, $end);
+        $officeId = $officeId ?? Office::getActiveOfficeId();
+        $filter = new MetricFilter($start, $end, [], [], null, $officeId);
 
         $scheduled = (new OdAppointment)->scheduledPatients($start, $end);
 
         // Patient visits = distinct patient-per-day among completed procedures
-        $visited = $this->patientVisits->patientVisits($start, $end);
+        $visited = $this->patientVisits->patientVisits($start, $end, [], [], $officeId);
 
         // New patients: single source of truth from PatientVisitService
-        $newPatientVisit = $this->patientVisits->newPatientCount($start, $end);
+        $newPatientVisit = $this->patientVisits->newPatientCount($start, $end, [], [], $officeId);
 
-        $newPatientsScheduled = (new OdAppointment)->newPatientsScheduled($start, $end);
+        $newPatientsScheduled = (new OdAppointment)->newPatientsScheduled($start, $end, $officeId);
 
         // Average net production per patient visit.
         $patientAvgProduction = $visited > 0

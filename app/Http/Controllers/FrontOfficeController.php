@@ -9,6 +9,7 @@ use App\Models\OdAppointment;
 use App\Models\OdPatient;
 use App\Models\OdProcedureLog;
 use App\Models\OdRecall;
+use App\Models\Office;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -333,13 +334,19 @@ class FrontOfficeController extends Controller
             $candidateApts->pluck('InsPlan2')->map(fn ($i) => (string) $i)->toArray()
         )), fn ($s) => $s !== '' && $s !== '0'));
 
+        $officeId = Office::getActiveOfficeId();
+
         // Batch procedure logs & descriptions (using PatNum index + AptNum filter)
         $feesMap = [];
         $procDescMap = [];
         if (! empty($patNums) && ! empty($aptNums)) {
             foreach (array_chunk($patNums, 200) as $patChunk) {
                 $procLogs = DB::table('od_procedure_logs as pl')
-                    ->leftJoin('od_procedures as p', 'pl.CodeNum', '=', 'p.CodeNum')
+                    ->leftJoin('od_procedures as p', function ($join) use ($officeId) {
+                        $join->on('pl.CodeNum', '=', 'p.CodeNum')
+                            ->where('p.office_id', '=', $officeId);
+                    })
+                    ->where('pl.office_id', $officeId)
                     ->whereIn('pl.PatNum', $patChunk)
                     ->whereIn('pl.AptNum', $aptNums)
                     ->where('pl.ProcStatus', '!=', '6')
@@ -380,7 +387,11 @@ class FrontOfficeController extends Controller
         if (! empty($insPlanNums)) {
             foreach (array_chunk($insPlanNums, 200) as $planChunk) {
                 $carriers = DB::table('od_insplans as ip')
-                    ->join('od_carriers as c', 'ip.CarrierNum', '=', 'c.CarrierNum')
+                    ->join('od_carriers as c', function ($join) use ($officeId) {
+                        $join->on('ip.CarrierNum', '=', 'c.CarrierNum')
+                            ->where('c.office_id', '=', $officeId);
+                    })
+                    ->where('ip.office_id', $officeId)
                     ->whereIn('ip.PlanNum', $planChunk)
                     ->pluck('c.CarrierName', 'ip.PlanNum')
                     ->toArray();

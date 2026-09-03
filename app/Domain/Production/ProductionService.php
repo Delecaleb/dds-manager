@@ -197,8 +197,10 @@ class ProductionService
             ->whereBetween('pl.ProcDate', [$filter->start, $filter->end]);
 
         if ($filter->hygiene !== null) {
-            $q->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
-                ->where('pc.IsHygiene', $filter->hygiene ? 'true' : 'false');
+            $q->join('od_procedures as pc', function ($join) use ($filter) {
+                $join->on('pl.CodeNum', '=', 'pc.CodeNum')
+                    ->where('pc.office_id', '=', $filter->officeId);
+            })->where('pc.IsHygiene', $filter->hygiene ? 'true' : 'false');
         }
 
         $this->applyClinicProvider($q, $filter, 'pl');
@@ -208,6 +210,8 @@ class ProductionService
 
     protected function applyClinicProvider(Builder $q, MetricFilter $filter, string $alias): void
     {
+        $q->where("{$alias}.office_id", $filter->officeId);
+
         if ($filter->clinics) {
             $q->whereIn("{$alias}.ClinicNum", $filter->clinics);
         }

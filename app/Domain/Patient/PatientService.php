@@ -4,6 +4,7 @@ namespace App\Domain\Patient;
 
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
+use App\Models\Office;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -30,10 +31,13 @@ class PatientService
      * Returns a query builder (columns: PatNum, first_date) for use in:
      *   ->joinSub($patients->firstVisitCohort(), 'fv', 'pl.PatNum', '=', 'fv.PatNum')
      */
-    public function firstVisitCohort(): Builder
+    public function firstVisitCohort(?int $officeId = null): Builder
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
+
         return DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
+            ->where('office_id', $officeId)
             ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereRaw("COALESCE(CodeNum, '') != '626'")
             ->groupBy('PatNum');
@@ -46,12 +50,13 @@ class PatientService
      *
      * @param  string  $dateAlias  column alias for the first-visit date (default 'first_date')
      */
-    public function firstVisitCohortSql(string $dateAlias = 'first_date'): string
+    public function firstVisitCohortSql(string $dateAlias = 'first_date', ?int $officeId = null): string
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
         $completed = ProcStatus::inList(ProcStatus::completed());
 
         return "SELECT PatNum, MIN(ProcDate) AS {$dateAlias} "
-            ."FROM od_procedure_logs WHERE ProcStatus IN ({$completed}) AND COALESCE(CodeNum, '') != '626' GROUP BY PatNum";
+            ."FROM od_procedure_logs WHERE office_id = {$officeId} AND ProcStatus IN ({$completed}) AND COALESCE(CodeNum, '') != '626' GROUP BY PatNum";
     }
 
     /** Patients seen (any completed procedure) in the period. */
@@ -64,17 +69,17 @@ class PatientService
     public function newPatientCount(MetricFilter $filter): int
     {
         if ($this->patientVisitService) {
-            return $this->patientVisitService->newPatientCount($filter->start, $filter->end, $filter->clinics, $filter->providers);
+            return $this->patientVisitService->newPatientCount($filter->start, $filter->end, $filter->clinics, $filter->providers, $filter->officeId);
         }
 
-        return app(PatientVisitService::class)->newPatientCount($filter->start, $filter->end, $filter->clinics, $filter->providers);
+        return app(PatientVisitService::class)->newPatientCount($filter->start, $filter->end, $filter->clinics, $filter->providers, $filter->officeId);
     }
 
     /** Existing patients: seen in the period but whose first visit predates it. */
     public function existingPatientCount(MetricFilter $filter): int
     {
         return (int) $this->completedInPeriod($filter)
-            ->joinSub($this->firstVisitCohort(), 'fv', 'pl.PatNum', '=', 'fv.PatNum')
+            ->joinSub($this->firstVisitCohort($filter->officeId), 'fv', 'pl.PatNum', '=', 'fv.PatNum')
             ->where('fv.first_date', '<', $filter->start)
             ->distinct()
             ->count('pl.PatNum');
@@ -84,6 +89,7 @@ class PatientService
     private function completedInPeriod(MetricFilter $filter): Builder
     {
         $q = DB::table('od_procedure_logs as pl')
+            ->where('pl.office_id', $filter->officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
             ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
             ->whereBetween('pl.ProcDate', [$filter->start, $filter->end]);

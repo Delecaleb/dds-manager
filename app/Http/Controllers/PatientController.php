@@ -34,9 +34,10 @@ class PatientController extends Controller
 
     public function data()
     {
+        $officeId = Office::getActiveOfficeId();
         $query = OdPatient::query()
             ->select('od_patients.*')
-            ->selectSub(function ($q) {
+            ->selectSub(function ($q) use ($officeId) {
                 // Fetch Guarantor Full Name via SubQuery Map securely
                 $concatSql = DB::getDriverName() === 'sqlite'
                     ? "LName || ', ' || FName"
@@ -44,22 +45,26 @@ class PatientController extends Controller
 
                 $q->from('od_patients as gp')
                     ->selectRaw($concatSql)
+                    ->where('gp.office_id', $officeId)
                     ->whereColumn('gp.PatNum', 'od_patients.Guarantor')
                     ->limit(1);
             }, 'guarantor_name')
-            ->selectSub(function ($q) {
+            ->selectSub(function ($q) use ($officeId) {
                 $q->from('od_appointments')
                     ->selectRaw('MIN(AptDateTime)')
+                    ->where('office_id', $officeId)
                     ->whereColumn('od_appointments.PatNum', 'od_patients.PatNum');
             }, 'first_visit')
-            ->selectSub(function ($q) {
+            ->selectSub(function ($q) use ($officeId) {
                 $q->from('od_procedure_logs')
                     ->selectRaw('COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0)')
+                    ->where('office_id', $officeId)
                     ->whereColumn('od_procedure_logs.PatNum', 'od_patients.PatNum');
             }, 'lifetime_production')
-            ->selectSub(function ($q) {
+            ->selectSub(function ($q) use ($officeId) {
                 $q->from('od_pay_splits')
                     ->selectRaw('COALESCE(SUM(CAST(SplitAmt AS DECIMAL(12,2))), 0)')
+                    ->where('office_id', $officeId)
                     ->whereColumn('od_pay_splits.PatNum', 'od_patients.PatNum');
             }, 'lifetime_collection');
 

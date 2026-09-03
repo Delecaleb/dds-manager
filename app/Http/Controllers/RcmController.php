@@ -42,7 +42,9 @@ class RcmController extends Controller
         $tab = $request->input('tab', 'claim_submissions');
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
-        $officeId = $request->input('office_id') !== 'all' ? (int) $request->input('office_id') : null;
+        $officeId = $request->input('office_id') === 'all'
+            ? null
+            : ($request->filled('office_id') ? (int) $request->input('office_id') : Office::getActiveOfficeId());
         $tier = $request->input('tier');
         $search = $request->input('search');
         $page = max((int) $request->input('page', 1), 1);
@@ -78,7 +80,9 @@ class RcmController extends Controller
         $tab = $request->input('tab', 'claim_submissions');
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
-        $officeId = $request->input('office_id') !== 'all' ? (int) $request->input('office_id') : null;
+        $officeId = $request->input('office_id') === 'all'
+            ? null
+            : ($request->filled('office_id') ? (int) $request->input('office_id') : Office::getActiveOfficeId());
         $tier = $request->input('tier');
         $search = $request->input('search');
 

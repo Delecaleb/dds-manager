@@ -88,28 +88,32 @@ class OdAppointment extends Model
             ->value('cnt');
     }
 
-    public function newPatientsScheduled($start, $end)
+    public function newPatientsScheduled($start, $end, ?int $officeId = null)
     {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
         $startDate = substr($start, 0, 10).' 00:00:00';
         $endDate = substr($end, 0, 10).' 23:59:59';
         $startDay = substr($start, 0, 10);
 
         return (int) DB::table('od_appointments as a')
+            ->where('a.office_id', $officeId)
             ->whereBetween('a.AptDateTime', [$startDate, $endDate])
             ->whereIn('a.AptStatus', [1, 2])
             ->whereIn('a.IsNewPatient', [1, '1', true, 'true'])
             ->whereNotIn('a.PatNum', [21216, 21231, 21254])
-            ->whereNotExists(function ($query) use ($startDate) {
+            ->whereNotExists(function ($query) use ($startDate, $officeId) {
                 $query->select(DB::raw(1))
                     ->from('od_appointments as a_old')
+                    ->where('a_old.office_id', $officeId)
                     ->whereColumn('a_old.PatNum', 'a.PatNum')
                     ->whereIn('a_old.AptStatus', [1, 2])
                     ->whereIn('a_old.IsNewPatient', [1, '1', true, 'true'])
                     ->where('a_old.AptDateTime', '<', $startDate);
             })
-            ->whereNotExists(function ($query) use ($startDay) {
+            ->whereNotExists(function ($query) use ($startDay, $officeId) {
                 $query->select(DB::raw(1))
                     ->from('od_procedure_logs as pl')
+                    ->where('pl.office_id', $officeId)
                     ->whereColumn('pl.PatNum', 'a.PatNum')
                     ->where('pl.ProcDate', '<', $startDay)
                     ->whereIn('pl.ProcStatus', ['C', '2', 'D']);

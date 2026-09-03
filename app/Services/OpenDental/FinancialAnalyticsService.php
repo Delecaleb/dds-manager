@@ -11,9 +11,9 @@ class FinancialAnalyticsService
         private readonly ProductionService $production,
     ) {}
 
-    public function filterAnalysis($start, $end)
+    public function filterAnalysis($start, $end, ?int $officeId = null)
     {
-        $s = $this->production->summary(new MetricFilter($start, $end));
+        $s = $this->production->summary(new MetricFilter($start, $end, [], [], false, $officeId));
 
         return [
             'gross_production' => $s->gross,

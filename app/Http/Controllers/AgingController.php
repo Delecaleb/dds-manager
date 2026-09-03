@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Support\ClinicRegistry;
+use App\Models\Office;
 use App\Services\OpenDental\AgingCalculationService;
 use Illuminate\Http\Request;
 
@@ -143,7 +144,7 @@ class AgingController extends Controller
             'data' => [
                 [
                     'id' => 1,
-                    'office' => $this->clinics->name(0),
+                    'office' => $this->clinics->name(0, Office::getActiveOfficeId()),
                     'bal_current' => $fmtCell($totals['current_total']),
                     'bal_30' => $fmtCell($totals['thirty_total']),
                     'bal_60' => $fmtCell($totals['sixty_total']),

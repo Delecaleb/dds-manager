@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
+use App\Models\Office;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -38,7 +39,9 @@ class ProviderPortalController extends Controller
 
     public function providers()
     {
+        $officeId = Office::getActiveOfficeId();
         $rows = DB::table('od_providers')
+            ->where('office_id', $officeId)
             ->whereIn('IsHidden', ['false', '0', 0, false])
             ->orderBy('LName')
             ->orderBy('PName')
@@ -59,10 +62,11 @@ class ProviderPortalController extends Controller
         $mode = $request->input('mode', 'daily');
         $provs = array_values(array_filter((array) $request->input('providers', [])));
         $type = $request->input('provider_type', 'all');
+        $officeId = Office::getActiveOfficeId();
 
         [$groupExpr, $labelExpr] = $this->periodExprs($mode, 'pl');
 
-        $bindings = [$start, $end];
+        $bindings = [$officeId, $officeId, $start, $end];
         $provFilter = '';
         $typeFilter = '';
 
@@ -82,8 +86,9 @@ class ProviderPortalController extends Controller
             SELECT {$labelExpr} AS label,
                    COALESCE(SUM(pl.ProcFee), 0) AS production
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus IN ({$this->completedIn})
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               {$provFilter}
               {$typeFilter}
@@ -104,10 +109,11 @@ class ProviderPortalController extends Controller
         $mode = $request->input('mode', 'daily');
         $provs = array_values(array_filter((array) $request->input('providers', [])));
         $type = $request->input('provider_type', 'all');
+        $officeId = Office::getActiveOfficeId();
 
         [$groupExpr, $labelExpr] = $this->periodExprs($mode, 'pl');
 
-        $bindings = [$start, $end];
+        $bindings = [$officeId, $officeId, $officeId, $start, $end];
         $provFilter = '';
         $typeFilter = '';
 
@@ -141,9 +147,10 @@ class ProviderPortalController extends Controller
                 SUM(pc.ProcCode IN ('D4261','D4262','D4268','D6199'))                          AS laser,
                 SUM(pc.ProcCode IN ('D1330','D1320'))                                          AS toothbrushes
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            JOIN od_providers p   ON pl.ProvNum  = p.ProvNum
-            WHERE pl.ProcStatus IN ({$this->completedIn})
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            JOIN od_providers p   ON pl.ProvNum  = p.ProvNum AND p.office_id = ?
+            WHERE pl.office_id = ?
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND p.IsHidden IN ('false', '0', 0)
               {$provFilter}
@@ -152,7 +159,7 @@ class ProviderPortalController extends Controller
             ORDER BY period DESC, total_prod DESC
         ", $bindings);
 
-        return response()->json(array_map(function ($r) {
+        return response()->json(array_map(function ($r) use ($officeId) {
             $prodPerVisit = $r->visits > 0 ? round($r->total_prod / $r->visits, 2) : 0;
             $visitsPerDay = $r->work_days > 0 ? round($r->visits / $r->work_days, 2) : 0;
             $avgHygDay = $r->hyg_days > 0 ? round($r->hyg_prod / $r->hyg_days, 2) : 0;
@@ -165,7 +172,7 @@ class ProviderPortalController extends Controller
 
             return [
                 'provider' => $r->provider_name,
-                'office' => $this->clinics->name(0),
+                'office' => $this->clinics->name(0, $officeId),
                 'provider_type' => $this->specialtyMap[(int) $r->Specialty] ?? 'General',
                 'date' => $r->period,
                 'avg_rev_hyg' => $avgHygDay,
