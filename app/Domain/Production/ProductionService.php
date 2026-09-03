@@ -200,7 +200,14 @@ class ProductionService
             $q->join('od_procedures as pc', function ($join) use ($filter) {
                 $join->on('pl.CodeNum', '=', 'pc.CodeNum')
                     ->where('pc.office_id', '=', $filter->officeId);
-            })->where('pc.IsHygiene', $filter->hygiene ? 'true' : 'false');
+            })->where(function ($q) use ($filter) {
+                if ($filter->hygiene) {
+                    $q->whereIn('pc.IsHygiene', ['true', '1', 1, true]);
+                } else {
+                    $q->whereIn('pc.IsHygiene', ['false', '0', 0, false])
+                        ->orWhereNull('pc.IsHygiene');
+                }
+            });
         }
 
         $this->applyClinicProvider($q, $filter, 'pl');

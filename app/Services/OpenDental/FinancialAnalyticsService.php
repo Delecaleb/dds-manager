@@ -13,7 +13,7 @@ class FinancialAnalyticsService
 
     public function filterAnalysis($start, $end, ?int $officeId = null)
     {
-        $s = $this->production->summary(new MetricFilter($start, $end, [], [], false, $officeId));
+        $s = $this->production->summary(new MetricFilter($start, $end, [], [], null, $officeId));
 
         return [
             'gross_production' => $s->gross,

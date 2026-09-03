@@ -332,19 +332,19 @@ class FinancialController extends Controller
             SELECT
                 COALESCE(pr.ProvNum, 0) AS prov_num,
                 {$provExpr} AS provider,
-                pc.Descript AS service,
-                pc.ProcCode AS service_code,
+                COALESCE(pc.Descript, 'Procedure') AS service,
+                COALESCE(pc.ProcCode, pl.CodeNum) AS service_code,
                 COUNT(*)         AS cnt,
                 CAST(pl.ProcFee AS DECIMAL(12,2)) AS service_fee,
                 SUM(CAST(pl.ProcFee AS DECIMAL(12,2))) AS total_production
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            LEFT JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             LEFT JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
             WHERE pl.office_id = ?
               AND pl.ProcStatus IN ({$this->completedIn})
               AND DATE(REPLACE(pl.ProcDate, 'T', ' ')) BETWEEN ? AND ?
               {$provFilter}
-            GROUP BY pr.ProvNum, pr.Abbr, pr.LName, pr.PName, pc.CodeNum, pc.ProcCode, pc.Descript, CAST(pl.ProcFee AS DECIMAL(12,2))
+            GROUP BY pr.ProvNum, pr.Abbr, pr.LName, pr.PName, pc.CodeNum, pc.ProcCode, pc.Descript, CAST(pl.ProcFee AS DECIMAL(12,2)), pl.CodeNum
             ORDER BY total_production DESC, cnt DESC
         ", array_merge([$officeId, $officeId], $bindings));
 

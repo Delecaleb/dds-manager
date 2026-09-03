@@ -17,10 +17,10 @@ use Illuminate\Support\Collection;
 final class ProcStatus
 {
     /** Completed procedures. Blueprint D1. */
-    public const COMPLETED = ['C', '2'];
+    public const COMPLETED = ['C', '2', 2, 'Complete', 'complete'];
 
     /** Treatment-planned (proposed) procedures. Blueprint D2. */
-    public const TREATMENT_PLANNED = ['TP', '1'];
+    public const TREATMENT_PLANNED = ['TP', '1', 1, 'TreatmentPlanned', 'treatmentplanned'];
 
     /** @return string[] for ->whereIn('ProcStatus', ProcStatus::completed()) */
     public static function completed(): array
