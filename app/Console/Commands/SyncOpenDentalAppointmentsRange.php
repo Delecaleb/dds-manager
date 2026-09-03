@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\SyncsForOffices;
 use App\Services\Sync\AppointmentSyncService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -12,11 +13,13 @@ use Illuminate\Console\Command;
  * Reuses AppointmentSyncService (same batching, retry, keyset cursor and
  * idempotent upserts as sync:appointments) and only narrows the source query
  * to an AptDateTime window. It records progress under its own sync_logs module
- * ("appointment:<start>..<end>"), so it can be killed and resumed, and can
+ * ("office_<id>:appointment:<start>..<end>"), so it can be killed and resumed, and can
  * never clobber the cursor or watermark of the full-table sync.
  */
 class SyncOpenDentalAppointmentsRange extends Command
 {
+    use SyncsForOffices;
+
     /**
      * The name and signature of the console command.
      *
@@ -24,14 +27,15 @@ class SyncOpenDentalAppointmentsRange extends Command
      */
     protected $signature = 'sync:appointments-range
                             {--since=2025-01-01 : Inclusive AptDateTime lower bound (Y-m-d)}
-                            {--until= : Inclusive AptDateTime upper bound (Y-m-d); omit for open-ended "till date"}';
+                            {--until= : Inclusive AptDateTime upper bound (Y-m-d); omit for open-ended "till date"}
+                            {--office-id= : Specific office ID to target (defaults to all active offices)}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Sync appointments from OpenDental for an AptDateTime window (defaults to 2025-01-01 onwards)';
+    protected $description = 'Sync appointments from OpenDental for an AptDateTime window (supports optional --office-id)';
 
     /**
      * Execute the console command.
@@ -59,23 +63,14 @@ class SyncOpenDentalAppointmentsRange extends Command
             return self::FAILURE;
         }
 
-        $this->info(sprintf(
-            'Syncing appointments for AptDateTime %s .. %s',
-            $since ?? 'beginning',
-            $until ?? 'today'
-        ));
+        $label = sprintf('appointments (%s .. %s)', $since ?? 'beginning', $until ?? 'today');
 
-        try {
-            $syncService->withDateWindow($since, $until)->sync();
-        } catch (\Throwable $e) {
-            $this->error('Sync failed: '.$e->getMessage());
-
-            return self::FAILURE;
-        }
-
-        $this->info('Done.');
-
-        return self::SUCCESS;
+        return $this->syncEachOffice($label, function ($office) use ($since, $until) {
+            app(AppointmentSyncService::class)
+                ->forOffice($office)
+                ->withDateWindow($since, $until)
+                ->sync();
+        });
     }
 
     /**

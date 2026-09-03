@@ -2,31 +2,36 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\SyncsForOffices;
 use App\Services\Sync\SyncCarrierService;
 use Illuminate\Console\Command;
 
 class SyncCarrierMap extends Command
 {
+    use SyncsForOffices;
+
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'sync:carriers';
+    protected $signature = 'sync:carriers
+                            {--office-id= : Specific office ID to target (defaults to all active offices)}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = ' Sync carrier from OpenDental to local database';
+    protected $description = 'Sync carriers from OpenDental to local database (supports optional --office-id)';
 
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
-        $syncService = app(SyncCarrierService::class);
-        $syncService->sync();
+        return $this->syncEachOffice('carriers', function ($office) {
+            app(SyncCarrierService::class)->forOffice($office)->sync();
+        });
     }
 }

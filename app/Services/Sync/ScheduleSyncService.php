@@ -25,9 +25,4 @@ class ScheduleSyncService extends BaseQuerySyncService
     {
         return 'DateTStamp';
     }
-
-    protected function module(): string
-    {
-        return 'schedules';
-    }
 }

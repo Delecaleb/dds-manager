@@ -33,18 +33,18 @@ class SyncDuplicatesTest extends TestCase
             ['office_id' => $office->id, 'PatNum' => 102, 'Guarantor' => 101, 'BalTotal' => '50.00', 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        $service = app(PatientBalanceSyncService::class);
+        $service = app(PatientBalanceSyncService::class)->forOffice($office);
 
         // First sync run
         $service->sync();
 
-        $countRun1 = OdPatientBalance::where('office_id', $office->id)->where('PatNum', 101)->count();
+        $countRun1 = OdPatientBalance::withoutGlobalScopes()->where('office_id', $office->id)->where('PatNum', 101)->count();
         $this->assertEquals(1, $countRun1);
 
         // Second sync run (simulating re-run)
         $service->sync();
 
-        $countRun2 = OdPatientBalance::where('office_id', $office->id)->where('PatNum', 101)->count();
+        $countRun2 = OdPatientBalance::withoutGlobalScopes()->where('office_id', $office->id)->where('PatNum', 101)->count();
         $this->assertEquals(1, $countRun2, 'Patient balance sync inserted duplicate records for guarantor PatNum 101');
     }
 

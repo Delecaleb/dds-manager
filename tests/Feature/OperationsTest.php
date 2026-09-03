@@ -1815,6 +1815,7 @@ class OperationsTest extends TestCase
 
         DB::table('od_procedure_logs')->insert([
             'ProcNum' => 7702,
+            'AptNum' => 5501,
             'PatNum' => $patient->PatNum,
             'ProvNum' => $provider->ProvNum,
             'ProcDate' => '2026-08-05',
@@ -1829,6 +1830,7 @@ class OperationsTest extends TestCase
         // Second procedure for same patient ($50.00) to verify grouping into $500.00
         DB::table('od_procedure_logs')->insert([
             'ProcNum' => 7703,
+            'AptNum' => 5501,
             'PatNum' => $patient->PatNum,
             'ProvNum' => $provider->ProvNum,
             'ProcDate' => '2026-08-05',

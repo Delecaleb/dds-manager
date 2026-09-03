@@ -2,6 +2,7 @@
 
 namespace App\Services\Sync;
 
+use App\Models\Office;
 use App\Models\SyncLog;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -15,26 +16,50 @@ use Illuminate\Support\Facades\DB;
  */
 class PatientBalanceSyncService
 {
+    protected ?Office $office = null;
+
+    public function forOffice(?Office $office): static
+    {
+        $this->office = $office;
+
+        return $this;
+    }
+
+    public function getOffice(): Office
+    {
+        return $this->office ?? Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
+    }
+
     protected function module(): string
     {
-        return 'patient-balance';
+        $officeId = $this->getOffice()->id ?? 1;
+
+        return "office_{$officeId}:patient-balance";
     }
 
     public function sync(): void
     {
-        $log = SyncLog::firstOrCreate(
+        $office = $this->getOffice();
+        $officeId = $office->id ?? 1;
+
+        $log = SyncLog::withoutGlobalScopes()->firstOrCreate(
             ['module' => $this->module()],
-            ['status' => 'idle', 'total_processed' => 0]
+            [
+                'office_id' => $officeId,
+                'status' => 'idle',
+                'total_processed' => 0,
+            ]
         );
 
         $log->update([
+            'office_id' => $officeId,
             'status' => 'running',
             'started_at' => now(),
             'last_error' => null,
         ]);
 
         try {
-            $rows = $this->guarantorRollups();
+            $rows = $this->guarantorRollups($officeId);
 
             foreach (array_chunk($rows, 500) as $batch) {
                 DB::table('od_patient_balances')->upsert(
@@ -63,15 +88,21 @@ class PatientBalanceSyncService
         }
     }
 
-    protected function guarantorRollups(): array
+    protected function guarantorRollups(?int $officeId = null): array
     {
         $now = now();
 
-        return DB::table('od_patients as p')
+        $query = DB::table('od_patients as p')
             ->leftJoin('od_patients as g', function ($join) {
                 $join->on('p.Guarantor', '=', 'g.PatNum')
                     ->on('p.office_id', '=', 'g.office_id');
-            })
+            });
+
+        if ($officeId !== null) {
+            $query->where('p.office_id', $officeId);
+        }
+
+        return $query
             ->groupBy('p.office_id', DB::raw('COALESCE(g.PatNum, p.PatNum)'))
             ->selectRaw("
                 p.office_id as office_id,

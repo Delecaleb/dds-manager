@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\SyncsForOffices;
 use App\Services\Sync\ProcedureLogSyncService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -12,11 +13,13 @@ use Illuminate\Console\Command;
  * Reuses ProcedureLogSyncService (same batching, retry, keyset cursor and
  * idempotent upserts as sync:procedurelogs) and only narrows the source query
  * to a ProcDate window. It records progress under its own sync_logs module
- * ("procedurelog:<start>..<end>"), so it can be killed and resumed, and can
+ * ("office_<id>:procedurelog:<start>..<end>"), so it can be killed and resumed, and can
  * never clobber the cursor or watermark of the full-table sync.
  */
 class SyncOpenDentalProcedureLogsRange extends Command
 {
+    use SyncsForOffices;
+
     /**
      * The name and signature of the console command.
      *
@@ -24,14 +27,15 @@ class SyncOpenDentalProcedureLogsRange extends Command
      */
     protected $signature = 'sync:procedurelogs-range
                             {--since=2025-01-01 : Inclusive ProcDate lower bound (Y-m-d)}
-                            {--until= : Inclusive ProcDate upper bound (Y-m-d); omit for open-ended "till date"}';
+                            {--until= : Inclusive ProcDate upper bound (Y-m-d); omit for open-ended "till date"}
+                            {--office-id= : Specific office ID to target (defaults to all active offices)}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Sync procedure logs from OpenDental for a ProcDate window (defaults to 2025-01-01 onwards)';
+    protected $description = 'Sync procedure logs from OpenDental for a ProcDate window (supports optional --office-id)';
 
     /**
      * Execute the console command.
@@ -59,23 +63,14 @@ class SyncOpenDentalProcedureLogsRange extends Command
             return self::FAILURE;
         }
 
-        $this->info(sprintf(
-            'Syncing procedurelog for ProcDate %s .. %s',
-            $since ?? 'beginning',
-            $until ?? 'today'
-        ));
+        $label = sprintf('procedure logs (%s .. %s)', $since ?? 'beginning', $until ?? 'today');
 
-        try {
-            $syncService->withDateWindow($since, $until)->sync();
-        } catch (\Throwable $e) {
-            $this->error('Sync failed: '.$e->getMessage());
-
-            return self::FAILURE;
-        }
-
-        $this->info('Done.');
-
-        return self::SUCCESS;
+        return $this->syncEachOffice($label, function ($office) use ($since, $until) {
+            app(ProcedureLogSyncService::class)
+                ->forOffice($office)
+                ->withDateWindow($since, $until)
+                ->sync();
+        });
     }
 
     /**

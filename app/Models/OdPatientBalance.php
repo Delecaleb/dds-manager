@@ -2,16 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 class OdPatientBalance extends Model
 {
+    use BelongsToOffice;
+
     protected $primaryKey = 'PatNum';
 
     public $incrementing = false;
 
     protected $fillable = [
-
+        'office_id',
         'PatNum',
 
         'Bal_0_30',

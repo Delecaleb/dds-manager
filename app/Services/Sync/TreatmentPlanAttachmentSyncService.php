@@ -41,12 +41,4 @@ class TreatmentPlanAttachmentSyncService extends BaseQuerySyncService
     {
         return 'TreatPlanAttachNum';
     }
-
-    /**
-     * Name used in sync_logs.
-     */
-    protected function module(): string
-    {
-        return 'treatment_plan_attachments';
-    }
 }

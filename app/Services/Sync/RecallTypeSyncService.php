@@ -25,9 +25,4 @@ class RecallTypeSyncService extends BaseQuerySyncService
     {
         return null;
     }
-
-    protected function module(): string
-    {
-        return 'recall_types';
-    }
 }

@@ -218,7 +218,7 @@ abstract class BaseQuerySyncService
             }
         }
 
-        $log = SyncLog::firstOrCreate(
+        $log = SyncLog::withoutGlobalScopes()->firstOrCreate(
             ['module' => $this->module()],
             [
                 'office_id' => $office->id ?? 1,
@@ -407,12 +407,13 @@ abstract class BaseQuerySyncService
                     }
                 }
 
-                $existing = $modelClass::where('office_id', $officeId)->where($pk, $row[$pk])->first();
+                $existing = $modelClass::withoutGlobalScopes()->where('office_id', $officeId)->where($pk, $row[$pk])->first();
 
                 if ($existing === null) {
 
                     $model = new $modelClass;
                     $model->fill($data);
+                    $model->office_id = $officeId;
                     $model->{$pk} = $row[$pk];
                     $model->save();
 
@@ -420,6 +421,7 @@ abstract class BaseQuerySyncService
                 } else {
 
                     $existing->fill($data);
+                    $existing->office_id = $officeId;
 
                     if ($existing->isDirty()) {
                         $existing->save();

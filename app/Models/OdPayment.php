@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 class OdPayment extends Model
 {
+    use BelongsToOffice;
+
     protected $primaryKey = 'PayNum';
 
     public $incrementing = false;
 
     protected $fillable = [
+        'office_id',
         'PayNum',
         'PayType',
         'PayDate',

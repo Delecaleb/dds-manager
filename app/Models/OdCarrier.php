@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 class OdCarrier extends Model
 {
+    use BelongsToOffice;
+
     protected $primaryKey = 'CarrierNum';
 
     public $incrementing = false;
 
     protected $fillable = [
+        'office_id',
         'CarrierNum',
         'CarrierName',
         'Address',

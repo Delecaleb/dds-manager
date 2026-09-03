@@ -44,12 +44,4 @@ class TreatmentPlanSyncService extends BaseQuerySyncService
     {
         return 'TreatPlanNum';
     }
-
-    /**
-     * Module name stored in sync_logs.
-     */
-    protected function module(): string
-    {
-        return 'treatment_plans';
-    }
 }

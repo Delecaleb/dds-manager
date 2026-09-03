@@ -25,9 +25,4 @@ class DepositSyncService extends BaseQuerySyncService
     {
         return 'DateDeposit';
     }
-
-    protected function module(): string
-    {
-        return 'deposits';
-    }
 }

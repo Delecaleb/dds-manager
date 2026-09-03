@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\SyncsForOffices;
 use App\Services\Sync\HistAppointmentSyncService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -11,6 +12,8 @@ use Illuminate\Console\Command;
  */
 class SyncOpenDentalHistAppointmentsRange extends Command
 {
+    use SyncsForOffices;
+
     /**
      * The name and signature of the console command.
      *
@@ -18,14 +21,15 @@ class SyncOpenDentalHistAppointmentsRange extends Command
      */
     protected $signature = 'sync:histappointments-range
                             {--since=2025-01-01 : Inclusive AptDateTime lower bound (Y-m-d)}
-                            {--until= : Inclusive AptDateTime upper bound (Y-m-d); omit for open-ended "till date"}';
+                            {--until= : Inclusive AptDateTime upper bound (Y-m-d); omit for open-ended "till date"}
+                            {--office-id= : Specific office ID to target (defaults to all active offices)}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Sync historical appointments from OpenDental for an AptDateTime window (defaults to this year / 2025-01-01 onwards)';
+    protected $description = 'Sync historical appointments from OpenDental for an AptDateTime window (supports optional --office-id)';
 
     /**
      * Execute the console command.
@@ -53,23 +57,14 @@ class SyncOpenDentalHistAppointmentsRange extends Command
             return self::FAILURE;
         }
 
-        $this->info(sprintf(
-            'Syncing historical appointments for AptDateTime %s .. %s',
-            $since ?? 'beginning',
-            $until ?? 'today'
-        ));
+        $label = sprintf('historical appointments (%s .. %s)', $since ?? 'beginning', $until ?? 'today');
 
-        try {
-            $syncService->withDateWindow($since, $until)->sync();
-        } catch (\Throwable $e) {
-            $this->error('Sync failed: '.$e->getMessage());
-
-            return self::FAILURE;
-        }
-
-        $this->info('Done.');
-
-        return self::SUCCESS;
+        return $this->syncEachOffice($label, function ($office) use ($since, $until) {
+            app(HistAppointmentSyncService::class)
+                ->forOffice($office)
+                ->withDateWindow($since, $until)
+                ->sync();
+        });
     }
 
     /**

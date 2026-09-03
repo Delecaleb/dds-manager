@@ -25,9 +25,4 @@ class PaymentSyncService extends BaseQuerySyncService
     {
         return 'DateEntry';
     }
-
-    protected function module(): string
-    {
-        return 'payments';
-    }
 }

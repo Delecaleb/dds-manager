@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 class OdProcedure extends Model
 {
+    use BelongsToOffice;
+
     protected $fillable = [
+        'office_id',
         'CodeNum',
         'ProcCode',
         'Descript',

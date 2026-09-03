@@ -157,13 +157,17 @@ class ProcessPendingSyncRequests extends Command
                 ];
 
                 $targetTable = $tableMap[$module] ?? 'all';
-                $deleter->syncHardDeletes(
-                    $targetTable,
-                    false,
-                    $startDate,
-                    $endDate,
-                    $office->id ?? 1
-                );
+                $tablesToPrune = $targetTable === 'all'
+                    ? $deleter->getSupportedTables()
+                    : [$targetTable];
+
+                foreach ($tablesToPrune as $tbl) {
+                    if ($startDate && $endDate) {
+                        $deleter->pruneTable($tbl, $startDate, $endDate, $office, false);
+                    } else {
+                        $deleter->pruneAllRecords($tbl, $office, false);
+                    }
+                }
             }
 
             $req->update([
