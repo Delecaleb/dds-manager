@@ -13,6 +13,7 @@ use App\Helpers\MetricDefinitions;
 use App\Models\OdPatient;
 use App\Models\OdProcedure;
 use App\Models\OdProcedureLog;
+use App\Models\Office;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -47,6 +48,7 @@ class OperationsAnalyticsService
         private readonly ClinicRegistry $clinics,
         private readonly PayorService $payors,
         private readonly PatientVisitService $patientVisits,
+        private readonly ScheduleSnapshotService $scheduleSnapshots,
     ) {
         $this->clinicNames = $this->clinics->all();
     }
@@ -1030,7 +1032,10 @@ class OperationsAnalyticsService
         $newVisits = $this->patientVisits->newPatientVisits($start, $end, $clinics);
         $actualNpt = collect($newVisits)->groupBy('dates')->map(fn ($g) => $g->count());
 
-        // --- SCHEDULE METRICS ---
+        $officeId = Office::getActiveOfficeId() ?? 1;
+        $snapshots = $this->scheduleSnapshots->getSnapshotSummary($officeId, $start, $end, $clinics);
+
+        // --- SCHEDULE METRICS (Live Fallback) ---
         $schedProdQuery = DB::table('od_appointments as a')
             ->join('od_procedure_logs as pl', 'a.AptNum', '=', 'pl.AptNum')
             ->selectRaw('DATE(a.AptDateTime) as d, SUM(pl.ProcFee) as total')
@@ -1138,11 +1143,19 @@ class OperationsAnalyticsService
             $apv = (int) ($actualProd[$d]->pts_visits ?? 0);
             $anv = (int) ($actualNpt[$d] ?? 0);
 
-            $sp = (float) ($schedProd[$d] ?? 0);
-            $spv = (int) ($schedAppts[$d] ?? 0);
-            $snv = (int) ($schedNpt[$d] ?? 0);
-            $oah = (float) ($openApptHours[$d] ?? 0.0);
-            $uns = (float) ($unschedTx[$d] ?? 0.0);
+            if (isset($snapshots[$d])) {
+                $sp = (float) ($snapshots[$d]['sched_production'] ?? 0);
+                $spv = (int) ($snapshots[$d]['sched_pts_visit'] ?? 0);
+                $snv = (int) ($snapshots[$d]['sched_new_pts_visit'] ?? 0);
+                $oah = (float) ($snapshots[$d]['open_appt_hours'] ?? 0.0);
+                $uns = (float) ($snapshots[$d]['unscheduled_tx'] ?? 0.0);
+            } else {
+                $sp = (float) ($schedProd[$d] ?? 0);
+                $spv = (int) ($schedAppts[$d] ?? 0);
+                $snv = (int) ($schedNpt[$d] ?? 0);
+                $oah = (float) ($openApptHours[$d] ?? 0.0);
+                $uns = (float) ($unschedTx[$d] ?? 0.0);
+            }
 
             $goal = 0.0;
             $bp = $ap != 0 ? $ap : $sp;

@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Yajra\DataTables\Facades\DataTables;
 
 class CalendarController extends Controller
@@ -164,7 +165,7 @@ class CalendarController extends Controller
             ->toArray();
 
         $operatoryMap = [];
-        if (\Illuminate\Support\Facades\Schema::hasTable('od_operatories')) {
+        if (Schema::hasTable('od_operatories')) {
             $operatoryMap = DB::table('od_operatories')
                 ->where('office_id', $officeId)
                 ->pluck('OpName', 'OperatoryNum')

@@ -58,6 +58,23 @@ Schedule::command('sync:insplan')->dailyAt('01:30')->withoutOverlapping(15)->run
 Schedule::command('sync:histappointments')->dailyAt('02:00')->withoutOverlapping(15)->runInBackground()->onOneServer();
 
 /*
+| SCHEDULE SNAPSHOTS (8:00 AM EST lock & rolling future forecasts)
+*/
+Schedule::command('snapshot:daily-schedule --lock-today')
+    ->dailyAt('08:00')
+    ->timezone('America/New_York')
+    ->withoutOverlapping(15)
+    ->runInBackground()
+    ->onOneServer();
+
+Schedule::command('snapshot:daily-schedule --future-days=60')
+    ->hourly()
+    ->timezone('America/New_York')
+    ->withoutOverlapping(15)
+    ->runInBackground()
+    ->onOneServer();
+
+/*
 | NOTE: Heavy range-backfill commands (`sync:*-range`) are kept on-demand
 | for initial setups and manual backfills via CLI / UI Sync Requests to avoid
 | overloading OpenDental servers during regular scheduled runs.

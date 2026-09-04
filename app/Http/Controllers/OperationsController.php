@@ -9,6 +9,7 @@ use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
 use App\Models\OdPatient;
 use App\Models\OdProvider;
+use App\Models\Office;
 use App\Services\OpenDental\OperationsAnalyticsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -312,6 +313,8 @@ class OperationsController extends Controller
             ];
         };
 
+        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : (Office::getActiveOfficeId() ?? 1);
+
         if ($metric === 'sched_production') {
             $title = 'Scheduled Production Breakdown';
             $columns = [
@@ -325,29 +328,6 @@ class OperationsController extends Controller
                 ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
             ];
 
-            $apptsQuery = DB::table('od_appointments as a')
-                ->join('od_procedure_logs as pl', 'a.AptNum', '=', 'pl.AptNum')
-                ->select(
-                    'a.AptNum',
-                    'a.PatNum',
-                    'a.ProvNum',
-                    'a.AptDateTime',
-                    'a.AptStatus',
-                    DB::raw('SUM(pl.ProcFee) as total_fee')
-                )
-                ->whereNotIn('a.AptStatus', [6])
-                ->whereBetween('a.AptDateTime', [$start.' 00:00:00', $end.' 23:59:59'])
-                ->groupBy('a.AptNum', 'a.PatNum', 'a.ProvNum', 'a.AptDateTime', 'a.AptStatus');
-
-            if ($provNum) {
-                $apptsQuery->where('a.ProvNum', $provNum);
-            } elseif ($clinicNum) {
-                $apptsQuery->where('a.ClinicNum', $clinicNum);
-            }
-
-            $appts = $apptsQuery->orderBy('a.AptDateTime')->get();
-            $patMap = $mapPatients($appts->pluck('PatNum')->unique());
-
             $statusLabels = [
                 '1' => 'Scheduled',
                 '2' => 'Complete',
@@ -359,32 +339,97 @@ class OperationsController extends Controller
                 '8' => 'PtNoteCompleted',
             ];
 
-            $totProd = 0;
-            foreach ($appts as $apt) {
-                $fee = (float) $apt->total_fee;
-                if ($fee <= 0) {
-                    continue;
-                }
-                $totProd += $fee;
-                $provInfo = $formatProv($apt->ProvNum);
-                $st = (string) $apt->AptStatus;
+            $snapQuery = DB::table('od_appointment_schedule_snapshots')
+                ->where('office_id', $officeId)
+                ->whereBetween('snapshot_date', [$start, $end]);
 
-                $rows[] = [
-                    'pat_id' => $apt->PatNum,
-                    'patient' => [
-                        'label' => $patMap[$apt->PatNum] ?? 'Unknown',
-                        'link' => true,
-                    ],
-                    'prov_id' => $provInfo['id'],
-                    'provider' => $provInfo['name'],
-                    'prov_num' => $apt->ProvNum,
-                    'appt_id' => $apt->AptNum,
-                    'appt_date' => date('M d, Y h:i A', strtotime($apt->AptDateTime)),
-                    'status' => $statusLabels[$st] ?? ('Status '.$st),
-                    'production' => $fee,
-                ];
+            if ($provNum) {
+                $snapQuery->where('prov_num', $provNum);
+            } elseif ($clinicNum) {
+                $snapQuery->where('clinic_num', $clinicNum);
             }
-            $totals = ['production' => $totProd];
+
+            if ($snapQuery->exists()) {
+                $snapAppts = $snapQuery->orderBy('apt_date_time')->get();
+                $patMap = $mapPatients($snapAppts->pluck('pat_num')->unique());
+                $totProd = 0;
+
+                foreach ($snapAppts as $apt) {
+                    $fee = (float) $apt->sched_production;
+                    if ($fee <= 0) {
+                        continue;
+                    }
+                    $totProd += $fee;
+                    $provInfo = $formatProv($apt->prov_num);
+                    $st = (string) $apt->apt_status;
+
+                    $rows[] = [
+                        'pat_id' => $apt->pat_num,
+                        'patient' => [
+                            'label' => $patMap[$apt->pat_num] ?? 'Unknown',
+                            'link' => true,
+                        ],
+                        'prov_id' => $provInfo['id'],
+                        'provider' => $provInfo['name'],
+                        'prov_num' => $apt->prov_num,
+                        'appt_id' => $apt->apt_num,
+                        'appt_date' => $apt->apt_date_time ? date('M d, Y h:i A', strtotime($apt->apt_date_time)) : '—',
+                        'status' => $statusLabels[$st] ?? ('Status '.$st),
+                        'production' => $fee,
+                    ];
+                }
+                $totals = ['production' => $totProd];
+            } else {
+                $apptsQuery = DB::table('od_appointments as a')
+                    ->join('od_procedure_logs as pl', 'a.AptNum', '=', 'pl.AptNum')
+                    ->select(
+                        'a.AptNum',
+                        'a.PatNum',
+                        'a.ProvNum',
+                        'a.AptDateTime',
+                        'a.AptStatus',
+                        DB::raw('SUM(pl.ProcFee) as total_fee')
+                    )
+                    ->whereNotIn('a.AptStatus', [6])
+                    ->whereBetween('a.AptDateTime', [$start.' 00:00:00', $end.' 23:59:59'])
+                    ->groupBy('a.AptNum', 'a.PatNum', 'a.ProvNum', 'a.AptDateTime', 'a.AptStatus');
+
+                if ($provNum) {
+                    $apptsQuery->where('a.ProvNum', $provNum);
+                } elseif ($clinicNum) {
+                    $apptsQuery->where('a.ClinicNum', $clinicNum);
+                }
+
+                $appts = $apptsQuery->orderBy('a.AptDateTime')->get();
+                $patMap = $mapPatients($appts->pluck('PatNum')->unique());
+
+                $totProd = 0;
+                foreach ($appts as $apt) {
+                    $fee = (float) $apt->total_fee;
+                    if ($fee <= 0) {
+                        continue;
+                    }
+                    $totProd += $fee;
+                    $provInfo = $formatProv($apt->ProvNum);
+                    $st = (string) $apt->AptStatus;
+
+                    $rows[] = [
+                        'pat_id' => $apt->PatNum,
+                        'patient' => [
+                            'label' => $patMap[$apt->PatNum] ?? 'Unknown',
+                            'link' => true,
+                        ],
+                        'prov_id' => $provInfo['id'],
+                        'provider' => $provInfo['name'],
+                        'prov_num' => $apt->ProvNum,
+                        'appt_id' => $apt->AptNum,
+                        'appt_date' => date('M d, Y h:i A', strtotime($apt->AptDateTime)),
+                        'status' => $statusLabels[$st] ?? ('Status '.$st),
+                        'production' => $fee,
+                    ];
+                }
+                $totals = ['production' => $totProd];
+            }
 
         } elseif ($metric === 'actual_production') {
             $title = 'Actual Production Breakdown';
@@ -672,20 +717,6 @@ class OperationsController extends Controller
                 ['key' => 'description', 'label' => 'Description', 'type' => 'text'],
             ];
 
-            $apptsQuery = DB::table('od_appointments')
-                ->select('AptNum', 'PatNum', 'ProvNum', 'AptDateTime', 'AptStatus', 'ProcDescript')
-                ->whereNotIn('AptStatus', [6])
-                ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
-
-            if ($provNum) {
-                $apptsQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
-                $apptsQuery->where('ClinicNum', $clinicNum);
-            }
-
-            $appts = $apptsQuery->orderBy('AptDateTime')->get()->unique('PatNum');
-            $patMap = $mapPatients($appts->pluck('PatNum')->unique());
-
             $statusLabels = [
                 '1' => 'Scheduled',
                 '2' => 'Complete',
@@ -695,21 +726,66 @@ class OperationsController extends Controller
                 '6' => 'Planned',
             ];
 
-            foreach ($appts as $apt) {
-                $provInfo = $formatProv($apt->ProvNum);
-                $st = (string) $apt->AptStatus;
-                $rows[] = [
-                    'pat_id' => $apt->PatNum,
-                    'patient' => ['label' => $patMap[$apt->PatNum] ?? 'Unknown', 'link' => true],
-                    'prov_id' => $provInfo['id'],
-                    'provider' => $provInfo['name'],
-                    'appt_id' => $apt->AptNum,
-                    'appt_date' => date('M d, Y h:i A', strtotime($apt->AptDateTime)),
-                    'status' => $statusLabels[$st] ?? ('Status '.$st),
-                    'description' => $apt->ProcDescript ?: 'Appointment',
-                ];
+            $snapQuery = DB::table('od_appointment_schedule_snapshots')
+                ->where('office_id', $officeId)
+                ->whereBetween('snapshot_date', [$start, $end]);
+
+            if ($provNum) {
+                $snapQuery->where('prov_num', $provNum);
+            } elseif ($clinicNum) {
+                $snapQuery->where('clinic_num', $clinicNum);
             }
-            $totals = [];
+
+            if ($snapQuery->exists()) {
+                $snapAppts = $snapQuery->orderBy('apt_date_time')->get()->unique('pat_num');
+                $patMap = $mapPatients($snapAppts->pluck('pat_num')->unique());
+
+                foreach ($snapAppts as $apt) {
+                    $provInfo = $formatProv($apt->prov_num);
+                    $st = (string) $apt->apt_status;
+                    $rows[] = [
+                        'pat_id' => $apt->pat_num,
+                        'patient' => ['label' => $patMap[$apt->pat_num] ?? 'Unknown', 'link' => true],
+                        'prov_id' => $provInfo['id'],
+                        'provider' => $provInfo['name'],
+                        'appt_id' => $apt->apt_num,
+                        'appt_date' => $apt->apt_date_time ? date('M d, Y h:i A', strtotime($apt->apt_date_time)) : '—',
+                        'status' => $statusLabels[$st] ?? ('Status '.$st),
+                        'description' => $apt->proc_descript ?: 'Appointment',
+                    ];
+                }
+                $totals = [];
+            } else {
+                $apptsQuery = DB::table('od_appointments')
+                    ->select('AptNum', 'PatNum', 'ProvNum', 'AptDateTime', 'AptStatus', 'ProcDescript')
+                    ->whereNotIn('AptStatus', [6])
+                    ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
+
+                if ($provNum) {
+                    $apptsQuery->where('ProvNum', $provNum);
+                } elseif ($clinicNum) {
+                    $apptsQuery->where('ClinicNum', $clinicNum);
+                }
+
+                $appts = $apptsQuery->orderBy('AptDateTime')->get()->unique('PatNum');
+                $patMap = $mapPatients($appts->pluck('PatNum')->unique());
+
+                foreach ($appts as $apt) {
+                    $provInfo = $formatProv($apt->ProvNum);
+                    $st = (string) $apt->AptStatus;
+                    $rows[] = [
+                        'pat_id' => $apt->PatNum,
+                        'patient' => ['label' => $patMap[$apt->PatNum] ?? 'Unknown', 'link' => true],
+                        'prov_id' => $provInfo['id'],
+                        'provider' => $provInfo['name'],
+                        'appt_id' => $apt->AptNum,
+                        'appt_date' => date('M d, Y h:i A', strtotime($apt->AptDateTime)),
+                        'status' => $statusLabels[$st] ?? ('Status '.$st),
+                        'description' => $apt->ProcDescript ?: 'Appointment',
+                    ];
+                }
+                $totals = [];
+            }
 
         } elseif ($metric === 'sched_new_pts_visit') {
             $title = 'Scheduled New Patient Visits Breakdown';
@@ -724,41 +800,239 @@ class OperationsController extends Controller
                 ['key' => 'description', 'label' => 'Description', 'type' => 'text'],
             ];
 
-            $apptsQuery = DB::table('od_appointments')
-                ->select('AptNum', 'PatNum', 'ProvNum', 'AptDateTime', 'AptStatus', 'ProcDescript')
-                ->where('IsNewPatient', 1)
-                ->whereIn('AptStatus', [1, 2])
-                ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
-
-            if ($provNum) {
-                $apptsQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
-                $apptsQuery->where('ClinicNum', $clinicNum);
-            }
-
-            $appts = $apptsQuery->orderBy('AptDateTime')->get()->unique('PatNum');
-            $patMap = $mapPatients($appts->pluck('PatNum')->unique());
-
             $statusLabels = [
                 '1' => 'Scheduled',
                 '2' => 'Complete',
             ];
 
-            foreach ($appts as $apt) {
-                $provInfo = $formatProv($apt->ProvNum);
-                $st = (string) $apt->AptStatus;
+            $snapQuery = DB::table('od_appointment_schedule_snapshots')
+                ->where('office_id', $officeId)
+                ->where('is_new_patient', true)
+                ->whereIn('apt_status', [1, 2])
+                ->whereBetween('snapshot_date', [$start, $end]);
+
+            if ($provNum) {
+                $snapQuery->where('prov_num', $provNum);
+            } elseif ($clinicNum) {
+                $snapQuery->where('clinic_num', $clinicNum);
+            }
+
+            if ($snapQuery->exists()) {
+                $snapAppts = $snapQuery->orderBy('apt_date_time')->get()->unique('pat_num');
+                $patMap = $mapPatients($snapAppts->pluck('pat_num')->unique());
+
+                foreach ($snapAppts as $apt) {
+                    $provInfo = $formatProv($apt->prov_num);
+                    $st = (string) $apt->apt_status;
+                    $rows[] = [
+                        'pat_id' => $apt->pat_num,
+                        'patient' => ['label' => $patMap[$apt->pat_num] ?? 'Unknown', 'link' => true],
+                        'prov_id' => $provInfo['id'],
+                        'provider' => $provInfo['name'],
+                        'appt_id' => $apt->apt_num,
+                        'appt_date' => $apt->apt_date_time ? date('M d, Y h:i A', strtotime($apt->apt_date_time)) : '—',
+                        'status' => $statusLabels[$st] ?? ('Status '.$st),
+                        'description' => $apt->proc_descript ?: 'New Patient Appointment',
+                    ];
+                }
+                $totals = [];
+            } else {
+                $apptsQuery = DB::table('od_appointments')
+                    ->select('AptNum', 'PatNum', 'ProvNum', 'AptDateTime', 'AptStatus', 'ProcDescript')
+                    ->where('IsNewPatient', 1)
+                    ->whereIn('AptStatus', [1, 2])
+                    ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
+
+                if ($provNum) {
+                    $apptsQuery->where('ProvNum', $provNum);
+                } elseif ($clinicNum) {
+                    $apptsQuery->where('ClinicNum', $clinicNum);
+                }
+
+                $appts = $apptsQuery->orderBy('AptDateTime')->get()->unique('PatNum');
+                $patMap = $mapPatients($appts->pluck('PatNum')->unique());
+
+                foreach ($appts as $apt) {
+                    $provInfo = $formatProv($apt->ProvNum);
+                    $st = (string) $apt->AptStatus;
+                    $rows[] = [
+                        'pat_id' => $apt->PatNum,
+                        'patient' => ['label' => $patMap[$apt->PatNum] ?? 'Unknown', 'link' => true],
+                        'prov_id' => $provInfo['id'],
+                        'provider' => $provInfo['name'],
+                        'appt_id' => $apt->AptNum,
+                        'appt_date' => date('M d, Y h:i A', strtotime($apt->AptDateTime)),
+                        'status' => $statusLabels[$st] ?? ('Status '.$st),
+                        'description' => $apt->ProcDescript ?: 'New Patient Appointment',
+                    ];
+                }
+                $totals = [];
+            }
+
+        } elseif ($metric === 'unscheduled_tx') {
+            $title = 'Unscheduled Treatment Breakdown';
+            $columns = [
+                ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+                ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'],
+                ['key' => 'appt_id', 'label' => 'Appt ID', 'type' => 'text'],
+                ['key' => 'appt_date', 'label' => 'Appt Date / Time', 'type' => 'text'],
+                ['key' => 'unscheduled_tx', 'label' => 'Unsched Tx $', 'type' => 'money', 'agg' => 'sum'],
+            ];
+
+            $snapQuery = DB::table('od_appointment_schedule_snapshots')
+                ->where('office_id', $officeId)
+                ->whereBetween('snapshot_date', [$start, $end])
+                ->where('unscheduled_tx', '>', 0);
+
+            if ($provNum) {
+                $snapQuery->where('prov_num', $provNum);
+            } elseif ($clinicNum) {
+                $snapQuery->where('clinic_num', $clinicNum);
+            }
+
+            $totUnsched = 0;
+            if ($snapQuery->exists()) {
+                $snapAppts = $snapQuery->orderBy('apt_date_time')->get()->unique('pat_num');
+                $patMap = $mapPatients($snapAppts->pluck('pat_num')->unique());
+                foreach ($snapAppts as $apt) {
+                    $amt = (float) $apt->unscheduled_tx;
+                    $totUnsched += $amt;
+                    $provInfo = $formatProv($apt->prov_num);
+                    $rows[] = [
+                        'pat_id' => $apt->pat_num,
+                        'patient' => ['label' => $patMap[$apt->pat_num] ?? 'Unknown', 'link' => true],
+                        'prov_id' => $provInfo['id'],
+                        'provider' => $provInfo['name'],
+                        'appt_id' => $apt->apt_num,
+                        'appt_date' => $apt->apt_date_time ? date('M d, Y h:i A', strtotime($apt->apt_date_time)) : '—',
+                        'unscheduled_tx' => $amt,
+                    ];
+                }
+                $totals = ['unscheduled_tx' => $totUnsched];
+            } else {
+                // Fallback: Query all TP procedures for the date range
+                $unschedQuery = DB::table('od_procedure_logs')
+                    ->where('office_id', $officeId)
+                    ->whereIn('ProcStatus', [1, '1', 6, '6', 'TP'])
+                    ->whereRaw('(AptNum IS NULL OR AptNum = 0)')
+                    ->whereBetween('ProcDate', [$start, $end]);
+
+                if ($provNum) {
+                    $unschedQuery->where('ProvNum', $provNum);
+                } elseif ($clinicNum) {
+                    $unschedQuery->where('ClinicNum', $clinicNum);
+                }
+
+                $logs = $unschedQuery->get();
+                $patMap = $mapPatients($logs->pluck('PatNum')->unique());
+
+                foreach ($logs as $log) {
+                    $fee = (float) $log->ProcFee;
+                    $totUnsched += $fee;
+                    $provInfo = $formatProv($log->ProvNum);
+                    $rows[] = [
+                        'pat_id' => $log->PatNum,
+                        'patient' => ['label' => $patMap[$log->PatNum] ?? 'Unknown', 'link' => true],
+                        'prov_id' => $provInfo['id'],
+                        'provider' => $provInfo['name'],
+                        'appt_id' => '—',
+                        'appt_date' => date('M d, Y', strtotime($log->ProcDate)),
+                        'unscheduled_tx' => $fee,
+                    ];
+                }
+                $totals = ['unscheduled_tx' => $totUnsched];
+            }
+
+        } elseif ($metric === 'open_appt_hours') {
+            $title = 'Open Appointment Hours Breakdown';
+            $columns = [
+                ['key' => 'prov_id', 'label' => 'Provider ID', 'type' => 'text'],
+                ['key' => 'provider', 'label' => 'Provider', 'type' => 'text'],
+                ['key' => 'date', 'label' => 'Date', 'type' => 'text'],
+                ['key' => 'sched_hours', 'label' => 'Provider Sched Hours', 'type' => 'number_2', 'agg' => 'sum'],
+                ['key' => 'booked_hours', 'label' => 'Booked Appt Hours', 'type' => 'number_2', 'agg' => 'sum'],
+                ['key' => 'open_hours', 'label' => 'Open Hours', 'type' => 'number_2', 'agg' => 'sum'],
+            ];
+
+            $schedQuery = DB::table('od_schedules')
+                ->where('office_id', $officeId)
+                ->where('SchedType', 1)
+                ->whereBetween('SchedDate', [$start, $end]);
+
+            if ($provNum) {
+                $schedQuery->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $schedQuery->where('ClinicNum', $clinicNum);
+            }
+
+            $schedHoursByProvDate = [];
+            foreach ($schedQuery->get() as $s) {
+                $pNum = (int) ($s->ProvNum ?? 0);
+                $d = substr((string) $s->SchedDate, 0, 10);
+                $startSec = strtotime('1970-01-01 '.(string) $s->StartTime);
+                $stopSec = strtotime('1970-01-01 '.(string) $s->StopTime);
+                $mins = max(0, ($stopSec - $startSec) / 60);
+                $k = $pNum.'|'.$d;
+                $schedHoursByProvDate[$k] = ($schedHoursByProvDate[$k] ?? 0) + $mins;
+            }
+
+            $apptQuery = DB::table('od_appointments')
+                ->where('office_id', $officeId)
+                ->whereIn('AptStatus', [1, 2])
+                ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
+
+            if ($provNum) {
+                $apptQuery->where('ProvNum', $provNum);
+            } elseif ($clinicNum) {
+                $apptQuery->where('ClinicNum', $clinicNum);
+            }
+
+            $bookedMinsByProvDate = [];
+            foreach ($apptQuery->get() as $apt) {
+                $pNum = (int) ($apt->ProvNum ?? 0);
+                $d = substr((string) $apt->AptDateTime, 0, 10);
+                $pattern = (string) ($apt->Pattern ?? '');
+                $duration = strlen($pattern) > 0 ? strlen($pattern) * 5 : 60;
+                $k = $pNum.'|'.$d;
+                $bookedMinsByProvDate[$k] = ($bookedMinsByProvDate[$k] ?? 0) + $duration;
+            }
+
+            $allKeys = array_unique(array_merge(array_keys($schedHoursByProvDate), array_keys($bookedMinsByProvDate)));
+            sort($allKeys);
+
+            $totSched = 0;
+            $totBooked = 0;
+            $totOpen = 0;
+
+            foreach ($allKeys as $k) {
+                [$pNum, $d] = explode('|', $k);
+                $sH = round(($schedHoursByProvDate[$k] ?? 0) / 60, 2);
+                $bH = round(($bookedMinsByProvDate[$k] ?? 0) / 60, 2);
+                $oH = max(0, round($sH - $bH, 2));
+
+                $totSched += $sH;
+                $totBooked += $bH;
+                $totOpen += $oH;
+
+                $provInfo = $formatProv((int) $pNum);
+
                 $rows[] = [
-                    'pat_id' => $apt->PatNum,
-                    'patient' => ['label' => $patMap[$apt->PatNum] ?? 'Unknown', 'link' => true],
                     'prov_id' => $provInfo['id'],
                     'provider' => $provInfo['name'],
-                    'appt_id' => $apt->AptNum,
-                    'appt_date' => date('M d, Y h:i A', strtotime($apt->AptDateTime)),
-                    'status' => $statusLabels[$st] ?? ('Status '.$st),
-                    'description' => $apt->ProcDescript ?: 'New Patient Appointment',
+                    'date' => date('l - M d, Y', strtotime($d)),
+                    'sched_hours' => number_format($sH, 2),
+                    'booked_hours' => number_format($bH, 2),
+                    'open_hours' => number_format($oH, 2),
                 ];
             }
-            $totals = [];
+
+            $totals = [
+                'sched_hours' => number_format($totSched, 2),
+                'booked_hours' => number_format($totBooked, 2),
+                'open_hours' => number_format($totOpen, 2),
+            ];
 
         } elseif ($metric === 'gross') {
             $title = 'Gross Production Breakdown';
