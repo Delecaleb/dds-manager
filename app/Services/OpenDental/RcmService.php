@@ -312,7 +312,7 @@ class RcmService
                 'claim_id' => (int) $row->claim_id,
                 'patient_id' => (int) $row->patient_id,
                 'patient_name' => $patientName,
-                'office_name' => $row->office_name ?? '8 Mile',
+                'office_name' => $row->office_name ?: (Office::find($row->office_id ?? Office::getActiveOfficeId())?->name ?? 'Office'),
                 'payor' => $this->resolvePayorName($row->plan_num, $row->carrier_name, $row->carrier_num),
                 'date_created' => $dateCreated,
                 'date_submitted' => $dateSubmitted,
@@ -453,7 +453,7 @@ class RcmService
                 'pay_plan_id' => (int) $row->pay_plan_id,
                 'patient_id' => (int) $row->patient_id,
                 'patient_name' => $patientName,
-                'office_name' => $row->office_name ?? '8 Mile',
+                'office_name' => $row->office_name ?: (Office::find($row->office_id ?? Office::getActiveOfficeId())?->name ?? 'Office'),
                 'line_of_business' => 'General',
                 'start_date' => $startDateFormatted,
                 'creation_date' => $startDateFormatted,
@@ -474,47 +474,6 @@ class RcmService
                 'days_past_due_formatted' => (string) $daysPastDue,
             ];
         });
-
-        if ($formatted->isEmpty()) {
-            $sampleArrangements = [
-                ['id' => 18920, 'name' => 'Carter, Bryan', 'office' => '8 Mile', 'lob' => 'General', 'start' => '2025-01-02', 'loan' => 1500.00, 'num' => 12, 'freq' => 'Monthly', 'rem' => 1125.00, 'dpd' => 0],
-                ['id' => 19342, 'name' => 'Jenkins, Marcus', 'office' => '8 Mile', 'lob' => 'General', 'start' => '2025-01-08', 'loan' => 850.00, 'num' => 6, 'freq' => 'Monthly', 'rem' => 566.67, 'dpd' => 0],
-                ['id' => 20411, 'name' => 'Mitchell, Latoya', 'office' => '8 Mile', 'lob' => 'General', 'start' => '2025-01-15', 'loan' => 2400.00, 'num' => 24, 'freq' => 'Monthly', 'rem' => 2100.00, 'dpd' => 12],
-                ['id' => 21088, 'name' => 'Robinson, Derrick', 'office' => '8 Mile', 'lob' => 'General', 'start' => '2025-01-20', 'loan' => 600.00, 'num' => 6, 'freq' => 'Monthly', 'rem' => 300.00, 'dpd' => 0],
-            ];
-
-            foreach ($sampleArrangements as $sa) {
-                $installmentAmt = $sa['loan'] / $sa['num'];
-                $loanBgClass = $sa['loan'] >= 1500 ? 'bg-[#dcfce7] text-[#15803d]' : ($sa['loan'] >= 500 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
-                $remBgClass = $sa['rem'] >= 1000 ? 'bg-[#dcfce7] text-[#15803d]' : ($sa['rem'] > 0 ? 'bg-[#fef3c7] text-[#b45309]' : 'bg-[#fee2e2] text-[#b91c1c]');
-
-                $formatted->push([
-                    'pay_plan_id' => $sa['id'],
-                    'patient_id' => $sa['id'],
-                    'patient_name' => $sa['name'],
-                    'office_name' => $sa['office'],
-                    'line_of_business' => $sa['lob'],
-                    'start_date' => $sa['start'],
-                    'creation_date' => $sa['start'],
-                    'last_pay_date' => Carbon::parse($sa['start'])->addDays(15)->format('Y-m-d'),
-                    'loan_amount' => $sa['loan'],
-                    'loan_amount_formatted' => '$ '.number_format($sa['loan'], 2),
-                    'loan_bg' => $loanBgClass,
-                    'payment_frequency' => $sa['freq'],
-                    'number_of_payments' => $sa['num'],
-                    'installment_amount' => $installmentAmt,
-                    'installment_amount_formatted' => '$ '.number_format($installmentAmt, 2),
-                    'last_payment_amount' => $installmentAmt,
-                    'last_payment_amount_formatted' => '$ '.number_format($installmentAmt, 2),
-                    'remaining_balance' => $sa['rem'],
-                    'remaining_balance_formatted' => '$ '.number_format($sa['rem'], 2),
-                    'remaining_bg' => $remBgClass,
-                    'days_past_due' => $sa['dpd'],
-                    'days_past_due_formatted' => (string) $sa['dpd'],
-                ]);
-            }
-            $totalItems = count($sampleArrangements);
-        }
 
         $totalPages = (int) ceil($totalItems / max($perPage, 1));
 
@@ -640,7 +599,7 @@ class RcmService
             return [
                 'patient_id' => (int) $row->patient_id,
                 'patient_name' => $patientName,
-                'office_name' => $row->office_name ?? '8 Mile',
+                'office_name' => $row->office_name ?: (Office::find($row->office_id ?? Office::getActiveOfficeId())?->name ?? 'Office'),
                 'statement_date' => $statementDate,
                 'balance_due_now' => $bal,
                 'balance_due_now_formatted' => $this->formatAccountingMoney($bal),
@@ -833,7 +792,7 @@ class RcmService
                 'proc_num' => (int) ($row->proc_num ?? 1),
                 'patient_id' => (int) ($row->patient_id ?? 0),
                 'patient_name' => $patientName,
-                'office_name' => $row->office_name ?? '8 Mile',
+                'office_name' => $row->office_name ?: (Office::find($row->office_id ?? Office::getActiveOfficeId())?->name ?? 'Office'),
                 'claim_id' => (int) $claimId,
                 'date_of_service' => $row->date_of_service ? Carbon::parse($row->date_of_service)->format('Y-m-d') : '-',
                 'provider_id_code' => $provDisplayId,
@@ -1023,7 +982,7 @@ class RcmService
                 'adj_id' => (int) $row->adj_id,
                 'patient_id' => (int) ($row->patient_id ?: 0),
                 'patient_name' => $patientName,
-                'office_name' => $row->office_name ?? '8 Mile',
+                'office_name' => $row->office_name ?: (Office::find($row->office_id ?? Office::getActiveOfficeId())?->name ?? 'Office'),
                 'adj_date' => $row->adj_date ? Carbon::parse($row->adj_date)->format('Y-m-d') : '-',
                 'provider_id_code' => $provDisplayId,
                 'provider_name' => $provName,
@@ -1715,30 +1674,6 @@ class RcmService
                     'total_received_formatted' => $this->formatAccountingMoney($received),
                 ];
             }
-        } else {
-            $samplePayors = [
-                ['payor' => 'CASH - 999999', 'charged' => 891893.81, 'received' => 536553.64],
-                ['payor' => 'Delta Dental of MI - 1029', 'charged' => 38883.52, 'received' => 24305.52],
-                ['payor' => 'Medicaid - 7', 'charged' => 5660.00, 'received' => 5660.00],
-                ['payor' => 'Dentaquest - 935', 'charged' => 4505.91, 'received' => 596.91],
-                ['payor' => 'DELTA DENTAL OF GA - 673', 'charged' => 72.10, 'received' => 125.10],
-                ['payor' => 'Dentaquest BCBS of MI - 1416', 'charged' => 0.0, 'received' => 0.0],
-                ['payor' => 'Guardian - 497', 'charged' => -45.00, 'received' => 0.0],
-                ['payor' => 'Humana - 159', 'charged' => -62.49, 'received' => 451.04],
-                ['payor' => 'Cigna Dental - 1513', 'charged' => -108.78, 'received' => 0.0],
-            ];
-
-            foreach ($samplePayors as $sp) {
-                $topPayorsTotalCharged += $sp['charged'];
-                $topPayorsTotalReceived += $sp['received'];
-                $topPayorsItems[] = [
-                    'payor' => $sp['payor'],
-                    'total_charged' => $sp['charged'],
-                    'total_charged_formatted' => $this->formatAccountingMoney($sp['charged']),
-                    'total_received' => $sp['received'],
-                    'total_received_formatted' => $this->formatAccountingMoney($sp['received']),
-                ];
-            }
         }
 
         $topPayorsData = [
@@ -1823,35 +1758,6 @@ class RcmService
                     'total_formatted' => $this->formatAccountingMoney($rp['tot']),
                 ];
             }
-        } else {
-            $sampleProviders = [
-                ['id' => 81, 'name' => 'Elias, Kathy', 'f24' => 0.0, 'f25' => 342532.12, 'f26' => 495474.75, 'tot' => 838006.87],
-                ['id' => 76, 'name' => 'Heller, Landi', 'f24' => 505323.23, 'f25' => 150596.66, 'f26' => -2060.00, 'tot' => 653859.89],
-                ['id' => 64, 'name' => 'Haddow, Mason', 'f24' => 1.00, 'f25' => 129932.07, 'f26' => 24013.85, 'tot' => 153946.92],
-                ['id' => 41, 'name' => 'Poole, Donna', 'f24' => 55296.51, 'f25' => 19493.05, 'f26' => 0.0, 'tot' => 74789.56],
-                ['id' => 49, 'name' => 'XRAY, ', 'f24' => 48040.91, 'f25' => 15793.08, 'f26' => 0.0, 'tot' => 63833.99],
-                ['id' => 46, 'name' => 'Detroit Dental Care, PC', 'f24' => 16041.08, 'f25' => 78.63, 'f26' => 55033.42, 'tot' => 71153.13],
-                ['id' => 83, 'name' => 'Zeitoun, Ali', 'f24' => 0.0, 'f25' => 0.0, 'f26' => 50150.00, 'tot' => 50150.00],
-                ['id' => 79, 'name' => 'Abudalou, Ameena', 'f24' => 22430.80, 'f25' => 0.0, 'f26' => 0.0, 'tot' => 22430.80],
-                ['id' => 7, 'name' => 'Pitaro, Rosemary', 'f24' => 75.79, 'f25' => 0.0, 'f26' => 0.0, 'tot' => 75.79],
-                ['id' => 53, 'name' => 'Alsabahi, Sami', 'f24' => 53.94, 'f25' => 0.0, 'f26' => 0.0, 'tot' => 53.94],
-            ];
-
-            foreach ($sampleProviders as $sp) {
-                $sumProv2024 += $sp['f24'];
-                $sumProv2025 += $sp['f25'];
-                $sumProv2026 += $sp['f26'];
-                $sumProvTotal += $sp['tot'];
-
-                $topProvidersItems[] = [
-                    'provider_id' => $sp['id'],
-                    'provider_name' => $sp['name'],
-                    'fee_2024_formatted' => $this->formatAccountingMoney($sp['f24']),
-                    'fee_2025_formatted' => $this->formatAccountingMoney($sp['f25']),
-                    'fee_2026_formatted' => $this->formatAccountingMoney($sp['f26']),
-                    'total_formatted' => $this->formatAccountingMoney($sp['tot']),
-                ];
-            }
         }
 
         $topProvidersData = [
@@ -1928,34 +1834,6 @@ class RcmService
                     'fee_2025_formatted' => $this->formatAccountingMoney($ra['f25']),
                     'fee_2026_formatted' => $this->formatAccountingMoney($ra['f26']),
                     'total_formatted' => $this->formatAccountingMoney($ra['tot']),
-                ];
-            }
-        } else {
-            $sampleAda = [
-                ['code' => 'D8090', 'f24' => 0.0, 'f25' => 364139.00, 'f26' => 491762.00, 'tot' => 855901.00],
-                ['code' => 'D8080', 'f24' => 0.0, 'f25' => 65928.00, 'f26' => 107699.00, 'tot' => 173627.00],
-                ['code' => 'D2740', 'f24' => 92846.10, 'f25' => 36425.55, 'f26' => 0.0, 'tot' => 129271.65],
-                ['code' => 'D7210', 'f24' => 54549.57, 'f25' => 10370.72, 'f26' => 0.0, 'tot' => 64920.29],
-                ['code' => 'D2392', 'f24' => 40746.78, 'f25' => 10442.31, 'f26' => 0.0, 'tot' => 51189.09],
-                ['code' => 'D2393', 'f24' => 30352.67, 'f25' => 8479.10, 'f26' => 0.0, 'tot' => 38831.77],
-                ['code' => 'D3320', 'f24' => 30549.80, 'f25' => 5067.69, 'f26' => 0.0, 'tot' => 35617.49],
-                ['code' => 'D2950', 'f24' => 22576.41, 'f25' => 6805.55, 'f26' => 0.0, 'tot' => 29381.96],
-                ['code' => 'D0140', 'f24' => 21897.83, 'f25' => 7315.30, 'f26' => 0.0, 'tot' => 29213.13],
-                ['code' => 'D3330', 'f24' => 24522.73, 'f25' => 3997.50, 'f26' => 0.0, 'tot' => 28520.23],
-            ];
-
-            foreach ($sampleAda as $sa) {
-                $sumAda2024 += $sa['f24'];
-                $sumAda2025 += $sa['f25'];
-                $sumAda2026 += $sa['f26'];
-                $sumAdaTotal += $sa['tot'];
-
-                $topAdaItems[] = [
-                    'ada_code' => $sa['code'],
-                    'fee_2024_formatted' => $this->formatAccountingMoney($sa['f24']),
-                    'fee_2025_formatted' => $this->formatAccountingMoney($sa['f25']),
-                    'fee_2026_formatted' => $this->formatAccountingMoney($sa['f26']),
-                    'total_formatted' => $this->formatAccountingMoney($sa['tot']),
                 ];
             }
         }

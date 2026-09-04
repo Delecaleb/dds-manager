@@ -15,36 +15,24 @@ class CalendarEventTransformer
         // Safe defaults and enum translations
         $status = AppointmentStatus::tryFrom($appointment->AptStatus) ?? AppointmentStatus::Scheduled;
 
-        // Requirement 3 & 4: Provider color coding
-        $color = '#94a3b8'; // default color for unassigned/others
-        $textColor = '#ffffff';
-        if ($appointment->ProvNum == 81) {
-            $color = '#6DE5C1'; // Kathy Elias
-            $textColor = '#0f172a'; // Contrast text
-        } elseif ($appointment->ProvNum == 64) {
-            $color = '#996BE5'; // Mason Haddow
-            $textColor = '#ffffff';
+        // Provider color coding: use OpenDental ProvColor, or deterministic palette hash
+        $provColor = $appointment->provider?->ProvColor;
+        $palette = ['#6DE5C1', '#996BE5', '#38bdf8', '#fb923c', '#f472b6', '#a78bfa', '#34d399', '#facc15', '#818cf8', '#2dd4bf'];
+        if ($provColor && preg_match('/^#?[0-9a-fA-F]{6}$/', (string) $provColor)) {
+            $color = str_starts_with((string) $provColor, '#') ? (string) $provColor : '#'.$provColor;
+        } elseif ($appointment->ProvNum > 0) {
+            $color = $palette[((int) $appointment->ProvNum) % count($palette)];
+        } else {
+            $color = '#94a3b8';
         }
+        $textColor = '#ffffff';
 
         $startDt = new \DateTime($appointment->AptDateTime);
         $endDt = (clone $startDt)->modify("+{$appointment->duration_minutes} minutes");
 
         // Match operatory tracking
         $opKey = 'op-'.($appointment->Op ?? '0');
-
-        $staticTitles = [
-            '1' => 'DR-1',
-            '2' => 'DR-2',
-            '3' => 'DR-3',
-            '4' => 'DR-4',
-            '5' => 'DR-5',
-            '6' => 'Unassigned 6',
-            '7' => 'Unassigned 7',
-            '8' => 'Unassigned 8',
-            '9' => 'Unassigned 9',
-            '10' => 'Unassigned 10',
-        ];
-        $opTitle = $staticTitles[$appointment->Op] ?? ('Op '.$appointment->Op);
+        $opTitle = $appointment->operatory?->OpName ?: ($appointment->Op ? 'Op '.$appointment->Op : 'Unassigned');
 
         $procedure = trim($appointment->ProcDescript ?? '');
         $note = trim($appointment->Note ?? '');

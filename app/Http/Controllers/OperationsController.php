@@ -261,45 +261,21 @@ class OperationsController extends Controller
             }
         }
 
-        $knownDoctors = [
-            'HADD' => 'Mason Haddow',
-            'Haddow' => 'Mason Haddow',
-            'ELIAS' => 'Kathy Elias',
-            'Elias' => 'Kathy Elias',
-            'ZEITOUN' => 'Ali Zeitoun',
-            'Zeitoun' => 'Ali Zeitoun',
-            'ZEIT' => 'Ali Zeitoun',
-            'DETD' => 'Detroit Dental Care, PC',
-            'MASS' => 'Massenburg',
-            'SANJ' => 'Sanjiv Johnson',
-            'TERR' => 'Terrance Johnson',
-            'ROSE' => 'Rose Pitaro',
-            'HELL' => 'Landi Heller',
-            'POOL' => 'Donna Poole',
-            'XRYS' => 'XRAY',
-        ];
-
         $providers = OdProvider::all()->keyBy('ProvNum');
 
-        $resolveProvName = function ($provNum) use ($providers, $knownDoctors) {
+        $resolveProvName = function ($provNum) use ($providers) {
             $p = $providers->get($provNum);
             if (! $p) {
                 return 'Provider '.$provNum;
             }
             $abbr = trim($p->Abbr ?? '');
             $lName = trim($p->LName ?? '');
-            if (isset($knownDoctors[$abbr])) {
-                return $knownDoctors[$abbr];
-            }
-            if (isset($knownDoctors[$lName])) {
-                return $knownDoctors[$lName];
-            }
-            $fName = trim($p->PName ?: ($p->PreferredName ?? ''));
+            $fName = trim($p->FName ?: $p->PName ?: ($p->PreferredName ?? ''));
             if ($fName !== '' && $lName !== '') {
                 return "$fName $lName";
             }
 
-            return $lName ?: ($fName ?: $abbr);
+            return $lName ?: ($fName ?: ($abbr ?: 'Provider '.$provNum));
         };
 
         // Common Provider mapping

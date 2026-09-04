@@ -420,37 +420,14 @@ class FrontOfficeController extends Controller
                     return '—';
                 }
 
-                $knownDoctors = [
-                    'HADD' => 'Mason Haddow',
-                    'Haddow' => 'Mason Haddow',
-                    'ELIAS' => 'Kathy Elias',
-                    'Elias' => 'Kathy Elias',
-                    'ZEITOUN' => 'Ali Zeitoun',
-                    'Zeitoun' => 'Ali Zeitoun',
-                    'ZEIT' => 'Ali Zeitoun',
-                    'DETD' => 'Detroit Dental Care, PC',
-                    'MASS' => 'Massenburg',
-                    'SANJ' => 'Sanjiv Johnson',
-                    'TERR' => 'Terrance Johnson',
-                    'ROSE' => 'Rose Pitaro',
-                    'HELL' => 'Heller',
-                ];
-
-                $abbr = trim($apt->provider->Abbr ?? '');
                 $lastName = trim($apt->provider->LName ?? '');
-                $firstName = trim($apt->provider->PName ?: ($apt->provider->PreferredName ?? ''));
+                $firstName = trim($apt->provider->FName ?: $apt->provider->PName ?: ($apt->provider->PreferredName ?? ''));
 
-                if (isset($knownDoctors[$abbr])) {
-                    return $knownDoctors[$abbr];
-                }
-                if (isset($knownDoctors[$lastName])) {
-                    return $knownDoctors[$lastName];
-                }
                 if ($firstName !== '' && $lastName !== '') {
                     return "{$firstName} {$lastName}";
                 }
 
-                return $lastName ?: ($firstName ?: '—');
+                return $lastName ?: ($firstName ?: ($apt->provider->Abbr ?: 'Provider #'.$apt->ProvNum));
             })
             ->addColumn('next_visit_date', fn ($apt) => $nextVisitMap[$apt->PatNum] ?? 'N/A')
             ->addColumn('recall_due', fn () => 'N/A')

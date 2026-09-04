@@ -41,18 +41,6 @@
     class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-20">
     <div class="flex items-center gap-3">
       <h2 class="text-3xl font-semibold text-slate-700 tracking-wide">Dashboard</h2>
-      <!-- Location selector -->
-      <div class="relative">
-        <select
-          class="appearance-none bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-9 py-1.5 text-sm font-semibold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white cursor-pointer transition-colors">
-          <option value="all">All Locations</option>
-          <option value="8mile" selected>8 Mile</option>
-        </select>
-        <div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-slate-400">
-          <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
-        </div>
-      </div>
-
       <!-- Date range picker -->
       <x-daterange-picker id="dashDateRange" on-apply="onDrpApply" />
 

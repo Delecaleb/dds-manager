@@ -21,7 +21,7 @@
                                 <option value="{{ $c->id ?? $c->ClinicNum ?? $loop->index + 1 }}">{{ $c->name ?? $c->Description ?? 'Clinic '.$loop->iteration }}</option>
                             @endforeach
                         @else
-                            <option value="8mile" selected>8 Mile</option>
+                            <option value="1" selected>{{ \App\Models\Office::getActiveOffice()?->name ?? 'Main Office' }}</option>
                         @endif
                     </select>
                     <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-500">

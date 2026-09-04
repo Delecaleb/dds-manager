@@ -163,18 +163,27 @@ class CalendarController extends Controller
             ->pluck('ItemName', 'DefNum')
             ->toArray();
 
-        $operatoryMap = [
-            1 => 'DR-1',
-            2 => 'DR-2',
-            3 => 'DR-3',
-            4 => 'DR-4',
-            5 => 'DR-5',
-            6 => 'Unassigned 6',
-            7 => 'Unassigned 7',
-            8 => 'Unassigned 8',
-            9 => 'Unassigned 9',
-            10 => 'Unassigned 10',
-        ];
+        $operatoryMap = [];
+        if (\Illuminate\Support\Facades\Schema::hasTable('od_operatories')) {
+            $operatoryMap = DB::table('od_operatories')
+                ->where('office_id', $officeId)
+                ->pluck('OpName', 'OperatoryNum')
+                ->toArray();
+        }
+        if (empty($operatoryMap)) {
+            $operatoryMap = [
+                1 => 'DR-1',
+                2 => 'DR-2',
+                3 => 'DR-3',
+                4 => 'DR-4',
+                5 => 'DR-5',
+                6 => 'Unassigned 6',
+                7 => 'Unassigned 7',
+                8 => 'Unassigned 8',
+                9 => 'Unassigned 9',
+                10 => 'Unassigned 10',
+            ];
+        }
 
         $query = OdAppointment::query()
             ->select('od_appointments.*')
@@ -576,17 +585,8 @@ class CalendarController extends Controller
 
         $appointments = $query->with(['patient', 'provider'])->get();
 
-        $knownDoctors = [
-            64 => ['first' => 'Mason', 'last' => 'Haddow'],
-            81 => ['first' => 'Kathy', 'last' => 'Elias'],
-            83 => ['first' => 'Ali', 'last' => 'Zeitoun'],
-            76 => ['first' => 'Landi', 'last' => 'Heller'],
-            41 => ['first' => 'Donna', 'last' => 'Poole'],
-            49 => ['first' => 'XRAY', 'last' => ''],
-        ];
-
         if ($type === 'provider_count') {
-            $providers = $appointments->map(function ($apt) use ($knownDoctors) {
+            $providers = $appointments->map(function ($apt) {
                 $prov = $apt->provider;
                 $pNum = (int) $apt->ProvNum;
                 if ($pNum <= 0) {
@@ -594,13 +594,10 @@ class CalendarController extends Controller
                 }
 
                 $name = '';
-                if (isset($knownDoctors[$pNum])) {
-                    $doc = $knownDoctors[$pNum];
-                    $name = $doc['last'] ? trim($doc['last'].', '.$doc['first']) : $doc['first'];
-                } elseif ($prov) {
+                if ($prov) {
                     $last = trim($prov->LName ?? '');
-                    $first = trim($prov->FName ?: $prov->PName ?: $prov->Abbr ?: '');
-                    $name = $last !== '' && $first !== '' ? $last.', '.$first : ($last ?: $first);
+                    $first = trim($prov->FName ?: $prov->PName ?: $prov->PreferredName ?: '');
+                    $name = $last !== '' && $first !== '' ? $last.', '.$first : ($last ?: ($first ?: ($prov->Abbr ?: 'Provider #'.$pNum)));
                 } else {
                     $name = 'Provider #'.$pNum;
                 }
@@ -615,7 +612,7 @@ class CalendarController extends Controller
             return response()->json($providers);
         }
 
-        $rows = $appointments->map(function ($apt) use ($knownDoctors) {
+        $rows = $appointments->map(function ($apt) {
             $pat = $apt->patient;
             $prov = $apt->provider;
 
@@ -639,13 +636,10 @@ class CalendarController extends Controller
 
             if ($hasProc && $pNum > 0) {
                 $provId = (string) $pNum;
-                if (isset($knownDoctors[$pNum])) {
-                    $doc = $knownDoctors[$pNum];
-                    $provName = $doc['last'] ? trim($doc['last'].', '.$doc['first']) : $doc['first'];
-                } elseif ($prov) {
+                if ($prov) {
                     $last = trim($prov->LName ?? '');
-                    $first = trim($prov->FName ?: $prov->PName ?: $prov->Abbr ?: '');
-                    $provName = $last !== '' && $first !== '' ? $last.', '.$first : ($last ?: $first);
+                    $first = trim($prov->FName ?: $prov->PName ?: ($prov->PreferredName ?? ''));
+                    $provName = $last !== '' && $first !== '' ? $last.', '.$first : ($last ?: ($first ?: ($prov->Abbr ?: 'Provider #'.$pNum)));
                 } else {
                     $provName = 'Provider #'.$pNum;
                 }

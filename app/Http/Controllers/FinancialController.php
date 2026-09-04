@@ -310,10 +310,10 @@ class FinancialController extends Controller
     private function providerExpr(string $alias): string
     {
         if (DB::connection()->getDriverName() === 'sqlite') {
-            return "COALESCE(NULLIF({$alias}.Abbr, ''), {$alias}.LName, 'Detroit Dental Care, PC')";
+            return "COALESCE(NULLIF({$alias}.Abbr, ''), {$alias}.LName, 'Provider')";
         }
 
-        return "COALESCE(NULLIF(TRIM(CONCAT(COALESCE({$alias}.LName, ''), CASE WHEN NULLIF({$alias}.PName, '') IS NOT NULL THEN CONCAT(', ', {$alias}.PName) ELSE '' END)), ''), {$alias}.Abbr, 'Detroit Dental Care, PC')";
+        return "COALESCE(NULLIF(TRIM(CONCAT(COALESCE({$alias}.LName, ''), CASE WHEN NULLIF({$alias}.PName, '') IS NOT NULL THEN CONCAT(', ', {$alias}.PName) ELSE '' END)), ''), {$alias}.Abbr, 'Provider')";
     }
 
     private function scoreCardsProduction(string $start, string $end, string $provNum, ?int $officeId = null): array
