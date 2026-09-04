@@ -12,14 +12,27 @@
   <section class="bg-white border-b border-gray-200 px-8 py-3 flex flex-wrap items-center gap-3">
     <x-daterange-picker on-apply="onDrpApply" />
 
-    <select
-      class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-[#00c58e] shadow-xs font-medium text-gray-700 min-w-[150px]">
-      <option selected>8 Mile</option>
-      <option>All Locations</option>
-    </select>
+    <div class="relative min-w-[200px]">
+      <select id="officeSelect"
+        class="w-full appearance-none bg-white border border-gray-300 rounded px-3 py-1.5 text-sm font-medium text-gray-700 focus:outline-none focus:border-[#00c58e] shadow-xs cursor-pointer pr-8">
+        <option value="all">All Locations</option>
+        @if(isset($offices) && $offices->count())
+          @foreach($offices as $off)
+            <option value="{{ $off->id }}" {{ (isset($activeOfficeId) && $off->id == $activeOfficeId) ? 'selected' : '' }}>
+              {{ $off->name }}
+            </option>
+          @endforeach
+        @else
+          <option value="{{ $activeOfficeId ?? 1 }}" selected>{{ \App\Models\Office::getActiveOffice()?->name ?? 'Main Office' }}</option>
+        @endif
+      </select>
+      <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-400">
+        <i data-lucide="chevron-down" class="w-4 h-4"></i>
+      </div>
+    </div>
 
     <button id="refreshBtn"
-      class="bg-white border border-[#00c58e] text-[#00c58e] px-5 py-1.5 rounded text-sm font-bold hover:bg-emerald-50 transition shadow-xs">
+      class="bg-white border border-[#00c58e] text-[#00c58e] px-5 py-1.5 rounded text-sm font-bold hover:bg-emerald-50 transition shadow-xs cursor-pointer">
       Refresh
     </button>
   </section>
@@ -484,7 +497,13 @@
       $('#detailTbody').html(skelDetail);
       $('#detailTfoot').addClass('hidden');
 
-      $.get('{{ route("deposits.data") }}', { start_date: start, end_date: end })
+      var officeId = $('#officeSelect').val();
+      var params = { start_date: start, end_date: end };
+      if (officeId && officeId !== '') {
+        params.office_id = officeId;
+      }
+
+      $.get('{{ route("deposits.data") }}', params)
         .done(function (res) {
           _depositsData = res.deposits || [];
           _detailsData = res.details || [];
@@ -591,6 +610,10 @@
     });
 
     window.onDrpApply = function (start, end) { fetchDeposits(start, end); };
+
+    $('#officeSelect').on('change', function () {
+      fetchDeposits();
+    });
 
     $('#refreshBtn').on('click', function () {
       fetchDeposits();
