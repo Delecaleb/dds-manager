@@ -9,6 +9,14 @@ class OdRecall extends Model
 {
     use BelongsToOffice;
 
+    protected $attributes = [
+        'Priority' => 0,
+        'RecallInterval' => 0,
+        'RecallStatus' => 0,
+        'IsDisabled' => 0,
+        'RecallTypeNum' => 0,
+    ];
+
     protected $fillable = [
         'office_id',
         'RecallNum',

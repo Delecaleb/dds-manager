@@ -13,17 +13,12 @@ return new class extends Migration
     {
         Schema::create('od_recall_types', function (Blueprint $table) {
             $table->id();
-            $table->integer('RecallTypeNum');
-
-            $table->string('Description');
-
-            $table->integer('DefaultInterval');
-
-            $table->string('TimePattern');
-
-            $table->string('Procedures');
-
-            $table->integer('AppendToSpecial');
+            $table->integer('RecallTypeNum')->nullable();
+            $table->string('Description')->nullable();
+            $table->integer('DefaultInterval')->nullable();
+            $table->string('TimePattern')->nullable();
+            $table->string('Procedures')->nullable();
+            $table->integer('AppendToSpecial')->nullable();
             $table->timestamps();
         });
     }

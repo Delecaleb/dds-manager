@@ -11,7 +11,14 @@ class OdClaimPayment extends Model
 
     protected $primaryKey = 'ClaimPaymentNum';
 
-    public $incrementing = false;
+    protected $attributes = [
+        'PayGroup' => 0,
+        'PayType' => 0,
+        'IsPartial' => 0,
+        'DepositNum' => 0,
+        'ClinicNum' => 0,
+        'SecUserNumEntry' => 0,
+    ];
 
     public $fillable = [
         'office_id',
