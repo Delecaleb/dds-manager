@@ -275,6 +275,17 @@
                             </select>
                         </div>
                     </form>
+
+                    <!-- Header Live Sync Report Button -->
+                    <button onclick="window.openGlobalSyncReport({{ $activeOfficeId ?? ($allOffices->first()->id ?? 1) }}, '{{ addslashes($currentOffice->name ?? 'Office') }}')" type="button"
+                        class="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-lg border border-emerald-200 shadow-xs transition-colors cursor-pointer"
+                        title="Live Sync Telemetry & Health Report">
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span class="hidden md:inline">Sync Status</span>
+                    </button>
                 @endif
 
                 <!-- User Profile Dropdown -->
@@ -335,6 +346,9 @@
             {{$slot}}
         </main>
     </div>
+
+    <!-- Reusable Global Sync Report Modal -->
+    <x-office-sync-report-modal />
 
     <script>
         lucide.createIcons();

@@ -29,6 +29,7 @@ Route::get('/', function () {
 Route::middleware('auth')->group(function () {
     // Shared user profile & location switching
     Route::post('offices/switch', [OfficeController::class, 'switch'])->name('offices.switch');
+    Route::get('offices/{office}/sync-report', [OfficeController::class, 'syncReport'])->name('offices.sync-report');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -54,6 +55,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('module:offices')->group(function () {
         Route::resource('offices', OfficeController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::post('offices/{office}/sync', [OfficeController::class, 'syncNow'])->name('offices.sync');
+        Route::post('offices/{office}/sync-module', [OfficeController::class, 'syncModule'])->name('offices.sync-module');
     });
 
     // Patients Module
