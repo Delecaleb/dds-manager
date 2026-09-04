@@ -227,6 +227,13 @@ abstract class BaseQuerySyncService
             ]
         );
 
+        // Prevent concurrent duplicate runs for the same module & office if an active process has an active heartbeat (< 10 min)
+        if ($log->status === 'running' && $log->updated_at && (now()->timestamp - strtotime((string) $log->updated_at)) < 600) {
+            $this->logOutput("Sync is already running for {$this->module()} (last heartbeat {$log->updated_at}). Skipping duplicate process.\n");
+
+            return;
+        }
+
         $log->update([
             'office_id' => $office->id ?? 1,
             'status' => 'running',

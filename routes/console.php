@@ -25,37 +25,37 @@ Artisan::command('inspire', function () {
 | HIGH FREQUENCY (every 5 minutes) — operational data that changes constantly.
 | Staggered start minutes so the syncs don't all fire at the exact same second.
 */
-Schedule::command('sync:process-pending')->everyMinute()->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:appointments')->cron('*/5 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:procedurelogs')->cron('1-59/5 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:adjustments')->cron('2-59/5 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:paysplits')->cron('3-59/5 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:claimpayments')->cron('4-59/5 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:claimprocs')->cron('*/5 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:patient-balance')->cron('2-59/5 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:payment')->cron('3-59/5 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
+Schedule::command('sync:process-pending')->everyMinute()->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:appointments')->cron('*/5 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:procedurelogs')->cron('1-59/5 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:adjustments')->cron('2-59/5 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:paysplits')->cron('3-59/5 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:claimpayments')->cron('4-59/5 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:claimprocs')->cron('*/5 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:patient-balance')->cron('2-59/5 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:payment')->cron('3-59/5 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
 
 /*
 | MEDIUM FREQUENCY (every 30 minutes) — data that changes occasionally.
 */
-Schedule::command('sync:patients')->cron('0,30 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:treatment-plans')->cron('5,35 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:treatment-plan-attachments')->cron('10,40 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:payplancharges')->cron('15,45 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:recalls')->cron('20,50 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:schedules')->cron('25,55 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:deposit')->cron('12,42 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:statements')->cron('18,48 * * * *')->withoutOverlapping(15)->runInBackground()->onOneServer();
+Schedule::command('sync:patients')->cron('0,30 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:treatment-plans')->cron('5,35 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:treatment-plan-attachments')->cron('10,40 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:payplancharges')->cron('15,45 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:recalls')->cron('20,50 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:schedules')->cron('25,55 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:deposit')->cron('12,42 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:statements')->cron('18,48 * * * *')->withoutOverlapping(120)->runInBackground()->onOneServer();
 
 /*
 | LOW FREQUENCY (daily) — reference tables and historical data (off-peak hours).
 */
-Schedule::command('sync:providers')->dailyAt('01:00')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:procedures')->dailyAt('01:10')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:recall-types')->dailyAt('01:20')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:carriers')->dailyAt('01:25')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:insplan')->dailyAt('01:30')->withoutOverlapping(15)->runInBackground()->onOneServer();
-Schedule::command('sync:histappointments')->dailyAt('02:00')->withoutOverlapping(15)->runInBackground()->onOneServer();
+Schedule::command('sync:providers')->dailyAt('01:00')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:procedures')->dailyAt('01:10')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:recall-types')->dailyAt('01:20')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:carriers')->dailyAt('01:25')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:insplan')->dailyAt('01:30')->withoutOverlapping(120)->runInBackground()->onOneServer();
+Schedule::command('sync:histappointments')->dailyAt('02:00')->withoutOverlapping(120)->runInBackground()->onOneServer();
 
 /*
 | SCHEDULE SNAPSHOTS (8:00 AM EST lock & rolling future forecasts)
@@ -63,14 +63,14 @@ Schedule::command('sync:histappointments')->dailyAt('02:00')->withoutOverlapping
 Schedule::command('snapshot:daily-schedule --lock-today')
     ->dailyAt('08:00')
     ->timezone('America/New_York')
-    ->withoutOverlapping(15)
+    ->withoutOverlapping(120)
     ->runInBackground()
     ->onOneServer();
 
 Schedule::command('snapshot:daily-schedule --future-days=60')
     ->hourly()
     ->timezone('America/New_York')
-    ->withoutOverlapping(15)
+    ->withoutOverlapping(120)
     ->runInBackground()
     ->onOneServer();
 
