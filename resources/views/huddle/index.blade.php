@@ -54,6 +54,18 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="space-y-0.5">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Location</label>
+                    <div class="relative">
+                        <select class="appearance-none bg-white border border-slate-300 rounded px-3 py-1 text-xs font-semibold text-slate-600 pr-8 focus:outline-none min-w-[140px]">
+                            <option>8 Mile</option>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-400">
+                            <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="flex items-center border border-slate-300 rounded overflow-hidden bg-white shadow-sm mt-3 sm:mt-0">

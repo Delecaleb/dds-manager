@@ -27,6 +27,13 @@
             <div class="flex flex-wrap items-center gap-3">
 
                 {{-- Location --}}
+                <div class="flex flex-col gap-0.5">
+                    <label class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Location</label>
+                    <select id="locationSelect"
+                        class="text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300 min-w-[120px]">
+                        <option value="">8 Mile</option>
+                    </select>
+                </div>
 
                 {{-- Provider type --}}
                 <div class="flex flex-col gap-0.5">

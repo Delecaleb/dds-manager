@@ -34,7 +34,14 @@
 
             <div class="space-y-1">
                 <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Location</label>
-                
+                <div class="relative">
+                    <select class="appearance-none bg-white border border-slate-300 rounded px-3 py-1 text-xs font-medium text-slate-700 pr-8 focus:outline-none min-w-[120px]">
+                        <option>8 Mile</option>
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-400">
+                        <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                    </div>
+                </div>
             </div>
         </div>
 
