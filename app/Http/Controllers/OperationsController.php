@@ -117,11 +117,15 @@ class OperationsController extends Controller
             abort(404);
         }
 
+        $officeId = Office::getActiveOfficeId() ?? 1;
+        $clinics = $this->clinics->all($officeId);
+
         return view('operations.index', [
             'tabs' => $this->tabs(),
             'subtabsByTab' => $this->subtabsByTab(),
             'activeTab' => $tab,
             'activeSubtab' => $subtab ?: $this->defaultSubtab($tab),
+            'clinics' => $clinics,
         ]);
     }
 
@@ -134,6 +138,7 @@ class OperationsController extends Controller
             abort(404);
         }
 
+        $officeId = Office::getActiveOfficeId() ?? 1;
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->endOfMonth()->toDateString());
         $subtab = $subtab ?: $this->defaultSubtab($tab);
@@ -148,7 +153,7 @@ class OperationsController extends Controller
         switch ($tab) {
             case 'offices':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->offices($start, $end, $subtab, $clinics),
+                    'spec' => $service->offices($start, $end, $subtab, $clinics, $officeId),
                 ]);
 
             case 'production-details':
@@ -156,32 +161,32 @@ class OperationsController extends Controller
 
                 return view('operations.tabs.production-details', $chrome + [
                     'group' => $group,
-                    'spec' => $service->productionDetails($start, $end, $group, $clinics),
+                    'spec' => $service->productionDetails($start, $end, $group, $clinics, $officeId),
                 ]);
 
             case 'cancellations':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->cancellations($start, $end, $subtab, $clinics),
+                    'spec' => $service->cancellations($start, $end, $subtab, $clinics, $officeId),
                 ]);
 
             case 'payors':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->payors($start, $end, $subtab, $clinics),
+                    'spec' => $service->payors($start, $end, $subtab, $clinics, $officeId),
                 ]);
 
             case 'providers':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->providers($start, $end, $subtab, $clinics),
+                    'spec' => $service->providers($start, $end, $subtab, $clinics, $officeId),
                 ]);
 
             case 'performance':
                 return view('operations.tabs.performance', $chrome + [
-                    'spec' => $service->performance($start, $end, $subtab, $clinics),
+                    'spec' => $service->performance($start, $end, $subtab, $clinics, $officeId),
                 ]);
 
             case 'services':
                 return view('operations.tabs.services', $chrome + [
-                    'spec' => $service->services($start, $end, $subtab, $clinics),
+                    'spec' => $service->services($start, $end, $subtab, $clinics, $officeId),
                 ]);
 
             case 'trends':
@@ -190,29 +195,29 @@ class OperationsController extends Controller
 
                 return view('operations.tabs.trends', $chrome + [
                     'metric' => $metric,
-                    'spec' => $service->trends($start, $end, $subtab, $clinics, $metric, $lob),
+                    'spec' => $service->trends($start, $end, $subtab, $clinics, $metric, $lob, $officeId),
                 ]);
 
             case 'claims':
                 return view('operations.tabs.claims', $chrome + [
-                    'spec' => $service->claims($start, $end, $subtab, $clinics),
+                    'spec' => $service->claims($start, $end, $subtab, $clinics, $officeId),
                 ]);
 
             case 'compliance':
                 return view('operations.tabs.compliance', $chrome + [
-                    'spec' => $service->compliance($start, $end, $subtab, $clinics),
+                    'spec' => $service->compliance($start, $end, $subtab, $clinics, $officeId),
                 ]);
 
             case 'marketing':
                 $zip = request('zip', 'ALL');
 
                 return view('operations.tabs.marketing', $chrome + [
-                    'spec' => $service->marketing($start, $end, $subtab, $clinics, $zip),
+                    'spec' => $service->marketing($start, $end, $subtab, $clinics, $zip, $officeId),
                 ]);
 
             case 'monthly-practice-scorecards':
                 return view('operations.tabs.monthly-practice-scorecards', $chrome + [
-                    'spec' => $service->monthlyPracticeScorecards($start, $end, $subtab, $clinics),
+                    'spec' => $service->monthlyPracticeScorecards($start, $end, $subtab, $clinics, $officeId),
                 ]);
 
             default:
@@ -234,6 +239,7 @@ class OperationsController extends Controller
      */
     public function drilldown(Request $request)
     {
+        $officeId = Office::getActiveOfficeId() ?? 1;
         $metric = $request->input('metric');
         $clinicNum = $request->input('clinic_num');
         $provNum = $request->input('prov_num');
@@ -252,7 +258,7 @@ class OperationsController extends Controller
 
         $providerInfo = null;
         if ($provNum) {
-            $p = OdProvider::where('ProvNum', $provNum)->first();
+            $p = OdProvider::where('office_id', $officeId)->where('ProvNum', $provNum)->first();
             if ($p) {
                 $name = trim(($p->LName ?? '').(($p->LName && $p->PName) ? ', ' : '').($p->PName ?? ''));
                 $providerInfo = [
@@ -262,7 +268,7 @@ class OperationsController extends Controller
             }
         }
 
-        $providers = OdProvider::all()->keyBy('ProvNum');
+        $providers = OdProvider::where('office_id', $officeId)->get()->keyBy('ProvNum');
 
         $resolveProvName = function ($provNum) use ($providers) {
             $p = $providers->get($provNum);
@@ -285,8 +291,8 @@ class OperationsController extends Controller
         })->toArray();
 
         // Common Patient mapping
-        $mapPatients = function ($patNums) {
-            return OdPatient::whereIn('PatNum', $patNums)->get()->mapWithKeys(function ($p) {
+        $mapPatients = function ($patNums) use ($officeId) {
+            return OdPatient::where('office_id', $officeId)->whereIn('PatNum', $patNums)->get()->mapWithKeys(function ($p) {
                 return [$p->PatNum => $p->LName.', '.$p->FName];
             })->toArray();
         };
@@ -380,8 +386,10 @@ class OperationsController extends Controller
                 }
                 $totals = ['production' => $totProd];
             } else {
-                $apptsQuery = DB::table('od_appointments as a')
-                    ->join('od_procedure_logs as pl', 'a.AptNum', '=', 'pl.AptNum')
+                $apptsQuery = DB::table('od_appointments as a')->where('a.office_id', $officeId)
+                    ->join('od_procedure_logs as pl', function ($j) use ($officeId) {
+                        $j->on('a.AptNum', '=', 'pl.AptNum')->where('pl.office_id', '=', $officeId);
+                    })
                     ->select(
                         'a.AptNum',
                         'a.PatNum',
@@ -445,7 +453,10 @@ class OperationsController extends Controller
             ];
 
             $query = DB::table('od_procedure_logs as pl')
-                ->leftJoin('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
+                ->leftJoin('od_procedures as pc', function ($j) use ($officeId) {
+                    $j->on('pl.CodeNum', '=', 'pc.CodeNum')->where('pc.office_id', '=', $officeId);
+                })
+                ->where('pl.office_id', $officeId)
                 ->select(
                     'pl.ProcNum',
                     'pl.PatNum',
@@ -502,9 +513,11 @@ class OperationsController extends Controller
             ];
 
             $splitsQuery = DB::table('od_pay_splits')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'DatePay', 'SplitAmt')
                 ->whereBetween('DatePay', [$start.' 00:00:00', $end.' 23:59:59']);
             $claimsQuery = DB::table('od_claim_procs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'DateCP as DatePay', 'InsPayAmt as SplitAmt')
                 ->whereBetween('DateCP', [$start.' 00:00:00', $end.' 23:59:59'])
                 ->where('Status', '!=', 0);
@@ -580,15 +593,18 @@ class OperationsController extends Controller
             ];
 
             $logsQuery = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end]);
 
             $adjsQuery = DB::table('od_adjustments')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt')
                 ->whereBetween('AdjDate', [$start, $end]);
 
             $wosQuery = DB::table('od_claim_procs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'WriteOff')
                 ->whereBetween('ProcDate', [$start, $end]);
 
@@ -689,7 +705,7 @@ class OperationsController extends Controller
             ];
 
             $clinicNums = (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) ? [$clinicNum] : [];
-            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums);
+            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums, [], $officeId);
 
             foreach ($nptVisits as $v) {
                 $pNum = $v['prov_num'] ?? 0;
@@ -757,6 +773,7 @@ class OperationsController extends Controller
                 $totals = [];
             } else {
                 $apptsQuery = DB::table('od_appointments')
+                    ->where('office_id', $officeId)
                     ->select('AptNum', 'PatNum', 'ProvNum', 'AptDateTime', 'AptStatus', 'ProcDescript')
                     ->whereNotIn('AptStatus', [6])
                     ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
@@ -838,6 +855,7 @@ class OperationsController extends Controller
                 $totals = [];
             } else {
                 $apptsQuery = DB::table('od_appointments')
+                    ->where('office_id', $officeId)
                     ->select('AptNum', 'PatNum', 'ProvNum', 'AptDateTime', 'AptStatus', 'ProcDescript')
                     ->where('IsNewPatient', 1)
                     ->whereIn('AptStatus', [1, 2])
@@ -1048,6 +1066,7 @@ class OperationsController extends Controller
             $columns[] = ['key' => 'gross', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'];
 
             $logsQuery = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end]);
@@ -1107,10 +1126,12 @@ class OperationsController extends Controller
             }
 
             $adjsQuery = DB::table('od_adjustments')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt', 'AdjType')
                 ->whereBetween('AdjDate', [$start, $end]);
 
             $wosQuery = DB::table('od_claim_procs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate as AdjDate', 'WriteOff')
                 ->whereBetween('ProcDate', [$start, $end])
                 ->where('WriteOff', '!=', 0);
@@ -1127,7 +1148,7 @@ class OperationsController extends Controller
             $wos = $wosQuery->get();
 
             $patMap = $mapPatients($adjs->pluck('PatNum')->merge($wos->pluck('PatNum'))->unique());
-            $defMap = DB::table('od_definitions')->where('Category', 1)->pluck('ItemName', 'DefNum')->toArray();
+            $defMap = DB::table('od_definitions')->where('office_id', $officeId)->where('Category', 1)->pluck('ItemName', 'DefNum')->toArray();
 
             $totalAdj = 0;
             $totalGrossAll = 0;
@@ -1156,6 +1177,7 @@ class OperationsController extends Controller
 
                 if ($metric === 'adj_production') {
                     $gross = (float) DB::table('od_procedure_logs')
+                        ->where('office_id', $officeId)
                         ->where('PatNum', $adj->PatNum)
                         ->where('ProcDate', 'like', substr($adj->AdjDate, 0, 10).'%')
                         ->whereIn('ProcStatus', ProcStatus::completed())
@@ -1192,6 +1214,7 @@ class OperationsController extends Controller
 
                 if ($metric === 'adj_production') {
                     $gross = (float) DB::table('od_procedure_logs')
+                        ->where('office_id', $officeId)
                         ->where('PatNum', $wo->PatNum)
                         ->where('ProcDate', 'like', substr($wo->AdjDate, 0, 10).'%')
                         ->whereIn('ProcStatus', ProcStatus::completed())
@@ -1221,12 +1244,18 @@ class OperationsController extends Controller
             ];
 
             $splitsQuery = DB::table('od_pay_splits as s')
-                ->leftJoin('od_payments as p', 'p.PayNum', '=', 's.PayNum')
+                ->leftJoin('od_payments as p', function ($j) use ($officeId) {
+                    $j->on('p.PayNum', '=', 's.PayNum')->where('p.office_id', '=', $officeId);
+                })
+                ->where('s.office_id', $officeId)
                 ->select('s.PatNum', 's.ProvNum', 's.DatePay', 's.SplitAmt', 'p.PayType')
                 ->whereBetween('s.DatePay', [$start.' 00:00:00', $end.' 23:59:59']);
 
             $claimsQuery = DB::table('od_claim_procs as cp')
-                ->leftJoin('od_claim_payments as cpay', 'cpay.ClaimPaymentNum', '=', 'cp.ClaimPaymentNum')
+                ->leftJoin('od_claim_payments as cpay', function ($j) use ($officeId) {
+                    $j->on('cpay.ClaimPaymentNum', '=', 'cp.ClaimPaymentNum')->where('cpay.office_id', '=', $officeId);
+                })
+                ->where('cp.office_id', $officeId)
                 ->select('cp.PatNum', 'cp.ProvNum', 'cp.DateCP as DatePay', 'cp.InsPayAmt as SplitAmt', 'cpay.CarrierName')
                 ->whereBetween('cp.DateCP', [$start.' 00:00:00', $end.' 23:59:59'])
                 ->where('cp.Status', '!=', 0)
@@ -1311,11 +1340,12 @@ class OperationsController extends Controller
                 $columns[] = ['key' => 'coll_pct', 'label' => 'Collection %', 'type' => 'percent'];
             }
 
-            $logsQuery = DB::table('od_procedure_logs')->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')->whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$start, $end]);
-            $adjsQuery = DB::table('od_adjustments')->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt')->whereBetween('AdjDate', [$start, $end]);
-            $wosQuery = DB::table('od_claim_procs')->select('PatNum', 'ProvNum', 'ProcDate', 'WriteOff')->whereBetween('ProcDate', [$start, $end]);
-            $splitsQuery = DB::table('od_pay_splits')->select('PatNum', 'ProvNum', 'DatePay', 'SplitAmt')->whereBetween('DatePay', [$start, $end]);
+            $logsQuery = DB::table('od_procedure_logs')->where('office_id', $officeId)->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')->whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$start, $end]);
+            $adjsQuery = DB::table('od_adjustments')->where('office_id', $officeId)->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt')->whereBetween('AdjDate', [$start, $end]);
+            $wosQuery = DB::table('od_claim_procs')->where('office_id', $officeId)->select('PatNum', 'ProvNum', 'ProcDate', 'WriteOff')->whereBetween('ProcDate', [$start, $end]);
+            $splitsQuery = DB::table('od_pay_splits')->where('office_id', $officeId)->select('PatNum', 'ProvNum', 'DatePay', 'SplitAmt')->whereBetween('DatePay', [$start, $end]);
             $insSplitsQuery = DB::table('od_claim_procs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'DateCP as DatePay', 'InsPayAmt as SplitAmt')
                 ->whereBetween('DateCP', [$start, $end])
                 ->where('Status', '!=', 0);
@@ -1432,6 +1462,7 @@ class OperationsController extends Controller
             ];
 
             $logsQuery = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProcDate')
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end]);
@@ -1479,10 +1510,11 @@ class OperationsController extends Controller
                 ['key' => 'count', 'label' => '# of Visit', 'type' => 'number', 'agg' => 'sum'],
             ];
 
-            $firstVisitSubQ = $this->patients->firstVisitCohort();
+            $firstVisitSubQ = $this->patients->firstVisitCohort($officeId);
 
             $logsQuery = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
+                ->where('pl.office_id', $officeId)
                 ->select('pl.PatNum', 'pl.ProcDate')
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereRaw('LEFT(pl.ProcDate, 10) = LEFT(fv.first_date, 10)')
@@ -1537,6 +1569,7 @@ class OperationsController extends Controller
             ];
 
             $query = DB::table('od_appointments as a')
+                ->where('a.office_id', $officeId)
                 ->select(
                     'a.AptNum',
                     'a.PatNum',
@@ -1558,7 +1591,7 @@ class OperationsController extends Controller
 
             $patMap = $mapPatients($appts->pluck('PatNum')->unique());
 
-            $providers = OdProvider::whereIn('ProvNum', $appts->pluck('ProvNum')->unique())
+            $providers = OdProvider::where('office_id', $officeId)->whereIn('ProvNum', $appts->pluck('ProvNum')->unique())
                 ->get()
                 ->keyBy('ProvNum');
 
@@ -1566,6 +1599,7 @@ class OperationsController extends Controller
             $fees = [];
             if ($aptNums->isNotEmpty()) {
                 $fees = DB::table('od_procedure_logs')
+                    ->where('office_id', $officeId)
                     ->selectRaw('AptNum, SUM(ProcFee) as total_fee')
                     ->whereIn('AptNum', $aptNums)
                     ->groupBy('AptNum')
@@ -1623,6 +1657,7 @@ class OperationsController extends Controller
             ];
 
             $query = DB::table('od_appointments as a')
+                ->where('a.office_id', $officeId)
                 ->select(
                     'a.AptNum',
                     'a.PatNum',
@@ -1644,7 +1679,7 @@ class OperationsController extends Controller
 
             $patMap = $mapPatients($appts->pluck('PatNum')->unique());
 
-            $providers = OdProvider::whereIn('ProvNum', $appts->pluck('ProvNum')->unique())
+            $providers = OdProvider::where('office_id', $officeId)->whereIn('ProvNum', $appts->pluck('ProvNum')->unique())
                 ->get()
                 ->keyBy('ProvNum');
 
@@ -1652,6 +1687,7 @@ class OperationsController extends Controller
             $fees = [];
             if ($aptNums->isNotEmpty()) {
                 $fees = DB::table('od_procedure_logs')
+                    ->where('office_id', $officeId)
                     ->selectRaw('AptNum, SUM(ProcFee) as total_fee')
                     ->whereIn('AptNum', $aptNums)
                     ->groupBy('AptNum')
@@ -1716,6 +1752,7 @@ class OperationsController extends Controller
             ];
 
             $query = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->selectRaw('ProcDate, COUNT(DISTINCT PatNum) as pts_visits, COUNT(*) as procedures, SUM(ProcFee) as production')
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereRaw("COALESCE(CodeNum, '') != '626'")
@@ -1768,6 +1805,7 @@ class OperationsController extends Controller
             ];
 
             $logs = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProcDate', 'ProvNum')
                 ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->whereIn('ProcStatus', ProcStatus::completed())
@@ -1776,7 +1814,7 @@ class OperationsController extends Controller
 
             $patMap = $mapPatients($logs->pluck('PatNum')->unique());
 
-            $clinicName = $clinicNum ? $this->clinics->name((int) $clinicNum) : 'All Offices';
+            $clinicName = $clinicNum ? $this->clinics->name((int) $clinicNum, $officeId) : 'All Offices';
             $patData = [];
 
             foreach ($logs as $log) {
@@ -1831,11 +1869,14 @@ class OperationsController extends Controller
                 ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
             ];
 
-            $firstVisitSubQ = $this->patients->firstVisitCohort();
+            $firstVisitSubQ = $this->patients->firstVisitCohort($officeId);
 
             $nptLogs = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
-                ->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
+                ->join('od_procedures as pc', function ($j) use ($officeId) {
+                    $j->on('pl.CodeNum', '=', 'pc.CodeNum')->where('pc.office_id', '=', $officeId);
+                })
+                ->where('pl.office_id', $officeId)
                 ->select('pl.PatNum', 'pl.ProcDate', 'pl.ProcFee', 'pc.ProcCode', 'fv.first_date')
                 ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
@@ -1888,7 +1929,7 @@ class OperationsController extends Controller
             ];
 
             $clinicNums = (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) ? [$clinicNum] : [];
-            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums);
+            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums, [], $officeId);
             $totalProduction = 0;
             foreach ($nptVisits as $visit) {
                 $totalProduction += (float) $visit['amount'];
@@ -1922,10 +1963,11 @@ class OperationsController extends Controller
 
             $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($start))).' 00:00:00';
 
-            $firstVisitSubQ = $this->patients->firstVisitCohort();
+            $firstVisitSubQ = $this->patients->firstVisitCohort($officeId);
 
             $activePts = DB::table('od_procedure_logs as pl')
                 ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
+                ->where('pl.office_id', $officeId)
                 ->select('pl.PatNum', 'fv.first_date')
                 ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
@@ -1939,6 +1981,7 @@ class OperationsController extends Controller
             $reservations = [];
             if ($patNums->isNotEmpty()) {
                 $reservations = DB::table('od_appointments')
+                    ->where('office_id', $officeId)
                     ->select('PatNum')
                     ->whereIn('PatNum', $patNums)
                     ->whereIn('AptStatus', [1, 2])
@@ -1975,6 +2018,7 @@ class OperationsController extends Controller
             $startWindow = date('Y-m-d', strtotime('-24 months', strtotime($start))).' 00:00:00';
 
             $logs = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate')
                 ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->whereIn('ProcStatus', ProcStatus::completed())
@@ -2056,6 +2100,7 @@ class OperationsController extends Controller
             $start36m = date('Y-m-d', strtotime('-36 months', strtotime($end)));
 
             $firstProcs = DB::table('od_procedure_logs as pl')
+                ->where('pl.office_id', $officeId)
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
                 ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
@@ -2064,6 +2109,7 @@ class OperationsController extends Controller
                 ->all();
 
             $patsAll = DB::table('od_procedure_logs as pl')
+                ->where('pl.office_id', $officeId)
                 ->selectRaw('pl.PatNum, MAX(pl.ProcDate) as last_date')
                 ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
@@ -2111,15 +2157,18 @@ class OperationsController extends Controller
             ];
 
             $logsQuery = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end]);
 
             $adjsQuery = DB::table('od_adjustments')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'AdjDate', 'AdjAmt')
                 ->whereBetween('AdjDate', [$start, $end]);
 
             $wosQuery = DB::table('od_claim_procs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'WriteOff')
                 ->whereBetween('ProcDate', [$start, $end]);
 
@@ -2198,6 +2247,7 @@ class OperationsController extends Controller
             ];
 
             $logsQuery = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProcDate', 'ProcFee')
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end]);
@@ -2213,11 +2263,13 @@ class OperationsController extends Controller
             $patMap = $mapPatients($patIds);
 
             $adjsQuery = DB::table('od_adjustments')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'AdjAmt')
                 ->whereIn('PatNum', $patIds)
                 ->whereBetween('AdjDate', [$start, $end]);
 
             $wosQuery = DB::table('od_claim_procs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'WriteOff')
                 ->whereIn('PatNum', $patIds)
                 ->whereBetween('ProcDate', [$start, $end]);
@@ -2317,6 +2369,7 @@ class OperationsController extends Controller
             ];
 
             $logsQuery = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select(
                     DB::raw('DATE(ProcDate) as proc_date'),
                     'ProvNum',
@@ -2364,6 +2417,7 @@ class OperationsController extends Controller
             ];
 
             $schedQuery = DB::table('od_schedules')
+                ->where('office_id', $officeId)
                 ->select('ProvNum', 'SchedDate', 'StartTime', 'StopTime')
                 ->where('SchedType', 1)
                 ->whereBetween('SchedDate', [$start, $end]);
@@ -2373,6 +2427,7 @@ class OperationsController extends Controller
             $scheds = $schedQuery->get();
 
             $apptQuery = DB::table('od_appointments')
+                ->where('office_id', $officeId)
                 ->select('ProvNum', 'AptDateTime', 'Pattern')
                 ->whereIn('AptStatus', [1, 2])
                 ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
@@ -2441,7 +2496,10 @@ class OperationsController extends Controller
             ];
 
             $query = DB::table('od_procedure_logs as pl')
-                ->leftJoin('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
+                ->leftJoin('od_procedures as pc', function ($j) use ($officeId) {
+                    $j->on('pl.CodeNum', '=', 'pc.CodeNum')->where('pc.office_id', '=', $officeId);
+                })
+                ->where('pl.office_id', $officeId)
                 ->select('pl.PatNum', 'pl.ProvNum', 'pl.ProcDate', 'pl.ProcFee', 'pc.ProcCode', 'pc.Descript')
                 ->whereIn('pl.ProcStatus', [1, '1', 'TP'])
                 ->whereRaw('(pl.AptNum IS NULL OR pl.AptNum = 0)')
@@ -2489,6 +2547,7 @@ class OperationsController extends Controller
             ];
 
             $completedLogs = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
@@ -2498,6 +2557,7 @@ class OperationsController extends Controller
 
             $isCompleted = $completedLogs->isNotEmpty();
             $targetLogs = $isCompleted ? $completedLogs : DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
                 ->whereNotIn('ProcStatus', ProcStatus::completed())
                 ->where('ProcFee', '>', 0)
@@ -2540,6 +2600,7 @@ class OperationsController extends Controller
             ];
 
             $logs = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
@@ -2579,6 +2640,7 @@ class OperationsController extends Controller
             ];
 
             $completedLogs = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
@@ -2587,6 +2649,7 @@ class OperationsController extends Controller
                 ->get();
 
             $schedLogs = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate', 'ProcFee')
                 ->whereNotIn('ProcStatus', ProcStatus::completed())
                 ->where('ProcFee', '>', 0)
@@ -2645,6 +2708,7 @@ class OperationsController extends Controller
             ];
 
             $completedLogs = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate')
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
@@ -2653,6 +2717,7 @@ class OperationsController extends Controller
                 ->get();
 
             $appts = DB::table('od_appointments')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'AptDateTime')
                 ->whereIn('AptStatus', [1, 2])
                 ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59'])
@@ -2704,9 +2769,10 @@ class OperationsController extends Controller
             ];
 
             $clinicNums = (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) ? [$clinicNum] : [];
-            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums);
+            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums, [], $officeId);
 
             $schedNptAppts = DB::table('od_appointments')
+                ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'AptDateTime')
                 ->where('IsNewPatient', 1)
                 ->whereIn('AptStatus', [1, 2])
@@ -2770,8 +2836,13 @@ class OperationsController extends Controller
             ];
 
             $procsQuery = DB::table('od_claim_procs as cp')
-                ->join('od_procedure_logs as pl', 'cp.ProcNum', '=', 'pl.ProcNum')
-                ->leftJoin('od_procedures as pc', 'pc.CodeNum', '=', 'pl.CodeNum')
+                ->join('od_procedure_logs as pl', function ($j) use ($officeId) {
+                    $j->on('cp.ProcNum', '=', 'pl.ProcNum')->where('pl.office_id', '=', $officeId);
+                })
+                ->leftJoin('od_procedures as pc', function ($j) use ($officeId) {
+                    $j->on('pc.CodeNum', '=', 'pl.CodeNum')->where('pc.office_id', '=', $officeId);
+                })
+                ->where('cp.office_id', $officeId)
                 ->select(
                     'pl.ProcNum',
                     'pl.PatNum',

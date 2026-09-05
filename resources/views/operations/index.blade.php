@@ -134,7 +134,18 @@
                 <div class="relative min-w-[140px]">
                     <select id="opsLocation"
                         class="w-full appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 font-medium text-slate-700 pr-8 shadow-sm focus:outline-none">
-                        <option value="0">8 Mile</option>
+                        @if (isset($clinics) && count($clinics) > 1)
+                            <option value="">All Locations</option>
+                            @foreach ($clinics as $clinicId => $clinicName)
+                                <option value="{{ $clinicId }}">{{ $clinicName }}</option>
+                            @endforeach
+                        @elseif (isset($clinics) && count($clinics) === 1)
+                            @foreach ($clinics as $clinicId => $clinicName)
+                                <option value="{{ $clinicId }}" selected>{{ $clinicName }}</option>
+                            @endforeach
+                        @else
+                            <option value="0">Main Location</option>
+                        @endif
                     </select>
                     <div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-slate-400">
                         <i data-lucide="chevron-down" class="w-4 h-4"></i>
