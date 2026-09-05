@@ -166,10 +166,6 @@
                     <x-daterange-picker id="calDateRange" on-apply="onCalendarRangeApply" />
                 </div>
 
-                <select id="clinicFilter"
-                    class="border border-slate-300 rounded px-3 py-1.5 text-sm font-medium text-slate-700 bg-white shadow-sm focus:outline-none focus:border-emerald-500 min-w-[120px]">
-                    <option>8 Mile</option>
-                </select>
 
                 <button id="refreshBtn"
                     class="border border-emerald-500 text-emerald-600 px-5 py-1.5 rounded text-sm font-semibold hover:bg-emerald-50 transition shadow-sm">

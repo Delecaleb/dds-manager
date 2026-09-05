@@ -261,16 +261,7 @@
   </header>
 
   <section class="bg-white border-b border-gray-200 px-8 py-4">
-    <div class="flex flex-wrap items-center gap-3">
-      <x-daterange-picker on-apply="onDrpApply" />
-      <select
-        class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
-        <option selected>8 Mile</option>
-      </select>
-      <span id="fetchError" class="hidden text-xs text-red-600 font-medium">
-        <i class="fa-solid fa-triangle-exclamation mr-1"></i>Failed to load data.
-      </span>
-    </div>
+    
   </section>
 
   <section class="px-8 bg-white border-b border-gray-200 flex gap-6 text-sm font-medium text-gray-500">

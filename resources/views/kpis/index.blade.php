@@ -102,12 +102,6 @@
   <section class="bg-white border-b border-gray-200 px-8 py-3 flex flex-wrap items-center gap-3">
     <x-daterange-picker id="kpiDateRange" />
 
-    <select id="kpiLocation"
-      class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
-      <option value="all">All Locations</option>
-      <option value="0" selected>8 Mile</option>
-    </select>
-
     <button id="kpiUpdateBtn"
       class="bg-white border border-emerald-500 text-emerald-600 px-5 py-1.5 rounded text-sm font-semibold hover:bg-emerald-50 transition shadow-sm">
       Update

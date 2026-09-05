@@ -484,7 +484,8 @@ abstract class BaseQuerySyncService
                 }
             }
 
-            $preparedRows[] = $cleanRow;
+            // Deduplicate by primary key within the batch to prevent unique constraint violations
+            $preparedRows[$cleanRow[$pk]] = $cleanRow;
             $lastId = (int) $row[$pk];
 
             if ($col !== null && isset($row[$col])) {
@@ -493,36 +494,28 @@ abstract class BaseQuerySyncService
         }
 
         if (! empty($preparedRows)) {
+            $rowsToUpsert = array_values($preparedRows);
             $updateColumns = array_keys($updateKeys);
 
             try {
                 // High-performance single multi-row UPSERT query
-                DB::table($tableName)->upsert($preparedRows, ['office_id', $pk], $updateColumns);
-                $log->increment('total_processed', count($preparedRows));
+                DB::table($tableName)->upsert($rowsToUpsert, ['office_id', $pk], $updateColumns);
+                $log->increment('total_processed', count($rowsToUpsert));
             } catch (\Throwable $e) {
-                // Safe fallback to chunked / single model save if table does not have composite unique key
-                DB::transaction(function () use ($preparedRows, $log, $modelClass, $pk, $officeId) {
-                    foreach ($preparedRows as $cleanRow) {
-                        $existing = $modelClass::withoutGlobalScopes()
-                            ->where('office_id', $officeId)
-                            ->where($pk, $cleanRow[$pk])
-                            ->first();
+                // Safe fallback to atomic updateOrInsert per record
+                DB::transaction(function () use ($tableName, $rowsToUpsert, $log, $pk, $officeId) {
+                    foreach ($rowsToUpsert as $cleanRow) {
+                        $pkVal = $cleanRow[$pk];
+                        $matchCond = [
+                            'office_id' => $officeId,
+                            $pk => $pkVal,
+                        ];
+                        $updateData = $cleanRow;
+                        unset($updateData['office_id'], $updateData[$pk]);
 
-                        if ($existing === null) {
-                            $m = new $modelClass;
-                            $m->fill($cleanRow);
-                            $m->office_id = $officeId;
-                            $m->{$pk} = $cleanRow[$pk];
-                            $m->save();
-                        } else {
-                            $existing->fill($cleanRow);
-                            $existing->office_id = $officeId;
-                            if ($existing->isDirty()) {
-                                $existing->save();
-                            }
-                        }
+                        DB::table($tableName)->updateOrInsert($matchCond, $updateData);
                     }
-                    $log->increment('total_processed', count($preparedRows));
+                    $log->increment('total_processed', count($rowsToUpsert));
                 });
             }
         }

@@ -16,11 +16,6 @@
       </div>
 
       <select class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
-        <option selected>8 Mile</option>
-        <option>Detroit Main</option>
-      </select>
-
-      <select class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
         <option selected>Detroit Dental Specialist</option>
         <option>All Brands</option>
       </select>
