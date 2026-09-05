@@ -80,10 +80,16 @@ class OdAppointment extends Model
         return $query->whereBetween('AptDateTime', [$startDate, $endDate]);
     }
 
-    public function scheduledPatients($start, $end)
+    public function scheduledPatients($start, $end, ?int $officeId = null)
     {
-        return (int) $this->inDateRange($start, $end)
-            ->scheduled()
+        $officeId = $officeId ?? Office::getActiveOfficeId();
+        $startDate = substr($start, 0, 10).' 00:00:00';
+        $endDate = substr($end, 0, 10).' 23:59:59';
+
+        return (int) DB::table('od_appointments')
+            ->where('office_id', $officeId)
+            ->whereIn('AptStatus', [1, 2])
+            ->whereBetween('AptDateTime', [$startDate, $endDate])
             ->selectRaw(MetricDefinitions::scheduledPatients('cnt'))
             ->value('cnt');
     }

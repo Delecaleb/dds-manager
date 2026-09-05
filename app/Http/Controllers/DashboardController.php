@@ -67,55 +67,70 @@ class DashboardController extends Controller
         $rows = DB::table('od_procedure_logs')
             ->where('office_id', $officeId)
             ->selectRaw(
-                'ClinicNum, '.
+                'COALESCE(ClinicNum + 0, 0) as ClinicNum, '.
                 MetricDefinitions::grossProduction('total_production').', '.
                 MetricDefinitions::patientVisits('patient_count')
             )
             ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end])
-            ->groupBy('ClinicNum')
+            ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
             ->orderByDesc('total_production')
             ->get();
 
         $adjustments = DB::table('od_adjustments')
             ->where('office_id', $officeId)
-            ->selectRaw('ClinicNum, '.MetricDefinitions::adjustments('val'))
+            ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::adjustments('val'))
             ->whereBetween('AdjDate', [$start, $end])
-            ->groupBy('ClinicNum')
-            ->pluck('val', 'ClinicNum');
+            ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+            ->pluck('val', 'ClinicNum')
+            ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
 
         $writeoffs = DB::table('od_claim_procs')
             ->where('office_id', $officeId)
-            ->selectRaw('ClinicNum, '.MetricDefinitions::writeOffs('val'))
+            ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::writeOffs('val'))
             ->whereBetween('ProcDate', [$start, $end])
-            ->groupBy('ClinicNum')
-            ->pluck('val', 'ClinicNum');
+            ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+            ->pluck('val', 'ClinicNum')
+            ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
 
         $clinicNames = $this->clinics->all($officeId);
 
-        return response()->json(
-            $rows->map(function ($row, $i) use ($adjustments, $writeoffs, $clinicNames) {
-                $gross = (float) $row->total_production;
-                $adj = (float) ($adjustments[$row->ClinicNum] ?? 0);
-                $wo = (float) ($writeoffs[$row->ClinicNum] ?? 0);
+        $allClinicNums = collect(array_keys($clinicNames))
+            ->merge($rows->pluck('ClinicNum'))
+            ->map(fn ($k) => (int) $k)
+            ->unique()
+            ->values();
 
-                $net = $this->production->netFrom($gross, $adj, $wo);
+        $rowsMap = $rows->keyBy(fn ($r) => (int) $r->ClinicNum);
 
-                $avg = $row->patient_count > 0
-                    ? round($net / $row->patient_count, 2)
-                    : 0;
+        $result = $allClinicNums->map(function ($cNum) use ($rowsMap, $adjustments, $writeoffs, $clinicNames) {
+            $row = $rowsMap->get((int) $cNum);
+            $gross = $row ? (float) $row->total_production : 0.0;
+            $adj = (float) ($adjustments->get((int) $cNum, 0));
+            $wo = (float) ($writeoffs->get((int) $cNum, 0));
+            $patientCount = $row ? (int) $row->patient_count : 0;
 
-                return [
-                    'rank' => $i + 1,
-                    'clinic_num' => (int) $row->ClinicNum,
-                    'location' => $clinicNames[(int) $row->ClinicNum] ?? 'Location '.$row->ClinicNum,
-                    'total_production' => round($gross, 2),
-                    'net_production' => $net,
-                    'patient_count' => (int) $row->patient_count,
-                    'avg_production' => $avg,
-                ];
-            })->values()
-        );
+            $net = $this->production->netFrom($gross, $adj, $wo);
+
+            $avg = $patientCount > 0
+                ? round($net / $patientCount, 2)
+                : 0;
+
+            return [
+                'clinic_num' => (int) $cNum,
+                'location' => $clinicNames[(int) $cNum] ?? 'Location '.$cNum,
+                'total_production' => round($gross, 2),
+                'net_production' => $net,
+                'patient_count' => $patientCount,
+                'avg_production' => $avg,
+            ];
+        })->sortByDesc('total_production')->values()->map(function ($item, $i) {
+            $item['rank'] = $i + 1;
+
+            return $item;
+        });
+
+        return response()->json($result);
     }
 
     public function providerDetails(Request $request, $id)
@@ -287,7 +302,7 @@ class DashboardController extends Controller
             ->select('ProvNum', DB::raw('COUNT(*) AS appointment_count'))
             ->where('office_id', $officeId)
             ->whereIn('AptStatus', [1, 2])
-            ->whereBetween('AptDateTime', [$start, $end])
+            ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59'])
             ->groupBy('ProvNum');
 
         $providers = DB::table('od_providers as p')
@@ -334,7 +349,7 @@ class DashboardController extends Controller
         $unassignedPatColl = (float) DB::table('od_pay_splits')->where('office_id', $officeId)->whereBetween('DatePay', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('SplitAmt');
         $unassignedInsColl = (float) DB::table('od_claim_procs')->where('office_id', $officeId)->whereBetween('DateCP', [$start, $end])->where('Status', '!=', 0)->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->sum('InsPayAmt');
         $unassignedColl = $unassignedPatColl + $unassignedInsColl;
-        $unassignedApts = (int) DB::table('od_appointments')->where('office_id', $officeId)->whereIn('AptStatus', [1, 2])->whereBetween('AptDateTime', [$start, $end])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->count();
+        $unassignedApts = (int) DB::table('od_appointments')->where('office_id', $officeId)->whereIn('AptStatus', [1, 2])->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59'])->where(fn ($q) => $q->whereNull('ProvNum')->orWhere('ProvNum', 0))->count();
 
         if (! in_array(0, $knownProvNums) && ($unassignedGross != 0 || $unassignedAdj != 0 || $unassignedWo != 0 || $unassignedColl != 0 || $unassignedApts != 0)) {
             $providers->push((object) [
@@ -379,38 +394,48 @@ class DashboardController extends Controller
         $buildLocationStats = function ($s, $e) use ($officeId) {
             $gross = DB::table('od_procedure_logs')
                 ->where('office_id', $officeId)
-                ->selectRaw('ClinicNum, '.MetricDefinitions::grossProduction('val'))
+                ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::grossProduction('val'))
                 ->whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$s, $e])
-                ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
+                ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                ->pluck('val', 'ClinicNum')
+                ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
 
             $adj = DB::table('od_adjustments')
                 ->where('office_id', $officeId)
-                ->selectRaw('ClinicNum, '.MetricDefinitions::adjustments('val'))
+                ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::adjustments('val'))
                 ->whereBetween('AdjDate', [$s, $e])
-                ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
+                ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                ->pluck('val', 'ClinicNum')
+                ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
 
             $writeoffs = DB::table('od_claim_procs')
                 ->where('office_id', $officeId)
-                ->selectRaw('ClinicNum, '.MetricDefinitions::writeOffs('val'))
+                ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::writeOffs('val'))
                 ->whereBetween('ProcDate', [$s, $e])
-                ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
+                ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                ->pluck('val', 'ClinicNum')
+                ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
 
             $patColl = DB::table('od_pay_splits')
                 ->where('office_id', $officeId)
-                ->selectRaw('ClinicNum, SUM(SplitAmt) as val')
+                ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, SUM(SplitAmt) as val')
                 ->whereBetween('DatePay', [$s, $e])
-                ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
+                ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                ->pluck('val', 'ClinicNum')
+                ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
 
             $insColl = DB::table('od_claim_procs')
                 ->where('office_id', $officeId)
-                ->selectRaw('ClinicNum, SUM(InsPayAmt) as val')
+                ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, SUM(InsPayAmt) as val')
                 ->whereBetween('DateCP', [$s, $e])
                 ->where('Status', '!=', 0)
-                ->groupBy('ClinicNum')->pluck('val', 'ClinicNum');
+                ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                ->pluck('val', 'ClinicNum')
+                ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
 
             $coll = collect();
-            foreach ($patColl->keys()->merge($insColl->keys())->unique() as $cNum) {
-                $coll->put($cNum, (float) ($patColl->get($cNum, 0) + $insColl->get($cNum, 0)));
+            foreach ($patColl->keys()->merge($insColl->keys())->map(fn ($k) => (int) $k)->unique() as $cNum) {
+                $coll->put((int) $cNum, (float) ($patColl->get((int) $cNum, 0) + $insColl->get((int) $cNum, 0)));
             }
 
             return compact('gross', 'adj', 'writeoffs', 'coll');
@@ -419,7 +444,9 @@ class DashboardController extends Controller
         $currentStats = $buildLocationStats($start, $end);
         $lastYearStats = $buildLocationStats($startLastYear, $endLastYear);
 
-        $allClinicNums = collect()
+        $clinicNames = $this->clinics->all($officeId);
+
+        $allClinicNums = collect(array_keys($clinicNames))
             ->merge($currentStats['gross']->keys())
             ->merge($currentStats['adj']->keys())
             ->merge($currentStats['writeoffs']->keys())
@@ -428,24 +455,25 @@ class DashboardController extends Controller
             ->merge($lastYearStats['adj']->keys())
             ->merge($lastYearStats['writeoffs']->keys())
             ->merge($lastYearStats['coll']->keys())
+            ->map(fn ($k) => (int) $k)
             ->unique()
-            ->sort();
+            ->sort()
+            ->values();
 
-        $clinicNames = $this->clinics->all($officeId);
         $result = [];
         foreach ($allClinicNums as $cNum) {
-            $cg = (float) $currentStats['gross']->get($cNum, 0);
-            $ca = (float) $currentStats['adj']->get($cNum, 0) - (float) $currentStats['writeoffs']->get($cNum, 0);
-            $cc = (float) $currentStats['coll']->get($cNum, 0);
+            $cg = (float) $currentStats['gross']->get((int) $cNum, 0);
+            $ca = (float) $currentStats['adj']->get((int) $cNum, 0) - (float) $currentStats['writeoffs']->get((int) $cNum, 0);
+            $cc = (float) $currentStats['coll']->get((int) $cNum, 0);
             $cn = $cg + $ca;
 
-            $lg = (float) $lastYearStats['gross']->get($cNum, 0);
-            $la = (float) $lastYearStats['adj']->get($cNum, 0) - (float) $lastYearStats['writeoffs']->get($cNum, 0);
-            $lc = (float) $lastYearStats['coll']->get($cNum, 0);
+            $lg = (float) $lastYearStats['gross']->get((int) $cNum, 0);
+            $la = (float) $lastYearStats['adj']->get((int) $cNum, 0) - (float) $lastYearStats['writeoffs']->get((int) $cNum, 0);
+            $lc = (float) $lastYearStats['coll']->get((int) $cNum, 0);
             $ln = $lg + $la;
 
             $result[] = [
-                'clinic_num' => $cNum,
+                'clinic_num' => (int) $cNum,
                 'location' => $clinicNames[(int) $cNum] ?? 'Location '.$cNum,
                 'gross_production' => round($cg, 2),
                 'gross_production_last' => round($lg, 2),

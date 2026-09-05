@@ -22,7 +22,7 @@ class PatientAnalyticsService
         $officeId = $officeId ?? Office::getActiveOfficeId();
         $filter = new MetricFilter($start, $end, [], [], null, $officeId);
 
-        $scheduled = (new OdAppointment)->scheduledPatients($start, $end);
+        $scheduled = (new OdAppointment)->scheduledPatients($start, $end, $officeId);
 
         // Patient visits = distinct patient-per-day among completed procedures
         $visited = $this->patientVisits->patientVisits($start, $end, [], [], $officeId);

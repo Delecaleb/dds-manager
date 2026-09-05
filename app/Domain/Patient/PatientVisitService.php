@@ -118,7 +118,7 @@ class PatientVisitService
             'dates' => $r->dates,
             'service_codes' => $r->service_codes,
             'amount' => round((float) $r->amount, 2),
-            'clinic_num' => $r->clinic_num ?? null,
+            'clinic_num' => (int) ($r->clinic_num ?? 0),
             'prov_num' => $r->prov_num ?? null,
         ], $rows);
     }
@@ -263,12 +263,13 @@ class PatientVisitService
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereRaw("COALESCE(CodeNum, '') != '626'")
                 ->whereBetween('ProcDate', [$s, $e])
-                ->selectRaw('ClinicNum, '.MetricDefinitions::patientVisits('val'))
-                ->groupBy('ClinicNum')
-                ->pluck('val', 'ClinicNum');
+                ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::patientVisits('val'))
+                ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                ->pluck('val', 'ClinicNum')
+                ->mapWithKeys(fn ($val, $k) => [(int) $k => (int) $val]);
 
             $newVisits = collect($this->newPatientVisits($s, $e, [], [], $officeId))
-                ->groupBy('clinic_num')
+                ->groupBy(fn ($item) => (int) ($item['clinic_num'] ?? 0))
                 ->map(fn ($g) => $g->count());
 
             return compact('patientVisits', 'newVisits');
@@ -277,23 +278,25 @@ class PatientVisitService
         $currentStats = $getStats($start, $end);
         $lastYearStats = $getStats($startLastYear, $endLastYear);
 
-        $allClinicNums = collect()
+        $allClinicNums = collect(array_keys($clinicNames))
             ->merge($currentStats['patientVisits']->keys())
             ->merge($currentStats['newVisits']->keys())
             ->merge($lastYearStats['patientVisits']->keys())
             ->merge($lastYearStats['newVisits']->keys())
+            ->map(fn ($k) => (int) $k)
             ->unique()
-            ->sort();
+            ->sort()
+            ->values();
 
         $result = [];
         foreach ($allClinicNums as $cNum) {
             $result[] = [
-                'clinic_num' => $cNum,
+                'clinic_num' => (int) $cNum,
                 'location' => $clinicNames[(int) $cNum] ?? 'Location '.$cNum,
-                'patient_visits' => (int) $currentStats['patientVisits']->get($cNum, 0),
-                'patient_visits_last' => (int) $lastYearStats['patientVisits']->get($cNum, 0),
-                'new_patient_visits' => (int) $currentStats['newVisits']->get($cNum, 0),
-                'new_patient_visits_last' => (int) $lastYearStats['newVisits']->get($cNum, 0),
+                'patient_visits' => (int) $currentStats['patientVisits']->get((int) $cNum, 0),
+                'patient_visits_last' => (int) $lastYearStats['patientVisits']->get((int) $cNum, 0),
+                'new_patient_visits' => (int) $currentStats['newVisits']->get((int) $cNum, 0),
+                'new_patient_visits_last' => (int) $lastYearStats['newVisits']->get((int) $cNum, 0),
             ];
         }
 
