@@ -3,6 +3,7 @@
 namespace App\Domain\Patient;
 
 use App\Domain\Support\MetricFilter;
+use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
 use App\Models\Office;
@@ -45,6 +46,9 @@ class PatientVisitService
         $clinicFilter = ! empty($clinics) ? 'AND pl_inner.ClinicNum IN ('.implode(',', array_map('intval', $clinics)).')' : '';
         $provFilter = ! empty($providers) ? 'AND pl_inner.ProvNum IN ('.implode(',', array_map('intval', $providers)).')' : '';
 
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
+        $excludedIn = "'".implode("', '", array_map('addslashes', $excludedCodes))."'";
+
         $rows = DB::select("
             SELECT
                 fv.PatNum                                                              AS patient_id,
@@ -62,7 +66,7 @@ class PatientVisitService
                 FROM od_procedure_logs pl_inner
                 WHERE pl_inner.office_id = ?
                   AND pl_inner.ProcStatus IN ({$this->completedIn})
-                  AND COALESCE(pl_inner.CodeNum, '') != '626'
+                  AND COALESCE(pl_inner.CodeNum, '') NOT IN ({$excludedIn})
                   AND pl_inner.ProcDate BETWEEN ? AND ?
                   {$clinicFilter}
                   {$provFilter}
@@ -71,7 +75,7 @@ class PatientVisitService
                       WHERE pl_prior.office_id = ?
                         AND pl_prior.PatNum = pl_inner.PatNum
                         AND pl_prior.ProcStatus IN ({$this->completedIn})
-                        AND COALESCE(pl_prior.CodeNum, '') != '626'
+                        AND COALESCE(pl_prior.CodeNum, '') NOT IN ({$excludedIn})
                         AND pl_prior.ProcDate < ?
                   )
                 GROUP BY pl_inner.PatNum
@@ -82,15 +86,15 @@ class PatientVisitService
                 AND pl.office_id = ?
                 AND pl.ProcDate = fv.first_date
                 AND pl.ProcStatus IN ({$this->completedIn})
-                AND COALESCE(pl.CodeNum, '') != '626'
-            LEFT JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
+                AND COALESCE(pl.CodeNum, '') NOT IN ({$excludedIn})
+            LEFT JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = pl.office_id
             -- Filter 1: Exclude patients who already had a completed appointment before this visit date
             WHERE NOT EXISTS (
                 SELECT 1 FROM od_appointments a_prev
                 WHERE a_prev.office_id = ?
                   AND a_prev.PatNum = fv.PatNum
                   AND a_prev.AptStatus IN (2, 'Complete', 'Completed')
-                  AND a_prev.AptDateTime < ".($isSqlite ? 'fv.first_date' : "CONCAT(fv.first_date, ' 00:00:00')").'
+                  AND a_prev.AptDateTime < ".($isSqlite ? 'fv.first_date' : "CONCAT(fv.first_date, ' 00:00:00')")."
             )
             -- Filter 2: Exclude returning patients whose visit was IsNewPatient = 0 AND who had appointments prior to this date range
             AND NOT (
@@ -98,7 +102,7 @@ class PatientVisitService
                     SELECT 1 FROM od_appointments a_curr
                     WHERE a_curr.office_id = ?
                       AND a_curr.PatNum = fv.PatNum
-                      AND a_curr.AptDateTime BETWEEN '.($isSqlite ? "fv.first_date AND fv.first_date || ' 23:59:59'" : "CONCAT(fv.first_date, ' 00:00:00') AND CONCAT(fv.first_date, ' 23:59:59')")."
+                      AND a_curr.AptDateTime BETWEEN ".($isSqlite ? "fv.first_date AND fv.first_date || ' 23:59:59'" : "CONCAT(fv.first_date, ' 00:00:00') AND CONCAT(fv.first_date, ' 23:59:59')")."
                       AND (a_curr.IsNewPatient = 0 OR a_curr.IsNewPatient = '0')
                 )
                 AND EXISTS (
@@ -108,6 +112,7 @@ class PatientVisitService
                       AND a_old.AptDateTime < ?
                 )
             )
+            AND (pc.ProcCode NOT IN ('D9986', 'D9987') OR pc.ProcCode IS NULL)
             GROUP BY fv.PatNum, p.LName, p.FName, fv.first_date
             ORDER BY fv.first_date, p.LName
         ", [$officeId, $start, $end, $officeId, $start, $officeId, $officeId, $officeId, $officeId, $officeId, $start.' 00:00:00']);
@@ -149,10 +154,12 @@ class PatientVisitService
             $officeId = $officeId ?? Office::getActiveOfficeId();
         }
 
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
+
         $q = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->whereBetween('pl.ProcDate', [$startDate, $endDate]);
 
         if (! empty($clinics)) {
@@ -186,6 +193,9 @@ class PatientVisitService
         $clinicFilter = ! empty($clinics) ? 'AND pl.ClinicNum IN ('.implode(',', array_map('intval', $clinics)).')' : '';
         $provFilter = ! empty($providers) ? 'AND pl.ProvNum IN ('.implode(',', array_map('intval', $providers)).')' : '';
 
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
+        $excludedIn = "'".implode("', '", array_map('addslashes', $excludedCodes))."'";
+
         $rows = DB::select("
             SELECT
                 p.PatNum                         AS patient_id,
@@ -196,7 +206,7 @@ class PatientVisitService
             JOIN od_patients p ON pl.PatNum = p.PatNum AND p.office_id = ?
             WHERE pl.office_id = ?
               AND pl.ProcStatus IN ({$this->completedIn})
-              AND COALESCE(pl.CodeNum, '') != '626'
+              AND COALESCE(pl.CodeNum, '') NOT IN ({$excludedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               {$clinicFilter}
               {$provFilter}
@@ -220,11 +230,12 @@ class PatientVisitService
     public function dailyStats(string $start, string $end, array $clinics = [], array $providers = [], ?int $officeId = null): array
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
         $q = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->whereBetween('pl.ProcDate', [$start, $end]);
 
         if (! empty($clinics)) {
@@ -256,12 +267,13 @@ class PatientVisitService
         $officeId = $officeId ?? Office::getActiveOfficeId();
         $startLastYear = Carbon::parse($start)->subYear()->toDateString();
         $endLastYear = Carbon::parse($end)->subYear()->toDateString();
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
-        $getStats = function ($s, $e) use ($officeId) {
+        $getStats = function ($s, $e) use ($officeId, $excludedCodes) {
             $patientVisits = DB::table('od_procedure_logs')
                 ->where('office_id', $officeId)
                 ->whereIn('ProcStatus', ProcStatus::completed())
-                ->whereRaw("COALESCE(CodeNum, '') != '626'")
+                ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes)
                 ->whereBetween('ProcDate', [$s, $e])
                 ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::patientVisits('val'))
                 ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))

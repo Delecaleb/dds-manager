@@ -6,6 +6,7 @@ use App\Domain\Patient\PatientService;
 use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Models\OdPatient;
 use App\Models\OdProvider;
@@ -1751,11 +1752,12 @@ class OperationsController extends Controller
                 ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
             ];
 
+            $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
             $query = DB::table('od_procedure_logs')
                 ->where('office_id', $officeId)
                 ->selectRaw('ProcDate, COUNT(DISTINCT PatNum) as pts_visits, COUNT(*) as procedures, SUM(ProcFee) as production')
                 ->whereIn('ProcStatus', ProcStatus::completed())
-                ->whereRaw("COALESCE(CodeNum, '') != '626'")
+                ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes)
                 ->whereBetween('ProcDate', [$start, $end]);
 
             if ($provNum) {
@@ -2098,11 +2100,12 @@ class OperationsController extends Controller
 
             $start18m = date('Y-m-d', strtotime('-18 months', strtotime($end)));
             $start36m = date('Y-m-d', strtotime('-36 months', strtotime($end)));
+            $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
             $firstProcs = DB::table('od_procedure_logs as pl')
                 ->where('pl.office_id', $officeId)
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+                ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
                 ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
                 ->groupBy('pl.PatNum')
                 ->pluck('first_date', 'PatNum')
@@ -2113,7 +2116,7 @@ class OperationsController extends Controller
                 ->selectRaw('pl.PatNum, MAX(pl.ProcDate) as last_date')
                 ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+                ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
                 ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $end.' 23:59:59'])
                 ->groupBy('pl.PatNum')
                 ->get();

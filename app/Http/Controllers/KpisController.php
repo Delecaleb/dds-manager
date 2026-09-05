@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Patient\PatientService;
 use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\MetricFilter;
+use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use App\Models\Office;
@@ -468,10 +469,11 @@ class KpisController extends Controller
         $priorActivePatients = (int) ($retentionData->active_36m_prior ?? 0);
 
         // New patients in last 18 months
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
         $newPatientsCount = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', [2, '2', 'C'])
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
             ->groupBy('pl.PatNum')
             ->havingRaw('MIN(pl.ProcDate) >= ?', [$cutoff18m.' 00:00:00'])

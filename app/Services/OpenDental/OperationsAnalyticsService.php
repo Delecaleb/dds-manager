@@ -7,6 +7,7 @@ use App\Domain\Patient\PatientService;
 use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use App\Helpers\MetricDefinitions;
@@ -457,6 +458,8 @@ class OperationsAnalyticsService
         }
 
         // 5. Case-acceptance components ($ presented vs $ completed/scheduled) mapped by PlanNum.
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
+
         $caQ = DB::table('od_procedure_logs as pl')
             ->leftJoinSub($latestClaim, 'cp', 'pl.PatNum', '=', 'cp.PatNum')
             ->where('pl.office_id', $officeId)
@@ -468,7 +471,7 @@ class OperationsAnalyticsService
                 SUM(CASE WHEN pl.ProcStatus IN ('1', 1) AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.AptNum > 0
                          THEN pl.ProcFee ELSE 0 END) AS accepted
             ")
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->whereBetween('pl.DateTP', [$start, $end]);
         if ($clinics) {
             $caQ->whereIn('pl.ClinicNum', $clinics);
@@ -606,12 +609,13 @@ class OperationsAnalyticsService
 
         $latestClaim = $this->payors->planForPatientSubquery($officeId);
 
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
         $q = DB::table('od_procedure_logs as pl')
             ->leftJoinSub($latestClaim, 'cp', 'pl.PatNum', '=', 'cp.PatNum')
             ->where('pl.office_id', $officeId)
             ->selectRaw('COALESCE(cp.PlanNum, 0) AS PlanNum, pl.ClinicNum, pl.PatNum')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->whereBetween('pl.ProcDate', [$start, $end])
             ->whereIn('pl.PatNum', $newPatIds);
 
@@ -814,12 +818,13 @@ class OperationsAnalyticsService
     private function pdGroupedProduction(string $start, string $end, array $dims, array $clinics, int $officeId): array
     {
         $concat = $this->concatPatNumProcDate();
+        $notBroken = ProcCode::notBrokenAppointmentSql('', $officeId);
         $q = DB::table('od_procedure_logs')
             ->where('office_id', $officeId)
             ->selectRaw("ClinicNum,
                 SUM(ProcFee)                                  AS gross,
                 COUNT(*)                                      AS procedures,
-                COUNT(DISTINCT CASE WHEN COALESCE(CodeNum, 0) != 626 THEN {$concat} END) AS pts_visits,
+                COUNT(DISTINCT CASE WHEN {$notBroken} THEN {$concat} END) AS pts_visits,
                 COUNT(DISTINCT ProcDate)                      AS working_days")
             ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end]);
@@ -917,11 +922,12 @@ class OperationsAnalyticsService
             return [];
         }
 
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
         $q = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->selectRaw('pl.ClinicNum, COUNT(DISTINCT pl.PatNum) AS npt')
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->whereBetween('pl.ProcDate', [$start, $end])
             ->whereIn('pl.PatNum', $newPatIds);
 
@@ -1517,12 +1523,15 @@ class OperationsAnalyticsService
     {
         // Production-side metrics grouped by clinic + provider.
         $concat = $this->concatPatNumProcDate();
+        $notBroken = ProcCode::notBrokenAppointmentSql('', $officeId);
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
+
         $prodQ = DB::table('od_procedure_logs')
             ->where('office_id', $officeId)
             ->selectRaw("ClinicNum, ProvNum,
                 SUM(ProcFee)                                  AS gross,
                 COUNT(*)                                      AS procedures,
-                COUNT(DISTINCT CASE WHEN COALESCE(CodeNum, '') != '626' THEN {$concat} END) AS pts_visits,
+                COUNT(DISTINCT CASE WHEN {$notBroken} THEN {$concat} END) AS pts_visits,
                 COUNT(DISTINCT CASE WHEN ProcFee > 0 THEN ProcDate END) AS working_days")
             ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end]);
@@ -1545,7 +1554,7 @@ class OperationsAnalyticsService
         $firstProcs = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
             ->groupBy('pl.PatNum')
             ->pluck('first_date', 'PatNum')
@@ -1554,7 +1563,7 @@ class OperationsAnalyticsService
         $patsCur = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->whereBetween('pl.ProcDate', [$start18m, $endStr])
             ->when($clinics, fn ($q) => $q->whereIn('pl.ClinicNum', $clinics))
             ->select('pl.ClinicNum', 'pl.ProvNum', 'pl.PatNum')
@@ -1564,7 +1573,7 @@ class OperationsAnalyticsService
         $patsPrior = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->whereBetween('pl.ProcDate', [$start36m, $start18m])
             ->when($clinics, fn ($q) => $q->whereIn('pl.ClinicNum', $clinics))
             ->select('pl.ClinicNum', 'pl.ProvNum', 'pl.PatNum')
@@ -1991,13 +2000,14 @@ class OperationsAnalyticsService
     private function productionMetrics(string $start, string $end, array $clinics, int $officeId): array
     {
         $concat = $this->concatPatNumProcDate();
+        $notBroken = ProcCode::notBrokenAppointmentSql('', $officeId);
         $q = DB::table('od_procedure_logs')
             ->where('office_id', $officeId)
             ->selectRaw("ClinicNum,
                 SUM(ProcFee)                                  AS gross,
                 COUNT(*)                                      AS procedures,
                 COUNT(DISTINCT PatNum)                        AS unique_pts,
-                COUNT(DISTINCT CASE WHEN COALESCE(CodeNum, 0) != 626 THEN {$concat} END) AS pts_visit,
+                COUNT(DISTINCT CASE WHEN {$notBroken} THEN {$concat} END) AS pts_visit,
                 COUNT(DISTINCT ProcDate)                      AS working_days")
             ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end]);
@@ -2012,7 +2022,7 @@ class OperationsAnalyticsService
     /** New patients = first-ever completed procedure falls in range; dollars = their production in range. */
     private function newPatientMetrics(string $start, string $end, array $clinics, int $officeId): array
     {
-        $visits = $this->patientVisits->newPatientVisits($start, $end, $clinics);
+        $visits = $this->patientVisits->newPatientVisits($start, $end, $clinics, [], $officeId);
 
         $out = [];
         foreach ($visits as $v) {
@@ -2040,12 +2050,13 @@ class OperationsAnalyticsService
     {
         $start18m = date('Y-m-d', strtotime('-18 months', strtotime($end)));
         $start36m = date('Y-m-d', strtotime('-36 months', strtotime($end)));
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
         // 1. First-ever completed procedure date for each patient (to identify new patients)
         $firstProcs = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
             ->groupBy('pl.PatNum')
             ->pluck('first_date', 'PatNum')
@@ -2055,7 +2066,7 @@ class OperationsAnalyticsService
         $qCur = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->whereBetween('pl.ProcDate', [$start18m.' 00:00:00', $end.' 23:59:59']);
         if ($clinics) {
             $qCur->whereIn('pl.ClinicNum', $clinics);
@@ -2066,7 +2077,7 @@ class OperationsAnalyticsService
         $qPrior = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $start18m.' 00:00:00']);
         if ($clinics) {
             $qPrior->whereIn('pl.ClinicNum', $clinics);
@@ -3220,10 +3231,12 @@ class OperationsAnalyticsService
             $earliest36 = (new \DateTime($monthKeys[0].'-01'))->modify('-36 months')->format('Y-m-d');
             $latestEnd = (new \DateTime(end($monthKeys).'-01'))->modify('last day of this month')->format('Y-m-d');
 
+            $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
+
             $firstProcs = DB::table('od_procedure_logs as pl')
                 ->where('pl.office_id', $officeId)
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+                ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
                 ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
                 ->groupBy('pl.PatNum')
                 ->pluck('first_date', 'PatNum')
@@ -3232,7 +3245,7 @@ class OperationsAnalyticsService
             $qProcs = DB::table('od_procedure_logs as pl')
                 ->where('pl.office_id', $officeId)
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+                ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
                 ->whereBetween('pl.ProcDate', [$earliest36.' 00:00:00', $latestEnd.' 23:59:59']);
             if ($clinics) {
                 $qProcs->whereIn('pl.ClinicNum', $clinics);
@@ -3425,11 +3438,12 @@ class OperationsAnalyticsService
 
         // 11. Patient Visits
         if (str_contains(strtolower($metricNorm), 'visit') || str_contains(strtolower($metricNorm), 'pts visits')) {
+            $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
             $q = DB::table('od_procedure_logs as pl')
                 ->where('pl.office_id', $officeId)
                 ->selectRaw("pl.ClinicNum, {$mProcDate} as month, ".MetricDefinitions::patientVisits('val'))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->where('pl.CodeNum', '!=', 626)
+                ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
                 ->whereBetween('pl.ProcDate', [$start, $end]);
             if ($clinics) {
                 $q->whereIn('pl.ClinicNum', $clinics);

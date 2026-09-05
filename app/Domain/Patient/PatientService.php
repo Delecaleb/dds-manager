@@ -3,6 +3,7 @@
 namespace App\Domain\Patient;
 
 use App\Domain\Support\MetricFilter;
+use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Models\Office;
 use Illuminate\Database\Query\Builder;
@@ -34,12 +35,13 @@ class PatientService
     public function firstVisitCohort(?int $officeId = null): Builder
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
         return DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
             ->where('office_id', $officeId)
             ->whereIn('ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes)
             ->groupBy('PatNum');
     }
 
@@ -54,9 +56,10 @@ class PatientService
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
         $completed = ProcStatus::inList(ProcStatus::completed());
+        $notBroken = ProcCode::notBrokenAppointmentSql('', $officeId);
 
         return "SELECT PatNum, MIN(ProcDate) AS {$dateAlias} "
-            ."FROM od_procedure_logs WHERE office_id = {$officeId} AND ProcStatus IN ({$completed}) AND COALESCE(CodeNum, '') != '626' GROUP BY PatNum";
+            ."FROM od_procedure_logs WHERE office_id = {$officeId} AND ProcStatus IN ({$completed}) AND {$notBroken} GROUP BY PatNum";
     }
 
     /** Patients seen (any completed procedure) in the period. */
@@ -88,10 +91,12 @@ class PatientService
     /** Completed procedure-log rows for the filter (the base for patient counts). */
     private function completedInPeriod(MetricFilter $filter): Builder
     {
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($filter->officeId);
+
         $q = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $filter->officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->whereBetween('pl.ProcDate', [$filter->start, $filter->end]);
 
         if ($filter->clinics) {

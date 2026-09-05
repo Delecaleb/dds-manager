@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Domain\Patient\PatientService;
+use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\MetricFilter;
+use App\Domain\Support\ProcCode;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -117,5 +119,80 @@ class PatientVisitCodeFilterTest extends TestCase
         // 2026-08-06 (CodeNum 101) -> 1 patient_visits
         $aug6 = $stats->firstWhere('date', '2026-08-06');
         $this->assertEquals(1, $aug6['patient_visits']);
+    }
+
+    public function test_patient_visit_excludes_d9986_and_d9987_with_arbitrary_code_nums(): void
+    {
+        ProcCode::clearCache();
+
+        // Setup Plymouth office (office_id = 4)
+        $plymouthOfficeId = 4;
+
+        DB::table('od_patients')->insert([
+            'PatNum' => 50,
+            'office_id' => $plymouthOfficeId,
+            'LName' => 'Wayne',
+            'FName' => 'Bruce',
+        ]);
+
+        // In Plymouth, D9986 has CodeNum 9986 and D9987 has CodeNum 9987
+        DB::table('od_procedures')->insert([
+            ['office_id' => $plymouthOfficeId, 'CodeNum' => 9986, 'ProcCode' => 'D9986', 'Descript' => 'Missed appointment'],
+            ['office_id' => $plymouthOfficeId, 'CodeNum' => 9987, 'ProcCode' => 'D9987', 'Descript' => 'Cancelled appointment'],
+            ['office_id' => $plymouthOfficeId, 'CodeNum' => 102, 'ProcCode' => 'D0150', 'Descript' => 'Comprehensive Oral Eval'],
+        ]);
+
+        // Patient 50 has a completed missed appointment (D9986) on 2026-08-10 and cancelled (D9987) on 2026-08-11
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 501,
+                'PatNum' => 50,
+                'office_id' => $plymouthOfficeId,
+                'CodeNum' => 9986,
+                'ProcDate' => '2026-08-10',
+                'ProcStatus' => 2,
+                'ProcFee' => 25.00,
+            ],
+            [
+                'ProcNum' => 502,
+                'PatNum' => 50,
+                'office_id' => $plymouthOfficeId,
+                'CodeNum' => 9987,
+                'ProcDate' => '2026-08-11',
+                'ProcStatus' => 2,
+                'ProcFee' => 0.00,
+            ],
+        ]);
+
+        $filter = new MetricFilter('2026-08-01', '2026-08-31', officeId: $plymouthOfficeId);
+        $productionService = app(ProductionService::class);
+        $patientService = app(PatientService::class);
+        $patientVisitService = app(PatientVisitService::class);
+
+        // Neither D9986 nor D9987 should count as patient visits or new patient visits
+        $this->assertEquals(0, $productionService->patientVisits($filter));
+        $this->assertEquals(0, $patientService->count($filter));
+        $this->assertEquals(0, $patientService->newPatientCount($filter));
+        $this->assertEquals(0, $patientVisitService->patientVisits($filter));
+        $this->assertEquals(0, $patientVisitService->newPatientCount('2026-08-01', '2026-08-31', [], [], $plymouthOfficeId));
+
+        // Now add a real clinical visit on 2026-08-15
+        DB::table('od_procedure_logs')->insert([
+            [
+                'ProcNum' => 503,
+                'PatNum' => 50,
+                'office_id' => $plymouthOfficeId,
+                'CodeNum' => 102,
+                'ProcDate' => '2026-08-15',
+                'ProcStatus' => 2,
+                'ProcFee' => 120.00,
+            ],
+        ]);
+
+        $this->assertEquals(1, $productionService->patientVisits($filter));
+        $this->assertEquals(1, $patientService->count($filter));
+        $this->assertEquals(1, $patientService->newPatientCount($filter));
+        $this->assertEquals(1, $patientVisitService->patientVisits($filter));
+        $this->assertEquals(1, $patientVisitService->newPatientCount('2026-08-01', '2026-08-31', [], [], $plymouthOfficeId));
     }
 }

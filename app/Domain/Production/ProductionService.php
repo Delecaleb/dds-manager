@@ -3,6 +3,7 @@
 namespace App\Domain\Production;
 
 use App\Domain\Support\MetricFilter;
+use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -105,8 +106,10 @@ class ProductionService
 
     public function patientVisits(MetricFilter $filter): int
     {
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($filter->officeId);
+
         return (int) $this->completedProcedures($filter)
-            ->whereRaw("COALESCE(pl.CodeNum, '') != '626'")
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->distinct()
             ->count(DB::raw($this->visitKeyExpr()));
     }
