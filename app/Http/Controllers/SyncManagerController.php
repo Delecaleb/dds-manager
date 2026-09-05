@@ -17,6 +17,8 @@ class SyncManagerController extends Controller
      */
     public function index(): View
     {
+        $currentOffice = Office::getActiveOffice() ?? Office::first();
+
         $modules = [
             'appointments' => 'Appointments',
             'procedurelogs' => 'Procedures',
@@ -29,6 +31,7 @@ class SyncManagerController extends Controller
         ];
 
         return view('sync_manager.index', [
+            'currentOffice' => $currentOffice,
             'modules' => $modules,
         ]);
     }
@@ -38,7 +41,10 @@ class SyncManagerController extends Controller
      */
     public function requests(): JsonResponse
     {
-        $requests = SyncRequest::with(['user:id,name'])
+        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
+
+        $requests = SyncRequest::with(['user:id,name', 'office:id,name'])
+            ->where('office_id', $activeOfficeId)
             ->orderBy('id', 'desc')
             ->take(50)
             ->get();
@@ -69,8 +75,11 @@ class SyncManagerController extends Controller
             return response()->json(['error' => 'Start date cannot be after end date.'], 422);
         }
 
+        $activeOffice = Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
+        $activeOfficeId = (int) ($activeOffice->id ?? 1);
+
         $syncReq = SyncRequest::create([
-            'office_id' => Office::getActiveOffice()->id ?? 1,
+            'office_id' => $activeOfficeId,
             'module' => $module,
             'start_date' => $startDate,
             'end_date' => $endDate,
@@ -103,7 +112,8 @@ class SyncManagerController extends Controller
     public function cancelSync(Request $request): JsonResponse
     {
         $id = (int) $request->input('id');
-        $syncReq = SyncRequest::find($id);
+        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
+        $syncReq = SyncRequest::where('office_id', $activeOfficeId)->find($id);
 
         if (! $syncReq) {
             return response()->json(['error' => 'Sync request not found.'], 404);
@@ -130,7 +140,8 @@ class SyncManagerController extends Controller
      */
     public function checkpoints(): JsonResponse
     {
-        $logs = SyncLog::orderBy('module')->get();
+        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
+        $logs = SyncLog::where('office_id', $activeOfficeId)->orderBy('module')->get();
 
         return response()->json([
             'logs' => $logs,
@@ -150,6 +161,8 @@ class SyncManagerController extends Controller
             return response()->json(['error' => 'Module is required.'], 400);
         }
 
+        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
+
         $formattedDate = null;
         if (! empty($lastSyncedAt)) {
             $ts = strtotime((string) $lastSyncedAt);
@@ -159,7 +172,7 @@ class SyncManagerController extends Controller
         }
 
         if ($module === 'all') {
-            SyncLog::query()->update([
+            SyncLog::where('office_id', $activeOfficeId)->update([
                 'last_synced_at' => $formattedDate,
                 'last_primary_key' => $lastPrimaryKey,
                 'status' => 'idle',
@@ -173,7 +186,7 @@ class SyncManagerController extends Controller
         }
 
         $log = SyncLog::firstOrCreate(
-            ['module' => $module],
+            ['office_id' => $activeOfficeId, 'module' => $module],
             ['status' => 'idle', 'total_processed' => 0]
         );
 

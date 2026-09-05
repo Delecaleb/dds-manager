@@ -85,4 +85,36 @@ class SyncRequestTest extends TestCase
             'status' => 'cancelled',
         ]);
     }
+
+    public function test_sync_manager_requests_are_isolated_per_office(): void
+    {
+        $user = User::factory()->create();
+
+        SyncRequest::create([
+            'office_id' => 1,
+            'module' => 'appointments',
+            'status' => 'pending',
+            'created_by' => $user->id,
+        ]);
+
+        $req2 = SyncRequest::create([
+            'office_id' => 2,
+            'module' => 'patients',
+            'status' => 'pending',
+            'created_by' => $user->id,
+        ]);
+
+        // Requests for office 1
+        $res = $this->actingAs($user)->withSession(['active_office_id' => 1])->getJson('/sync-manager/requests');
+        $res->assertStatus(200);
+        $res->assertJsonCount(1, 'requests');
+        $res->assertJsonFragment(['module' => 'appointments']);
+        $res->assertJsonMissing(['module' => 'patients']);
+
+        // Cannot cancel office 2 request from office 1
+        $cancelRes = $this->actingAs($user)->withSession(['active_office_id' => 1])->postJson('/sync-manager/cancel', [
+            'id' => $req2->id,
+        ]);
+        $cancelRes->assertStatus(404);
+    }
 }

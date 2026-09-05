@@ -2,11 +2,20 @@
   <div class="p-6 space-y-5 max-w-[1600px] mx-auto text-slate-800">
 
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
         <h1 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
           <i data-lucide="database" class="w-5 h-5 text-slate-700"></i> OpenDental Realtime Data Explorer
         </h1>
+        <p class="text-xs text-slate-500 mt-0.5">
+          Realtime database querying, API synchronization, and data reconciliation for <span class="font-semibold text-slate-800">{{ $currentOffice->name ?? 'Active Location' }}</span>
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+          <i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+          Location: {{ $currentOffice->name ?? 'Default Office' }}
+        </span>
       </div>
     </div>
 
@@ -44,12 +53,12 @@
       </div>
 
       <!-- Contextual Filter Controls (For Query & Compare Modes) -->
-      <div id="filterControlsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 items-end">
+      <div id="filterControlsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5 items-end">
         
         <!-- 1. Table Select -->
-        <div>
+        <div class="lg:col-span-4">
           <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Table</label>
-          <select id="activeTableSelect" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 focus:border-slate-400 shadow-2xs">
+          <select id="activeTableSelect" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 focus:border-slate-400 shadow-2xs h-[38px]">
             <optgroup label="📅 Appointments & Schedules">
               <option value="appointment" selected>appointment (od_appointments)</option>
               <option value="histappointment">histappointment (od_histappointments)</option>
@@ -87,22 +96,18 @@
           </select>
         </div>
 
-        <!-- 2. Start Date -->
-        <div>
-          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Start Date</label>
-          <input type="date" id="filterStartDate" value="2026-08-01" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 shadow-2xs">
+        <!-- 2. Date Range Picker -->
+        <div class="lg:col-span-4">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Date Range</label>
+          <x-daterange-picker id="odExplorerDateRange" on-apply="odExplorerDateApplied" class="w-full h-[38px] !bg-white shadow-2xs text-xs" />
+          <input type="hidden" id="filterStartDate" value="2026-08-01">
+          <input type="hidden" id="filterEndDate" value="2026-08-19">
         </div>
 
-        <!-- 3. End Date -->
-        <div>
-          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">End Date</label>
-          <input type="date" id="filterEndDate" value="2026-08-19" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 shadow-2xs">
-        </div>
-
-        <!-- 4. Status Filter (Visible for appointments) -->
-        <div id="statusFilterWrapper">
+        <!-- 3. Status Filter (Visible for appointments) -->
+        <div id="statusFilterWrapper" class="lg:col-span-2">
           <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Status</label>
-          <select id="filterStatusSelect" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 shadow-2xs">
+          <select id="filterStatusSelect" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 shadow-2xs h-[38px]">
             <option value="1_2" selected>Scheduled & Complete (1, 2)</option>
             <option value="all">All Statuses (No Filter)</option>
             <option value="1">Scheduled Only (1)</option>
@@ -111,10 +116,10 @@
           </select>
         </div>
 
-        <!-- 5. Max Rows Limit -->
-        <div>
+        <!-- 4. Max Rows Limit -->
+        <div class="lg:col-span-2">
           <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Limit</label>
-          <select id="filterLimitSelect" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 shadow-2xs">
+          <select id="filterLimitSelect" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 shadow-2xs h-[38px]">
             <option value="200">200 rows</option>
             <option value="500" selected>500 rows</option>
             <option value="1000">1,000 rows</option>
@@ -360,6 +365,20 @@
     var _activeDiffFilter = 'all';
     var _singleQueryResult = null;
 
+    window.odExplorerDateApplied = function (startYMD, endYMD) {
+      document.getElementById('filterStartDate').value = startYMD;
+      document.getElementById('filterEndDate').value = endYMD;
+      executeCurrentMode();
+    };
+
+    document.addEventListener('daterange:changed', function (e) {
+      if (e.detail && e.detail.id === 'odExplorerDateRange') {
+        document.getElementById('filterStartDate').value = e.detail.start;
+        document.getElementById('filterEndDate').value = e.detail.end;
+        executeCurrentMode();
+      }
+    });
+
     document.addEventListener('DOMContentLoaded', function () {
       var modeSelect = document.getElementById('intentModeSelect');
       var tableSelect = document.getElementById('activeTableSelect');
@@ -449,25 +468,37 @@
       var m = String(now.getMonth() + 1).padStart(2, '0');
       var d = String(now.getDate()).padStart(2, '0');
 
+      var startStr = '';
+      var endStr = '';
+
       if (preset === 'aug_2026') {
-        s.value = '2026-08-01';
-        e.value = '2026-08-19';
+        startStr = '2026-08-01';
+        endStr = '2026-08-19';
       } else if (preset === 'this_month') {
-        s.value = y + '-' + m + '-01';
-        e.value = y + '-' + m + '-' + d;
+        startStr = y + '-' + m + '-01';
+        endStr = y + '-' + m + '-' + d;
       } else if (preset === 'last_month') {
         var prevM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         var lastPrev = new Date(now.getFullYear(), now.getMonth(), 0);
-        s.value = prevM.toISOString().slice(0, 7) + '-01';
-        e.value = lastPrev.toISOString().slice(0, 10);
+        startStr = prevM.toISOString().slice(0, 7) + '-01';
+        endStr = lastPrev.toISOString().slice(0, 10);
       } else if (preset === 'last_30_days') {
         var past30 = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-        s.value = past30.toISOString().slice(0, 10);
-        e.value = y + '-' + m + '-' + d;
+        startStr = past30.toISOString().slice(0, 10);
+        endStr = y + '-' + m + '-' + d;
       } else if (preset === 'today') {
-        s.value = y + '-' + m + '-' + d;
-        e.value = y + '-' + m + '-' + d;
+        startStr = y + '-' + m + '-' + d;
+        endStr = y + '-' + m + '-' + d;
       }
+
+      s.value = startStr;
+      e.value = endStr;
+
+      if (typeof $ !== 'undefined' && $('#odExplorerDateRange').data('daterangepicker') && typeof moment !== 'undefined') {
+        $('#odExplorerDateRange').data('daterangepicker').setStartDate(moment(startStr, 'YYYY-MM-DD'));
+        $('#odExplorerDateRange').data('daterangepicker').setEndDate(moment(endStr, 'YYYY-MM-DD'));
+      }
+
       executeCurrentMode();
     }
 

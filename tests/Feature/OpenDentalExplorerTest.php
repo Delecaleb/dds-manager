@@ -411,4 +411,216 @@ class OpenDentalExplorerTest extends TestCase
             'HistApptNum' => 9001,
         ]);
     }
+
+    public function test_od_explorer_local_query_strictly_scoped_to_active_office(): void
+    {
+        $user = User::factory()->create();
+        $office1 = Office::create(['id' => 1, 'name' => 'Office 1', 'is_active' => true]);
+        $office2 = Office::create(['id' => 2, 'name' => 'Office 2', 'is_active' => true]);
+
+        DB::table('od_patients')->insert([
+            ['office_id' => 1, 'PatNum' => 1001, 'LName' => 'Smith', 'FName' => 'Office1Patient'],
+            ['office_id' => 2, 'PatNum' => 2001, 'LName' => 'Johnson', 'FName' => 'Office2Patient'],
+        ]);
+
+        // Query with Office 1 active
+        $res1 = $this->actingAs($user)->withSession(['active_office_id' => 1])->postJson('/open-dental-explorer/query', [
+            'source' => 'local_db',
+            'table' => 'patient',
+            'columns' => ['PatNum', 'LName', 'FName', 'office_id'],
+        ]);
+
+        $res1->assertStatus(200);
+        $res1->assertJson(['count' => 1]);
+        $res1->assertJsonFragment(['PatNum' => 1001, 'FName' => 'Office1Patient']);
+        $res1->assertJsonMissing(['FName' => 'Office2Patient']);
+
+        // Query with Office 2 active
+        $res2 = $this->actingAs($user)->withSession(['active_office_id' => 2])->postJson('/open-dental-explorer/query', [
+            'source' => 'local_db',
+            'table' => 'patient',
+            'columns' => ['PatNum', 'LName', 'FName', 'office_id'],
+        ]);
+
+        $res2->assertStatus(200);
+        $res2->assertJson(['count' => 1]);
+        $res2->assertJsonFragment(['PatNum' => 2001, 'FName' => 'Office2Patient']);
+        $res2->assertJsonMissing(['FName' => 'Office1Patient']);
+    }
+
+    public function test_od_explorer_local_query_nested_conditions_do_not_leak_cross_tenant_data(): void
+    {
+        $user = User::factory()->create();
+        $office1 = Office::create(['id' => 1, 'name' => 'Office 1', 'is_active' => true]);
+        $office2 = Office::create(['id' => 2, 'name' => 'Office 2', 'is_active' => true]);
+
+        DB::table('od_appointments')->insert([
+            ['office_id' => 1, 'AptNum' => 3001, 'PatNum' => 101, 'AptStatus' => 1, 'AptDateTime' => '2026-08-10 10:00:00'],
+            ['office_id' => 2, 'AptNum' => 3002, 'PatNum' => 102, 'AptStatus' => 2, 'AptDateTime' => '2026-08-10 11:00:00'],
+        ]);
+
+        // Condition with OR: AptStatus = 1 OR AptStatus = 2
+        $res = $this->actingAs($user)->withSession(['active_office_id' => 1])->postJson('/open-dental-explorer/query', [
+            'source' => 'local_db',
+            'table' => 'appointment',
+            'conditions' => [
+                ['column' => 'AptStatus', 'operator' => '=', 'value' => '1', 'logical' => 'and'],
+                ['column' => 'AptStatus', 'operator' => '=', 'value' => '2', 'logical' => 'or'],
+            ],
+        ]);
+
+        $res->assertStatus(200);
+        $res->assertJson(['count' => 1]);
+        $res->assertJsonFragment(['AptNum' => '3001']);
+        $res->assertJsonMissing(['AptNum' => '3002']);
+    }
+
+    public function test_od_explorer_sync_to_local_enforces_active_office_id(): void
+    {
+        $user = User::factory()->create();
+        $office2 = Office::create(['id' => 2, 'name' => 'Office 2', 'is_active' => true]);
+
+        $res = $this->actingAs($user)->withSession(['active_office_id' => 2])->postJson('/open-dental-explorer/sync-to-local', [
+            'table' => 'patient',
+            'rows' => [
+                ['PatNum' => 5555, 'LName' => 'Taylor', 'FName' => 'Alex'],
+            ],
+        ]);
+
+        $res->assertStatus(200);
+        $this->assertDatabaseHas('od_patients', [
+            'office_id' => 2,
+            'PatNum' => 5555,
+            'LName' => 'Taylor',
+        ]);
+    }
+
+    public function test_od_explorer_reconcile_diff_is_isolated_to_active_office(): void
+    {
+        $user = User::factory()->create();
+        $office1 = Office::create(['id' => 1, 'name' => 'Office 1', 'is_active' => true]);
+        $office2 = Office::create(['id' => 2, 'name' => 'Office 2', 'is_active' => true]);
+
+        DB::table('od_appointments')->insert([
+            ['office_id' => 1, 'AptNum' => 4001, 'PatNum' => 101, 'AptDateTime' => '2026-08-10 10:00:00', 'AptStatus' => 1],
+            ['office_id' => 2, 'AptNum' => 4002, 'PatNum' => 102, 'AptDateTime' => '2026-08-10 11:00:00', 'AptStatus' => 1],
+        ]);
+
+        $mockQueryService = $this->mock(QueryService::class);
+        $mockQueryService->shouldReceive('forOffice')->andReturnSelf();
+        $mockQueryService->shouldReceive('shortQuery')->andReturn([
+            ['AptNum' => 4001, 'PatNum' => 101, 'AptDateTime' => '2026-08-10 10:00:00', 'AptStatus' => 1],
+        ]);
+
+        $res = $this->actingAs($user)->withSession(['active_office_id' => 1])->postJson('/open-dental-explorer/reconcile-diff', [
+            'table' => 'appointment',
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-19',
+        ]);
+
+        $res->assertStatus(200);
+        $res->assertJson([
+            'success' => true,
+            'summary' => [
+                'live_count' => 1,
+                'local_count' => 1, // Only office 1's record is counted in local snapshot
+                'matched_count' => 1,
+                'orphan_count' => 0,
+                'missing_count' => 0,
+            ],
+        ]);
+    }
+
+    public function test_od_explorer_prune_orphans_never_deletes_records_from_other_offices(): void
+    {
+        $user = User::factory()->create();
+        $office1 = Office::create(['id' => 1, 'name' => 'Office 1', 'is_active' => true]);
+        $office2 = Office::create(['id' => 2, 'name' => 'Office 2', 'is_active' => true]);
+
+        // Same AptNum in two different offices (composite key)
+        DB::table('od_appointments')->insert([
+            ['office_id' => 1, 'AptNum' => 7777, 'PatNum' => 101, 'AptDateTime' => '2026-08-10 10:00:00', 'AptStatus' => 1],
+            ['office_id' => 2, 'AptNum' => 7777, 'PatNum' => 202, 'AptDateTime' => '2026-08-10 11:00:00', 'AptStatus' => 1],
+        ]);
+
+        // Prune from Office 1
+        $res = $this->actingAs($user)->withSession(['active_office_id' => 1])->postJson('/open-dental-explorer/prune-orphans', [
+            'table' => 'appointment',
+            'keys' => [7777],
+        ]);
+
+        $res->assertStatus(200);
+        $res->assertJson(['success' => true, 'deleted_count' => 1]);
+
+        // Office 1 record deleted
+        $this->assertDatabaseMissing('od_appointments', [
+            'office_id' => 1,
+            'AptNum' => 7777,
+        ]);
+
+        // Office 2 record MUST remain intact!
+        $this->assertDatabaseHas('od_appointments', [
+            'office_id' => 2,
+            'AptNum' => 7777,
+            'PatNum' => 202,
+        ]);
+    }
+
+    public function test_od_explorer_sync_checkpoints_and_requests_scoped_to_active_office(): void
+    {
+        $user = User::factory()->create();
+        $office1 = Office::create(['id' => 1, 'name' => 'Office 1', 'is_active' => true]);
+        $office2 = Office::create(['id' => 2, 'name' => 'Office 2', 'is_active' => true]);
+
+        DB::table('sync_logs')->insert([
+            ['office_id' => 1, 'module' => 'office1_module', 'status' => 'idle', 'last_primary_key' => 10, 'created_at' => now(), 'updated_at' => now()],
+            ['office_id' => 2, 'module' => 'office2_module', 'status' => 'idle', 'last_primary_key' => 20, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        DB::table('sync_requests')->insert([
+            ['office_id' => 1, 'module' => 'appointments', 'status' => 'pending', 'created_by' => $user->id, 'created_at' => now(), 'updated_at' => now()],
+            ['office_id' => 2, 'module' => 'patients', 'status' => 'pending', 'created_by' => $user->id, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // Checkpoints in Office 1
+        $cpRes = $this->actingAs($user)->withSession(['active_office_id' => 1])->getJson('/open-dental-explorer/sync-checkpoints');
+        $cpRes->assertStatus(200);
+        $cpRes->assertJsonFragment(['module' => 'office1_module']);
+        $cpRes->assertJsonMissing(['module' => 'office2_module']);
+
+        // Sync Requests in Office 1
+        $reqRes = $this->actingAs($user)->withSession(['active_office_id' => 1])->getJson('/open-dental-explorer/sync-requests');
+        $reqRes->assertStatus(200);
+        $reqRes->assertJsonFragment(['module' => 'appointments']);
+        $reqRes->assertJsonMissing(['module' => 'patients']);
+    }
+
+    public function test_od_explorer_cannot_cancel_sync_request_of_another_office(): void
+    {
+        $user = User::factory()->create();
+        $office1 = Office::create(['id' => 1, 'name' => 'Office 1', 'is_active' => true]);
+        $office2 = Office::create(['id' => 2, 'name' => 'Office 2', 'is_active' => true]);
+
+        $syncReqId = DB::table('sync_requests')->insertGetId([
+            'office_id' => 2,
+            'module' => 'patients',
+            'status' => 'pending',
+            'created_by' => $user->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Attempt cancel from Office 1
+        $res = $this->actingAs($user)->withSession(['active_office_id' => 1])->postJson('/open-dental-explorer/cancel-sync-request', [
+            'id' => $syncReqId,
+        ]);
+
+        $res->assertStatus(404);
+        $res->assertJson(['error' => 'Sync request not found.']);
+
+        $this->assertDatabaseHas('sync_requests', [
+            'id' => $syncReqId,
+            'status' => 'pending',
+        ]);
+    }
 }

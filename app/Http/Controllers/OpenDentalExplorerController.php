@@ -176,7 +176,10 @@ class OpenDentalExplorerController extends Controller
 
     public function index(): View
     {
+        $currentOffice = Office::getActiveOffice() ?? Office::first();
+
         return view('od-explorer.index', [
+            'currentOffice' => $currentOffice,
             'openDentalTables' => array_keys($this->openDentalNativeTables),
             'localTables' => $this->getLocalTables(),
         ]);
@@ -219,6 +222,9 @@ class OpenDentalExplorerController extends Controller
             return response()->json(['error' => 'Invalid or unauthorized table selected.'], 400);
         }
 
+        $activeOffice = Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
+        $activeOfficeId = (int) ($activeOffice->id ?? 1);
+
         $tableColumns = DB::getSchemaBuilder()->getColumnListing($resolvedTable);
 
         // Column Projection
@@ -247,7 +253,7 @@ class OpenDentalExplorerController extends Controller
                         : ($foundKey !== false ? $foundKey : $table));
 
                 $sql = $this->buildRawSqlString($odTableName, $colsToSelect, $conditions, $orderBy, $orderDir, $limit, $tableColumns);
-                $rows = $this->queryService->forOffice(Office::getActiveOffice())->shortQuery($sql);
+                $rows = $this->queryService->forOffice($activeOffice)->shortQuery($sql);
 
                 $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
                 $actualColumns = ($colsToSelect === ['*'])
@@ -269,63 +275,69 @@ class OpenDentalExplorerController extends Controller
             }
         }
 
-        // 2. Query via Local DB QueryBuilder
+        // 2. Query via Local DB QueryBuilder strictly scoped to active office
         $builder = DB::table($resolvedTable)->select($colsToSelect);
 
-        if (is_array($conditions)) {
-            foreach ($conditions as $cond) {
-                if (! is_array($cond) || empty($cond['column']) || ! in_array($cond['column'], $tableColumns, true)) {
-                    continue;
+        if (in_array('office_id', $tableColumns, true)) {
+            $builder->where("{$resolvedTable}.office_id", $activeOfficeId);
+        }
+
+        if (is_array($conditions) && ! empty($conditions)) {
+            $builder->where(function ($sub) use ($conditions, $tableColumns) {
+                foreach ($conditions as $cond) {
+                    if (! is_array($cond) || empty($cond['column']) || ! in_array($cond['column'], $tableColumns, true)) {
+                        continue;
+                    }
+
+                    $col = $cond['column'];
+                    $op = strtoupper((string) ($cond['operator'] ?? '='));
+                    $val = $cond['value'] ?? '';
+                    $logical = strtolower((string) ($cond['logical'] ?? 'and'));
+
+                    $whereMethod = ($logical === 'or') ? 'orWhere' : 'where';
+
+                    switch ($op) {
+                        case '=':
+                        case '!=':
+                        case '>':
+                        case '>=':
+                        case '<':
+                        case '<=':
+                            $sub->$whereMethod($col, $op, $val);
+                            break;
+                        case 'LIKE':
+                        case 'NOT LIKE':
+                            $valPattern = str_contains((string) $val, '%') ? $val : '%'.$val.'%';
+                            $sub->$whereMethod($col, $op, $valPattern);
+                            break;
+                        case 'IN':
+                            $vals = array_map('trim', explode(',', (string) $val));
+                            $inMethod = ($logical === 'or') ? 'orWhereIn' : 'whereIn';
+                            $sub->$inMethod($col, $vals);
+                            break;
+                        case 'NOT IN':
+                            $vals = array_map('trim', explode(',', (string) $val));
+                            $notInMethod = ($logical === 'or') ? 'orWhereNotIn' : 'whereNotIn';
+                            $sub->$notInMethod($col, $vals);
+                            break;
+                        case 'IS NULL':
+                            $nullMethod = ($logical === 'or') ? 'orWhereNull' : 'whereNull';
+                            $sub->$nullMethod($col);
+                            break;
+                        case 'IS NOT NULL':
+                            $notNullMethod = ($logical === 'or') ? 'orWhereNotNull' : 'whereNotNull';
+                            $sub->$notNullMethod($col);
+                            break;
+                        case 'BETWEEN':
+                            $range = array_map('trim', explode(',', (string) $val, 2));
+                            if (count($range) === 2) {
+                                $betweenMethod = ($logical === 'or') ? 'orWhereBetween' : 'whereBetween';
+                                $sub->$betweenMethod($col, $range);
+                            }
+                            break;
+                    }
                 }
-
-                $col = $cond['column'];
-                $op = strtoupper((string) ($cond['operator'] ?? '='));
-                $val = $cond['value'] ?? '';
-                $logical = strtolower((string) ($cond['logical'] ?? 'and'));
-
-                $whereMethod = ($logical === 'or') ? 'orWhere' : 'where';
-
-                switch ($op) {
-                    case '=':
-                    case '!=':
-                    case '>':
-                    case '>=':
-                    case '<':
-                    case '<=':
-                        $builder->$whereMethod($col, $op, $val);
-                        break;
-                    case 'LIKE':
-                    case 'NOT LIKE':
-                        $valPattern = str_contains((string) $val, '%') ? $val : '%'.$val.'%';
-                        $builder->$whereMethod($col, $op, $valPattern);
-                        break;
-                    case 'IN':
-                        $vals = array_map('trim', explode(',', (string) $val));
-                        $inMethod = ($logical === 'or') ? 'orWhereIn' : 'whereIn';
-                        $builder->$inMethod($col, $vals);
-                        break;
-                    case 'NOT IN':
-                        $vals = array_map('trim', explode(',', (string) $val));
-                        $notInMethod = ($logical === 'or') ? 'orWhereNotIn' : 'whereNotIn';
-                        $builder->$notInMethod($col, $vals);
-                        break;
-                    case 'IS NULL':
-                        $nullMethod = ($logical === 'or') ? 'orWhereNull' : 'whereNull';
-                        $builder->$nullMethod($col);
-                        break;
-                    case 'IS NOT NULL':
-                        $notNullMethod = ($logical === 'or') ? 'orWhereNotNull' : 'whereNotNull';
-                        $builder->$notNullMethod($col);
-                        break;
-                    case 'BETWEEN':
-                        $range = array_map('trim', explode(',', (string) $val, 2));
-                        if (count($range) === 2) {
-                            $betweenMethod = ($logical === 'or') ? 'orWhereBetween' : 'whereBetween';
-                            $builder->$betweenMethod($col, $range);
-                        }
-                        break;
-                }
-            }
+            });
         }
 
         if ($orderBy && in_array($orderBy, $tableColumns, true)) {
@@ -498,7 +510,8 @@ class OpenDentalExplorerController extends Controller
 
         $primaryKey = $this->getPrimaryKeyForTable($resolvedTable, $tableColumns);
         $syncedCount = 0;
-        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
+        $activeOffice = Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
+        $activeOfficeId = (int) ($activeOffice->id ?? 1);
         $hasOfficeCol = in_array('office_id', $tableColumns, true);
 
         $validRecords = [];
@@ -615,7 +628,8 @@ class OpenDentalExplorerController extends Controller
 
     public function syncCheckpoints(): JsonResponse
     {
-        $logs = SyncLog::orderBy('module')->get();
+        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
+        $logs = SyncLog::where('office_id', $activeOfficeId)->orderBy('module')->get();
 
         return response()->json([
             'logs' => $logs,
@@ -632,6 +646,8 @@ class OpenDentalExplorerController extends Controller
             return response()->json(['error' => 'Module is required.'], 400);
         }
 
+        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
+
         $formattedDate = null;
         if (! empty($lastSyncedAt)) {
             $ts = strtotime((string) $lastSyncedAt);
@@ -641,7 +657,7 @@ class OpenDentalExplorerController extends Controller
         }
 
         if ($module === 'all') {
-            SyncLog::query()->update([
+            SyncLog::where('office_id', $activeOfficeId)->update([
                 'last_synced_at' => $formattedDate,
                 'last_primary_key' => $lastPrimaryKey,
                 'status' => 'idle',
@@ -655,7 +671,7 @@ class OpenDentalExplorerController extends Controller
         }
 
         $log = SyncLog::firstOrCreate(
-            ['module' => $module],
+            ['office_id' => $activeOfficeId, 'module' => $module],
             ['status' => 'idle', 'total_processed' => 0]
         );
 
@@ -675,7 +691,10 @@ class OpenDentalExplorerController extends Controller
 
     public function getSyncRequests(): JsonResponse
     {
-        $requests = SyncRequest::with(['user:id,name'])
+        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
+
+        $requests = SyncRequest::with(['user:id,name', 'office:id,name'])
+            ->where('office_id', $activeOfficeId)
             ->orderBy('id', 'desc')
             ->take(50)
             ->get();
@@ -703,8 +722,11 @@ class OpenDentalExplorerController extends Controller
             return response()->json(['error' => 'Start date cannot be after end date.'], 422);
         }
 
+        $activeOffice = Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
+        $activeOfficeId = (int) ($activeOffice->id ?? 1);
+
         $syncReq = SyncRequest::create([
-            'office_id' => Office::getActiveOffice()->id ?? 1,
+            'office_id' => $activeOfficeId,
             'module' => $module,
             'start_date' => $startDate,
             'end_date' => $endDate,
@@ -734,7 +756,8 @@ class OpenDentalExplorerController extends Controller
     public function cancelSyncRequest(Request $request): JsonResponse
     {
         $id = (int) $request->input('id');
-        $syncReq = SyncRequest::find($id);
+        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
+        $syncReq = SyncRequest::where('office_id', $activeOfficeId)->find($id);
 
         if (! $syncReq) {
             return response()->json(['error' => 'Sync request not found.'], 404);
@@ -813,7 +836,7 @@ class OpenDentalExplorerController extends Controller
             $liveError = $e->getMessage();
         }
 
-        // 2. Fetch from Local DB Snapshot
+        // 2. Fetch from Local DB Snapshot strictly scoped to active office
         $localQuery = DB::table($resolvedTable);
         if (in_array('office_id', $tableColumns, true)) {
             $localQuery->where('office_id', $officeId);
@@ -823,22 +846,25 @@ class OpenDentalExplorerController extends Controller
             $localQuery->whereBetween($dateCol, ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
         }
 
-        if (is_array($conditions)) {
-            foreach ($conditions as $cond) {
-                if (! is_array($cond) || empty($cond['column']) || ! in_array($cond['column'], $tableColumns, true)) {
-                    continue;
+        if (is_array($conditions) && ! empty($conditions)) {
+            $localQuery->where(function ($sub) use ($conditions, $tableColumns) {
+                foreach ($conditions as $cond) {
+                    if (! is_array($cond) || empty($cond['column']) || ! in_array($cond['column'], $tableColumns, true)) {
+                        continue;
+                    }
+                    $col = $cond['column'];
+                    $op = strtoupper((string) ($cond['operator'] ?? '='));
+                    $val = $cond['value'] ?? '';
+                    $logical = strtolower((string) ($cond['logical'] ?? 'and'));
+                    $whereMethod = ($logical === 'or') ? 'orWhere' : 'where';
+                    if ($op === '=') {
+                        $sub->$whereMethod($col, $op, $val);
+                    } elseif ($op === 'IN') {
+                        $inMethod = ($logical === 'or') ? 'orWhereIn' : 'whereIn';
+                        $sub->$inMethod($col, array_map('trim', explode(',', (string) $val)));
+                    }
                 }
-                $col = $cond['column'];
-                $op = strtoupper((string) ($cond['operator'] ?? '='));
-                $val = $cond['value'] ?? '';
-                $logical = strtolower((string) ($cond['logical'] ?? 'and'));
-                $whereMethod = ($logical === 'or') ? 'orWhere' : 'where';
-                if ($op === '=') {
-                    $localQuery->$whereMethod($col, $op, $val);
-                } elseif ($op === 'IN') {
-                    $localQuery->whereIn($col, array_map('trim', explode(',', (string) $val)));
-                }
-            }
+            });
         }
 
         $localRowsRaw = $localQuery->orderBy($dateCol ?: $primaryKey, 'asc')->limit($limit)->get();
