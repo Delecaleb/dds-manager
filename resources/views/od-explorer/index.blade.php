@@ -145,7 +145,7 @@
     <div id="viewCompareContainer" class="space-y-5">
       
       <!-- Metrics Grid -->
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
           <div>
             <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Live OpenDental</span>
@@ -190,6 +190,17 @@
           </div>
         </div>
 
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span class="text-[11px] font-bold text-blue-800 uppercase tracking-wider block">Discrepancies</span>
+            <span id="statDiscrepancyCount" class="text-xl font-bold text-blue-600 mt-0.5 block">0</span>
+            <span class="text-[11px] text-slate-400">Value Out of Sync</span>
+          </div>
+          <div class="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 border border-blue-100">
+            <i data-lucide="alert-circle" class="w-4 h-4"></i>
+          </div>
+        </div>
+
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between col-span-2 md:col-span-1">
           <div>
             <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Match Rate</span>
@@ -213,6 +224,9 @@
             <button type="button" id="pillAll" onclick="setDiffFilter('all')" class="px-3 py-1 text-xs font-bold rounded-lg bg-slate-900 text-white shadow-2xs transition cursor-pointer">
               All (<span id="countPillAll">0</span>)
             </button>
+            <button type="button" id="pillDiscrepancy" onclick="setDiffFilter('discrepancy')" class="px-3 py-1 text-xs font-medium rounded-lg bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 transition cursor-pointer">
+              Value Discrepancies (<span id="countPillDiscrepancy">0</span>)
+            </button>
             <button type="button" id="pillOrphan" onclick="setDiffFilter('orphan')" class="px-3 py-1 text-xs font-medium rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition cursor-pointer">
               Deleted in OD (<span id="countPillOrphan">0</span>)
             </button>
@@ -230,6 +244,10 @@
               <input type="text" id="diffSearchInput" placeholder="Search rows..." class="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-3 py-1 text-xs font-medium text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-slate-400 shadow-2xs">
               <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2"></i>
             </div>
+
+            <button type="button" id="btnSyncDiscrepancies" onclick="syncAllDiscrepancies()" disabled class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-slate-400 rounded-lg cursor-not-allowed transition shadow-2xs disabled:opacity-60">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Update Discrepancies
+            </button>
 
             <button type="button" id="btnPruneAll" onclick="pruneAllOrphans()" disabled class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-slate-400 rounded-lg cursor-not-allowed transition shadow-2xs disabled:opacity-60">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Prune Orphans
@@ -569,17 +587,30 @@
       document.getElementById('statLocalCount').textContent = Number(sum.local_count || 0).toLocaleString();
       document.getElementById('statOrphanCount').textContent = Number(sum.orphan_count || 0).toLocaleString();
       document.getElementById('statMissingCount').textContent = Number(sum.missing_count || 0).toLocaleString();
+      document.getElementById('statDiscrepancyCount').textContent = Number(sum.discrepancy_count || 0).toLocaleString();
       document.getElementById('statMatchRate').textContent = (sum.match_rate_pct || 100) + '%';
       document.getElementById('statExecTime').textContent = (_diffResult.execution_time_ms || 0) + ' ms';
 
       document.getElementById('countPillAll').textContent = (_diffResult.diff_rows || []).length;
+      document.getElementById('countPillDiscrepancy').textContent = (sum.discrepancy_count || 0);
       document.getElementById('countPillOrphan').textContent = (sum.orphan_count || 0);
       document.getElementById('countPillMissing').textContent = (sum.missing_count || 0);
       document.getElementById('countPillMatched').textContent = (sum.matched_count || 0);
 
+      var discBtn = document.getElementById('btnSyncDiscrepancies');
       var pruneBtn = document.getElementById('btnPruneAll');
       var syncBtn = document.getElementById('btnSyncAll');
       var exportBtn = document.getElementById('btnExportDiff');
+
+      if ((sum.discrepancy_count || 0) > 0) {
+        discBtn.disabled = false;
+        discBtn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Update Discrepancies';
+        discBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-2xs transition cursor-pointer';
+      } else {
+        discBtn.disabled = true;
+        discBtn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Update Discrepancies';
+        discBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-slate-400 rounded-lg cursor-not-allowed transition shadow-2xs disabled:opacity-60';
+      }
 
       if ((sum.orphan_count || 0) > 0) {
         pruneBtn.disabled = false;
@@ -610,17 +641,20 @@
       _activeDiffFilter = status;
       var pills = {
         all: document.getElementById('pillAll'),
+        discrepancy: document.getElementById('pillDiscrepancy'),
         orphan: document.getElementById('pillOrphan'),
         missing: document.getElementById('pillMissing'),
         matched: document.getElementById('pillMatched')
       };
 
       pills.all.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition cursor-pointer';
+      pills.discrepancy.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 transition cursor-pointer';
       pills.orphan.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 transition cursor-pointer';
       pills.missing.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-amber-200 text-amber-800 hover:bg-amber-50 transition cursor-pointer';
       pills.matched.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-emerald-200 text-emerald-800 hover:bg-emerald-50 transition cursor-pointer';
 
-      if (status === 'orphan') pills.orphan.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-rose-600 text-white shadow-2xs transition cursor-pointer';
+      if (status === 'discrepancy') pills.discrepancy.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-blue-600 text-white shadow-2xs transition cursor-pointer';
+      else if (status === 'orphan') pills.orphan.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-rose-600 text-white shadow-2xs transition cursor-pointer';
       else if (status === 'missing') pills.missing.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-amber-600 text-white shadow-2xs transition cursor-pointer';
       else if (status === 'matched') pills.matched.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-emerald-600 text-white shadow-2xs transition cursor-pointer';
       else pills.all.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-slate-900 text-white shadow-2xs transition cursor-pointer';
@@ -664,6 +698,9 @@
         } else if (item.status === 'missing') {
           statusBadge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">🟡 Missing Locally</span>';
           actionBtn = '<button onclick="syncSingleMissing(' + item.pk + ')" class="px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition cursor-pointer" title="Sync into local database">Sync</button>';
+        } else if (item.status === 'discrepancy') {
+          statusBadge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">🔵 Value Out of Sync</span>';
+          actionBtn = '<button onclick="syncSingleMissing(' + item.pk + ')" class="px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition cursor-pointer" title="Overwrite local values with Live OD">Update</button>';
         } else {
           statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200">🟢 Matched</span>';
           actionBtn = '<span class="text-slate-400 text-[11px]">Synced</span>';
@@ -673,7 +710,26 @@
         var dateVal = d.AptDateTime || d.ProcDate || d.AdjDate || d.DatePay || d.PayDate || d.DateTP || d.DateDue || '—';
         var statusVal = (d.AptStatus !== undefined) ? 'Status ' + d.AptStatus : (d.ProcStatus || d.ProcCode || '—');
         var provVal = d.ProvNum ? 'Prov #' + d.ProvNum : '—';
-        var descVal = d.Note || d.ProcDescript || d.Descript || d.ToothNum || '—';
+        var descVal = d.Note || d.ProcDescript || d.Descript || d.ToothNum || '';
+
+        var fieldDiffHtml = '';
+        if (item.field_diffs && Object.keys(item.field_diffs).length > 0) {
+          fieldDiffHtml = '<div class="mt-1 flex flex-wrap gap-1">';
+          for (var field in item.field_diffs) {
+            var diff = item.field_diffs[field];
+            fieldDiffHtml += '<span class="inline-block px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 text-[10px] font-mono border border-blue-200" title="Local: ' + escHtml(diff.local) + ' → Live OD: ' + escHtml(diff.live) + '">' +
+              escHtml(field) + ': ' + escHtml(diff.local) + ' → <b>' + escHtml(diff.live) + '</b>' +
+              '</span>';
+          }
+          fieldDiffHtml += '</div>';
+        }
+
+        var relationalHtml = '';
+        if (item.relational_issue) {
+          relationalHtml = '<div class="mt-1 text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-medium inline-block">' +
+            '⚠️ ' + escHtml(item.relational_issue) +
+            '</div>';
+        }
 
         return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
           '<td class="px-4 py-2.5">' + statusBadge + '</td>' +
@@ -682,7 +738,7 @@
           '<td class="px-4 py-2.5 font-mono text-[11px] text-slate-600">' + escHtml(dateVal) + '</td>' +
           '<td class="px-4 py-2.5 font-medium text-slate-700">' + escHtml(statusVal) + '</td>' +
           '<td class="px-4 py-2.5 text-slate-600">' + escHtml(provVal) + '</td>' +
-          '<td class="px-4 py-2.5 text-slate-500 max-w-xs truncate" title="' + escHtml(descVal) + '">' + escHtml(descVal) + '</td>' +
+          '<td class="px-4 py-2.5 text-slate-500 max-w-xs">' + (descVal ? '<span class="truncate block" title="' + escHtml(descVal) + '">' + escHtml(descVal) + '</span>' : '') + fieldDiffHtml + relationalHtml + '</td>' +
           '<td class="px-4 py-2.5 text-right">' + actionBtn + '</td>' +
           '</tr>';
       }).join('');
@@ -692,6 +748,34 @@
     }
 
     document.getElementById('diffSearchInput').addEventListener('input', renderCompareTable);
+
+    function syncAllDiscrepancies() {
+      if (!_diffResult || !_diffResult.discrepancy_keys || !_diffResult.discrepancy_keys.length) return;
+      var discRows = _diffResult.diff_rows
+        .filter(function (r) { return r.status === 'discrepancy'; })
+        .map(function (r) { return r.data; });
+
+      if (!confirm('Update ' + discRows.length + ' out-of-sync records in local DB with live OpenDental values?')) return;
+      var btn = document.getElementById('btnSyncDiscrepancies');
+      btn.disabled = true;
+      btn.innerHTML = '<svg class="animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Updating...';
+
+      fetch('{{ url("/open-dental-explorer/sync-to-local") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ table: _diffResult.table, rows: discRows })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.error) alert('Error: ' + res.error);
+          else alert(res.message || 'Successfully updated out-of-sync records.');
+          executeCompare();
+        })
+        .catch(function (err) {
+          alert('Update failed: ' + err.message);
+          executeCompare();
+        });
+    }
 
     function pruneAllOrphans() {
       if (!_diffResult || !_diffResult.orphan_keys || !_diffResult.orphan_keys.length) return;

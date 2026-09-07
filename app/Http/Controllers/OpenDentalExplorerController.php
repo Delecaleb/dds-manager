@@ -47,6 +47,30 @@ class OpenDentalExplorerController extends Controller
     ];
 
     /**
+     * Critical columns to inspect for multi-column value drift and discrepancy detection.
+     */
+    protected array $criticalColumnsMap = [
+        'od_pay_splits' => ['PayNum', 'PatNum', 'ProvNum', 'ProcNum', 'ClinicNum', 'SplitAmt', 'DatePay', 'SecDateTEdit'],
+        'paysplit' => ['PayNum', 'PatNum', 'ProvNum', 'ProcNum', 'ClinicNum', 'SplitAmt', 'DatePay', 'SecDateTEdit'],
+        'od_payments' => ['PatNum', 'PayDate', 'PayAmt', 'PayType', 'ClinicNum', 'DepositNum', 'Receipt'],
+        'payment' => ['PatNum', 'PayDate', 'PayAmt', 'PayType', 'ClinicNum', 'DepositNum', 'Receipt'],
+        'od_claim_procs' => ['ClaimNum', 'ProcNum', 'PatNum', 'ProvNum', 'Status', 'InsPayAmt', 'FeeBilled', 'DedApplied', 'ProcDate'],
+        'claimproc' => ['ClaimNum', 'ProcNum', 'PatNum', 'ProvNum', 'Status', 'InsPayAmt', 'FeeBilled', 'DedApplied', 'ProcDate'],
+        'od_adjustments' => ['PatNum', 'AdjDate', 'AdjAmt', 'AdjType', 'ProvNum', 'ClinicNum', 'ProcNum'],
+        'adjustment' => ['PatNum', 'AdjDate', 'AdjAmt', 'AdjType', 'ProvNum', 'ClinicNum', 'ProcNum'],
+        'od_procedure_logs' => ['PatNum', 'ProcDate', 'CodeNum', 'ProcFee', 'ProvNum', 'ClinicNum', 'ProcStatus'],
+        'procedurelog' => ['PatNum', 'ProcDate', 'CodeNum', 'ProcFee', 'ProvNum', 'ClinicNum', 'ProcStatus'],
+        'od_appointments' => ['PatNum', 'AptDateTime', 'AptStatus', 'ProvNum', 'Op', 'ClinicNum', 'Pattern'],
+        'appointment' => ['PatNum', 'AptDateTime', 'AptStatus', 'ProvNum', 'Op', 'ClinicNum', 'Pattern'],
+        'od_histappointments' => ['HistApptNum', 'AptNum', 'PatNum', 'AptDateTime', 'AptStatus', 'HistDateTStamp'],
+        'histappointment' => ['HistApptNum', 'AptNum', 'PatNum', 'AptDateTime', 'AptStatus', 'HistDateTStamp'],
+        'od_claim_payments' => ['CheckDate', 'CheckAmt', 'CheckNum', 'DepositNum', 'ClinicNum'],
+        'claimpayment' => ['CheckDate', 'CheckAmt', 'CheckNum', 'DepositNum', 'ClinicNum'],
+        'od_deposits' => ['DateDeposit', 'Amount'],
+        'deposit' => ['DateDeposit', 'Amount'],
+    ];
+
+    /**
      * Map of common table aliases to native OpenDental table names.
      */
     protected array $tableAliases = [
@@ -880,15 +904,59 @@ class OpenDentalExplorerController extends Controller
         }
 
         // 3. Compute Diff Sets
-        $matchedKeys = array_values(array_intersect($localKeys, $liveKeys));
+        $intersectKeys = array_values(array_intersect($localKeys, $liveKeys));
         $orphanKeys = array_values(array_diff($localKeys, $liveKeys)); // in local, deleted in live OD
         $missingKeys = array_values(array_diff($liveKeys, $localKeys)); // in live OD, missing in local
 
-        // Build structured diff rows
+        $criticalCols = $this->criticalColumnsMap[$resolvedTable]
+            ?? $this->criticalColumnsMap[$odTableName]
+            ?? array_values(array_diff($tableColumns, ['id', 'created_at', 'updated_at', 'office_id']));
+
+        $pureMatchedKeys = [];
+        $discrepancyKeys = [];
         $diffRows = [];
+
+        // Discrepancy & Matched (Present in Both)
+        foreach ($intersectKeys as $k) {
+            $localData = $localRowsByPk[$k] ?? [];
+            $liveData = $liveRowsByPk[$k] ?? [];
+            $fieldDiffs = $this->compareRowAttributes($localData, $liveData, $criticalCols);
+            $relationalWarning = $this->checkRelationalIntegrity($resolvedTable, $officeId, $localData);
+
+            if (! empty($fieldDiffs)) {
+                $discrepancyKeys[] = $k;
+                $diffRows[] = [
+                    'status' => 'discrepancy',
+                    'status_label' => 'Modified in OpenDental (Data Discrepancy)',
+                    'status_badge' => 'blue',
+                    'pk' => $k,
+                    'primary_key_name' => $primaryKey,
+                    'source' => 'both',
+                    'field_diffs' => $fieldDiffs,
+                    'relational_issue' => $relationalWarning,
+                    'data' => $liveData,
+                    'local_data' => $localData,
+                ];
+            } else {
+                $pureMatchedKeys[] = $k;
+                $diffRows[] = [
+                    'status' => 'matched',
+                    'status_label' => 'Synced & Matched',
+                    'status_badge' => 'emerald',
+                    'pk' => $k,
+                    'primary_key_name' => $primaryKey,
+                    'source' => 'both',
+                    'field_diffs' => [],
+                    'relational_issue' => $relationalWarning,
+                    'data' => $liveData ?: $localData,
+                ];
+            }
+        }
 
         // Orphans (Present in Local DB only - deleted in OpenDental)
         foreach ($orphanKeys as $k) {
+            $localData = $localRowsByPk[$k] ?? [];
+            $relationalWarning = $this->checkRelationalIntegrity($resolvedTable, $officeId, $localData);
             $diffRows[] = [
                 'status' => 'orphan',
                 'status_label' => 'Deleted in OpenDental (Orphan in Local DB)',
@@ -896,7 +964,9 @@ class OpenDentalExplorerController extends Controller
                 'pk' => $k,
                 'primary_key_name' => $primaryKey,
                 'source' => 'local_only',
-                'data' => $localRowsByPk[$k] ?? null,
+                'field_diffs' => [],
+                'relational_issue' => $relationalWarning,
+                'data' => $localData,
             ];
         }
 
@@ -909,26 +979,15 @@ class OpenDentalExplorerController extends Controller
                 'pk' => $k,
                 'primary_key_name' => $primaryKey,
                 'source' => 'live_only',
+                'field_diffs' => [],
+                'relational_issue' => null,
                 'data' => $liveRowsByPk[$k] ?? null,
-            ];
-        }
-
-        // Matched (In Both)
-        foreach ($matchedKeys as $k) {
-            $diffRows[] = [
-                'status' => 'matched',
-                'status_label' => 'Synced & Matched',
-                'status_badge' => 'emerald',
-                'pk' => $k,
-                'primary_key_name' => $primaryKey,
-                'source' => 'both',
-                'data' => $liveRowsByPk[$k] ?? $localRowsByPk[$k] ?? null,
             ];
         }
 
         $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
         $totalCombined = count($diffRows);
-        $matchRate = $totalCombined > 0 ? round((count($matchedKeys) / $totalCombined) * 100, 1) : 100;
+        $matchRate = $totalCombined > 0 ? round((count($pureMatchedKeys) / $totalCombined) * 100, 1) : 100;
 
         return response()->json([
             'success' => true,
@@ -944,13 +1003,15 @@ class OpenDentalExplorerController extends Controller
             'summary' => [
                 'live_count' => count($liveKeys),
                 'local_count' => count($localKeys),
-                'matched_count' => count($matchedKeys),
+                'matched_count' => count($pureMatchedKeys),
+                'discrepancy_count' => count($discrepancyKeys),
                 'orphan_count' => count($orphanKeys),
                 'missing_count' => count($missingKeys),
                 'match_rate_pct' => $matchRate,
             ],
             'orphan_keys' => $orphanKeys,
             'missing_keys' => $missingKeys,
+            'discrepancy_keys' => $discrepancyKeys,
             'diff_rows' => $diffRows,
         ]);
     }
@@ -1034,6 +1095,93 @@ class OpenDentalExplorerController extends Controller
         foreach (['AptDateTime', 'ProcDate', 'AdjDate', 'PayDate', 'DatePay', 'DateTP', 'DateTStamp', 'created_at'] as $candidate) {
             if (in_array($candidate, $columns, true)) {
                 return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Compare key attributes between local DB row and live OpenDental row.
+     */
+    private function compareRowAttributes(array $localRow, array $liveRow, array $criticalCols): array
+    {
+        $diffs = [];
+        foreach ($criticalCols as $col) {
+            if (! array_key_exists($col, $localRow) || ! array_key_exists($col, $liveRow)) {
+                continue;
+            }
+
+            $localVal = $localRow[$col];
+            $liveVal = $liveRow[$col];
+
+            // Normalize numeric amounts
+            if (is_numeric($localVal) && is_numeric($liveVal)) {
+                if (abs((float) $localVal - (float) $liveVal) > 0.005) {
+                    $diffs[$col] = ['local' => $localVal, 'live' => $liveVal];
+                }
+
+                continue;
+            }
+
+            // Normalize dates/datetimes
+            if (is_string($localVal) && is_string($liveVal) && (str_contains(strtolower($col), 'date') || str_contains(strtolower($col), 'time'))) {
+                $normLocal = str_replace('T', ' ', trim($localVal));
+                $normLive = str_replace('T', ' ', trim($liveVal));
+                if (substr($normLocal, 0, 10) !== substr($normLive, 0, 10)) {
+                    $diffs[$col] = ['local' => $localVal, 'live' => $liveVal];
+                }
+
+                continue;
+            }
+
+            // General scalar equality
+            if ((string) $localVal !== (string) $liveVal) {
+                $diffs[$col] = ['local' => $localVal, 'live' => $liveVal];
+            }
+        }
+
+        return $diffs;
+    }
+
+    /**
+     * Inspect relational integrity (e.g. child paysplit without parent payment, or split sum mismatch).
+     */
+    private function checkRelationalIntegrity(string $resolvedTable, int $officeId, array $row): ?string
+    {
+        if ($resolvedTable === 'od_pay_splits') {
+            $payNum = (int) ($row['PayNum'] ?? 0);
+            if ($payNum > 0) {
+                $parentPay = DB::table('od_payments')->where('office_id', $officeId)->where('PayNum', $payNum)->first();
+                if (! $parentPay) {
+                    return "Parent Payment #{$payNum} is missing in local DB (Relational Orphan)";
+                }
+                $splitSum = (float) DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->sum('SplitAmt');
+                $payAmt = (float) ($parentPay->PayAmt ?? 0);
+                if (abs($splitSum - $payAmt) > 0.01) {
+                    return "Split allocation mismatch: Local splits sum to \${$splitSum} vs Payment #{$payNum} amount \${$payAmt}";
+                }
+            }
+        } elseif ($resolvedTable === 'od_payments') {
+            $payNum = (int) ($row['PayNum'] ?? 0);
+            if ($payNum > 0) {
+                $splitSum = (float) DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->sum('SplitAmt');
+                $payAmt = (float) ($row['PayAmt'] ?? 0);
+                $splitCount = DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->count();
+                if ($splitCount === 0) {
+                    return "No child pay splits found in local DB for Payment #{$payNum}";
+                }
+                if (abs($splitSum - $payAmt) > 0.01) {
+                    return "Child splits sum (\${$splitSum}) differs from PayAmt (\${$payAmt})";
+                }
+            }
+        } elseif ($resolvedTable === 'od_claim_procs') {
+            $claimNum = (int) ($row['ClaimNum'] ?? 0);
+            if ($claimNum > 0) {
+                $claimExists = DB::table('od_claims')->where('office_id', $officeId)->where('ClaimNum', $claimNum)->exists();
+                if (! $claimExists) {
+                    return "Parent Claim #{$claimNum} missing locally";
+                }
             }
         }
 

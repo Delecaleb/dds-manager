@@ -623,4 +623,115 @@ class OpenDentalExplorerTest extends TestCase
             'status' => 'pending',
         ]);
     }
+
+    public function test_reconcile_diff_detects_multicolumn_discrepancies_and_field_diffs(): void
+    {
+        $user = User::factory()->create();
+        $office = Office::updateOrCreate(['id' => 1], [
+            'name' => 'Main Test Office',
+            'is_default' => true,
+            'developer_key' => 'dev_test',
+            'customer_key' => 'cust_test',
+        ]);
+
+        // Create a local paysplit with ProvNum 81 and SplitAmt 4000.00
+        DB::table('od_pay_splits')->insert([
+            'office_id' => 1,
+            'SplitNum' => 103199,
+            'PayNum' => 54838,
+            'PatNum' => 23286,
+            'ProvNum' => 81,
+            'ProcNum' => 1909773,
+            'SplitAmt' => 4000.00,
+            'DatePay' => '2026-09-03',
+        ]);
+
+        // Mock Live OD returning the SAME SplitNum 103199 but with updated ProvNum 83 and SplitAmt 2000.00
+        $mockQueryService = $this->mock(QueryService::class);
+        $mockQueryService->shouldReceive('forOffice')->andReturnSelf();
+        $mockQueryService->shouldReceive('shortQuery')->andReturn([
+            [
+                'SplitNum' => 103199,
+                'PayNum' => 54838,
+                'PatNum' => 23286,
+                'ProvNum' => 83,
+                'ProcNum' => 1909773,
+                'SplitAmt' => 2000.00,
+                'DatePay' => '2026-09-03',
+            ],
+        ]);
+
+        $res = $this->actingAs($user)->postJson('/open-dental-explorer/reconcile-diff', [
+            'table' => 'paysplit',
+            'start_date' => '2026-09-01',
+            'end_date' => '2026-09-30',
+        ]);
+
+        $res->assertStatus(200);
+        $res->assertJson([
+            'success' => true,
+            'summary' => [
+                'live_count' => 1,
+                'local_count' => 1,
+                'matched_count' => 0,
+                'discrepancy_count' => 1,
+                'orphan_count' => 0,
+                'missing_count' => 0,
+            ],
+            'discrepancy_keys' => ['103199'],
+        ]);
+
+        $rows = $res->json('diff_rows');
+        $this->assertEquals('discrepancy', $rows[0]['status']);
+        $this->assertArrayHasKey('SplitAmt', $rows[0]['field_diffs']);
+        $this->assertArrayHasKey('ProvNum', $rows[0]['field_diffs']);
+    }
+
+    public function test_reconcile_diff_detects_broken_relational_integrity_for_paysplit(): void
+    {
+        $user = User::factory()->create();
+        $office = Office::updateOrCreate(['id' => 1], [
+            'name' => 'Main Test Office',
+            'is_default' => true,
+            'developer_key' => 'dev_test',
+            'customer_key' => 'cust_test',
+        ]);
+
+        // Insert paysplit with PayNum 99999 (which does NOT exist in od_payments)
+        DB::table('od_pay_splits')->insert([
+            'office_id' => 1,
+            'SplitNum' => 777123,
+            'PayNum' => 99999,
+            'PatNum' => 1234,
+            'ProvNum' => 83,
+            'ProcNum' => 0,
+            'SplitAmt' => 150.00,
+            'DatePay' => '2026-09-05',
+        ]);
+
+        $mockQueryService = $this->mock(QueryService::class);
+        $mockQueryService->shouldReceive('forOffice')->andReturnSelf();
+        $mockQueryService->shouldReceive('shortQuery')->andReturn([
+            [
+                'SplitNum' => 777123,
+                'PayNum' => 99999,
+                'PatNum' => 1234,
+                'ProvNum' => 83,
+                'ProcNum' => 0,
+                'SplitAmt' => 150.00,
+                'DatePay' => '2026-09-05',
+            ],
+        ]);
+
+        $res = $this->actingAs($user)->postJson('/open-dental-explorer/reconcile-diff', [
+            'table' => 'paysplit',
+            'start_date' => '2026-09-01',
+            'end_date' => '2026-09-30',
+        ]);
+
+        $res->assertStatus(200);
+        $rows = $res->json('diff_rows');
+        $this->assertNotEmpty($rows[0]['relational_issue']);
+        $this->assertStringContainsString('Parent Payment #99999 is missing', $rows[0]['relational_issue']);
+    }
 }
