@@ -38,6 +38,7 @@ class OpenDentalClient
             'Authorization' => 'ODFHIR '.$developerKey.'/'.$customerKey,
             'Content-Type' => 'application/json',
         ])
+            ->withoutVerifying()
             ->baseUrl($baseUrl)
             ->timeout(120);
     }

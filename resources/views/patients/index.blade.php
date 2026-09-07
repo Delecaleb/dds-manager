@@ -66,13 +66,7 @@
 
             <div class="bg-white border-b border-slate-200 px-8 py-3 flex items-center justify-between gap-4">
                 <div class="flex items-center gap-3">
-                    <button class="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:opacity-80">
-                        My Lists <i data-lucide="chevron-down" class="w-4 h-4"></i>
-                    </button>
-                    <button
-                        class="border border-emerald-500 text-slate-800 text-sm font-medium px-4 py-1.5 rounded bg-white flex items-center gap-1">
-                        <span class="text-emerald-500 font-bold">+</span> Add Filter
-                    </button>
+                    
                 </div>
 
                 <div class="flex items-center gap-2">

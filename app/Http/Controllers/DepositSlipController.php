@@ -104,6 +104,9 @@ class DepositSlipController extends Controller
                 $join->on("{$paymentTable}.PayType", '=', "{$defTable}.DefNum")
                     ->on("{$paymentTable}.office_id", '=', "{$defTable}.office_id");
             })
+            ->leftJoin(DB::raw("(SELECT DefNum, MIN(ItemName) as ItemName FROM {$defTable} WHERE Category = 10 OR ItemName IS NOT NULL GROUP BY DefNum) as def_fallback"), function ($join) use ($paymentTable) {
+                $join->on("{$paymentTable}.PayType", '=', 'def_fallback.DefNum');
+            })
             ->whereBetween("{$paymentTable}.PayDate", [$start, $end]);
 
         if ($officeId !== null) {
@@ -117,10 +120,10 @@ class DepositSlipController extends Controller
             ->select(
                 "{$paymentTable}.office_id",
                 "{$paymentTable}.ClinicNum",
-                "{$defTable}.ItemName as type",
+                DB::raw("COALESCE({$defTable}.ItemName, def_fallback.ItemName, 'Uncategorized Payment') as type"),
                 DB::raw("SUM({$paymentTable}.PayAmt) as amount")
             )
-            ->groupBy("{$paymentTable}.office_id", "{$paymentTable}.ClinicNum", "{$defTable}.ItemName")
+            ->groupBy("{$paymentTable}.office_id", "{$paymentTable}.ClinicNum", DB::raw("COALESCE({$defTable}.ItemName, def_fallback.ItemName, 'Uncategorized Payment')"))
             ->get();
 
         $results = [];
@@ -191,6 +194,9 @@ class DepositSlipController extends Controller
                 $join->on("{$paymentTable}.PayType", '=', "{$defTable}.DefNum")
                     ->on("{$paymentTable}.office_id", '=', "{$defTable}.office_id");
             })
+            ->leftJoin(DB::raw("(SELECT DefNum, MIN(ItemName) as ItemName FROM {$defTable} WHERE Category = 10 OR ItemName IS NOT NULL GROUP BY DefNum) as def_fallback"), function ($join) use ($paymentTable) {
+                $join->on("{$paymentTable}.PayType", '=', 'def_fallback.DefNum');
+            })
             ->leftJoin($patientTable, function ($join) use ($paymentTable, $patientTable) {
                 $join->on("{$paymentTable}.PatNum", '=', "{$patientTable}.PatNum")
                     ->on("{$paymentTable}.office_id", '=', "{$patientTable}.office_id");
@@ -209,7 +215,7 @@ class DepositSlipController extends Controller
                 "{$paymentTable}.PayNum",
                 "{$paymentTable}.office_id",
                 "{$paymentTable}.ClinicNum",
-                "{$defTable}.ItemName as type",
+                DB::raw("COALESCE({$defTable}.ItemName, def_fallback.ItemName, 'Uncategorized Payment') as type"),
                 "{$paymentTable}.PayAmt as amount",
                 "{$paymentTable}.PayDate as date",
                 "{$paymentTable}.PatNum",
@@ -281,6 +287,9 @@ class DepositSlipController extends Controller
                 $join->on("{$claimPaymentTable}.PayType", '=', "{$defTable}.DefNum")
                     ->on("{$claimPaymentTable}.office_id", '=', "{$defTable}.office_id");
             })
+            ->leftJoin(DB::raw("(SELECT DefNum, MIN(ItemName) as ItemName FROM {$defTable} WHERE Category = 10 OR ItemName IS NOT NULL GROUP BY DefNum) as def_fallback"), function ($join) use ($claimPaymentTable) {
+                $join->on("{$claimPaymentTable}.PayType", '=', 'def_fallback.DefNum');
+            })
             ->whereBetween("{$claimPaymentTable}.CheckDate", [$start, $end]);
 
         if ($officeId !== null) {
@@ -294,7 +303,7 @@ class DepositSlipController extends Controller
             ->select(
                 "{$claimPaymentTable}.office_id",
                 "{$claimPaymentTable}.ClinicNum",
-                "{$defTable}.ItemName as type",
+                DB::raw("COALESCE({$defTable}.ItemName, def_fallback.ItemName, 'Insurance Co Pmt') as type"),
                 "{$claimPaymentTable}.CheckAmt as amount",
                 "{$claimPaymentTable}.CheckDate as date",
                 "{$claimPaymentTable}.CarrierName",

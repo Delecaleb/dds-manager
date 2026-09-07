@@ -94,7 +94,7 @@ class PatientVisitService
                 WHERE a_prev.office_id = ?
                   AND a_prev.PatNum = fv.PatNum
                   AND a_prev.AptStatus IN (2, 'Complete', 'Completed')
-                  AND a_prev.AptDateTime < ".($isSqlite ? 'fv.first_date' : "CONCAT(fv.first_date, ' 00:00:00')")."
+                  AND a_prev.AptDateTime < ".($isSqlite ? 'fv.first_date' : "CONCAT(fv.first_date, ' 00:00:00')").'
             )
             -- Filter 2: Exclude returning patients whose visit was IsNewPatient = 0 AND who had appointments prior to this date range
             AND NOT (
@@ -102,7 +102,7 @@ class PatientVisitService
                     SELECT 1 FROM od_appointments a_curr
                     WHERE a_curr.office_id = ?
                       AND a_curr.PatNum = fv.PatNum
-                      AND a_curr.AptDateTime BETWEEN ".($isSqlite ? "fv.first_date AND fv.first_date || ' 23:59:59'" : "CONCAT(fv.first_date, ' 00:00:00') AND CONCAT(fv.first_date, ' 23:59:59')")."
+                      AND a_curr.AptDateTime BETWEEN '.($isSqlite ? "fv.first_date AND fv.first_date || ' 23:59:59'" : "CONCAT(fv.first_date, ' 00:00:00') AND CONCAT(fv.first_date, ' 23:59:59')")."
                       AND (a_curr.IsNewPatient = 0 OR a_curr.IsNewPatient = '0')
                 )
                 AND EXISTS (
