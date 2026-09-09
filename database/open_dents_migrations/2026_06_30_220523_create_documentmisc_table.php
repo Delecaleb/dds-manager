@@ -4,35 +4,29 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('documentmisc', function (Blueprint $table) {
 
-Schema::create('documentmisc', function(Blueprint $table){
+            $table->integer('DocMiscNum');
 
-$table->integer('DocMiscNum');
+            $table->date('DateCreated');
 
-$table->date('DateCreated');
+            $table->string('FileName');
 
-$table->string('FileName');
+            $table->integer('DocMiscType');
 
-$table->integer('DocMiscType');
+            $table->text('RawBase64');
 
-$table->text('RawBase64');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('documentmisc');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('documentmisc');
+    }
 };

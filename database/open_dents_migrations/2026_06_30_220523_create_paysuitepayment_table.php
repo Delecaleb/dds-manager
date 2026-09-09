@@ -4,53 +4,47 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('paysuitepayment', function (Blueprint $table) {
 
-Schema::create('paysuitepayment', function(Blueprint $table){
+            $table->integer('PaySuitePaymentNum');
 
-$table->integer('PaySuitePaymentNum');
+            $table->string('PaymentId');
 
-$table->string('PaymentId');
+            $table->string('ProviderId');
 
-$table->string('ProviderId');
+            $table->string('PaymentMethod');
 
-$table->string('PaymentMethod');
+            $table->string('PaymentReference');
 
-$table->string('PaymentReference');
+            $table->string('PaymentAmount');
 
-$table->string('PaymentAmount');
+            $table->date('PaymentDate');
 
-$table->date('PaymentDate');
+            $table->string('PaymentStatus');
 
-$table->string('PaymentStatus');
+            $table->string('ReversalReasonCode');
 
-$table->string('ReversalReasonCode');
+            $table->string('AssociatedPaymentId');
 
-$table->string('AssociatedPaymentId');
+            $table->integer('PaySuitePaymentDetailNum');
 
-$table->integer('PaySuitePaymentDetailNum');
+            $table->integer('HasUnresolvedClaimPayment');
 
-$table->integer('HasUnresolvedClaimPayment');
+            $table->integer('ReconciliationStatus');
 
-$table->integer('ReconciliationStatus');
+            $table->integer('ClaimPaymentNum');
 
-$table->integer('ClaimPaymentNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('paysuitepayment');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('paysuitepayment');
+    }
 };

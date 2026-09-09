@@ -4,47 +4,41 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('automation', function (Blueprint $table) {
 
-Schema::create('automation', function(Blueprint $table){
+            $table->integer('AutomationNum');
 
-$table->integer('AutomationNum');
+            $table->text('Description');
 
-$table->text('Description');
+            $table->integer('Autotrigger');
 
-$table->integer('Autotrigger');
+            $table->text('ProcCodes');
 
-$table->text('ProcCodes');
+            $table->integer('AutoAction');
 
-$table->integer('AutoAction');
+            $table->integer('SheetDefNum');
 
-$table->integer('SheetDefNum');
+            $table->integer('CommType');
 
-$table->integer('CommType');
+            $table->text('MessageContent');
 
-$table->text('MessageContent');
+            $table->integer('AptStatus');
 
-$table->integer('AptStatus');
+            $table->integer('AppointmentTypeNum');
 
-$table->integer('AppointmentTypeNum');
+            $table->integer('PatStatus');
 
-$table->integer('PatStatus');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('automation');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('automation');
+    }
 };

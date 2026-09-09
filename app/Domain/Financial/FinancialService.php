@@ -29,13 +29,17 @@ class FinancialService
     public function adjustmentsBreakdown(MetricFilter $filter): array
     {
         $q = DB::table('od_adjustments as a')
-            ->join('od_definitions as d', 'a.AdjType', '=', 'd.DefNum')
+            ->leftJoin('od_definitions as d', function ($join) use ($filter) {
+                $join->on('a.AdjType', '=', 'd.DefNum')
+                    ->where('d.office_id', '=', $filter->officeId);
+            })
+            ->where('a.office_id', $filter->officeId)
             ->whereBetween('a.AdjDate', [$filter->start, $filter->end]);
         if ($filter->clinics) {
             $q->whereIn('a.ClinicNum', $filter->clinics);
         }
 
-        return $q->selectRaw('d.DefNum, d.ItemName AS label, SUM(a.AdjAmt) AS value')
+        return $q->selectRaw("COALESCE(d.DefNum, 0) as DefNum, COALESCE(d.ItemName, 'Adjustment') AS label, SUM(a.AdjAmt) AS value")
             ->groupBy('d.DefNum', 'd.ItemName')
             ->orderByRaw('ABS(SUM(a.AdjAmt)) DESC')
             ->get()

@@ -4,31 +4,25 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('schoolcourseinstructor', function (Blueprint $table) {
 
-Schema::create('schoolcourseinstructor', function(Blueprint $table){
+            $table->integer('SchoolCourseInstructorNum');
 
-$table->integer('SchoolCourseInstructorNum');
+            $table->integer('SchoolCourseNum');
 
-$table->integer('SchoolCourseNum');
+            $table->integer('InstructorNum');
 
-$table->integer('InstructorNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('schoolcourseinstructor');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('schoolcourseinstructor');
+    }
 };

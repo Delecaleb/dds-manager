@@ -4,47 +4,41 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('evaluation', function (Blueprint $table) {
 
-Schema::create('evaluation', function(Blueprint $table){
+            $table->integer('EvaluationNum');
 
-$table->integer('EvaluationNum');
+            $table->integer('InstructNum');
 
-$table->integer('InstructNum');
+            $table->integer('StudentNum');
 
-$table->integer('StudentNum');
+            $table->integer('SchoolCourseNum');
 
-$table->integer('SchoolCourseNum');
+            $table->string('EvalTitle');
 
-$table->string('EvalTitle');
+            $table->date('DateEval');
 
-$table->date('DateEval');
+            $table->integer('GradingScaleNum');
 
-$table->integer('GradingScaleNum');
+            $table->string('OverallGradeShowing');
 
-$table->string('OverallGradeShowing');
+            $table->string('OverallGradeNumber');
 
-$table->string('OverallGradeNumber');
+            $table->text('Notes');
 
-$table->text('Notes');
+            $table->string('GradeOverride');
 
-$table->string('GradeOverride');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('evaluation');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('evaluation');
+    }
 };

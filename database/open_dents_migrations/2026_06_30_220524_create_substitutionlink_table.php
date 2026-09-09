@@ -4,35 +4,29 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('substitutionlink', function (Blueprint $table) {
 
-Schema::create('substitutionlink', function(Blueprint $table){
+            $table->integer('SubstitutionLinkNum');
 
-$table->integer('SubstitutionLinkNum');
+            $table->integer('PlanNum');
 
-$table->integer('PlanNum');
+            $table->integer('CodeNum');
 
-$table->integer('CodeNum');
+            $table->string('SubstitutionCode');
 
-$table->string('SubstitutionCode');
+            $table->integer('SubstOnlyIf');
 
-$table->integer('SubstOnlyIf');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('substitutionlink');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('substitutionlink');
+    }
 };

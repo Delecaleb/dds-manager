@@ -4,149 +4,143 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('ehrlab', function (Blueprint $table) {
 
-Schema::create('ehrlab', function(Blueprint $table){
+            $table->integer('EhrLabNum');
 
-$table->integer('EhrLabNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->string('OrderControlCode');
 
-$table->string('OrderControlCode');
+            $table->string('PlacerOrderNum');
 
-$table->string('PlacerOrderNum');
+            $table->string('PlacerOrderNamespace');
 
-$table->string('PlacerOrderNamespace');
+            $table->string('PlacerOrderUniversalID');
 
-$table->string('PlacerOrderUniversalID');
+            $table->string('PlacerOrderUniversalIDType');
 
-$table->string('PlacerOrderUniversalIDType');
+            $table->string('FillerOrderNum');
 
-$table->string('FillerOrderNum');
+            $table->string('FillerOrderNamespace');
 
-$table->string('FillerOrderNamespace');
+            $table->string('FillerOrderUniversalID');
 
-$table->string('FillerOrderUniversalID');
+            $table->string('FillerOrderUniversalIDType');
 
-$table->string('FillerOrderUniversalIDType');
+            $table->string('PlacerGroupNum');
 
-$table->string('PlacerGroupNum');
+            $table->string('PlacerGroupNamespace');
 
-$table->string('PlacerGroupNamespace');
+            $table->string('PlacerGroupUniversalID');
 
-$table->string('PlacerGroupUniversalID');
+            $table->string('PlacerGroupUniversalIDType');
 
-$table->string('PlacerGroupUniversalIDType');
+            $table->string('OrderingProviderID');
 
-$table->string('OrderingProviderID');
+            $table->string('OrderingProviderLName');
 
-$table->string('OrderingProviderLName');
+            $table->string('OrderingProviderFName');
 
-$table->string('OrderingProviderFName');
+            $table->string('OrderingProviderMiddleNames');
 
-$table->string('OrderingProviderMiddleNames');
+            $table->string('OrderingProviderSuffix');
 
-$table->string('OrderingProviderSuffix');
+            $table->string('OrderingProviderPrefix');
 
-$table->string('OrderingProviderPrefix');
+            $table->string('OrderingProviderAssigningAuthorityNamespaceID');
 
-$table->string('OrderingProviderAssigningAuthorityNamespaceID');
+            $table->string('OrderingProviderAssigningAuthorityUniversalID');
 
-$table->string('OrderingProviderAssigningAuthorityUniversalID');
+            $table->string('OrderingProviderAssigningAuthorityIDType');
 
-$table->string('OrderingProviderAssigningAuthorityIDType');
+            $table->string('OrderingProviderNameTypeCode');
 
-$table->string('OrderingProviderNameTypeCode');
+            $table->string('OrderingProviderIdentifierTypeCode');
 
-$table->string('OrderingProviderIdentifierTypeCode');
+            $table->integer('SetIdOBR');
 
-$table->integer('SetIdOBR');
+            $table->string('UsiID');
 
-$table->string('UsiID');
+            $table->string('UsiText');
 
-$table->string('UsiText');
+            $table->string('UsiCodeSystemName');
 
-$table->string('UsiCodeSystemName');
+            $table->string('UsiIDAlt');
 
-$table->string('UsiIDAlt');
+            $table->string('UsiTextAlt');
 
-$table->string('UsiTextAlt');
+            $table->string('UsiCodeSystemNameAlt');
 
-$table->string('UsiCodeSystemNameAlt');
+            $table->string('UsiTextOriginal');
 
-$table->string('UsiTextOriginal');
+            $table->string('ObservationDateTimeStart');
 
-$table->string('ObservationDateTimeStart');
+            $table->string('ObservationDateTimeEnd');
 
-$table->string('ObservationDateTimeEnd');
+            $table->string('SpecimenActionCode');
 
-$table->string('SpecimenActionCode');
+            $table->string('ResultDateTime');
 
-$table->string('ResultDateTime');
+            $table->string('ResultStatus');
 
-$table->string('ResultStatus');
+            $table->string('ParentObservationID');
 
-$table->string('ParentObservationID');
+            $table->string('ParentObservationText');
 
-$table->string('ParentObservationText');
+            $table->string('ParentObservationCodeSystemName');
 
-$table->string('ParentObservationCodeSystemName');
+            $table->string('ParentObservationIDAlt');
 
-$table->string('ParentObservationIDAlt');
+            $table->string('ParentObservationTextAlt');
 
-$table->string('ParentObservationTextAlt');
+            $table->string('ParentObservationCodeSystemNameAlt');
 
-$table->string('ParentObservationCodeSystemNameAlt');
+            $table->string('ParentObservationTextOriginal');
 
-$table->string('ParentObservationTextOriginal');
+            $table->string('ParentObservationSubID');
 
-$table->string('ParentObservationSubID');
+            $table->string('ParentPlacerOrderNum');
 
-$table->string('ParentPlacerOrderNum');
+            $table->string('ParentPlacerOrderNamespace');
 
-$table->string('ParentPlacerOrderNamespace');
+            $table->string('ParentPlacerOrderUniversalID');
 
-$table->string('ParentPlacerOrderUniversalID');
+            $table->string('ParentPlacerOrderUniversalIDType');
 
-$table->string('ParentPlacerOrderUniversalIDType');
+            $table->string('ParentFillerOrderNum');
 
-$table->string('ParentFillerOrderNum');
+            $table->string('ParentFillerOrderNamespace');
 
-$table->string('ParentFillerOrderNamespace');
+            $table->string('ParentFillerOrderUniversalID');
 
-$table->string('ParentFillerOrderUniversalID');
+            $table->string('ParentFillerOrderUniversalIDType');
 
-$table->string('ParentFillerOrderUniversalIDType');
+            $table->integer('ListEhrLabResultsHandlingF');
 
-$table->integer('ListEhrLabResultsHandlingF');
+            $table->integer('ListEhrLabResultsHandlingN');
 
-$table->integer('ListEhrLabResultsHandlingN');
+            $table->integer('TQ1SetId');
 
-$table->integer('TQ1SetId');
+            $table->string('TQ1DateTimeStart');
 
-$table->string('TQ1DateTimeStart');
+            $table->string('TQ1DateTimeEnd');
 
-$table->string('TQ1DateTimeEnd');
+            $table->integer('IsCpoe');
 
-$table->integer('IsCpoe');
+            $table->text('OriginalPIDSegment');
 
-$table->text('OriginalPIDSegment');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('ehrlab');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('ehrlab');
+    }
 };

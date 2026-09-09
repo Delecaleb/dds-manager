@@ -4,31 +4,25 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('lettermergefield', function (Blueprint $table) {
 
-Schema::create('lettermergefield', function(Blueprint $table){
+            $table->integer('FieldNum');
 
-$table->integer('FieldNum');
+            $table->integer('LetterMergeNum');
 
-$table->integer('LetterMergeNum');
+            $table->string('FieldName');
 
-$table->string('FieldName');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('lettermergefield');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('lettermergefield');
+    }
 };

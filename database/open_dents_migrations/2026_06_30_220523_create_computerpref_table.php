@@ -4,93 +4,87 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('computerpref', function (Blueprint $table) {
 
-Schema::create('computerpref', function(Blueprint $table){
+            $table->integer('ComputerPrefNum');
 
-$table->integer('ComputerPrefNum');
+            $table->string('ComputerName');
 
-$table->string('ComputerName');
+            $table->integer('GraphicsUseHardware');
 
-$table->integer('GraphicsUseHardware');
+            $table->integer('GraphicsSimple');
 
-$table->integer('GraphicsSimple');
+            $table->string('SensorType');
 
-$table->string('SensorType');
+            $table->integer('SensorBinned');
 
-$table->integer('SensorBinned');
+            $table->integer('SensorPort');
 
-$table->integer('SensorPort');
+            $table->integer('SensorExposure');
 
-$table->integer('SensorExposure');
+            $table->integer('GraphicsDoubleBuffering');
 
-$table->integer('GraphicsDoubleBuffering');
+            $table->integer('PreferredPixelFormatNum');
 
-$table->integer('PreferredPixelFormatNum');
+            $table->string('AtoZpath');
 
-$table->string('AtoZpath');
+            $table->integer('TaskKeepListHidden');
 
-$table->integer('TaskKeepListHidden');
+            $table->integer('TaskDock');
 
-$table->integer('TaskDock');
+            $table->integer('TaskX');
 
-$table->integer('TaskX');
+            $table->integer('TaskY');
 
-$table->integer('TaskY');
+            $table->string('DirectXFormat');
 
-$table->string('DirectXFormat');
+            $table->integer('ScanDocSelectSource');
 
-$table->integer('ScanDocSelectSource');
+            $table->integer('ScanDocShowOptions');
 
-$table->integer('ScanDocShowOptions');
+            $table->integer('ScanDocDuplex');
 
-$table->integer('ScanDocDuplex');
+            $table->integer('ScanDocGrayscale');
 
-$table->integer('ScanDocGrayscale');
+            $table->integer('ScanDocResolution');
 
-$table->integer('ScanDocResolution');
+            $table->integer('ScanDocQuality');
 
-$table->integer('ScanDocQuality');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('ApptViewNum');
 
-$table->integer('ApptViewNum');
+            $table->integer('RecentApptView');
 
-$table->integer('RecentApptView');
+            $table->integer('PatSelectSearchMode');
 
-$table->integer('PatSelectSearchMode');
+            $table->integer('NoShowLanguage');
 
-$table->integer('NoShowLanguage');
+            $table->integer('NoShowDecimal');
 
-$table->integer('NoShowDecimal');
+            $table->string('ComputerOS');
 
-$table->string('ComputerOS');
+            $table->string('HelpButtonXAdjustment');
 
-$table->string('HelpButtonXAdjustment');
+            $table->integer('GraphicsUseDirectX11');
 
-$table->integer('GraphicsUseDirectX11');
+            $table->integer('Zoom');
 
-$table->integer('Zoom');
+            $table->string('VideoRectangle');
 
-$table->string('VideoRectangle');
+            $table->string('CreditCardTerminalId');
 
-$table->string('CreditCardTerminalId');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('computerpref');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('computerpref');
+    }
 };

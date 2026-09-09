@@ -4,51 +4,45 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('promotionlog', function (Blueprint $table) {
 
-Schema::create('promotionlog', function(Blueprint $table){
+            $table->integer('PromotionLogNum');
 
-$table->integer('PromotionLogNum');
+            $table->integer('PromotionNum');
 
-$table->integer('PromotionNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('MessageFk');
 
-$table->integer('MessageFk');
+            $table->integer('EmailHostingFK');
 
-$table->integer('EmailHostingFK');
+            $table->date('DateTimeSent');
 
-$table->date('DateTimeSent');
+            $table->integer('PromotionStatus');
 
-$table->integer('PromotionStatus');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('SendStatus');
 
-$table->integer('SendStatus');
+            $table->integer('MessageType');
 
-$table->integer('MessageType');
+            $table->date('DateTimeEntry');
 
-$table->date('DateTimeEntry');
+            $table->text('ResponseDescript');
 
-$table->text('ResponseDescript');
+            $table->integer('ApptReminderRuleNum');
 
-$table->integer('ApptReminderRuleNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('promotionlog');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('promotionlog');
+    }
 };

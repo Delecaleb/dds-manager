@@ -4,35 +4,29 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('oidexternal', function (Blueprint $table) {
 
-Schema::create('oidexternal', function(Blueprint $table){
+            $table->integer('OIDExternalNum');
 
-$table->integer('OIDExternalNum');
+            $table->string('IDType');
 
-$table->string('IDType');
+            $table->integer('IDInternal');
 
-$table->integer('IDInternal');
+            $table->string('IDExternal');
 
-$table->string('IDExternal');
+            $table->string('rootExternal');
 
-$table->string('rootExternal');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('oidexternal');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('oidexternal');
+    }
 };

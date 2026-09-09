@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('stmtlink', function (Blueprint $table) {
 
-Schema::create('stmtlink', function(Blueprint $table){
+            $table->integer('StmtLinkNum');
 
-$table->integer('StmtLinkNum');
+            $table->integer('StatementNum');
 
-$table->integer('StatementNum');
+            $table->integer('StmtLinkType');
 
-$table->integer('StmtLinkType');
+            $table->integer('FKey');
 
-$table->integer('FKey');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('stmtlink');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('stmtlink');
+    }
 };

@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('payperiod', function (Blueprint $table) {
 
-Schema::create('payperiod', function(Blueprint $table){
+            $table->integer('PayPeriodNum');
 
-$table->integer('PayPeriodNum');
+            $table->date('DateStart');
 
-$table->date('DateStart');
+            $table->date('DateStop');
 
-$table->date('DateStop');
+            $table->date('DatePaycheck');
 
-$table->date('DatePaycheck');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('payperiod');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('payperiod');
+    }
 };

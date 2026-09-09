@@ -4,31 +4,25 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('conngroupattach', function (Blueprint $table) {
 
-Schema::create('conngroupattach', function(Blueprint $table){
+            $table->integer('ConnGroupAttachNum');
 
-$table->integer('ConnGroupAttachNum');
+            $table->integer('ConnectionGroupNum');
 
-$table->integer('ConnectionGroupNum');
+            $table->integer('CentralConnectionNum');
 
-$table->integer('CentralConnectionNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('conngroupattach');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('conngroupattach');
+    }
 };

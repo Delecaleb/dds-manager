@@ -2,56 +2,32 @@
 
 namespace App\Services\OpenDental;
 
-
-use App\Services\OpenDental\ProcedureService;
-use App\Services\OpenDental\PaymentService;
-
-
 class DashboardAnalyticsService
 {
-
-
     public function __construct(
 
         protected ProcedureService $procedures,
 
         protected PaymentService $payments
 
-    ) {
-    }
-
-
-
+    ) {}
 
     public function metrics()
     {
 
-
         return [
 
-            "production" =>
-                $this->production(),
+            'production' => $this->production(),
 
+            'collection' => $this->collectionRate(),
 
-            "collection" =>
-                $this->collectionRate(),
+            'patients' => $this->patientMetrics(),
 
-
-            "patients" =>
-                $this->patientMetrics(),
-
-
-            "aging" =>
-                $this->aging()
-
+            'aging' => $this->aging(),
 
         ];
 
-
     }
-
-
-
 
     /*
     |--------------------------------------------------------------------------
@@ -59,20 +35,15 @@ class DashboardAnalyticsService
     |--------------------------------------------------------------------------
     */
 
-
     private function production()
     {
-
 
         $start = now()
             ->startOfMonth()
             ->format('Y-m-d');
 
-
         $end = now()
             ->format('Y-m-d');
-
-
 
         $procedures = collect(
 
@@ -81,45 +52,30 @@ class DashboardAnalyticsService
 
         );
 
-
-
         $gross = $procedures
 
             ->filter(function ($item) {
 
-                return $item['ProcStatus'] == "Complete";
+                return $item['ProcStatus'] == 'Complete';
 
             })
 
             ->sum('ProcFee');
 
-
-
         return [
 
+            'gross' => round($gross, 2),
 
-            "gross" =>
-                round($gross, 2),
-
-
-
-            "net" =>
+            'net' =>
 
                 // temporary
                 // until adjustments API/query is available
 
-                round($gross, 2)
-
+                round($gross, 2),
 
         ];
 
-
     }
-
-
-
-
-
 
     /*
     |--------------------------------------------------------------------------
@@ -127,23 +83,17 @@ class DashboardAnalyticsService
     |--------------------------------------------------------------------------
     */
 
-
     private function collectionRate()
     {
-
-
 
         $start =
             now()
                 ->startOfMonth()
                 ->format('Y-m-d');
 
-
         $end =
             now()
                 ->format('Y-m-d');
-
-
 
         $payments = collect(
 
@@ -152,31 +102,18 @@ class DashboardAnalyticsService
 
         );
 
-
-
         $collected =
             $payments
                 ->sum('PayAmt');
 
-
-
         $production =
             $this->production()['gross'];
 
-
-
         return [
 
+            'collected' => round($collected, 2),
 
-            "collected" =>
-                round($collected, 2),
-
-
-
-            "rate" =>
-
-
-                $production > 0
+            'rate' => $production > 0
 
                 ?
 
@@ -187,17 +124,11 @@ class DashboardAnalyticsService
 
                 :
 
-                0
-
+                0,
 
         ];
 
-
     }
-
-
-
-
 
     /*
     |--------------------------------------------------------------------------
@@ -205,17 +136,13 @@ class DashboardAnalyticsService
     |--------------------------------------------------------------------------
     */
 
-
     private function patientMetrics()
     {
-
 
         $start =
             now()
                 ->subMonths(24)
                 ->format('Y-m-d');
-
-
 
         $procedures = collect(
 
@@ -224,16 +151,13 @@ class DashboardAnalyticsService
 
         );
 
-
-
         $activePatients =
 
             $procedures
 
                 ->filter(function ($proc) {
 
-                    return
-                        $proc['ProcStatus'] == "Complete";
+                    return $proc['ProcStatus'] == 'Complete';
 
                 })
 
@@ -243,22 +167,13 @@ class DashboardAnalyticsService
 
                 ->count();
 
-
-
         return [
 
-
-            "active_patients" =>
-                $activePatients
-
+            'active_patients' => $activePatients,
 
         ];
 
     }
-
-
-
-
 
     /*
     |--------------------------------------------------------------------------
@@ -266,25 +181,16 @@ class DashboardAnalyticsService
     |--------------------------------------------------------------------------
     */
 
-
     private function aging()
     {
 
-
         return [
 
+            'over_90' => 0,
 
-            "over_90" => 0,
-
-
-            "message" =>
-                "Requires ledger/query access"
-
+            'message' => 'Requires ledger/query access',
 
         ];
 
-
     }
-
-
 }

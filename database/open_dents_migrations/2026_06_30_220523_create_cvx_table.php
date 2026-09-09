@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('cvx', function (Blueprint $table) {
 
-Schema::create('cvx', function(Blueprint $table){
+            $table->integer('CvxNum');
 
-$table->integer('CvxNum');
+            $table->string('CvxCode');
 
-$table->string('CvxCode');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->string('IsActive');
 
-$table->string('IsActive');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('cvx');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('cvx');
+    }
 };

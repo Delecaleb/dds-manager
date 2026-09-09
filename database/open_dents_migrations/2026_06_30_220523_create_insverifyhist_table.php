@@ -4,53 +4,47 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('insverifyhist', function (Blueprint $table) {
 
-Schema::create('insverifyhist', function(Blueprint $table){
+            $table->integer('InsVerifyHistNum');
 
-$table->integer('InsVerifyHistNum');
+            $table->integer('InsVerifyNum');
 
-$table->integer('InsVerifyNum');
+            $table->date('DateLastVerified');
 
-$table->date('DateLastVerified');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->integer('VerifyType');
 
-$table->integer('VerifyType');
+            $table->integer('FKey');
 
-$table->integer('FKey');
+            $table->integer('DefNum');
 
-$table->integer('DefNum');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->date('DateLastAssigned');
 
-$table->date('DateLastAssigned');
+            $table->date('DateTimeEntry');
 
-$table->date('DateTimeEntry');
+            $table->string('HoursAvailableForVerification');
 
-$table->string('HoursAvailableForVerification');
+            $table->integer('VerifyUserNum');
 
-$table->integer('VerifyUserNum');
+            $table->string('SecDateTEdit');
 
-$table->string('SecDateTEdit');
+            $table->string('SecurityHash');
 
-$table->string('SecurityHash');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('insverifyhist');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('insverifyhist');
+    }
 };

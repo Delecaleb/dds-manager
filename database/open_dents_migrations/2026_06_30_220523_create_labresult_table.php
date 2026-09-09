@@ -4,45 +4,39 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('labresult', function (Blueprint $table) {
 
-Schema::create('labresult', function(Blueprint $table){
+            $table->integer('LabResultNum');
 
-$table->integer('LabResultNum');
+            $table->integer('LabPanelNum');
 
-$table->integer('LabPanelNum');
+            $table->date('DateTimeTest');
 
-$table->date('DateTimeTest');
+            $table->string('TestName');
 
-$table->string('TestName');
+            $table->string('DateTStamp');
 
-$table->string('DateTStamp');
+            $table->string('TestID');
 
-$table->string('TestID');
+            $table->string('ObsValue');
 
-$table->string('ObsValue');
+            $table->string('ObsUnits');
 
-$table->string('ObsUnits');
+            $table->string('ObsRange');
 
-$table->string('ObsRange');
+            $table->integer('AbnormalFlag');
 
-$table->integer('AbnormalFlag');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('labresult');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('labresult');
+    }
 };

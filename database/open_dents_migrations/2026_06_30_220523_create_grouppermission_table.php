@@ -4,37 +4,31 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('grouppermission', function (Blueprint $table) {
 
-Schema::create('grouppermission', function(Blueprint $table){
+            $table->integer('GroupPermNum');
 
-$table->integer('GroupPermNum');
+            $table->date('NewerDate');
 
-$table->date('NewerDate');
+            $table->integer('NewerDays');
 
-$table->integer('NewerDays');
+            $table->integer('UserGroupNum');
 
-$table->integer('UserGroupNum');
+            $table->integer('PermType');
 
-$table->integer('PermType');
+            $table->integer('FKey');
 
-$table->integer('FKey');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('grouppermission');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('grouppermission');
+    }
 };

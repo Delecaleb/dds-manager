@@ -148,7 +148,7 @@
         {{-- ══════════════════ TOP TOOLBAR ══════════════════ --}}
         <div class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0">
             <div class="flex items-center gap-3">
-                <div
+                <div id="singleDateWrapper"
                     class="relative flex items-center border border-slate-300 rounded px-3 py-1.5 gap-2 bg-white shadow-sm">
                     <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24">
@@ -160,6 +160,10 @@
                     <input type="date" id="calDate"
                         class="border-0 outline-none text-sm font-semibold text-slate-700 bg-transparent cursor-pointer"
                         value="{{ date('Y-m-d') }}">
+                </div>
+
+                <div id="rangeDateWrapper" class="hidden">
+                    <x-daterange-picker id="calDateRange" on-apply="onCalendarRangeApply" />
                 </div>
 
                 <select id="clinicFilter"
@@ -174,7 +178,7 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <div class="flex bg-slate-100 rounded-md border border-slate-200 p-0.5 gap-0.5">
+                <div id="viewToggleWrapper" class="flex bg-slate-100 rounded-md border border-slate-200 p-0.5 gap-0.5">
                     <button class="view-btn px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
                         data-view="dayGridMonth">Month</button>
                     <button class="view-btn px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
@@ -212,8 +216,8 @@
             <div class="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-10 flex-shrink-0">
                 <div>
                     <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
-                        Production
-                        <span class="text-slate-400 cursor-help"
+                        <span id="stat-production-title">Production</span>
+                        <span class="text-slate-400 cursor-help" id="stat-production-help"
                             title="Display $ amount of what has been produced for the day">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -225,7 +229,7 @@
                 </div>
                 <div id="stat-scheduled-container" class="cursor-pointer group rounded-lg p-1.5 -m-1.5 transition hover:bg-emerald-50/60" title="Click to view scheduled production breakdown" onclick="openScheduledProductionModal()">
                     <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1.5">
-                        Scheduled Production
+                        <span id="stat-scheduled-title">Scheduled Production</span>
                         <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                             Breakdown
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -312,30 +316,20 @@
             <div class="flex gap-4 mb-6">
                 <div class="flex flex-col flex-1">
                     <label class="text-xs font-bold text-slate-900 mb-1">Provider(s)</label>
-                    <select
-                        class="border border-slate-300 rounded px-3 py-1.5 text-sm text-slate-700 bg-white uppercase font-semibold">
-                        <option>PROVIDERS 0 selected</option>
-                    </select>
-                </div>
-                <div class="flex flex-col flex-1">
-                    <label class="text-xs font-bold text-slate-900 mb-1">Procedure(s)</label>
-                    <select
-                        class="border border-slate-300 rounded px-3 py-1.5 text-sm text-slate-700 bg-white uppercase font-semibold">
-                        <option>PROCEDURES 0 selected</option>
-                    </select>
-                </div>
-                <div class="flex flex-col flex-1">
-                    <label class="text-xs font-bold text-slate-900 mb-1">Patient(s)</label>
-                    <select
-                        class="border border-slate-300 rounded px-3 py-1.5 text-sm text-slate-700 bg-white uppercase font-semibold">
-                        <option>PATIENTS 0 selected</option>
+                    <select id="detailsFilterProvider"
+                        class="border border-slate-300 rounded px-3 py-1.5 text-sm text-slate-700 bg-white font-semibold">
+                        <option value="">All Providers</option>
                     </select>
                 </div>
                 <div class="flex flex-col flex-1">
                     <label class="text-xs font-bold text-slate-900 mb-1">Appointment Status</label>
-                    <select
-                        class="border border-slate-300 rounded px-3 py-1.5 text-sm text-slate-700 bg-white uppercase font-semibold">
-                        <option>APPOINTMENT STATUS 0 selected</option>
+                    <select id="detailsFilterStatus"
+                        class="border border-slate-300 rounded px-3 py-1.5 text-sm text-slate-700 bg-white font-semibold">
+                        <option value="">All Statuses</option>
+                        <option value="1">Scheduled</option>
+                        <option value="2">Completed</option>
+                        <option value="4">ASAP</option>
+                        <option value="5">Broken</option>
                     </select>
                 </div>
             </div>
@@ -362,12 +356,16 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
-                            <input type="text" placeholder="Search"
+                            <input type="text" id="detailsSearch" placeholder="Search"
                                 class="border border-slate-300 pl-9 pr-3 py-1.5 text-slate-700 w-64 focus:outline-emerald-500">
                         </div>
-                        <select class="border border-slate-300 px-3 py-1.5 text-slate-700 bg-white font-medium">
-                            <option>Export CSV</option>
-                        </select>
+                        <button id="exportDetailsCsvBtn" onclick="exportAppointmentDetailsCsv()"
+                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Export CSV
+                        </button>
                     </div>
                 </div>
 
@@ -538,48 +536,6 @@
                         </x-slot:foot>
                     </x-data-table>
                 </div>
-
-                {{-- Footer Pagination --}}
-                <div
-                    class="border-t border-slate-200 px-5 py-4 flex items-center justify-between text-sm text-slate-600 bg-white">
-                    <div class="flex items-center gap-2">
-                        <span class="font-medium">Items per location</span>
-                        <select class="border border-slate-300 rounded px-2 py-1 text-slate-700 bg-white">
-                            <option>20</option>
-                        </select>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <span class="font-medium">20 items of <span
-                                class="bg-emerald-500 text-white px-2 py-0.5 rounded font-bold ml-1 text-xs tracking-wide">Page
-                                Capacity 20</span> <span
-                                class="bg-cyan-500 text-white px-2 py-0.5 rounded font-bold ml-1 text-xs tracking-wide">Total
-                                Items 52</span></span>
-                        <div class="flex items-center gap-2">
-                            <select
-                                class="border border-slate-300 rounded px-2 py-1 text-slate-700 bg-white font-medium">
-                                <option>1</option>
-                            </select>
-                            <span class="font-medium">of 3 pages</span>
-                            <div class="flex border border-slate-300 bg-white">
-                                <button
-                                    class="px-3 py-1 hover:bg-slate-50 border-r border-slate-300 flex items-center justify-center">
-                                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                </button>
-                                <button class="px-3 py-1 hover:bg-slate-50 flex items-center justify-center">
-                                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -605,8 +561,11 @@
                             <input type="text" id="capacitySearch" placeholder="Search"
                                 class="border border-slate-300 pl-9 pr-3 py-1.5 rounded-sm text-slate-700 w-48 focus:outline-emerald-500">
                         </div>
-                        <button
-                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm">
+                        <button id="exportCapacityCsvBtn" onclick="exportAppointmentCapacityCsv()"
+                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
                             Export CSV
                         </button>
                     </div>
@@ -741,9 +700,77 @@
         let calendar;
 
         // ── Skeleton builder ─────────────────────────────────────────────
-        function buildSkeleton() {
+        function buildSkeleton(viewType) {
+            const currentView = viewType || (calendar && calendar.view ? calendar.view.type : 'resourceTimeGridDay');
+
+            if (currentView === 'dayGridMonth') {
+                const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const headerCols = daysOfWeek.map(day => `
+                    <div class="flex-1 py-2 text-center border-r border-slate-200 last:border-0 bg-slate-50">
+                        <span class="text-xs font-bold text-slate-700">${day}</span>
+                    </div>
+                `).join('');
+
+                let monthGridRows = '';
+                for (let week = 0; week < 5; week++) {
+                    let weekCells = '';
+                    for (let d = 0; d < 7; d++) {
+                        const delay = (week * 7 + d) * 20;
+                        weekCells += `
+                            <div class="border-r border-b border-slate-200 last:border-r-0 p-2 flex flex-col justify-between min-h-[110px] bg-white">
+                                <div class="flex justify-between items-start">
+                                    <div class="h-3 w-4 bg-slate-200 rounded skel-pulse" style="animation-delay:${delay}ms"></div>
+                                    <div class="flex flex-col items-end gap-1">
+                                        <div class="h-2 w-12 bg-slate-100 rounded skel-pulse" style="animation-delay:${delay + 10}ms"></div>
+                                        <div class="h-2.5 w-6 bg-slate-200 rounded skel-pulse" style="animation-delay:${delay + 20}ms"></div>
+                                    </div>
+                                </div>
+                                <div class="space-y-1 mt-2">
+                                    <div class="flex items-center justify-between">
+                                        <div class="h-2 w-10 bg-slate-100 rounded skel-pulse"></div>
+                                        <div class="h-2 w-4 bg-slate-200 rounded skel-pulse"></div>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="h-2 w-8 bg-slate-100 rounded skel-pulse"></div>
+                                        <div class="h-2 w-12 bg-emerald-100 rounded skel-pulse"></div>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="h-2 w-8 bg-slate-100 rounded skel-pulse"></div>
+                                        <div class="h-2 w-10 bg-slate-200 rounded skel-pulse"></div>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="h-2 w-8 bg-slate-100 rounded skel-pulse"></div>
+                                        <div class="h-2 w-12 bg-emerald-200 rounded skel-pulse"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    monthGridRows += `<div class="grid grid-cols-7 flex-1">${weekCells}</div>`;
+                }
+
+                return `
+<div id="cal-skeleton" class="absolute inset-0 z-30 bg-white flex flex-col overflow-hidden">
+    <div class="flex-shrink-0 px-3 pt-3 pb-2">
+        <div class="flex items-center justify-between mb-1.5">
+            <span id="skel-label" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Loading Month...</span>
+            <span id="skel-pct" class="text-sm font-bold text-emerald-600 tabular-nums">0%</span>
+        </div>
+        <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div id="skel-bar" class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500" style="width:0%"></div>
+        </div>
+    </div>
+    <div class="flex-shrink-0 flex border-y border-slate-200 bg-slate-50">
+        ${headerCols}
+    </div>
+    <div class="flex flex-col flex-1 overflow-hidden">
+        ${monthGridRows}
+    </div>
+</div>`;
+            }
+
+            const numCols = currentView === 'resourceTimeGridWeek' ? 7 : 5;
             const slotH = 32;
-            const numCols = 5;
             const times = ['6:00 AM', '6:30 AM', '7:00 AM', '7:30 AM', '8:00 AM', '8:30 AM',
                 '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM'];
 
@@ -759,16 +786,16 @@
         </div>`).join('');
 
             const gridRows = times.map(() =>
-                `<div class="border-b border-slate-100 col-span-5" style="height:${slotH}px"></div>`
+                `<div class="border-b border-slate-100" style="height:${slotH}px;grid-column:1/-1;"></div>`
             ).join('');
 
-            // Fake appointment blocks: { col 0-4, startSlot index, spanSlots }
             const fakeApts = [
-                { col: 0, start: 6, span: 2 }, { col: 1, start: 8, span: 3 },
-                { col: 2, start: 6, span: 1 }, { col: 3, start: 7, span: 2 },
-                { col: 4, start: 8, span: 4 }, { col: 1, start: 4, span: 1 },
-                { col: 3, start: 4, span: 1 }, { col: 0, start: 9, span: 2 },
-            ].map(({ col, start, span }) => {
+                { col: 0, start: 2, span: 2 }, { col: 1, start: 4, span: 3 },
+                { col: 2, start: 1, span: 2 }, { col: 3, start: 5, span: 2 },
+                { col: 4, start: 3, span: 4 }, { col: 1, start: 8, span: 2 },
+                { col: Math.min(numCols - 1, 5), start: 2, span: 3 },
+                { col: Math.min(numCols - 1, 6), start: 6, span: 2 },
+            ].filter(a => a.col < numCols).map(({ col, start, span }) => {
                 const colW = 100 / numCols;
                 const leftPc = col * colW;
                 const inner = span > 1
@@ -787,31 +814,23 @@
 
             return `
 <div id="cal-skeleton" class="absolute inset-0 z-30 bg-white flex flex-col overflow-hidden">
-
-    {{-- Progress bar --}}
     <div class="flex-shrink-0 px-3 pt-3 pb-2">
         <div class="flex items-center justify-between mb-1.5">
-            <span id="skel-label" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Initializing...</span>
+            <span id="skel-label" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Loading...</span>
             <span id="skel-pct" class="text-sm font-bold text-emerald-600 tabular-nums">0%</span>
         </div>
         <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
             <div id="skel-bar" class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500" style="width:0%"></div>
         </div>
     </div>
-
-    {{-- Column headers --}}
     <div class="flex-shrink-0 flex border-y border-slate-200 bg-slate-50">
         <div class="w-16 flex-shrink-0 border-r border-slate-200"></div>
         <div class="flex-1 flex">${headerCols}</div>
     </div>
-
-    {{-- Grid body --}}
     <div class="flex flex-1 overflow-hidden">
-        {{-- Time labels --}}
         <div class="w-16 flex-shrink-0 border-r border-slate-200 flex flex-col overflow-hidden bg-white">
             ${timeRows}
         </div>
-        {{-- Appointment area --}}
         <div class="flex-1 overflow-hidden relative">
             <div class="absolute inset-0 grid pointer-events-none" style="grid-template-columns:repeat(${numCols},1fr)">
                 ${gridRows}
@@ -841,14 +860,61 @@
             setTimeout(() => skel.remove(), 460);
         }
 
-        function showCalSkeleton(label) {
+        function showCalSkeleton(label, viewType) {
             let skel = document.getElementById('cal-skeleton');
-            if (!skel) {
-                document.getElementById('calendar-wrap').insertAdjacentHTML('afterbegin', buildSkeleton());
+            if (skel) {
+                skel.remove();
+            }
+            const wrap = document.getElementById('calendar-wrap');
+            if (wrap) {
+                wrap.insertAdjacentHTML('afterbegin', buildSkeleton(viewType));
                 skel = document.getElementById('cal-skeleton');
             }
-            skel.style.opacity = '1';
-            setProgress(5, label || 'Loading...');
+            if (skel) {
+                skel.style.opacity = '1';
+                setProgress(10, label || 'Loading...');
+            }
+        }
+
+        // ── View Date Range Helper ────────────────────────────────────────
+        function getViewDateRange(view) {
+            const viewType = view?.type || 'resourceTimeGridDay';
+            const fmt = d => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            };
+
+            if (viewType === 'dayGridMonth') {
+                const cur = view.currentStart || view.activeStart || new Date();
+                const firstDay = new Date(cur.getFullYear(), cur.getMonth(), 1);
+                const lastDay = new Date(cur.getFullYear(), cur.getMonth() + 1, 0);
+                return {
+                    type: 'month',
+                    start: fmt(firstDay),
+                    end: fmt(lastDay),
+                    label: 'Month'
+                };
+            } else if (viewType === 'resourceTimeGridWeek') {
+                const aStart = view.activeStart || view.currentStart || new Date();
+                const aEnd = view.activeEnd ? new Date(view.activeEnd.getTime() - 86400000) : aStart;
+                return {
+                    type: 'week',
+                    start: fmt(aStart),
+                    end: fmt(aEnd),
+                    label: 'Week'
+                };
+            } else {
+                const cur = view.currentStart || view.activeStart || new Date();
+                const dateStr = fmt(cur);
+                return {
+                    type: 'day',
+                    start: dateStr,
+                    end: dateStr,
+                    label: 'Day'
+                };
+            }
         }
 
         const STATUS_MAP = {
@@ -864,7 +930,7 @@
             const calEl = document.getElementById('calendar');
 
             // Show skeleton immediately before the calendar even starts constructing
-            showCalSkeleton('Initializing...');
+            showCalSkeleton('Initializing...', 'resourceTimeGridDay');
 
             calendar = new FullCalendar.Calendar(calEl, {
                 schedulerLicenseKey: 'CC-Attribution-NonCommercialNoDerivatives',
@@ -997,14 +1063,16 @@
                     document.getElementById('calDate').value = dateStr;
                     updateDateLabel(d, info.view?.type);
 
+                    const range = getViewDateRange(info.view);
+
                     if (info.view?.type === 'dayGridMonth') {
                         fetchMonthlySummary(info);
+                        fetchCalendarStats(range.start, range.end, range.type);
                     } else {
                         if (dateChanged) {
                             calendar.refetchResources();
                         }
-                        // Production stats are computed server-side for the visible day.
-                        fetchCalendarStats(dateStr);
+                        fetchCalendarStats(range.start, range.end, range.type);
                     }
                 },
             });
@@ -1017,43 +1085,62 @@
 
             // ── Active Columns Toggle ───────────────────────────────────────
             document.getElementById('activeColumnsToggle').addEventListener('change', function () {
-                showCalSkeleton('Updating columns...');
+                showCalSkeleton('Updating columns...', calendar?.view?.type);
                 calendar.refetchResources();
             });
 
             // ── Navigation buttons ────────────────────────────────────────
             document.getElementById('prevBtn').addEventListener('click', () => {
-                showCalSkeleton('Loading...');
+                showCalSkeleton('Loading...', calendar?.view?.type);
                 calendar.prev();
             });
             document.getElementById('nextBtn').addEventListener('click', () => {
-                showCalSkeleton('Loading...');
+                showCalSkeleton('Loading...', calendar?.view?.type);
                 calendar.next();
             });
 
             // ── Refresh ───────────────────────────────────────────────────
             document.getElementById('refreshBtn').addEventListener('click', () => {
-                showCalSkeleton('Refreshing...');
-                if (calendar?.view?.type === 'dayGridMonth') {
-                    fetchMonthlySummary(calendar.view);
+                const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
+                if (activeTab === 'view-details') {
+                    if (aptDetailsTable) aptDetailsTable.ajax.reload();
+                } else if (activeTab === 'view-capacity') {
+                    if (aptCapacityTable) aptCapacityTable.ajax.reload();
                 } else {
-                    calendar.refetchEvents();
-                    calendar.refetchResources();
-                    fetchCalendarStats(document.getElementById('calDate').value);
+                    const range = getViewDateRange(calendar?.view);
+                    showCalSkeleton('Refreshing...', calendar?.view?.type);
+                    if (calendar?.view?.type === 'dayGridMonth') {
+                        fetchMonthlySummary(calendar.view);
+                        fetchCalendarStats(range.start, range.end, range.type);
+                    } else {
+                        calendar.refetchEvents();
+                        calendar.refetchResources();
+                        fetchCalendarStats(range.start, range.end, range.type);
+                    }
                 }
             });
 
             // ── Date picker ───────────────────────────────────────────────
             document.getElementById('calDate').addEventListener('change', function () {
+                showCalSkeleton('Loading date...', calendar?.view?.type);
                 calendar.gotoDate(this.value);
             });
 
             // ── View toggle ───────────────────────────────────────────────
             document.querySelectorAll('.view-btn').forEach(btn => {
                 btn.addEventListener('click', function () {
+                    const targetView = this.dataset.view;
+                    if (calendar && calendar.view && calendar.view.type === targetView) return;
+
                     document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
                     this.classList.add('active');
-                    calendar.changeView(this.dataset.view);
+
+                    const viewLabel = targetView === 'dayGridMonth'
+                        ? 'Loading Month View...'
+                        : (targetView === 'resourceTimeGridWeek' ? 'Loading Week View...' : 'Loading Day View...');
+                    showCalSkeleton(viewLabel, targetView);
+
+                    calendar.changeView(targetView);
                 });
             });
 
@@ -1064,7 +1151,7 @@
                     if (dayCell) {
                         const clickedDate = dayCell.getAttribute('data-date');
                         if (clickedDate) {
-                            showCalSkeleton('Loading day view...');
+                            showCalSkeleton('Loading Day View...', 'resourceTimeGridDay');
                             calendar.gotoDate(clickedDate);
                             calendar.changeView('resourceTimeGridDay');
                             document.querySelectorAll('.view-btn').forEach(b => {
@@ -1238,34 +1325,60 @@
 
         // ── Stats bar ─────────────────────────────────────────────────────
         // Production / Scheduled Production are computed server-side for the
-        // selected day (see CalendarController@stats) so the figures reflect
-        // real produced/scheduled dollars rather than a client-side sum.
-        function fetchCalendarStats(date) {
+        // selected date range (day, week, or month, see CalendarController@stats).
+        function fetchCalendarStats(start, end, viewType) {
             const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
             const prodEl = document.getElementById('stat-production');
             const schedEl = document.getElementById('stat-scheduled');
-            prodEl.textContent = schedEl.textContent = '…';
 
-            fetch(baseUrl + '/calendar/stats?date=' + date)
+            const sDate = start || document.getElementById('calDate')?.value || '{{ date("Y-m-d") }}';
+            const eDate = end || sDate;
+            const vType = viewType || (calendar && calendar.view ? getViewDateRange(calendar.view).type : 'day');
+
+            // Show animated skeleton pulse during loading
+            if (prodEl) {
+                prodEl.innerHTML = '<span class="inline-block h-6 w-24 bg-slate-200 rounded animate-pulse"></span>';
+            }
+            if (schedEl) {
+                schedEl.innerHTML = '<span class="inline-block h-6 w-24 bg-slate-200 rounded animate-pulse"></span>';
+            }
+
+            // Update tooltip / subtitle based on view
+            const periodName = vType === 'month' ? 'the month' : (vType === 'week' ? 'the week' : 'the day');
+            const prodHelp = document.getElementById('stat-production-help');
+            if (prodHelp) {
+                prodHelp.setAttribute('title', `Display $ amount of what has been produced for ${periodName}`);
+            }
+
+            const schedTitle = document.getElementById('stat-scheduled-title');
+            if (schedTitle) {
+                schedTitle.innerHTML = vType === 'month'
+                    ? 'Scheduled Production <span class="text-[10px] text-slate-400 font-normal">(Month)</span>'
+                    : (vType === 'week' ? 'Scheduled Production <span class="text-[10px] text-slate-400 font-normal">(Week)</span>' : 'Scheduled Production');
+            }
+
+            fetch(baseUrl + '/calendar/stats?start=' + encodeURIComponent(sDate) + '&end=' + encodeURIComponent(eDate) + '&date=' + encodeURIComponent(sDate))
                 .then(r => r.json())
                 .then(s => {
-                    prodEl.textContent = usd.format(parseFloat(s.production) || 0);
-                    schedEl.textContent = usd.format(parseFloat(s.scheduled_production) || 0);
-                    renderProviderHeader(s.providers);
+                    if (prodEl) prodEl.textContent = usd.format(parseFloat(s.production) || 0);
+                    if (schedEl) schedEl.textContent = usd.format(parseFloat(s.scheduled_production) || 0);
+                    renderProviderHeader(s.providers, vType);
                 })
                 .catch(() => {
-                    prodEl.textContent = schedEl.textContent = '—';
-                    renderProviderHeader([]);
+                    if (prodEl) prodEl.textContent = '—';
+                    if (schedEl) schedEl.textContent = '—';
+                    renderProviderHeader([], vType);
                 });
         }
 
         // ── Provider Header Renderer ──────────────────────────────────────
-        function renderProviderHeader(providers) {
+        function renderProviderHeader(providers, viewType) {
             const container = document.getElementById('provider-header');
             if (!container) return;
 
             if (!providers || providers.length === 0) {
-                container.innerHTML = '<p class="text-xs text-slate-400 py-1.5 align-middle">No active providers scheduled for today</p>';
+                const period = viewType === 'month' ? 'this month' : (viewType === 'week' ? 'this week' : 'today');
+                container.innerHTML = `<p class="text-xs text-slate-400 py-1.5 align-middle">No active providers scheduled for ${period}</p>`;
                 return;
             }
 
@@ -1362,6 +1475,48 @@
             document.querySelectorAll('.fc-event').forEach(el => el.style.opacity = '1');
         }
 
+        function syncDateRangeFromSinglePicker() {
+            const singleDate = document.getElementById('calDate')?.value || '{{ date("Y-m-d") }}';
+            if (!singleDate) return;
+            if (window.jQuery && jQuery('#calDateRange').data('daterangepicker') && typeof moment !== 'undefined') {
+                const drp = jQuery('#calDateRange').data('daterangepicker');
+                const m = moment(singleDate, 'YYYY-MM-DD');
+                drp.setStartDate(m);
+                drp.setEndDate(m);
+                jQuery('#calDateRange').val(m.format('MMM D, YYYY') + ' – ' + m.format('MMM D, YYYY'));
+            }
+        }
+
+        function getCalendarDateRange() {
+            const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
+            if (activeTab === 'view-details' || activeTab === 'view-capacity') {
+                const drp = window.jQuery && jQuery('#calDateRange').data('daterangepicker');
+                if (drp && drp.startDate && drp.endDate) {
+                    return {
+                        start: drp.startDate.format('YYYY-MM-DD'),
+                        end: drp.endDate.format('YYYY-MM-DD')
+                    };
+                }
+            }
+            const singleDate = document.getElementById('calDate')?.value || "{{ date('Y-m-d') }}";
+            return { start: singleDate, end: singleDate };
+        }
+
+        window.onCalendarRangeApply = function(start, end) {
+            const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
+            if (activeTab === 'view-details' && aptDetailsTable) {
+                aptDetailsTable.ajax.reload();
+            } else if (activeTab === 'view-capacity' && aptCapacityTable) {
+                aptCapacityTable.ajax.reload();
+            }
+        };
+
+        document.addEventListener('daterange:changed', function(e) {
+            if (e.detail && e.detail.id === 'calDateRange') {
+                window.onCalendarRangeApply(e.detail.start, e.detail.end);
+            }
+        });
+
         // ── Tabs logic ────────────────────────────────────────────────────
         document.querySelectorAll('.cal-tab').forEach(tab => {
             tab.addEventListener('click', function (e) {
@@ -1385,8 +1540,25 @@
                 document.getElementById('view-capacity').classList.add('hidden');
                 document.getElementById('view-capacity').classList.remove('flex');
 
-                // Show target view
                 const target = this.getAttribute('data-target');
+
+                // Toggle date selection input vs range picker & calendar view buttons based on tab
+                const singleDateWrapper = document.getElementById('singleDateWrapper');
+                const rangeDateWrapper = document.getElementById('rangeDateWrapper');
+                const viewToggleWrapper = document.getElementById('viewToggleWrapper');
+
+                if (target === 'view-calendar') {
+                    singleDateWrapper?.classList.remove('hidden');
+                    rangeDateWrapper?.classList.add('hidden');
+                    viewToggleWrapper?.classList.remove('hidden');
+                } else {
+                    syncDateRangeFromSinglePicker();
+                    singleDateWrapper?.classList.add('hidden');
+                    rangeDateWrapper?.classList.remove('hidden');
+                    viewToggleWrapper?.classList.add('hidden');
+                }
+
+                // Show target view
                 const viewEl = document.getElementById(target);
                 if (viewEl) {
                     viewEl.classList.remove('hidden');
@@ -1398,11 +1570,19 @@
                     }
 
                     if (target === 'view-details') {
-                        initAptDetailsTable();
+                        if (aptDetailsTable) {
+                            aptDetailsTable.ajax.reload();
+                        } else {
+                            initAptDetailsTable();
+                        }
                     }
 
                     if (target === 'view-capacity') {
-                        initAptCapacityTable();
+                        if (aptCapacityTable) {
+                            aptCapacityTable.ajax.reload();
+                        } else {
+                            initAptCapacityTable();
+                        }
                     }
                 }
             });
@@ -1412,39 +1592,61 @@
         function initAptDetailsTable() {
             if (aptDetailsTable) return;
 
+            // Populate provider dropdown if empty
+            const provSelect = document.getElementById('detailsFilterProvider');
+            if (provSelect && provSelect.options.length <= 1) {
+                fetch(baseUrl + '/calendar/resources?active_only=0')
+                    .then(r => r.json())
+                    .then(providers => {
+                        providers.forEach(p => {
+                            if (p.id) {
+                                const opt = document.createElement('option');
+                                opt.value = p.id;
+                                opt.textContent = p.title;
+                                provSelect.appendChild(opt);
+                            }
+                        });
+                    })
+                    .catch(() => {});
+            }
+
             aptDetailsTable = DDS.dataTable(document.getElementById('appointmentDetailsTable'), {
                 processing: true,
                 serverSide: true,
                 ajax: {
                     url: "{{ route('calendar.appointments-details-data') }}",
                     data: function (d) {
-                        const datePicker = document.getElementById('calDate');
-                        d.start = datePicker ? datePicker.value : "{{ date('Y-m-d') }}";
-                        d.end = d.start;
+                        const range = getCalendarDateRange();
+                        d.start = range.start;
+                        d.end = range.end;
+                        const provVal = $('#detailsFilterProvider').val();
+                        if (provVal) d.provider_id = provVal;
+                        const statusVal = $('#detailsFilterStatus').val();
+                        if (statusVal) d.status = statusVal;
                     }
                 },
                 columns: [
                     { data: 'location', name: 'location' },
                     { data: 'patient_name', name: 'patient_name' },
-                    { data: 'appointment_date', name: 'appointment_date', orderable: false },
-                    { data: 'appointment_time', name: 'appointment_time', orderable: false },
-                    { data: 'appointment_duration', name: 'appointment_duration', orderable: false },
+                    { data: 'appointment_date', name: 'appointment_date' },
+                    { data: 'appointment_time', name: 'appointment_time' },
+                    { data: 'appointment_duration', name: 'appointment_duration' },
                     { data: 'operatory_name', name: 'operatory_name' },
                     { data: 'appointment_status', name: 'appointment_status' },
-                    { data: 'patient_age', name: 'patient_age', orderable: false },
-                    { data: 'patient_phone', name: 'patient_phone', orderable: false },
-                    { data: 'email_address', name: 'email_address', orderable: false },
-                    { data: 'patient_type', name: 'patient_type', orderable: false },
-                    { data: 'appointment_notes', name: 'appointment_notes', orderable: false },
-                    { data: 'confirmation_status', name: 'confirmation_status', orderable: false },
+                    { data: 'patient_age', name: 'patient_age' },
+                    { data: 'patient_phone', name: 'patient_phone' },
+                    { data: 'email_address', name: 'email_address' },
+                    { data: 'patient_type', name: 'patient_type' },
+                    { data: 'appointment_notes', name: 'appointment_notes' },
+                    { data: 'confirmation_status', name: 'confirmation_status' },
                     { data: 'provider_name', name: 'provider_name' },
-                    { data: 'procedure_codes', name: 'procedure_codes', orderable: false },
-                    { data: 'production', name: 'production', orderable: false },
-                    { data: 'primary_insurance', name: 'primary_insurance', orderable: false },
-                    { data: 'secondary_insurance', name: 'secondary_insurance', orderable: false },
-                    { data: 'referral_source', name: 'referral_source', orderable: false },
-                    { data: 'unscheduled_tx', name: 'unscheduled_tx', orderable: false },
-                    { data: 'last_visit_date', name: 'last_visit_date', orderable: false }
+                    { data: 'procedure_codes', name: 'procedure_codes' },
+                    { data: 'production', name: 'production' },
+                    { data: 'primary_insurance', name: 'primary_insurance' },
+                    { data: 'secondary_insurance', name: 'secondary_insurance' },
+                    { data: 'referral_source', name: 'referral_source' },
+                    { data: 'unscheduled_tx', name: 'unscheduled_tx' },
+                    { data: 'last_visit_date', name: 'last_visit_date' }
                 ],
                 dom: 'rt<"flex justify-between items-center px-4 py-3 border-t border-slate-200"ip>',
                 pagingType: 'simple_numbers',
@@ -1504,7 +1706,16 @@
             });
 
             $('#calDate').on('change', function () {
+                syncDateRangeFromSinglePicker();
                 if (aptDetailsTable) aptDetailsTable.ajax.reload();
+            });
+
+            $('#detailsFilterProvider, #detailsFilterStatus').on('change', function () {
+                if (aptDetailsTable) aptDetailsTable.ajax.reload();
+            });
+
+            $('#detailsSearch').on('keyup', function () {
+                if (aptDetailsTable) aptDetailsTable.search(this.value).draw();
             });
 
             // Notes hover cards
@@ -1550,9 +1761,9 @@
                 ajax: {
                     url: "{{ route('calendar.appointment-capacity-data') }}",
                     data: function (d) {
-                        const datePicker = document.getElementById('calDate');
-                        d.start = datePicker ? datePicker.value : "{{ date('Y-m-d') }}";
-                        d.end = d.start;
+                        const range = getCalendarDateRange();
+                        d.start = range.start;
+                        d.end = range.end;
                     }
                 },
                 columns: [
@@ -1616,10 +1827,201 @@
             });
         }
 
+        // ── CSV Export Helpers ───────────────────────────────────────────
+        function downloadCsv(filename, rows) {
+            const csvContent = rows.map(row =>
+                row.map(cell => {
+                    const str = (cell === null || cell === undefined) ? '' : String(cell);
+                    return '"' + str.replace(/"/g, '""') + '"';
+                }).join(',')
+            ).join('\r\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function exportAppointmentDetailsCsv() {
+            const btn = document.getElementById('exportDetailsCsvBtn');
+            const originalHtml = btn ? btn.innerHTML : 'Export CSV';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = 'Exporting...';
+            }
+
+            const range = getCalendarDateRange();
+            const url = `${baseUrl}/calendar/appointments-details-data?start=${range.start}&end=${range.end}&length=-1`;
+
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    const data = res.data || [];
+                    if (data.length === 0) {
+                        alert('No appointment details found for the selected date range.');
+                        return;
+                    }
+
+                    const headers = [
+                        "Location", "Patient Name", "Appointment Date", "Appointment Time",
+                        "Appointment Duration", "Operatory Name", "Appointment Status", "Patient Age",
+                        "Patient Phone", "Email Address", "Patient Type", "Appointment Notes",
+                        "Confirmation Status", "Provider Name", "Procedure Codes", "Production",
+                        "Primary Insurance Carrier", "Secondary Insurance Carrier", "Referral Source",
+                        "Unscheduled Tx $", "Last Visit Date"
+                    ];
+
+                    const rows = [headers];
+
+                    let totalDuration = 0;
+                    let totalProduction = 0;
+                    let totalUnscheduled = 0;
+                    const parseMoney = (val) => {
+                        if (!val) return 0;
+                        const num = parseFloat(String(val).replace(/[^0-9.-]+/g, ''));
+                        return isNaN(num) ? 0 : num;
+                    };
+
+                    data.forEach(item => {
+                        const dur = parseFloat(item.appointment_duration) || 0;
+                        const prod = parseMoney(item.production);
+                        const unsched = parseMoney(item.unscheduled_tx);
+
+                        totalDuration += dur;
+                        totalProduction += prod;
+                        totalUnscheduled += unsched;
+
+                        rows.push([
+                            item.location || '',
+                            item.patient_name || '',
+                            item.appointment_date || '',
+                            item.appointment_time || '',
+                            item.appointment_duration || '',
+                            item.operatory_name || '',
+                            item.appointment_status || '',
+                            item.patient_age || '',
+                            item.patient_phone || '',
+                            item.email_address || '',
+                            item.patient_type || '',
+                            item.appointment_notes || '',
+                            item.confirmation_status || '',
+                            item.provider_name || '',
+                            item.procedure_codes || '',
+                            item.production || '$ 0',
+                            item.primary_insurance || 'N/A',
+                            item.secondary_insurance || 'N/A',
+                            item.referral_source || 'No Source Listed',
+                            item.unscheduled_tx || '$ 0',
+                            item.last_visit_date || 'N/A'
+                        ]);
+                    });
+
+                    // Add summary footer rows matching Jarvis Analytics
+                    const count = data.length;
+                    const avgDuration = count > 0 ? (totalDuration / count).toFixed(2) : '0.00';
+                    const avgProduction = count > 0 ? (totalProduction / count) : 0;
+                    const avgUnscheduled = count > 0 ? (totalUnscheduled / count) : 0;
+
+                    const formatMoney = (val) => {
+                        if (val === 0) return '$ 0';
+                        return '$ ' + Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    };
+
+                    // Average row
+                    rows.push([
+                        "Average:", "-", "-", "-",
+                        avgDuration,
+                        "-", "-", "-", "-", "-", "-", "-", "-", "-", "-",
+                        formatMoney(avgProduction),
+                        "-", "-", "-",
+                        formatMoney(avgUnscheduled),
+                        "-"
+                    ]);
+
+                    // Total row
+                    rows.push([
+                        "Total:", "-", "-", "-",
+                        Number(totalDuration).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                        "-", "-", "-", "-", "-", "-", "-", "-", "-", "-",
+                        formatMoney(totalProduction),
+                        "-", "-", "-",
+                        formatMoney(totalUnscheduled),
+                        "-"
+                    ]);
+
+                    downloadCsv(`appointment-details-${range.start}-to-${range.end}.csv`, rows);
+                })
+                .catch(err => {
+                    console.error('Failed to export CSV:', err);
+                    alert('Failed to export CSV. Please try again.');
+                })
+                .finally(() => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }
+                });
+        }
+
+        function exportAppointmentCapacityCsv() {
+            const btn = document.getElementById('exportCapacityCsvBtn');
+            const originalHtml = btn ? btn.innerHTML : 'Export CSV';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = 'Exporting...';
+            }
+
+            const range = getCalendarDateRange();
+            const url = `${baseUrl}/calendar/appointment-capacity-data?start=${range.start}&end=${range.end}&length=-1`;
+
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    const data = res.data || [];
+                    if (data.length === 0) {
+                        alert('No capacity data found for the selected date range.');
+                        return;
+                    }
+
+                    const headers = [
+                        "Location", "Scheduled Appointments", "# of Providers", "Booked Hours",
+                        "Avg. Lead Time - All (days)", "Avg. Lead Time - New (days)", "Avg. Lead Time - Emergency (days)"
+                    ];
+
+                    const rows = [headers];
+                    data.forEach(item => {
+                        rows.push([
+                            item.location || '',
+                            item.scheduled_appointments || 0,
+                            item.provider_count || 0,
+                            item.booked_hours || 0,
+                            item.avg_lead_all || 0,
+                            item.avg_lead_new || 0,
+                            item.avg_lead_emerg || 0
+                        ]);
+                    });
+
+                    downloadCsv(`appointment-capacity-${range.start}-to-${range.end}.csv`, rows);
+                })
+                .catch(err => {
+                    console.error('Failed to export capacity CSV:', err);
+                    alert('Failed to export CSV. Please try again.');
+                })
+                .finally(() => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }
+                });
+        }
+
         // ── Appointment Capacity Breakdown Modal ─────────────────────────
         function openCapacityBreakdown(type) {
-            const datePicker = document.getElementById('calDate');
-            const date = datePicker ? datePicker.value : "{{ date('Y-m-d') }}";
+            const range = getCalendarDateRange();
+            const date = range.start || "{{ date('Y-m-d') }}";
 
             let title = 'Capacity Breakdown';
             let columns = [];
@@ -1686,7 +2088,7 @@
 
             setDataTableModalLoading('capacity-breakdown-modal', title);
 
-            fetch(baseUrl + '/calendar/capacity-breakdown?date=' + date + '&type=' + type)
+            fetch(`${baseUrl}/calendar/capacity-breakdown?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}&date=${encodeURIComponent(date)}&type=${encodeURIComponent(type)}`)
                 .then(r => r.json())
                 .then(data => {
                     openDataTableModal('capacity-breakdown-modal', title, columns, data);
@@ -1700,7 +2102,9 @@
         let rawSchedData = null;
 
         function openScheduledProductionModal() {
-            const date = document.getElementById('calDate').value || '{{ date("Y-m-d") }}';
+            const range = calendar && calendar.view
+                ? getViewDateRange(calendar.view)
+                : { start: document.getElementById('calDate')?.value || '{{ date("Y-m-d") }}', end: document.getElementById('calDate')?.value || '{{ date("Y-m-d") }}' };
             const modal = document.getElementById('scheduled-prod-modal');
             modal.classList.remove('hidden');
 
@@ -1710,7 +2114,7 @@
             document.getElementById('sched-modal-prov-count').textContent = '…';
             document.getElementById('sched-view-provider').innerHTML = '<div class="p-8 text-center text-xs text-slate-400">Loading breakdown data...</div>';
 
-            fetch(baseUrl + '/calendar/scheduled-production-breakdown?date=' + date)
+            fetch(baseUrl + '/calendar/scheduled-production-breakdown?start=' + encodeURIComponent(range.start) + '&end=' + encodeURIComponent(range.end) + '&date=' + encodeURIComponent(range.start))
                 .then(r => r.json())
                 .then(data => {
                     rawSchedData = data;

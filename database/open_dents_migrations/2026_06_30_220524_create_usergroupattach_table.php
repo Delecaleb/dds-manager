@@ -4,31 +4,25 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('usergroupattach', function (Blueprint $table) {
 
-Schema::create('usergroupattach', function(Blueprint $table){
+            $table->integer('UserGroupAttachNum');
 
-$table->integer('UserGroupAttachNum');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->integer('UserGroupNum');
 
-$table->integer('UserGroupNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('usergroupattach');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('usergroupattach');
+    }
 };

@@ -4,51 +4,45 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('imagedraw', function (Blueprint $table) {
 
-Schema::create('imagedraw', function(Blueprint $table){
+            $table->integer('ImageDrawNum');
 
-$table->integer('ImageDrawNum');
+            $table->integer('DocNum');
 
-$table->integer('DocNum');
+            $table->integer('MountNum');
 
-$table->integer('MountNum');
+            $table->integer('ColorDraw');
 
-$table->integer('ColorDraw');
+            $table->integer('ColorBack');
 
-$table->integer('ColorBack');
+            $table->text('DrawingSegment');
 
-$table->text('DrawingSegment');
+            $table->string('DrawText');
 
-$table->string('DrawText');
+            $table->string('FontSize');
 
-$table->string('FontSize');
+            $table->integer('DrawType');
 
-$table->integer('DrawType');
+            $table->integer('ImageAnnotVendor');
 
-$table->integer('ImageAnnotVendor');
+            $table->text('Details');
 
-$table->text('Details');
+            $table->integer('PearlLayer');
 
-$table->integer('PearlLayer');
+            $table->integer('BetterDiagLayer');
 
-$table->integer('BetterDiagLayer');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('imagedraw');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('imagedraw');
+    }
 };

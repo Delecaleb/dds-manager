@@ -4,31 +4,25 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('referralcliniclink', function (Blueprint $table) {
 
-Schema::create('referralcliniclink', function(Blueprint $table){
+            $table->integer('ReferralClinicLinkNum');
 
-$table->integer('ReferralClinicLinkNum');
+            $table->integer('ReferralNum');
 
-$table->integer('ReferralNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('referralcliniclink');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('referralcliniclink');
+    }
 };

@@ -4,53 +4,47 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('discountplan', function (Blueprint $table) {
 
-Schema::create('discountplan', function(Blueprint $table){
+            $table->integer('DiscountPlanNum');
 
-$table->integer('DiscountPlanNum');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->integer('FeeSchedNum');
 
-$table->integer('FeeSchedNum');
+            $table->integer('DefNum');
 
-$table->integer('DefNum');
+            $table->integer('IsHidden');
 
-$table->integer('IsHidden');
+            $table->text('PlanNote');
 
-$table->text('PlanNote');
+            $table->integer('ExamFreqLimit');
 
-$table->integer('ExamFreqLimit');
+            $table->integer('XrayFreqLimit');
 
-$table->integer('XrayFreqLimit');
+            $table->integer('ProphyFreqLimit');
 
-$table->integer('ProphyFreqLimit');
+            $table->integer('FluorideFreqLimit');
 
-$table->integer('FluorideFreqLimit');
+            $table->integer('PerioFreqLimit');
 
-$table->integer('PerioFreqLimit');
+            $table->integer('LimitedExamFreqLimit');
 
-$table->integer('LimitedExamFreqLimit');
+            $table->integer('PAFreqLimit');
 
-$table->integer('PAFreqLimit');
+            $table->string('AnnualMax');
 
-$table->string('AnnualMax');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('discountplan');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('discountplan');
+    }
 };

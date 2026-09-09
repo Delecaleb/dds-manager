@@ -4,31 +4,25 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('county', function (Blueprint $table) {
 
-Schema::create('county', function(Blueprint $table){
+            $table->integer('CountyNum');
 
-$table->integer('CountyNum');
+            $table->string('CountyName');
 
-$table->string('CountyName');
+            $table->string('CountyCode');
 
-$table->string('CountyCode');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('county');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('county');
+    }
 };

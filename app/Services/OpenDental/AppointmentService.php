@@ -7,19 +7,14 @@ use Illuminate\Support\Facades\Log;
 
 class AppointmentService
 {
-
-
     public function __construct(
         protected OpenDentalClient $client
-    ) {
-    }
+    ) {}
 
     public function all()
     {
         return $this->client->get('appointments');
     }
-
-
 
     /*
     |--------------------------------------------------------------------------
@@ -30,9 +25,7 @@ class AppointmentService
     public function byDate($start, $end)
     {
 
-
         $key = "od_appointments_{$start}_{$end}";
-
 
         return Cache::remember(
 
@@ -40,28 +33,23 @@ class AppointmentService
 
             now()->addHours(12),
 
-
             function () use ($start, $end) {
 
                 Log::info("Fetching appointments from OpenDental API for date range: {$start} to {$end}");
+
                 return $this->client->get(
                     'appointments',
                     [
                         'dateStart' => $start,
-                        'dateEnd' => $end
+                        'dateEnd' => $end,
                     ]
                 );
-
 
             }
 
         );
 
-
     }
-
-
-
 
     /*
     |--------------------------------------------------------------------------
@@ -72,14 +60,9 @@ class AppointmentService
     public function find($id)
     {
 
-
         return $this->client->get(
             "appointments/$id"
         );
 
-
     }
-
-
-
 }

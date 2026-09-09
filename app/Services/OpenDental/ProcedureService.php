@@ -4,16 +4,11 @@ namespace App\Services\OpenDental;
 
 use Illuminate\Support\Facades\Cache;
 
-
 class ProcedureService
 {
-
-
     public function __construct(
         protected OpenDentalClient $client
-    ){}
-
-
+    ) {}
 
     public function all()
     {
@@ -23,23 +18,17 @@ class ProcedureService
 
             now()->addHours(12),
 
-            fn()=> $this->client->get(
+            fn () => $this->client->get(
                 'procedurelogs'
             )
         );
 
     }
 
-
-
-
-
-    public function byDate($start,$end)
+    public function byDate($start, $end)
     {
 
-
         $key = "od_procedures_{$start}_{$end}";
-
 
         return Cache::remember(
 
@@ -47,9 +36,7 @@ class ProcedureService
 
             now()->addHours(12),
 
-
-            function() use($start,$end){
-
+            function () use ($start, $end) {
 
                 return $this->client->get(
 
@@ -57,24 +44,19 @@ class ProcedureService
 
                     [
 
-                        'dateStart'=>$start,
+                        'dateStart' => $start,
 
-                        'dateEnd'=>$end
+                        'dateEnd' => $end,
 
                     ]
 
                 );
 
-
             }
 
         );
 
-
     }
-
-
-
 
     public function find($id)
     {
@@ -84,7 +66,4 @@ class ProcedureService
         );
 
     }
-
-
-
 }

@@ -4,51 +4,45 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('centralconnection', function (Blueprint $table) {
 
-Schema::create('centralconnection', function(Blueprint $table){
+            $table->integer('CentralConnectionNum');
 
-$table->integer('CentralConnectionNum');
+            $table->string('ServerName');
 
-$table->string('ServerName');
+            $table->string('DatabaseName');
 
-$table->string('DatabaseName');
+            $table->string('MySqlUser');
 
-$table->string('MySqlUser');
+            $table->string('MySqlPassword');
 
-$table->string('MySqlPassword');
+            $table->string('ServiceURI');
 
-$table->string('ServiceURI');
+            $table->string('OdUser');
 
-$table->string('OdUser');
+            $table->string('OdPassword');
 
-$table->string('OdPassword');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->integer('WebServiceIsEcw');
 
-$table->integer('WebServiceIsEcw');
+            $table->string('ConnectionStatus');
 
-$table->string('ConnectionStatus');
+            $table->integer('HasClinicBreakdownReports');
 
-$table->integer('HasClinicBreakdownReports');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('centralconnection');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('centralconnection');
+    }
 };

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
+use App\Models\Office;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -25,7 +27,7 @@ class ProviderPortalController extends Controller
     private readonly string $completedIn;
 
     public function __construct(
-        private readonly \App\Domain\Support\ClinicRegistry $clinics,
+        private readonly ClinicRegistry $clinics,
     ) {
         $this->completedIn = ProcStatus::inList(ProcStatus::completed());
     }
@@ -37,13 +39,15 @@ class ProviderPortalController extends Controller
 
     public function providers()
     {
+        $officeId = Office::getActiveOfficeId();
         $rows = DB::table('od_providers')
+            ->where('office_id', $officeId)
             ->whereIn('IsHidden', ['false', '0', 0, false])
             ->orderBy('LName')
             ->orderBy('PName')
             ->get(['ProvNum', 'LName', 'PName', 'Specialty']);
 
-        return response()->json($rows->map(fn($p) => [
+        return response()->json($rows->map(fn ($p) => [
             'id' => (int) $p->ProvNum,
             'name' => trim("{$p->LName}, {$p->PName}"),
             'type' => $this->specialtyMap[(int) $p->Specialty] ?? 'General',
@@ -58,14 +62,15 @@ class ProviderPortalController extends Controller
         $mode = $request->input('mode', 'daily');
         $provs = array_values(array_filter((array) $request->input('providers', [])));
         $type = $request->input('provider_type', 'all');
+        $officeId = Office::getActiveOfficeId();
 
         [$groupExpr, $labelExpr] = $this->periodExprs($mode, 'pl');
 
-        $bindings = [$start, $end];
+        $bindings = [$officeId, $officeId, $start, $end];
         $provFilter = '';
         $typeFilter = '';
 
-        if (!empty($provs)) {
+        if (! empty($provs)) {
             $ph = implode(',', array_fill(0, count($provs), '?'));
             $provFilter = "AND pl.ProvNum IN ({$ph})";
             array_push($bindings, ...$provs);
@@ -81,8 +86,9 @@ class ProviderPortalController extends Controller
             SELECT {$labelExpr} AS label,
                    COALESCE(SUM(pl.ProcFee), 0) AS production
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            WHERE pl.ProcStatus IN ({$this->completedIn})
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            WHERE pl.office_id = ?
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               {$provFilter}
               {$typeFilter}
@@ -90,7 +96,7 @@ class ProviderPortalController extends Controller
             ORDER BY {$groupExpr}
         ", $bindings);
 
-        return response()->json(array_map(fn($r) => [
+        return response()->json(array_map(fn ($r) => [
             'label' => $r->label,
             'production' => round((float) $r->production, 2),
         ], $rows));
@@ -103,23 +109,24 @@ class ProviderPortalController extends Controller
         $mode = $request->input('mode', 'daily');
         $provs = array_values(array_filter((array) $request->input('providers', [])));
         $type = $request->input('provider_type', 'all');
+        $officeId = Office::getActiveOfficeId();
 
         [$groupExpr, $labelExpr] = $this->periodExprs($mode, 'pl');
 
-        $bindings = [$start, $end];
+        $bindings = [$officeId, $officeId, $officeId, $start, $end];
         $provFilter = '';
         $typeFilter = '';
 
-        if (!empty($provs)) {
+        if (! empty($provs)) {
             $ph = implode(',', array_fill(0, count($provs), '?'));
             $provFilter = "AND pl.ProvNum IN ({$ph})";
             array_push($bindings, ...$provs);
         }
 
         if ($type === 'hygiene') {
-            $typeFilter = "AND p.Specialty = 8";
+            $typeFilter = 'AND p.Specialty = 8';
         } elseif ($type === 'doctor') {
-            $typeFilter = "AND p.Specialty != 8";
+            $typeFilter = 'AND p.Specialty != 8';
         }
 
         $rows = DB::select("
@@ -140,9 +147,10 @@ class ProviderPortalController extends Controller
                 SUM(pc.ProcCode IN ('D4261','D4262','D4268','D6199'))                          AS laser,
                 SUM(pc.ProcCode IN ('D1330','D1320'))                                          AS toothbrushes
             FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum
-            JOIN od_providers p   ON pl.ProvNum  = p.ProvNum
-            WHERE pl.ProcStatus IN ({$this->completedIn})
+            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
+            JOIN od_providers p   ON pl.ProvNum  = p.ProvNum AND p.office_id = ?
+            WHERE pl.office_id = ?
+              AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND p.IsHidden IN ('false', '0', 0)
               {$provFilter}
@@ -151,7 +159,7 @@ class ProviderPortalController extends Controller
             ORDER BY period DESC, total_prod DESC
         ", $bindings);
 
-        return response()->json(array_map(function ($r) {
+        return response()->json(array_map(function ($r) use ($officeId) {
             $prodPerVisit = $r->visits > 0 ? round($r->total_prod / $r->visits, 2) : 0;
             $visitsPerDay = $r->work_days > 0 ? round($r->visits / $r->work_days, 2) : 0;
             $avgHygDay = $r->hyg_days > 0 ? round($r->hyg_prod / $r->hyg_days, 2) : 0;
@@ -164,7 +172,7 @@ class ProviderPortalController extends Controller
 
             return [
                 'provider' => $r->provider_name,
-                'office' => $this->clinics->name(0),
+                'office' => $this->clinics->name(0, $officeId),
                 'provider_type' => $this->specialtyMap[(int) $r->Specialty] ?? 'General',
                 'date' => $r->period,
                 'avg_rev_hyg' => $avgHygDay,
@@ -185,6 +193,7 @@ class ProviderPortalController extends Controller
     private function periodExprs(string $mode, string $alias): array
     {
         $d = "{$alias}.ProcDate";
+
         return match ($mode) {
             'weekly' => ["YEARWEEK({$d}, 1)", "DATE_FORMAT(MIN({$d}), '%Y-%m-%d')"],
             'monthly' => ["DATE_FORMAT({$d}, '%Y-%m')", "DATE_FORMAT({$d}, '%Y-%m')"],

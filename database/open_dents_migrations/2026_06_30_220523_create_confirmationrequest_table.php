@@ -4,67 +4,61 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('confirmationrequest', function (Blueprint $table) {
 
-Schema::create('confirmationrequest', function(Blueprint $table){
+            $table->integer('ConfirmationRequestNum');
 
-$table->integer('ConfirmationRequestNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('ApptNum');
 
-$table->integer('ApptNum');
+            $table->date('DateTimeConfirmExpire');
 
-$table->date('DateTimeConfirmExpire');
+            $table->string('ShortGUID');
 
-$table->string('ShortGUID');
+            $table->string('ConfirmCode');
 
-$table->string('ConfirmCode');
+            $table->date('DateTimeEntry');
 
-$table->date('DateTimeEntry');
+            $table->date('DateTimeConfirmTransmit');
 
-$table->date('DateTimeConfirmTransmit');
+            $table->date('DateTimeRSVP');
 
-$table->date('DateTimeRSVP');
+            $table->integer('RSVPStatus');
 
-$table->integer('RSVPStatus');
+            $table->text('ResponseDescript');
 
-$table->text('ResponseDescript');
+            $table->text('GuidMessageFromMobile');
 
-$table->text('GuidMessageFromMobile');
+            $table->date('ApptDateTime');
 
-$table->date('ApptDateTime');
+            $table->integer('TSPrior');
 
-$table->integer('TSPrior');
+            $table->integer('DoNotResend');
 
-$table->integer('DoNotResend');
+            $table->integer('SendStatus');
 
-$table->integer('SendStatus');
+            $table->integer('ApptReminderRuleNum');
 
-$table->integer('ApptReminderRuleNum');
+            $table->integer('MessageType');
 
-$table->integer('MessageType');
+            $table->integer('MessageFk');
 
-$table->integer('MessageFk');
+            $table->date('DateTimeSent');
 
-$table->date('DateTimeSent');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('confirmationrequest');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('confirmationrequest');
+    }
 };

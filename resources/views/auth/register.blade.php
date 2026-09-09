@@ -53,11 +53,11 @@
                             Practice Location / Node Assigned <span class="text-red-500">*</span>
                         </label>
                         <div class="relative">
-                            <select class="app-input appearance-none pl-9 pr-8 text-left bg-white font-medium text-slate-700 cursor-pointer" required>
-                                <option value="" disabled selected>Select assigned target node...</option>
-                                <option value="8mile">8 Mile Location</option>
-                                <option value="detroit_main">Detroit Dental Head</option>
-                                <option value="grand_river">Grand River Branch</option>
+                            <select name="office_id" class="app-input appearance-none pl-9 pr-8 text-left bg-white font-medium text-slate-700 cursor-pointer" required>
+                                <option value="" disabled selected>Select assigned practice location...</option>
+                                @foreach(\App\Models\Office::where('is_active', true)->get() as $office)
+                                    <option value="{{ $office->id }}">{{ $office->name }}</option>
+                                @endforeach
                             </select>
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                 <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>

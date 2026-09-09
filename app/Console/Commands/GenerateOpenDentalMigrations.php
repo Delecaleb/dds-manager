@@ -3,15 +3,12 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use SimpleXMLElement;
-use Illuminate\Support\Str;
 
 class GenerateOpenDentalMigrations extends Command
 {
     protected $signature = 'opendental:generate-migrations';
 
     protected $description = 'Generate Laravel migrations from Open Dental XML schema';
-
 
     public function handle()
     {
@@ -20,26 +17,20 @@ class GenerateOpenDentalMigrations extends Command
             storage_path('app/opendental-schema.xml')
         );
 
-
         foreach ($xml->table as $table) {
 
             $tableName = strtolower((string) $table['name']);
 
-
             $migrationName = date('Y_m_d_His')
-                . "_create_{$tableName}_table.php";
-
+                ."_create_{$tableName}_table.php";
 
             $path = database_path(
-                "migrations/" . $migrationName
+                'migrations/'.$migrationName
             );
 
-
-            $columns = "";
-
+            $columns = '';
 
             foreach ($table->column as $column) {
-
 
                 $name = (string) $column['name'];
 
@@ -47,22 +38,19 @@ class GenerateOpenDentalMigrations extends Command
                     (string) $column['type']
                 );
 
-
                 $nullable =
-                    ((string) $column['null'] === "true")
-                    ? "->nullable()"
-                    : "";
-
+                    ((string) $column['null'] === 'true')
+                    ? '->nullable()'
+                    : '';
 
                 $columns .= $this->convertType(
                     $name,
                     $type
                 )
-                    . $nullable
-                    . ";\n\n";
+                    .$nullable
+                    .";\n\n";
 
             }
-
 
             $stub = <<<PHP
 <?php
@@ -96,12 +84,10 @@ Schema::dropIfExists('$tableName');
 
 PHP;
 
-
             file_put_contents(
                 $path,
                 $stub
             );
-
 
             $this->info(
                 "Created $tableName"
@@ -109,21 +95,16 @@ PHP;
 
         }
 
-
     }
-
-
 
     private function convertType($name, $type)
     {
-
 
         if (str_contains($type, 'int')) {
 
             return "\$table->integer('$name')";
 
         }
-
 
         if (
             str_contains($type, 'varchar')
@@ -133,7 +114,6 @@ PHP;
 
         }
 
-
         if (
             str_contains($type, 'text')
         ) {
@@ -141,7 +121,6 @@ PHP;
             return "\$table->text('$name')";
 
         }
-
 
         if (
             str_contains($type, 'date')
@@ -151,7 +130,6 @@ PHP;
 
         }
 
-
         if (
             str_contains($type, 'datetime')
         ) {
@@ -159,7 +137,6 @@ PHP;
             return "\$table->dateTime('$name')";
 
         }
-
 
         if (
             str_contains($type, 'decimal')
@@ -169,11 +146,7 @@ PHP;
 
         }
 
-
         return "\$table->string('$name')";
 
-
     }
-
-
 }

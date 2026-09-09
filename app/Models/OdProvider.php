@@ -2,11 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 class OdProvider extends Model
 {
+    use BelongsToOffice;
+
+    protected $primaryKey = 'ProvNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
+        'office_id',
         'ProvNum',
         'Abbr',
         'ItemOrder',

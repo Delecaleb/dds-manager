@@ -4,41 +4,35 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('orthohardware', function (Blueprint $table) {
 
-Schema::create('orthohardware', function(Blueprint $table){
+            $table->integer('OrthoHardwareNum');
 
-$table->integer('OrthoHardwareNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->date('DateExam');
 
-$table->date('DateExam');
+            $table->integer('OrthoHardwareType');
 
-$table->integer('OrthoHardwareType');
+            $table->integer('OrthoHardwareSpecNum');
 
-$table->integer('OrthoHardwareSpecNum');
+            $table->string('ToothRange');
 
-$table->string('ToothRange');
+            $table->string('Note');
 
-$table->string('Note');
+            $table->integer('IsHidden');
 
-$table->integer('IsHidden');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('orthohardware');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('orthohardware');
+    }
 };

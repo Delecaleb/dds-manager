@@ -4,39 +4,33 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('terminalactive', function (Blueprint $table) {
 
-Schema::create('terminalactive', function(Blueprint $table){
+            $table->integer('TerminalActiveNum');
 
-$table->integer('TerminalActiveNum');
+            $table->string('ComputerName');
 
-$table->string('ComputerName');
+            $table->integer('TerminalStatus');
 
-$table->integer('TerminalStatus');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('SessionId');
 
-$table->integer('SessionId');
+            $table->integer('ProcessId');
 
-$table->integer('ProcessId');
+            $table->string('SessionName');
 
-$table->string('SessionName');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('terminalactive');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('terminalactive');
+    }
 };

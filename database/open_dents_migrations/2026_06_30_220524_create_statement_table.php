@@ -4,87 +4,81 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('statement', function (Blueprint $table) {
 
-Schema::create('statement', function(Blueprint $table){
+            $table->integer('StatementNum');
 
-$table->integer('StatementNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->date('DateSent');
 
-$table->date('DateSent');
+            $table->date('DateRangeFrom');
 
-$table->date('DateRangeFrom');
+            $table->date('DateRangeTo');
 
-$table->date('DateRangeTo');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->text('NoteBold');
 
-$table->text('NoteBold');
+            $table->integer('Mode_');
 
-$table->integer('Mode_');
+            $table->integer('HidePayment');
 
-$table->integer('HidePayment');
+            $table->integer('SinglePatient');
 
-$table->integer('SinglePatient');
+            $table->integer('Intermingled');
 
-$table->integer('Intermingled');
+            $table->integer('IsSent');
 
-$table->integer('IsSent');
+            $table->integer('DocNum');
 
-$table->integer('DocNum');
+            $table->string('DateTStamp');
 
-$table->string('DateTStamp');
+            $table->integer('IsReceipt');
 
-$table->integer('IsReceipt');
+            $table->integer('IsInvoice');
 
-$table->integer('IsInvoice');
+            $table->integer('IsInvoiceCopy');
 
-$table->integer('IsInvoiceCopy');
+            $table->string('EmailSubject');
 
-$table->string('EmailSubject');
+            $table->text('EmailBody');
 
-$table->text('EmailBody');
+            $table->integer('SuperFamily');
 
-$table->integer('SuperFamily');
+            $table->integer('IsBalValid');
 
-$table->integer('IsBalValid');
+            $table->string('InsEst');
 
-$table->string('InsEst');
+            $table->string('BalTotal');
 
-$table->string('BalTotal');
+            $table->string('StatementType');
 
-$table->string('StatementType');
+            $table->string('ShortGUID');
 
-$table->string('ShortGUID');
+            $table->string('StatementShortURL');
 
-$table->string('StatementShortURL');
+            $table->string('StatementURL');
 
-$table->string('StatementURL');
+            $table->integer('SmsSendStatus');
 
-$table->integer('SmsSendStatus');
+            $table->integer('LimitedCustomFamily');
 
-$table->integer('LimitedCustomFamily');
+            $table->integer('ShowTransSinceBalZero');
 
-$table->integer('ShowTransSinceBalZero');
+            $table->integer('IsServiceDateView');
 
-$table->integer('IsServiceDateView');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('statement');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('statement');
+    }
 };

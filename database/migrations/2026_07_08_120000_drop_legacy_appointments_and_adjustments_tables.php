@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Schema;
  * bare `appointments`/`adjustments` tables, and both hold zero rows, so this
  * is a safe cleanup with no data loss.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::dropIfExists('appointments');

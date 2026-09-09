@@ -4,35 +4,29 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('branding', function (Blueprint $table) {
 
-Schema::create('branding', function(Blueprint $table){
+            $table->integer('BrandingNum');
 
-$table->integer('BrandingNum');
+            $table->integer('BrandingType');
 
-$table->integer('BrandingType');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->text('ValueString');
 
-$table->text('ValueString');
+            $table->date('DateTimeUpdated');
 
-$table->date('DateTimeUpdated');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('branding');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('branding');
+    }
 };

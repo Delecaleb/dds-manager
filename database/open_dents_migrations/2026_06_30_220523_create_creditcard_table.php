@@ -4,77 +4,71 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('creditcard', function (Blueprint $table) {
 
-Schema::create('creditcard', function(Blueprint $table){
+            $table->integer('CreditCardNum');
 
-$table->integer('CreditCardNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->string('Address');
 
-$table->string('Address');
+            $table->string('Zip');
 
-$table->string('Zip');
+            $table->string('XChargeToken');
 
-$table->string('XChargeToken');
+            $table->string('CCNumberMasked');
 
-$table->string('CCNumberMasked');
+            $table->date('CCExpiration');
 
-$table->date('CCExpiration');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->string('ChargeAmt');
 
-$table->string('ChargeAmt');
+            $table->date('DateStart');
 
-$table->date('DateStart');
+            $table->date('DateStop');
 
-$table->date('DateStop');
+            $table->string('Note');
 
-$table->string('Note');
+            $table->integer('PayPlanNum');
 
-$table->integer('PayPlanNum');
+            $table->string('PayConnectToken');
 
-$table->string('PayConnectToken');
+            $table->date('PayConnectTokenExp');
 
-$table->date('PayConnectTokenExp');
+            $table->text('Procedures');
 
-$table->text('Procedures');
+            $table->integer('CCSource');
 
-$table->integer('CCSource');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('ExcludeProcSync');
 
-$table->integer('ExcludeProcSync');
+            $table->string('PaySimpleToken');
 
-$table->string('PaySimpleToken');
+            $table->string('ChargeFrequency');
 
-$table->string('ChargeFrequency');
+            $table->integer('CanChargeWhenNoBal');
 
-$table->integer('CanChargeWhenNoBal');
+            $table->integer('PaymentType');
 
-$table->integer('PaymentType');
+            $table->integer('IsRecurringActive');
 
-$table->integer('IsRecurringActive');
+            $table->string('Nickname');
 
-$table->string('Nickname');
+            $table->string('CardHolderName');
 
-$table->string('CardHolderName');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('creditcard');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('creditcard');
+    }
 };

@@ -37,19 +37,8 @@ class TreatmentPlanAttachmentSyncService extends BaseQuerySyncService
         return '*';
     }
 
-    /**
-     * Used during full sync.
-     */
     protected function orderBy(): string
     {
         return 'TreatPlanAttachNum';
-    }
-
-    /**
-     * Name used in sync_logs.
-     */
-    protected function module(): string
-    {
-        return 'treatment_plan_attachments';
     }
 }

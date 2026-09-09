@@ -41,18 +41,6 @@
     class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-20">
     <div class="flex items-center gap-3">
       <h2 class="text-3xl font-semibold text-slate-700 tracking-wide">Dashboard</h2>
-      <!-- Location selector -->
-      <div class="relative">
-        <select
-          class="appearance-none bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-9 py-1.5 text-sm font-semibold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white cursor-pointer transition-colors">
-          <option value="all">All Locations</option>
-          <option value="8mile" selected>8 Mile</option>
-        </select>
-        <div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-slate-400">
-          <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
-        </div>
-      </div>
-
       <!-- Date range picker -->
       <x-daterange-picker id="dashDateRange" on-apply="onDrpApply" />
 
@@ -60,15 +48,7 @@
 
     <!-- Right: status + user -->
     <div class="flex items-center gap-4">
-      <div
-        class="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded border border-emerald-200 flex items-center gap-1.5">
-        <i data-lucide="check-circle" class="w-3 h-3"></i> Open Dental Inbound Match 100%
-      </div>
-      <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
-        <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">JA
-        </div>
-        <span class="text-sm font-medium text-slate-700 hidden md:inline">Admin Controller</span>
-      </div>
+      
     </div>
   </header>
 
@@ -502,16 +482,7 @@
     }
 
     function fmtMoneyCompact(v) {
-      var n = Number(v ?? 0);
-      var neg = n < 0;
-      var abs = Math.abs(n);
-      var str;
-      if (abs >= 1000) {
-        str = '$' + (abs / 1000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + 'K';
-      } else {
-        str = '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      }
-      return neg ? '(' + str + ')' : str;
+      return fmtMoney(v);
     }
 
     var AVATAR_COLORS = [
@@ -641,7 +612,7 @@
       $('#tot-gross').text(fmtMoney(totals.gross));
       $('#tot-net').text(fmtMoney(totals.net));
       $('#tot-coll').text(fmtMoney(totals.coll));
-      $('#tot-adj').text(fmtMoneyCompact(totals.adj));
+      $('#tot-adj').text(fmtMoney(totals.adj));
 
       if (!data.length) {
         $('#providerList').html('<p class="px-5 py-8 text-xs text-slate-400 text-center">No providers match your search.</p>');
@@ -654,7 +625,7 @@
         var initStr = initials(row);
         var name = escHtml(row.LName || '') + (row.PName ? ', ' + escHtml(row.PName) : '');
         var adjVal = Number(row.adjustments || 0);
-        var adjFmt = fmtMoneyCompact(adjVal);
+        var adjFmt = fmtMoney(adjVal);
         var adjColor = adjVal < 0 ? 'text-red-500' : 'text-slate-900';
 
         html += '<div class="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/70 transition-colors">';

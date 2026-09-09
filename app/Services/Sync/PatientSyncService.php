@@ -30,6 +30,15 @@ class PatientSyncService extends BaseQuerySyncService
     }
 
     /**
+     * Business date a windowed sync (sync:patients-range) filters on.
+     * SecDateEntry is when the patient was entered into Open Dental.
+     */
+    protected function dateColumn(): ?string
+    {
+        return 'SecDateEntry';
+    }
+
+    /**
      * Optional.
      * Helps performance when selecting *
      */
@@ -45,5 +54,21 @@ class PatientSyncService extends BaseQuerySyncService
     protected function select(): string
     {
         return '*';
+    }
+
+    protected function transformRow(array $row): array
+    {
+        $dateCols = ['Birthdate', 'SecDateEntry', 'DateFirstVisit', 'DateTimeDeceased', 'AdmitDate'];
+        foreach ($dateCols as $col) {
+            if (array_key_exists($col, $row)) {
+                $row[$col] = $this->normalizeDate($row[$col]);
+            }
+        }
+
+        if (array_key_exists('DateTStamp', $row)) {
+            $row['DateTStamp'] = $this->normalizeDateTime($row['DateTStamp']);
+        }
+
+        return $row;
     }
 }

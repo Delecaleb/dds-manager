@@ -4,35 +4,29 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('custreference', function (Blueprint $table) {
 
-Schema::create('custreference', function(Blueprint $table){
+            $table->integer('CustReferenceNum');
 
-$table->integer('CustReferenceNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->date('DateMostRecent');
 
-$table->date('DateMostRecent');
+            $table->string('Note');
 
-$table->string('Note');
+            $table->integer('IsBadRef');
 
-$table->integer('IsBadRef');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('custreference');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('custreference');
+    }
 };

@@ -2,11 +2,8 @@
 
 namespace App\Services\OpenDental;
 
-
 class TreatmentAnalyticsService
 {
-
-
     public function __construct(
 
         protected TreatmentPlanService $treatments,
@@ -17,8 +14,8 @@ class TreatmentAnalyticsService
 
         protected ProcedureCodeService $codes
 
-    ) {
-    }
+    ) {}
+
     public function patientPlans($patientId)
     {
         /*
@@ -26,7 +23,6 @@ class TreatmentAnalyticsService
         | Get patient's treatment plans
         |--------------------------------------------------------------------------
         */
-
 
         $plans = collect(
 
@@ -39,8 +35,6 @@ class TreatmentAnalyticsService
             $this->providers->all()
 
         );
-
-
 
         $data = collect();
 
@@ -56,12 +50,7 @@ class TreatmentAnalyticsService
 
             );
 
-
-
-
             foreach ($attachments as $attach) {
-
-
 
                 $procedure = $this->procedures->find(
 
@@ -69,9 +58,7 @@ class TreatmentAnalyticsService
 
                 );
 
-
-
-                if (!$procedure) {
+                if (! $procedure) {
 
                     continue;
 
@@ -90,52 +77,32 @@ class TreatmentAnalyticsService
 
                 );
                 $data->push([
-                    'treatment_plan_id' =>
+                    'treatment_plan_id' => $plan['TreatPlanNum'],
+                    'date_planned' => $procedure['ProcDate'] ?? null,
 
-                        $plan['TreatPlanNum'],
-                    'date_planned' =>
+                    'code' => $code['ProcCode'] ?? null,
 
-                        $procedure['ProcDate'] ?? null,
+                    'description' => $code['Descript'] ?? null,
 
-                    'code' =>
+                    'provider_id' => $procedure['ProvNum'] ?? null,
 
-                        $code['ProcCode'] ?? null,
+                    'provider' => ($provider['FName'] ?? '')
+                        .' '
+                        .($provider['LName'] ?? ''),
 
-                    'description' =>
+                    'provider_abbr' => $provider['Abbr'] ?? null,
 
-                        $code['Descript'] ?? null,
+                    'status' => $this->status(
 
-                    'provider_id' =>
+                        $procedure['ProcStatus'] ?? null
 
-                        $procedure['ProvNum'] ?? null,
+                    ),
+                    'amount' => floatval(
 
-                    'provider' =>
+                        $procedure['ProcFee'] ?? 0
 
-                        ($provider['FName'] ?? '')
-                        . ' '
-                        . ($provider['LName'] ?? ''),
-
-                    'provider_abbr' =>
-
-                        $provider['Abbr'] ?? null,
-
-                    'status' =>
-
-                        $this->status(
-
-                            $procedure['ProcStatus'] ?? null
-
-                        ),
-                    'amount' =>
-
-                        floatval(
-
-                            $procedure['ProcFee'] ?? 0
-
-                        ),
-                    'date_completed' =>
-
-                        ($procedure['ProcStatus'] ?? null)
+                    ),
+                    'date_completed' => ($procedure['ProcStatus'] ?? null)
                         === 'C'
 
                         ?
@@ -145,17 +112,17 @@ class TreatmentAnalyticsService
                         :
 
                         '--',
-                    'date_scheduled' =>
-
-                        $procedure['AptNum']
+                    'date_scheduled' => $procedure['AptNum']
                         ??
 
-                        null
+                        null,
                 ]);
             }
         }
+
         return $data;
     }
+
     private function status($status)
     {
         return match ($status) {
@@ -170,8 +137,5 @@ class TreatmentAnalyticsService
 
         };
 
-
     }
-
-
 }

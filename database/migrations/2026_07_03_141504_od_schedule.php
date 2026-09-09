@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('od_schedules', function (Blueprint $table) {
-            
+
             $table->id();
             $table->integer('ScheduleNum')->nullable();
             $table->date('SchedDate')->nullable();

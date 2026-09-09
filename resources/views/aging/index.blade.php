@@ -661,7 +661,7 @@
         order: [[15, 'desc']], // Total, descending — matches the previous fixed sort
         pageLength: 20,
         lengthChange: true, // this table shows a length selector
-        lengthMenu: [10, 20, 50, 100],
+        lengthMenu: [[10, 20, 50, 100, -1], [10, 20, 50, 100, 'All']],
         ajax: {
           url: baseUrl + '/aging/data',
           type: 'GET',

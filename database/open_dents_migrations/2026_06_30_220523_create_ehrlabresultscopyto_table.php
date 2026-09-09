@@ -4,51 +4,45 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('ehrlabresultscopyto', function (Blueprint $table) {
 
-Schema::create('ehrlabresultscopyto', function(Blueprint $table){
+            $table->integer('EhrLabResultsCopyToNum');
 
-$table->integer('EhrLabResultsCopyToNum');
+            $table->integer('EhrLabNum');
 
-$table->integer('EhrLabNum');
+            $table->string('CopyToID');
 
-$table->string('CopyToID');
+            $table->string('CopyToLName');
 
-$table->string('CopyToLName');
+            $table->string('CopyToFName');
 
-$table->string('CopyToFName');
+            $table->string('CopyToMiddleNames');
 
-$table->string('CopyToMiddleNames');
+            $table->string('CopyToSuffix');
 
-$table->string('CopyToSuffix');
+            $table->string('CopyToPrefix');
 
-$table->string('CopyToPrefix');
+            $table->string('CopyToAssigningAuthorityNamespaceID');
 
-$table->string('CopyToAssigningAuthorityNamespaceID');
+            $table->string('CopyToAssigningAuthorityUniversalID');
 
-$table->string('CopyToAssigningAuthorityUniversalID');
+            $table->string('CopyToAssigningAuthorityIDType');
 
-$table->string('CopyToAssigningAuthorityIDType');
+            $table->string('CopyToNameTypeCode');
 
-$table->string('CopyToNameTypeCode');
+            $table->string('CopyToIdentifierTypeCode');
 
-$table->string('CopyToIdentifierTypeCode');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('ehrlabresultscopyto');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('ehrlabresultscopyto');
+    }
 };

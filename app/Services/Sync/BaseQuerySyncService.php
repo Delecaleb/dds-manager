@@ -7,10 +7,7 @@ use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
 use Exception;
 use Illuminate\Support\Facades\DB;
-use App\Models\SyncLog;
-use App\Services\OpenDental\QueryService;
-use Exception;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 abstract class BaseQuerySyncService
 {
@@ -21,6 +18,8 @@ abstract class BaseQuerySyncService
     protected int $maxRetries = 5;
 
     protected int $sleepSeconds = 1;
+
+    protected int $overlapSeconds = 300;
 
     protected ?string $windowStart = null;
 
@@ -95,7 +94,9 @@ abstract class BaseQuerySyncService
 
     protected function module(): string
     {
-        return $this->table();
+        $officeId = $this->getOffice()->id ?? 1;
+
+        return "office_{$officeId}:".$this->table().$this->windowSuffix();
     }
 
     /**
@@ -178,7 +179,27 @@ abstract class BaseQuerySyncService
         $timestamp = strtotime($value);
 
         return $timestamp !== false ? date('Y-m-d H:i:s', $timestamp) : null;
+    }
 
+    /**
+     * Convert an OpenDental date string into a MySQL-storable "Y-m-d" value,
+     * or null when the source is blank/sentinel/out-of-range.
+     */
+    protected function normalizeDate($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = str_replace('T', ' ', trim((string) $value));
+
+        if ($value === '' || $value < '1000-01-01' || $value > '9999-12-31') {
+            return null;
+        }
+
+        $timestamp = strtotime($value);
+
+        return $timestamp !== false ? date('Y-m-d', $timestamp) : null;
     }
 
     public function sync(): void
@@ -186,7 +207,18 @@ abstract class BaseQuerySyncService
         $office = $this->getOffice();
         $this->queryService->forOffice($office);
 
-        $log = SyncLog::firstOrCreate(
+        $modelClass = $this->model();
+        if (class_exists($modelClass)) {
+            $model = new $modelClass;
+            $tableName = $model->getTable();
+            if (Schema::hasTable($tableName) && ! Schema::hasColumn($tableName, 'office_id')) {
+                Schema::table($tableName, function ($table) {
+                    $table->unsignedBigInteger('office_id')->default(1)->index();
+                });
+            }
+        }
+
+        $log = SyncLog::withoutGlobalScopes()->firstOrCreate(
             ['module' => $this->module()],
             [
                 'office_id' => $office->id ?? 1,
@@ -194,6 +226,13 @@ abstract class BaseQuerySyncService
                 'total_processed' => 0,
             ]
         );
+
+        // Prevent concurrent duplicate runs for the same module & office if an active process has an active heartbeat (< 10 min)
+        if ($log->status === 'running' && $log->updated_at && (now()->timestamp - strtotime((string) $log->updated_at)) < 600) {
+            $this->logOutput("Sync is already running for {$this->module()} (last heartbeat {$log->updated_at}). Skipping duplicate process.\n");
+
+            return;
+        }
 
         $log->update([
             'office_id' => $office->id ?? 1,
@@ -245,6 +284,13 @@ abstract class BaseQuerySyncService
         }
     }
 
+    /**
+     * Cache table columns to avoid repetitive schema reflection.
+     *
+     * @var array<string, array<string, bool>>
+     */
+    protected static array $tableColumnsCache = [];
+
     protected function runInitialSync(SyncLog $log): void
     {
         $pk = $this->primaryKey();
@@ -252,6 +298,7 @@ abstract class BaseQuerySyncService
         $window = $this->windowClause();
 
         while (true) {
+            $t0 = microtime(true);
 
             $sql = "
                 SELECT *
@@ -267,15 +314,30 @@ abstract class BaseQuerySyncService
                 break;
             }
 
+            $fetchTime = round(microtime(true) - $t0, 2);
+            $t1 = microtime(true);
+
             [, $lastId] = $this->persistBatch($rows, $log);
+
+            $persistTime = round(microtime(true) - $t1, 2);
 
             $log->update([
                 'last_primary_key' => $lastId,
+                'updated_at' => now(),
             ]);
 
-            $this->logOutput("Synced through ID {$lastId}\n");
+            $this->logOutput(sprintf(
+                "[%s] Synced %d records through ID %d (API: %ss, DB: %ss)\n",
+                $this->table(),
+                count($rows),
+                $lastId,
+                $fetchTime,
+                $persistTime
+            ));
 
-            sleep($this->sleepSeconds);
+            if ($this->sleepSeconds > 0) {
+                usleep(50000); // 50ms light throttle
+            }
         }
     }
 
@@ -295,7 +357,7 @@ abstract class BaseQuerySyncService
         $window = $this->windowClause();
 
         while (true) {
-
+            $t0 = microtime(true);
             $safeSync = addslashes($lastSync);
 
             // Keyset pagination on the (syncColumn, primaryKey) tuple.
@@ -323,86 +385,140 @@ abstract class BaseQuerySyncService
                 break;
             }
 
+            $fetchTime = round(microtime(true) - $t0, 2);
+            $t1 = microtime(true);
+
             [$lastSync, $lastId] = $this->persistBatch($rows, $log, $lastSync, $lastId);
 
+            $persistTime = round(microtime(true) - $t1, 2);
 
-                $model = $this->model();
-
-                foreach ($rows as $row) {
             // Persist both halves of the cursor so a kill mid-run resumes
             // exactly where it left off (minus the overlap window).
             $log->update([
                 'last_synced_at' => $lastSync,
                 'last_primary_key' => $lastId,
+                'updated_at' => now(),
             ]);
 
-            $this->logOutput("Synced through {$lastSync} (ID {$lastId})\n");
+            $this->logOutput(sprintf(
+                "[%s] Synced %d records through %s (ID %d) (API: %ss, DB: %ss)\n",
+                $this->table(),
+                count($rows),
+                $lastSync,
+                $lastId,
+                $fetchTime,
+                $persistTime
+            ));
 
-            sleep($this->sleepSeconds);
+            if ($this->sleepSeconds > 0) {
+                usleep(50000); // 50ms light throttle
+            }
         }
     }
+
     /**
      * Persist a batch of rows idempotently and advance the cursor.
      *
-     * Identity is ALWAYS the OpenDental primary key — a row can never be
-     * inserted twice, no matter how many times it is re-synced.
-     *
-     * - New records (not in local DB) are inserted.
-     * - Existing records are updated if any substantive columns have changed.
-     * - Local auto-generated columns (id, created_at, updated_at) are ignored.
+     * Identity is ALWAYS the OpenDental primary key scoped by office_id.
+     * Uses bulk upsert (INSERT ... ON DUPLICATE KEY UPDATE) for extreme performance.
      *
      * @return array{0: ?string, 1: int} [$lastSync, $lastId]
      */
     protected function persistBatch(array $rows, SyncLog $log, ?string $lastSync = null, int $lastId = 0): array
     {
+        if (empty($rows)) {
+            return [$lastSync, $lastId];
+        }
+
         $modelClass = $this->model();
         $pk = $this->primaryKey();
         $col = $this->syncColumn();
         $officeId = $this->getOffice()->id ?? 1;
 
-        DB::transaction(function () use ($rows, $log, $modelClass, $pk, $col, $officeId, &$lastSync, &$lastId) {
+        $model = new $modelClass;
+        $tableName = $model->getTable();
 
-            foreach ($rows as $row) {
+        // Cache column listing to avoid repeated schema reflections
+        if (! isset(static::$tableColumnsCache[$tableName])) {
+            static::$tableColumnsCache[$tableName] = array_flip(Schema::getColumnListing($tableName));
+        }
+        $validColumns = static::$tableColumnsCache[$tableName];
+        $hasCreatedAt = isset($validColumns['created_at']);
+        $hasUpdatedAt = isset($validColumns['updated_at']);
+        $nowString = now()->format('Y-m-d H:i:s');
 
-                $data = $this->transformRow($row);
+        $preparedRows = [];
+        $updateKeys = [];
 
-                $data['office_id'] = $officeId;
+        foreach ($rows as $row) {
+            $data = $this->transformRow($row);
 
-                // Safeguard non-note string attributes from exceeding MySQL VARCHAR limits
-                foreach ($data as $key => $val) {
-                    if (is_string($val) && strlen($val) > 255 && ! str_contains(strtolower($key), 'note')) {
-                        $data[$key] = mb_substr($val, 0, 255);
-                    }
+            // Strip local-only auto-generated / transient fields
+            unset($data['id'], $data['row_hash']);
+
+            $data['office_id'] = $officeId;
+            $data[$pk] = $row[$pk];
+
+            if ($hasCreatedAt && ! isset($data['created_at'])) {
+                $data['created_at'] = $nowString;
+            }
+            if ($hasUpdatedAt) {
+                $data['updated_at'] = $nowString;
+            }
+
+            // Safeguard non-note string attributes from exceeding MySQL VARCHAR limits
+            $cleanRow = [];
+            foreach ($data as $key => $val) {
+                if (! isset($validColumns[$key])) {
+                    continue;
                 }
 
-                $existing = $modelClass::where('office_id', $officeId)->where($pk, $row[$pk])->first();
-
-                if ($existing === null) {
-
-                    $model = new $modelClass;
-                    $model->fill($data);
-                    $model->{$pk} = $row[$pk];
-                    $model->save();
-
-                    $log->increment('total_processed');
-                } else {
-
-                    $existing->fill($data);
-
-                    if ($existing->isDirty()) {
-                        $existing->save();
-                        $log->increment('total_processed');
-                    }
+                if (is_string($val) && strlen($val) > 255 && ! str_contains(strtolower($key), 'note')) {
+                    $val = mb_substr($val, 0, 255);
                 }
 
-                $lastId = (int) $row[$pk];
+                $cleanRow[$key] = $val;
 
-                if ($col !== null && isset($row[$col])) {
-                    $lastSync = $this->normalizeDateTime($row[$col]) ?? $lastSync;
+                if ($key !== 'id' && $key !== 'office_id' && $key !== $pk && $key !== 'created_at') {
+                    $updateKeys[$key] = true;
                 }
             }
 
-        });
+            // Deduplicate by primary key within the batch to prevent unique constraint violations
+            $preparedRows[$cleanRow[$pk]] = $cleanRow;
+            $lastId = (int) $row[$pk];
+
+            if ($col !== null && isset($row[$col])) {
+                $lastSync = $this->normalizeDateTime($row[$col]) ?? $lastSync;
+            }
+        }
+
+        if (! empty($preparedRows)) {
+            $rowsToUpsert = array_values($preparedRows);
+            $updateColumns = array_keys($updateKeys);
+
+            try {
+                // High-performance single multi-row UPSERT query
+                DB::table($tableName)->upsert($rowsToUpsert, ['office_id', $pk], $updateColumns);
+                $log->increment('total_processed', count($rowsToUpsert));
+            } catch (\Throwable $e) {
+                // Safe fallback to atomic updateOrInsert per record
+                DB::transaction(function () use ($tableName, $rowsToUpsert, $log, $pk, $officeId) {
+                    foreach ($rowsToUpsert as $cleanRow) {
+                        $pkVal = $cleanRow[$pk];
+                        $matchCond = [
+                            'office_id' => $officeId,
+                            $pk => $pkVal,
+                        ];
+                        $updateData = $cleanRow;
+                        unset($updateData['office_id'], $updateData[$pk]);
+
+                        DB::table($tableName)->updateOrInsert($matchCond, $updateData);
+                    }
+                    $log->increment('total_processed', count($rowsToUpsert));
+                });
+            }
+        }
 
         return [$lastSync, $lastId];
     }

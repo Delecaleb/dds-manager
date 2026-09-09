@@ -4,41 +4,35 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('eclipboardimagecapturedef', function (Blueprint $table) {
 
-Schema::create('eclipboardimagecapturedef', function(Blueprint $table){
+            $table->integer('EClipboardImageCaptureDefNum');
 
-$table->integer('EClipboardImageCaptureDefNum');
+            $table->integer('DefNum');
 
-$table->integer('DefNum');
+            $table->integer('IsSelfPortrait');
 
-$table->integer('IsSelfPortrait');
+            $table->integer('FrequencyDays');
 
-$table->integer('FrequencyDays');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('OcrCaptureType');
 
-$table->integer('OcrCaptureType');
+            $table->integer('Frequency');
 
-$table->integer('Frequency');
+            $table->integer('ResubmitInterval');
 
-$table->integer('ResubmitInterval');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('eclipboardimagecapturedef');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('eclipboardimagecapturedef');
+    }
 };

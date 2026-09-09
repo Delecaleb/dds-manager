@@ -4,7 +4,9 @@ namespace App\Http\Requests\Auth;
 
 use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -27,7 +29,8 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'username' => ['required', 'string'],
+            'email' => ['nullable', 'string'],
+            'username' => ['nullable', 'string'],
             'password' => ['required', 'string'],
         ];
     }
@@ -41,35 +44,47 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        $username = trim(strtolower($this->input('username', '')));
-        $password = $this->input('password', '');
+        $loginInput = trim((string) ($this->input('email') ?? $this->input('username') ?? ''));
+        $password = (string) $this->input('password', '');
+        $remember = $this->boolean('remember');
 
-        if ($username !== 'user' && $username !== 'user@dds-manager.local') {
-            RateLimiter::hit($this->throttleKey());
-
+        if ($loginInput === '') {
             throw ValidationException::withMessages([
-                'username' => trans('auth.failed'),
+                'email' => 'Please provide your email address or username.',
             ]);
         }
 
-        if ($password !== 'password') {
+        // Determine whether input is an email address or username/name
+        $field = filter_var($loginInput, FILTER_VALIDATE_EMAIL) ? 'email' : 'email';
+
+        // Check if user exists by email or name/username
+        $user = User::where('email', $loginInput)
+            ->orWhere('name', $loginInput)
+            ->first();
+
+        if (! $user || ! Auth::attempt(['email' => $user->email, 'password' => $password], $remember)) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'password' => trans('auth.failed'),
+                'email' => trans('auth.failed'),
+            ]);
+        }
+
+        if (! $user->is_active) {
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'Your account has been deactivated. Please contact your Super Administrator.',
             ]);
         }
 
         RateLimiter::clear($this->throttleKey());
 
-        return User::updateOrCreate(
-            ['email' => 'user@dds-manager.local'],
-            [
-                'name' => 'User',
-                'password' => bcrypt('password'),
-                'email_verified_at' => now(),
-            ]
-        );
+        // Update last login timestamp
+        $user->forceFill(['last_login_at' => now()])->save();
+
+        return $user;
     }
 
     /**
@@ -100,6 +115,8 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        $loginInput = trim((string) ($this->input('email') ?? $this->input('username') ?? ''));
+
+        return Str::transliterate(Str::lower($loginInput).'|'.$this->ip());
     }
 }

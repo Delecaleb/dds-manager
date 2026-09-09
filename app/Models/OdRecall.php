@@ -2,27 +2,39 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 class OdRecall extends Model
 {
+    use BelongsToOffice;
+
+    protected $attributes = [
+        'Priority' => 0,
+        'RecallInterval' => 0,
+        'RecallStatus' => 0,
+        'IsDisabled' => 0,
+        'RecallTypeNum' => 0,
+    ];
+
     protected $fillable = [
-        'RecallNum', 
-        'PatNum', 
-        'DateDueCalc', 
-        'DateDue', 
-        'DatePrevious', 
-        'RecallInterval', 
-        'RecallStatus', 
-        'Note', 
-        'IsDisabled', 
-        'DateTStamp', 
-        'RecallTypeNum', 
-        'DisableUntilBalance', 
-        'DisableUntilDate', 
-        'DateScheduled', 
-        'Priority', 
-        'TimePatternOverride'
+        'office_id',
+        'RecallNum',
+        'PatNum',
+        'DateDueCalc',
+        'DateDue',
+        'DatePrevious',
+        'RecallInterval',
+        'RecallStatus',
+        'Note',
+        'IsDisabled',
+        'DateTStamp',
+        'RecallTypeNum',
+        'DisableUntilBalance',
+        'DisableUntilDate',
+        'DateScheduled',
+        'Priority',
+        'TimePatternOverride',
     ];
 
     protected $primaryKey = 'RecallNum';

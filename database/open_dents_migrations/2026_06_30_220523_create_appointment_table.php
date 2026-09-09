@@ -4,97 +4,91 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('appointment', function (Blueprint $table) {
 
-Schema::create('appointment', function(Blueprint $table){
+            $table->integer('AptNum');
 
-$table->integer('AptNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('AptStatus');
 
-$table->integer('AptStatus');
+            $table->string('Pattern');
 
-$table->string('Pattern');
+            $table->integer('Confirmed');
 
-$table->integer('Confirmed');
+            $table->integer('TimeLocked');
 
-$table->integer('TimeLocked');
+            $table->integer('Op');
 
-$table->integer('Op');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->integer('ProvNum');
 
-$table->integer('ProvNum');
+            $table->integer('ProvHyg');
 
-$table->integer('ProvHyg');
+            $table->date('AptDateTime');
 
-$table->date('AptDateTime');
+            $table->integer('NextAptNum');
 
-$table->integer('NextAptNum');
+            $table->integer('UnschedStatus');
 
-$table->integer('UnschedStatus');
+            $table->integer('IsNewPatient');
 
-$table->integer('IsNewPatient');
+            $table->text('ProcDescript');
 
-$table->text('ProcDescript');
+            $table->integer('Assistant');
 
-$table->integer('Assistant');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('IsHygiene');
 
-$table->integer('IsHygiene');
+            $table->string('DateTStamp');
 
-$table->string('DateTStamp');
+            $table->date('DateTimeArrived');
 
-$table->date('DateTimeArrived');
+            $table->date('DateTimeSeated');
 
-$table->date('DateTimeSeated');
+            $table->date('DateTimeDismissed');
 
-$table->date('DateTimeDismissed');
+            $table->integer('InsPlan1');
 
-$table->integer('InsPlan1');
+            $table->integer('InsPlan2');
 
-$table->integer('InsPlan2');
+            $table->date('DateTimeAskedToArrive');
 
-$table->date('DateTimeAskedToArrive');
+            $table->text('ProcsColored');
 
-$table->text('ProcsColored');
+            $table->integer('ColorOverride');
 
-$table->integer('ColorOverride');
+            $table->integer('AppointmentTypeNum');
 
-$table->integer('AppointmentTypeNum');
+            $table->integer('SecUserNumEntry');
 
-$table->integer('SecUserNumEntry');
+            $table->date('SecDateTEntry');
 
-$table->date('SecDateTEntry');
+            $table->integer('Priority');
 
-$table->integer('Priority');
+            $table->string('ProvBarText');
 
-$table->string('ProvBarText');
+            $table->string('PatternSecondary');
 
-$table->string('PatternSecondary');
+            $table->string('SecurityHash');
 
-$table->string('SecurityHash');
+            $table->integer('ItemOrderPlanned');
 
-$table->integer('ItemOrderPlanned');
+            $table->integer('IsMirrored');
 
-$table->integer('IsMirrored');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('appointment');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('appointment');
+    }
 };

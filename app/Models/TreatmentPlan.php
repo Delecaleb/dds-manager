@@ -2,11 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 class TreatmentPlan extends Model
 {
+    use BelongsToOffice;
+
+    protected $primaryKey = 'TreatPlanNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
+        'office_id',
         'TreatPlanNum',
         'PatNum',
         'DateTP',

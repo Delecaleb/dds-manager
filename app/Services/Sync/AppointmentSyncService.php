@@ -27,6 +27,15 @@ class AppointmentSyncService extends BaseQuerySyncService
     }
 
     /**
+     * Business date a windowed sync filters on.
+     * AptDateTime is what appointment/calendar metrics bucket by.
+     */
+    protected function dateColumn(): ?string
+    {
+        return 'AptDateTime';
+    }
+
+    /**
      * AptDateTime is a real DATETIME column locally, but OpenDental sends it
      * as an ISO-8601 string with a 'T' separator. Normalize it on the way in
      * so the value stores cleanly and stays range-queryable (calendar, KPIs,

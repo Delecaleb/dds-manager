@@ -4,43 +4,37 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('claimformitem', function (Blueprint $table) {
 
-Schema::create('claimformitem', function(Blueprint $table){
+            $table->integer('ClaimFormItemNum');
 
-$table->integer('ClaimFormItemNum');
+            $table->integer('ClaimFormNum');
 
-$table->integer('ClaimFormNum');
+            $table->string('ImageFileName');
 
-$table->string('ImageFileName');
+            $table->string('FieldName');
 
-$table->string('FieldName');
+            $table->string('FormatString');
 
-$table->string('FormatString');
+            $table->string('XPos');
 
-$table->string('XPos');
+            $table->string('YPos');
 
-$table->string('YPos');
+            $table->string('Width');
 
-$table->string('Width');
+            $table->string('Height');
 
-$table->string('Height');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('claimformitem');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('claimformitem');
+    }
 };

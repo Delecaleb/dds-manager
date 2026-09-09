@@ -4,41 +4,35 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('mobilenotification', function (Blueprint $table) {
 
-Schema::create('mobilenotification', function(Blueprint $table){
+            $table->integer('MobileNotificationNum');
 
-$table->integer('MobileNotificationNum');
+            $table->integer('NotificationType');
 
-$table->integer('NotificationType');
+            $table->string('DeviceId');
 
-$table->string('DeviceId');
+            $table->text('PrimaryKeys');
 
-$table->text('PrimaryKeys');
+            $table->text('Tags');
 
-$table->text('Tags');
+            $table->date('DateTimeEntry');
 
-$table->date('DateTimeEntry');
+            $table->date('DateTimeExpires');
 
-$table->date('DateTimeExpires');
+            $table->integer('AppTarget');
 
-$table->integer('AppTarget');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('mobilenotification');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('mobilenotification');
+    }
 };

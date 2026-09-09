@@ -4,67 +4,61 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('treatplan', function (Blueprint $table) {
 
-Schema::create('treatplan', function(Blueprint $table){
+            $table->integer('TreatPlanNum');
 
-$table->integer('TreatPlanNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->date('DateTP');
 
-$table->date('DateTP');
+            $table->string('Heading');
 
-$table->string('Heading');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->text('Signature');
 
-$table->text('Signature');
+            $table->integer('SigIsTopaz');
 
-$table->integer('SigIsTopaz');
+            $table->integer('ResponsParty');
 
-$table->integer('ResponsParty');
+            $table->integer('DocNum');
 
-$table->integer('DocNum');
+            $table->integer('TPStatus');
 
-$table->integer('TPStatus');
+            $table->integer('SecUserNumEntry');
 
-$table->integer('SecUserNumEntry');
+            $table->date('SecDateEntry');
 
-$table->date('SecDateEntry');
+            $table->string('SecDateTEdit');
 
-$table->string('SecDateTEdit');
+            $table->integer('UserNumPresenter');
 
-$table->integer('UserNumPresenter');
+            $table->integer('TPType');
 
-$table->integer('TPType');
+            $table->text('SignaturePractice');
 
-$table->text('SignaturePractice');
+            $table->date('DateTSigned');
 
-$table->date('DateTSigned');
+            $table->date('DateTPracticeSigned');
 
-$table->date('DateTPracticeSigned');
+            $table->string('SignatureText');
 
-$table->string('SignatureText');
+            $table->string('SignaturePracticeText');
 
-$table->string('SignaturePracticeText');
+            $table->integer('MobileAppDeviceNum');
 
-$table->integer('MobileAppDeviceNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('treatplan');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('treatplan');
+    }
 };

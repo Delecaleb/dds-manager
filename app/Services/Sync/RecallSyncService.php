@@ -25,9 +25,4 @@ class RecallSyncService extends BaseQuerySyncService
     {
         return 'DateTStamp';
     }
-
-    protected function module(): string
-    {
-        return 'recalls';
-    }
 }

@@ -25,9 +25,4 @@ class PayPlanChargeSyncService extends BaseQuerySyncService
     {
         return 'SecDateTEdit';
     }
-
-    protected function module(): string
-    {
-        return 'payplancharges';
-    }
 }

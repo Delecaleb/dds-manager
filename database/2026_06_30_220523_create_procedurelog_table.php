@@ -4,161 +4,155 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('procedurelog', function (Blueprint $table) {
 
-Schema::create('procedurelog', function(Blueprint $table){
+            $table->integer('ProcNum');
 
-$table->integer('ProcNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('AptNum');
 
-$table->integer('AptNum');
+            $table->string('OldCode');
 
-$table->string('OldCode');
+            $table->date('ProcDate');
 
-$table->date('ProcDate');
+            $table->string('ProcFee');
 
-$table->string('ProcFee');
+            $table->string('Surf');
 
-$table->string('Surf');
+            $table->string('ToothNum');
 
-$table->string('ToothNum');
+            $table->string('ToothRange');
 
-$table->string('ToothRange');
+            $table->integer('Priority');
 
-$table->integer('Priority');
+            $table->integer('ProcStatus');
 
-$table->integer('ProcStatus');
+            $table->integer('ProvNum');
 
-$table->integer('ProvNum');
+            $table->integer('Dx');
 
-$table->integer('Dx');
+            $table->integer('PlannedAptNum');
 
-$table->integer('PlannedAptNum');
+            $table->integer('PlaceService');
 
-$table->integer('PlaceService');
+            $table->string('Prosthesis');
 
-$table->string('Prosthesis');
+            $table->date('DateOriginalProsth');
 
-$table->date('DateOriginalProsth');
+            $table->string('ClaimNote');
 
-$table->string('ClaimNote');
+            $table->date('DateEntryC');
 
-$table->date('DateEntryC');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->string('MedicalCode');
 
-$table->string('MedicalCode');
+            $table->string('DiagnosticCode');
 
-$table->string('DiagnosticCode');
+            $table->integer('IsPrincDiag');
 
-$table->integer('IsPrincDiag');
+            $table->integer('ProcNumLab');
 
-$table->integer('ProcNumLab');
+            $table->integer('BillingTypeOne');
 
-$table->integer('BillingTypeOne');
+            $table->integer('BillingTypeTwo');
 
-$table->integer('BillingTypeTwo');
+            $table->integer('CodeNum');
 
-$table->integer('CodeNum');
+            $table->string('CodeMod1');
 
-$table->string('CodeMod1');
+            $table->string('CodeMod2');
 
-$table->string('CodeMod2');
+            $table->string('CodeMod3');
 
-$table->string('CodeMod3');
+            $table->string('CodeMod4');
 
-$table->string('CodeMod4');
+            $table->string('RevCode');
 
-$table->string('RevCode');
+            $table->integer('UnitQty');
 
-$table->integer('UnitQty');
+            $table->integer('BaseUnits');
 
-$table->integer('BaseUnits');
+            $table->integer('StartTime');
 
-$table->integer('StartTime');
+            $table->integer('StopTime');
 
-$table->integer('StopTime');
+            $table->date('DateTP');
 
-$table->date('DateTP');
+            $table->integer('SiteNum');
 
-$table->integer('SiteNum');
+            $table->integer('HideGraphics');
 
-$table->integer('HideGraphics');
+            $table->string('CanadianTypeCodes');
 
-$table->string('CanadianTypeCodes');
+            $table->string('ProcTime');
 
-$table->string('ProcTime');
+            $table->string('ProcTimeEnd');
 
-$table->string('ProcTimeEnd');
+            $table->string('DateTStamp');
 
-$table->string('DateTStamp');
+            $table->integer('Prognosis');
 
-$table->integer('Prognosis');
+            $table->integer('DrugUnit');
 
-$table->integer('DrugUnit');
+            $table->string('DrugQty');
 
-$table->string('DrugQty');
+            $table->integer('UnitQtyType');
 
-$table->integer('UnitQtyType');
+            $table->integer('StatementNum');
 
-$table->integer('StatementNum');
+            $table->integer('IsLocked');
 
-$table->integer('IsLocked');
+            $table->string('BillingNote');
 
-$table->string('BillingNote');
+            $table->integer('RepeatChargeNum');
 
-$table->integer('RepeatChargeNum');
+            $table->string('SnomedBodySite');
 
-$table->string('SnomedBodySite');
+            $table->string('DiagnosticCode2');
 
-$table->string('DiagnosticCode2');
+            $table->string('DiagnosticCode3');
 
-$table->string('DiagnosticCode3');
+            $table->string('DiagnosticCode4');
 
-$table->string('DiagnosticCode4');
+            $table->integer('ProvOrderOverride');
 
-$table->integer('ProvOrderOverride');
+            $table->string('Discount');
 
-$table->string('Discount');
+            $table->integer('IsDateProsthEst');
 
-$table->integer('IsDateProsthEst');
+            $table->integer('IcdVersion');
 
-$table->integer('IcdVersion');
+            $table->integer('IsCpoe');
 
-$table->integer('IsCpoe');
+            $table->integer('SecUserNumEntry');
 
-$table->integer('SecUserNumEntry');
+            $table->date('SecDateEntry');
 
-$table->date('SecDateEntry');
+            $table->date('DateComplete');
 
-$table->date('DateComplete');
+            $table->integer('OrderingReferralNum');
 
-$table->integer('OrderingReferralNum');
+            $table->string('TaxAmt');
 
-$table->string('TaxAmt');
+            $table->integer('Urgency');
 
-$table->integer('Urgency');
+            $table->string('DiscountPlanAmt');
 
-$table->string('DiscountPlanAmt');
+            $table->integer('NoBillIns');
 
-$table->integer('NoBillIns');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('procedurelog');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('procedurelog');
+    }
 };

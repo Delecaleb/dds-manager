@@ -4,65 +4,59 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('vitalsign', function (Blueprint $table) {
 
-Schema::create('vitalsign', function(Blueprint $table){
+            $table->integer('VitalsignNum');
 
-$table->integer('VitalsignNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->string('Height');
 
-$table->string('Height');
+            $table->string('Weight');
 
-$table->string('Weight');
+            $table->integer('BpSystolic');
 
-$table->integer('BpSystolic');
+            $table->integer('BpDiastolic');
 
-$table->integer('BpDiastolic');
+            $table->date('DateTaken');
 
-$table->date('DateTaken');
+            $table->integer('HasFollowupPlan');
 
-$table->integer('HasFollowupPlan');
+            $table->integer('IsIneligible');
 
-$table->integer('IsIneligible');
+            $table->text('Documentation');
 
-$table->text('Documentation');
+            $table->integer('ChildGotNutrition');
 
-$table->integer('ChildGotNutrition');
+            $table->integer('ChildGotPhysCouns');
 
-$table->integer('ChildGotPhysCouns');
+            $table->string('WeightCode');
 
-$table->string('WeightCode');
+            $table->string('HeightExamCode');
 
-$table->string('HeightExamCode');
+            $table->string('WeightExamCode');
 
-$table->string('WeightExamCode');
+            $table->string('BMIExamCode');
 
-$table->string('BMIExamCode');
+            $table->integer('EhrNotPerformedNum');
 
-$table->integer('EhrNotPerformedNum');
+            $table->integer('PregDiseaseNum');
 
-$table->integer('PregDiseaseNum');
+            $table->integer('BMIPercentile');
 
-$table->integer('BMIPercentile');
+            $table->integer('Pulse');
 
-$table->integer('Pulse');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('vitalsign');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('vitalsign');
+    }
 };

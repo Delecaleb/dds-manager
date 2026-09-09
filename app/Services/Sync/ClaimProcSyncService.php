@@ -26,8 +26,29 @@ class ClaimProcSyncService extends BaseQuerySyncService
         return 'SecDateTEdit';
     }
 
-    protected function module(): string
+    protected function dateColumn(): ?string
     {
-        return 'claimprocs';
+        return 'ProcDate';
+    }
+
+    protected function orderBy(): string
+    {
+        return 'ClaimProcNum';
+    }
+
+    protected function transformRow(array $row): array
+    {
+        $dateCols = ['DateCP', 'ProcDate', 'DateEntry', 'SecDateEntry', 'DateSuppReceived', 'DateInsFinalized'];
+        foreach ($dateCols as $col) {
+            if (array_key_exists($col, $row)) {
+                $row[$col] = $this->normalizeDate($row[$col]);
+            }
+        }
+
+        if (array_key_exists('SecDateTEdit', $row)) {
+            $row['SecDateTEdit'] = $this->normalizeDateTime($row['SecDateTEdit']);
+        }
+
+        return $row;
     }
 }

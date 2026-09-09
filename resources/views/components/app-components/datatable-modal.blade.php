@@ -17,16 +17,28 @@ Call from JS via: openDataTableModal('modalId', 'Title', columnsConfig, dataArra
     <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh]">
 
         <!-- Header -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
             <h3 id="{{ $id }}Title" class="text-xl font-bold text-slate-800">Data Table</h3>
-            <button onclick="closeDataTableModal('{{ $id }}')"
-                class="text-slate-400 hover:text-slate-700 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2.5">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-            </button>
+            <div class="flex items-center gap-3">
+                <button type="button" id="{{ $id }}ExportBtn" onclick="exportDataTableModalCsv('{{ $id }}')"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded border border-emerald-500 text-emerald-600 hover:bg-emerald-50 focus:outline-none transition-colors cursor-pointer shadow-xs">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Export CSV
+                </button>
+                <button type="button" onclick="closeDataTableModal('{{ $id }}')"
+                    class="text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <!-- Body -->
@@ -54,6 +66,10 @@ Call from JS via: openDataTableModal('modalId', 'Title', columnsConfig, dataArra
      * @param {array} data - The array of objects for the table
      */
     function openDataTableModal(modalId, title, columns, data) {
+        window['_' + modalId + '_columns'] = columns;
+        window['_' + modalId + '_data'] = data;
+        window['_' + modalId + '_title'] = title;
+
         $('#' + modalId).removeClass('hidden');
         $('body').css('overflow', 'hidden');
         $('#' + modalId + 'Title').text(title);
@@ -161,6 +177,53 @@ Call from JS via: openDataTableModal('modalId', 'Title', columnsConfig, dataArra
     function closeDataTableModal(modalId) {
         $('#' + modalId).addClass('hidden');
         $('body').css('overflow', '');
+    }
+
+    function exportDataTableModalCsv(modalId) {
+        var columns = window['_' + modalId + '_columns'] || [];
+        var data = window['_' + modalId + '_data'] || [];
+        var title = window['_' + modalId + '_title'] || 'export';
+
+        if (!data || data.length === 0) {
+            alert('No data available to export.');
+            return;
+        }
+
+        // Header titles
+        var headers = columns.map(function (col) {
+            var colTitle = col.title || col.data || '';
+            return '"' + String(colTitle).replace(/"/g, '""') + '"';
+        }).join(',');
+
+        // Data rows
+        var rows = data.map(function (row) {
+            return columns.map(function (col) {
+                var val = '';
+                if (typeof col.data === 'string') {
+                    val = row[col.data];
+                } else if (typeof col.data === 'function') {
+                    val = col.data(row, 'export');
+                }
+                if (val === null || val === undefined) val = '';
+                // Strip HTML tags for clean text output if value is HTML string
+                if (typeof val === 'string' && val.indexOf('<') !== -1) {
+                    val = val.replace(/<[^>]*>?/gm, '').trim();
+                }
+                return '"' + String(val).replace(/"/g, '""') + '"';
+            }).join(',');
+        });
+
+        var csvContent = [headers].concat(rows).join('\n');
+        var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        var fileName = (title || 'breakdown').toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + new Date().toISOString().slice(0, 10) + '.csv';
+        link.href = url;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     }
 
     // Escape to close

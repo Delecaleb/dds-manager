@@ -4,39 +4,33 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('imagingdevice', function (Blueprint $table) {
 
-Schema::create('imagingdevice', function(Blueprint $table){
+            $table->integer('ImagingDeviceNum');
 
-$table->integer('ImagingDeviceNum');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->string('ComputerName');
 
-$table->string('ComputerName');
+            $table->integer('DeviceType');
 
-$table->integer('DeviceType');
+            $table->string('TwainName');
 
-$table->string('TwainName');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->integer('ShowTwainUI');
 
-$table->integer('ShowTwainUI');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('imagingdevice');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('imagingdevice');
+    }
 };

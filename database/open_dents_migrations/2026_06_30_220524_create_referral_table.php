@@ -4,81 +4,75 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('referral', function (Blueprint $table) {
 
-Schema::create('referral', function(Blueprint $table){
+            $table->integer('ReferralNum');
 
-$table->integer('ReferralNum');
+            $table->string('LName');
 
-$table->string('LName');
+            $table->string('FName');
 
-$table->string('FName');
+            $table->string('MName');
 
-$table->string('MName');
+            $table->string('SSN');
 
-$table->string('SSN');
+            $table->integer('UsingTIN');
 
-$table->integer('UsingTIN');
+            $table->integer('Specialty');
 
-$table->integer('Specialty');
+            $table->string('ST');
 
-$table->string('ST');
+            $table->string('Telephone');
 
-$table->string('Telephone');
+            $table->string('Address');
 
-$table->string('Address');
+            $table->string('Address2');
 
-$table->string('Address2');
+            $table->string('City');
 
-$table->string('City');
+            $table->string('Zip');
 
-$table->string('Zip');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->string('Phone2');
 
-$table->string('Phone2');
+            $table->integer('IsHidden');
 
-$table->integer('IsHidden');
+            $table->integer('NotPerson');
 
-$table->integer('NotPerson');
+            $table->string('Title');
 
-$table->string('Title');
+            $table->string('EMail');
 
-$table->string('EMail');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->string('NationalProvID');
 
-$table->string('NationalProvID');
+            $table->integer('Slip');
 
-$table->integer('Slip');
+            $table->integer('IsDoctor');
 
-$table->integer('IsDoctor');
+            $table->integer('IsTrustedDirect');
 
-$table->integer('IsTrustedDirect');
+            $table->string('DateTStamp');
 
-$table->string('DateTStamp');
+            $table->integer('IsPreferred');
 
-$table->integer('IsPreferred');
+            $table->string('BusinessName');
 
-$table->string('BusinessName');
+            $table->string('DisplayNote');
 
-$table->string('DisplayNote');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('referral');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('referral');
+    }
 };

@@ -263,10 +263,6 @@
   <section class="bg-white border-b border-gray-200 px-8 py-4">
     <div class="flex flex-wrap items-center gap-3">
       <x-daterange-picker on-apply="onDrpApply" />
-      <select
-        class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
-        <option selected>8 Mile</option>
-      </select>
       <span id="fetchError" class="hidden text-xs text-red-600 font-medium">
         <i class="fa-solid fa-triangle-exclamation mr-1"></i>Failed to load data.
       </span>
@@ -521,7 +517,7 @@
     {{-- ── Utilization Data Chart (Production by Provider) ────────────────────── --}}
     <div class="mt-8">
       <div class="font-bold border-b p-3 text-lg text-black bg-gray-50 border-gray-100 flex items-center">
-        Production (by Provider)
+        Utilization Data Chart
       </div>
       <div class="bg-white p-8 border border-gray-100 border-t-0 shadow-sm relative pt-[60px]">
         <div class="h-[400px] w-full">
@@ -826,8 +822,17 @@
     function fetchAnalytics(start, end) {
       showSkeletons();
 
-      // Load blocks concurrently to prevent massive response sizes generating bottlenecks
-      var sections = ['revenue-kpis', 'patient-kpis', 'utilization-chart', 'adjustment-chart', 'top-services-chart', 'daily-revenue-chart', 'daily-patient-chart'];
+      // Fetch gross production, net production, adjustments & collections from revenue route
+      $.get(baseUrl + '/financials/revenue', { start_date: start, end_date: end })
+        .done(function (data) {
+          populate(data);
+        })
+        .fail(function (err) {
+          console.error('Failed to load revenue route:', err);
+        });
+
+      // Load remaining blocks concurrently to prevent massive response sizes generating bottlenecks
+      var sections = ['patient-kpis', 'utilization-chart', 'adjustment-chart', 'top-services-chart', 'daily-revenue-chart', 'daily-patient-chart'];
       sections.forEach(function (section) {
         $.get(baseUrl + '/financials/data', { start_date: start, end_date: end, section: section })
           .done(function (data) {
@@ -843,7 +848,7 @@
     function renderUtilizationChart(utilData) {
       var ctx = document.getElementById('utilizationChart').getContext('2d');
       var labels = utilData.map(function (item) { return item.provider || 'Unknown Provider'; });
-      var values = utilData.map(function (item) { return parseFloat(item.production); });
+      var values = utilData.map(function (item) { return parseFloat(item.net_production !== undefined ? item.net_production : item.production); });
 
       if (utilizationChartInstance) {
         utilizationChartInstance.data.labels = labels;
@@ -855,7 +860,7 @@
           data: {
             labels: labels,
             datasets: [{
-              label: 'Production',
+              label: 'Net Production',
               data: values,
               backgroundColor: '#996BE5',
               barThickness: 100, // Slightly adjusted for better representation
@@ -1367,8 +1372,9 @@
     function scRenderKpis(kpis) {
       var html = '';
       if (_sc.tab === 'production') {
+        var uniqueCount = (_sc.filtered && _sc.filtered !== undefined) ? _sc.filtered.length : (kpis ? kpis.unique_by_pricing : 0);
         html = scKpiCard('Total Count', kpis.total_count, false) +
-          scKpiCard('Unique Services By Pricing', kpis.unique_by_pricing, false) +
+          scKpiCard('Unique Services By Pricing', uniqueCount, false) +
           scKpiCard('Total Production', kpis.total_production, true);
       } else {
         html = scKpiCard('Total Count', kpis.total_count, false) +
@@ -1480,6 +1486,7 @@
       }
       _sc.filtered = rows;
       _sc.page = 1;
+      scRenderKpis(_sc.data.kpis);
       scRenderTable();
     }
 
@@ -1832,9 +1839,13 @@
     document.getElementById('bkExportBtn').addEventListener('click', function () {
       if (_bk.filtered.length === 0) return;
       var cols = BK_COLS[_bk.type];
-      var headers = cols.map(function (c) { return c.title; }).join(',');
+      var headers = cols.map(function (c) { return '"' + (c.title || '').replace(/"/g, '""') + '"'; }).join(',');
       var rows = _bk.filtered.map(function (r) {
-        return cols.map(function (c) { return JSON.stringify(r[c.key] !== null ? r[c.key] : ''); }).join(',');
+        return cols.map(function (c) {
+          var val = r[c.key];
+          if (val === null || val === undefined) val = '';
+          return '"' + String(val).replace(/"/g, '""') + '"';
+        }).join(',');
       });
       var csv = [headers].concat(rows).join('\n');
       var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

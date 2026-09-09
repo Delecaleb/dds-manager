@@ -4,49 +4,43 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('schedule', function (Blueprint $table) {
 
-Schema::create('schedule', function(Blueprint $table){
+            $table->integer('ScheduleNum');
 
-$table->integer('ScheduleNum');
+            $table->date('SchedDate');
 
-$table->date('SchedDate');
+            $table->string('StartTime');
 
-$table->string('StartTime');
+            $table->string('StopTime');
 
-$table->string('StopTime');
+            $table->integer('SchedType');
 
-$table->integer('SchedType');
+            $table->integer('ProvNum');
 
-$table->integer('ProvNum');
+            $table->integer('BlockoutType');
 
-$table->integer('BlockoutType');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->integer('Status');
 
-$table->integer('Status');
+            $table->integer('EmployeeNum');
 
-$table->integer('EmployeeNum');
+            $table->string('DateTStamp');
 
-$table->string('DateTStamp');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('schedule');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('schedule');
+    }
 };

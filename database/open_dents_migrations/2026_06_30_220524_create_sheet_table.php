@@ -4,71 +4,65 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('sheet', function (Blueprint $table) {
 
-Schema::create('sheet', function(Blueprint $table){
+            $table->integer('SheetNum');
 
-$table->integer('SheetNum');
+            $table->integer('SheetType');
 
-$table->integer('SheetType');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->date('DateTimeSheet');
 
-$table->date('DateTimeSheet');
+            $table->string('FontSize');
 
-$table->string('FontSize');
+            $table->string('FontName');
 
-$table->string('FontName');
+            $table->integer('Width');
 
-$table->integer('Width');
+            $table->integer('Height');
 
-$table->integer('Height');
+            $table->integer('IsLandscape');
 
-$table->integer('IsLandscape');
+            $table->text('InternalNote');
 
-$table->text('InternalNote');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->integer('ShowInTerminal');
 
-$table->integer('ShowInTerminal');
+            $table->integer('IsWebForm');
 
-$table->integer('IsWebForm');
+            $table->integer('IsMultiPage');
 
-$table->integer('IsMultiPage');
+            $table->integer('IsDeleted');
 
-$table->integer('IsDeleted');
+            $table->integer('SheetDefNum');
 
-$table->integer('SheetDefNum');
+            $table->integer('DocNum');
 
-$table->integer('DocNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->date('DateTSheetEdited');
 
-$table->date('DateTSheetEdited');
+            $table->integer('HasMobileLayout');
 
-$table->integer('HasMobileLayout');
+            $table->integer('RevID');
 
-$table->integer('RevID');
+            $table->integer('WebFormSheetID');
 
-$table->integer('WebFormSheetID');
+            $table->date('DateTimeSubmitted');
 
-$table->date('DateTimeSubmitted');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('sheet');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('sheet');
+    }
 };

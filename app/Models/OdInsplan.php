@@ -2,11 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOffice;
 use Illuminate\Database\Eloquent\Model;
 
 class OdInsplan extends Model
 {
+    use BelongsToOffice;
+
+    protected $primaryKey = 'PlanNum';
+
+    public $incrementing = false;
+
     protected $fillable = [
+        'office_id',
         'PlanNum',
         'GroupName',
         'GroupNum',
@@ -55,4 +63,9 @@ class OdInsplan extends Model
         'PerVisitPatAmount',
         'PerVisitInsAmount',
     ];
+
+    public function carrier()
+    {
+        return $this->belongsTo(OdCarrier::class, 'CarrierNum', 'CarrierNum');
+    }
 }

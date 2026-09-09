@@ -4,75 +4,69 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('rxpat', function (Blueprint $table) {
 
-Schema::create('rxpat', function(Blueprint $table){
+            $table->integer('RxNum');
 
-$table->integer('RxNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->date('RxDate');
 
-$table->date('RxDate');
+            $table->string('Drug');
 
-$table->string('Drug');
+            $table->string('Sig');
 
-$table->string('Sig');
+            $table->string('Disp');
 
-$table->string('Disp');
+            $table->string('Refills');
 
-$table->string('Refills');
+            $table->integer('ProvNum');
 
-$table->integer('ProvNum');
+            $table->string('Notes');
 
-$table->string('Notes');
+            $table->integer('PharmacyNum');
 
-$table->integer('PharmacyNum');
+            $table->integer('IsControlled');
 
-$table->integer('IsControlled');
+            $table->string('DateTStamp');
 
-$table->string('DateTStamp');
+            $table->integer('SendStatus');
 
-$table->integer('SendStatus');
+            $table->integer('RxCui');
 
-$table->integer('RxCui');
+            $table->string('DosageCode');
 
-$table->string('DosageCode');
+            $table->string('ErxGuid');
 
-$table->string('ErxGuid');
+            $table->integer('IsErxOld');
 
-$table->integer('IsErxOld');
+            $table->string('ErxPharmacyInfo');
 
-$table->string('ErxPharmacyInfo');
+            $table->integer('IsProcRequired');
 
-$table->integer('IsProcRequired');
+            $table->integer('ProcNum');
 
-$table->integer('ProcNum');
+            $table->string('DaysOfSupply');
 
-$table->string('DaysOfSupply');
+            $table->text('PatientInstruction');
 
-$table->text('PatientInstruction');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->integer('RxType');
 
-$table->integer('RxType');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('rxpat');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('rxpat');
+    }
 };

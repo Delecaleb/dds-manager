@@ -607,7 +607,9 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
                             ? '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Completed</span>'
                             : itm.status === 'Scheduled'
                                 ? '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">Scheduled</span>'
-                                : '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-600 border border-slate-200">Unscheduled</span>';
+                                : itm.status === 'Broken'
+                                    ? '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-rose-50 text-rose-700 border border-rose-200">Broken</span>'
+                                    : '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-600 border border-slate-200">Unscheduled</span>';
                         var providerHtml = itm.provider_id
                             ? '<div class="flex items-center gap-2"><svg onclick="openProviderModal(' + itm.provider_id + ')" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-500 hover:text-emerald-700 cursor-pointer shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" title="Provider Information"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg><span>' + (itm.provider || '—') + '</span></div>'
                             : (itm.provider || '—');

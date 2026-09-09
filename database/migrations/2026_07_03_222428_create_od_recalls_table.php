@@ -13,38 +13,22 @@ return new class extends Migration
     {
         Schema::create('od_recalls', function (Blueprint $table) {
             $table->id();
-            $table->integer('RecallNum');
-
-            $table->integer('PatNum');
-
-            $table->date('DateDueCalc');
-
-            $table->date('DateDue');
-
-            $table->date('DatePrevious');
-
-            $table->integer('RecallInterval');
-
-            $table->integer('RecallStatus');
-
-            $table->text('Note');
-
-            $table->integer('IsDisabled');
-
-            $table->string('DateTStamp');
-
-            $table->integer('RecallTypeNum');
-
-            $table->string('DisableUntilBalance');
-
-            $table->date('DisableUntilDate');
-
-            $table->date('DateScheduled');
-
-            $table->integer('Priority');
-
-            $table->string('TimePatternOverride');
-
+            $table->integer('RecallNum')->nullable();
+            $table->integer('PatNum')->nullable();
+            $table->date('DateDueCalc')->nullable();
+            $table->date('DateDue')->nullable();
+            $table->date('DatePrevious')->nullable();
+            $table->integer('RecallInterval')->nullable();
+            $table->integer('RecallStatus')->nullable();
+            $table->text('Note')->nullable();
+            $table->integer('IsDisabled')->nullable();
+            $table->string('DateTStamp')->nullable();
+            $table->integer('RecallTypeNum')->nullable();
+            $table->string('DisableUntilBalance')->nullable();
+            $table->date('DisableUntilDate')->nullable();
+            $table->date('DateScheduled')->nullable();
+            $table->integer('Priority')->nullable();
+            $table->string('TimePatternOverride')->nullable();
             $table->timestamps();
         });
     }

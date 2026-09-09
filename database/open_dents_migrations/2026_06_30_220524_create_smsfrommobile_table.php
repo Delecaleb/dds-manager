@@ -4,59 +4,53 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('smsfrommobile', function (Blueprint $table) {
 
-Schema::create('smsfrommobile', function(Blueprint $table){
+            $table->integer('SmsFromMobileNum');
 
-$table->integer('SmsFromMobileNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('CommlogNum');
 
-$table->integer('CommlogNum');
+            $table->text('MsgText');
 
-$table->text('MsgText');
+            $table->date('DateTimeReceived');
 
-$table->date('DateTimeReceived');
+            $table->string('SmsPhoneNumber');
 
-$table->string('SmsPhoneNumber');
+            $table->string('MobilePhoneNumber');
 
-$table->string('MobilePhoneNumber');
+            $table->integer('MsgPart');
 
-$table->integer('MsgPart');
+            $table->integer('MsgTotal');
 
-$table->integer('MsgTotal');
+            $table->string('MsgRefID');
 
-$table->string('MsgRefID');
+            $table->integer('SmsStatus');
 
-$table->integer('SmsStatus');
+            $table->string('Flags');
 
-$table->string('Flags');
+            $table->integer('IsHidden');
 
-$table->integer('IsHidden');
+            $table->integer('MatchCount');
 
-$table->integer('MatchCount');
+            $table->string('GuidMessage');
 
-$table->string('GuidMessage');
+            $table->string('SecDateTEdit');
 
-$table->string('SecDateTEdit');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('smsfrommobile');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('smsfrommobile');
+    }
 };

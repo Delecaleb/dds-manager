@@ -31,6 +31,8 @@
                     $abs = number_format(abs($v), 2);
                     return $v < 0 ? "$ ($abs)" : "$ $abs";
                 case 'percent': return number_format((float) $value, 2) . '%';
+                case 'number_3': return number_format((float) $value, 3);
+                case 'number_2': return number_format((float) $value, 2);
                 case 'number':
                     $v = (float) $value;
                     return floor($v) == $v ? number_format($v) : number_format($v, 2);
@@ -122,7 +124,7 @@
                     }
                 @endphp
                 <tr class="bg-gray-50">
-                    <th colspan="{{ $leadSpan }}" class="{{ $thBase }} bg-gray-200 border-r-[6px] border-white"></th>
+                    <th colspan="{{ $leadSpan }}" class="{{ $thBase }} bg-gray-200 border-r-[6px] border-white dds-stick dds-stick-shadow" style="min-width: 12rem; z-index: 40;"></th>
                     @foreach ($groups as $group)
                         <th colspan="{{ $group['span'] }}"
                             class="{{ $thBase }} bg-gray-200 text-center uppercase tracking-wider text-xs border-r-[6px] border-white">
@@ -146,7 +148,7 @@
                                {{ ($col['type'] ?? 'text') === 'text' ? 'text-left' : 'text-right' }}
                                {{ $stickyClass($loop->index) }}
                                {{ $col['class'] ?? '' }}"
-                        @if (!empty($col['sticky'])) style="min-width:12rem"
+                        @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;"
                         @elseif (($col['type'] ?? '') === 'yn_badge') style="min-width:3rem"
                         @else style="min-width:8rem" @endif>
                         {{ $col['label'] }}
@@ -169,7 +171,7 @@
                             // would land at the top. Missing values get an empty key so they sort
                             // together at one end instead of scattering.
                             $orderAttr = '';
-                            if (in_array($type, ['money', 'percent', 'number'], true)) {
+                            if (in_array($type, ['money', 'percent', 'number', 'number_2', 'number_3'], true)) {
                                 $orderAttr = ($rawValue === null || $rawValue === '--')
                                     ? ' data-order=""'
                                     : ' data-order="' . (float) $rawValue . '"';
@@ -189,7 +191,7 @@
                             }
                             if (isset($col['class'])) $cellClasses .= ' ' . $col['class'];
                         @endphp
-                        <td class="{{ $cellClasses }} {{ ops_heat_class($heat, $col['key'], $rawValue) }}" {!! $orderAttr !!}>
+                        <td class="{{ $cellClasses }} {{ ops_heat_class($heat, $col['key'], $rawValue) }}" {!! $orderAttr !!} @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;" @endif>
                             @if ($isDiffMode)
                                 <div class="flex items-center gap-1.5 {{ $type === 'text' ? 'justify-start' : 'justify-end' }}">{!! $cellContent !!}</div>
                             @elseif (($col['key'] === 'provider' || !empty($col['provider_modal'])) && !empty($row['prov_num']))
@@ -205,24 +207,39 @@
                                         </svg>
                                     </button>
                                 </div>
-                            @elseif (!empty($col['drilldown_type']) && (isset($row['clinic_num']) || isset($row['prov_num'])))
+                            @elseif (!empty($col['drilldown_type']))
                                 @php
+                                    $hasVal = $type === 'yn_badge' ? true : ($rawValue !== null && $rawValue !== '--' && (float) $rawValue != 0);
+                                    $cellDate = $col['date'] ?? $row['date_raw'] ?? null;
+                                    $startDate = $cellDate ?? request('start_date', now()->startOfMonth()->toDateString());
+                                    $endDate = $cellDate ?? request('end_date', now()->toDateString());
                                     $ddUrl = route('operations.drilldown', array_filter([
                                         'metric' => $col['drilldown_type'],
-                                        'clinic_num' => $row['clinic_num'] ?? null,
-                                        'prov_num' => $row['prov_num'] ?? null,
-                                        'start_date' => request('start_date', now()->startOfMonth()->toDateString()),
-                                        'end_date' => request('end_date', now()->toDateString()),
+                                        'clinic_num' => $row['clinic_num'] ?? request('clinic_num'),
+                                        'prov_num' => $row['prov_num'] ?? request('prov_num'),
+                                        'start_date' => $startDate,
+                                        'end_date' => $endDate,
                                         'subtab' => $activeSubtab ?? 'default',
-                                    ]));
+                                    ], fn ($v) => $v !== null && $v !== ''));
                                 @endphp
-                                <div class="flex items-center justify-end gap-1.5 {{ $type === 'text' ? 'justify-start' : '' }}">
-                                    {!! $cellContent !!}
-                                    <button type="button" class="dds-accent hover:text-[#009688] focus:outline-none shrink-0"
-                                            onclick="DDS.modal.open('{{ $ddUrl }}')">
-                                        <svg class="h-3 w-3 stroke-current" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                                    </button>
-                                </div>
+                                @if ($type === 'yn_badge')
+                                    <div class="flex items-center justify-center">
+                                        <button type="button" class="w-full text-center py-0.5 rounded cursor-pointer hover:opacity-75 font-bold focus:outline-none transition"
+                                                onclick="DDS.modal.open('{{ $ddUrl }}')">
+                                            {!! $cellContent !!}
+                                        </button>
+                                    </div>
+                                @else
+                                    <div class="flex items-center justify-end gap-1.5 {{ $type === 'text' ? 'justify-start' : '' }}">
+                                        {!! $cellContent !!}
+                                        @if ($hasVal)
+                                            <button type="button" class="dds-accent hover:text-[#009688] focus:outline-none shrink-0"
+                                                    onclick="DDS.modal.open('{{ $ddUrl }}')">
+                                                <svg class="h-3 w-3 stroke-current" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                                            </button>
+                                        @endif
+                                    </div>
+                                @endif
                             @elseif (!empty($col['drilldown']) && (float) ($row[$col['key']] ?? 0) > 0)
                                 <div class="flex items-center justify-end gap-1.5 {{ $type === 'text' ? 'justify-start' : '' }}">
                                     {!! $cellContent !!}
@@ -254,11 +271,11 @@
                         <tr class="bg-gray-50 text-gray-900 font-bold text-xs text-right">
                             @foreach ($columns as $col)
                                 @if ($loop->first)
-                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right dds-stick dds-stick-shadow bg-gray-50">{{ $loop->parent->first ? 'Total:' : '' }}</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right {{ $stickyClass($loop->index) }} bg-gray-50" @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;" @endif>{{ $loop->parent->first ? 'Total:' : '' }}</td>
                                 @elseif ($col['key'] === 'type_label')
-                                    <td class="px-4 py-3.5 border-r border-gray-300 text-left {{ $col['class'] ?? '' }}">{{ $label }}</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-left {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}">{{ $label }}</td>
                                 @else
-                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['total'][$key][$col['key']] ?? 0, $col['type']) !!}</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['total'][$key][$col['key']] ?? 0, $col['type']) !!}</td>
                                 @endif
                             @endforeach
                         </tr>
@@ -268,9 +285,9 @@
                         <tr class="bg-gray-50 text-gray-900 font-bold text-xs text-right">
                             @foreach ($columns as $col)
                                 @if ($loop->first)
-                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right dds-stick dds-stick-shadow bg-gray-50">Average:</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right {{ $stickyClass($loop->index) }} bg-gray-50" @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;" @endif>Average:</td>
                                 @else
-                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['average'][$col['key']] ?? null, $col['type']) !!}</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['average'][$col['key']] ?? null, $col['type']) !!}</td>
                                 @endif
                             @endforeach
                         </tr>
@@ -279,9 +296,9 @@
                         <tr class="bg-gray-200 text-gray-900 font-bold text-xs text-right border-t border-gray-300">
                             @foreach ($columns as $col)
                                 @if ($loop->first)
-                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right dds-stick dds-stick-shadow bg-gray-200">Total:</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 text-right {{ $stickyClass($loop->index) }} bg-gray-200" @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;" @endif>Total:</td>
                                 @else
-                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['total'][$col['key']] ?? null, $col['type']) !!}</td>
+                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['total'][$col['key']] ?? null, $col['type']) !!}</td>
                                 @endif
                             @endforeach
                         </tr>

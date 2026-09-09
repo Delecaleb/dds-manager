@@ -58,7 +58,7 @@ class TreatmentAcceptanceService
     public function rateFrom(float $proposed, float $completed, float $accepted): float
     {
         return $proposed > 0
-            ? round(($completed + $accepted) / $proposed * 100, 2)
+            ? min(100.0, round(($completed + $accepted) / $proposed * 100, 2))
             : 0.0;
     }
 
@@ -107,10 +107,14 @@ class TreatmentAcceptanceService
     protected function baseQuery(MetricFilter $filter): Builder
     {
         $q = DB::table('od_procedure_logs as pl')
+            ->where('pl.office_id', $filter->officeId)
             ->whereBetween('pl.ProcDate', [$filter->start, $filter->end]);
 
         if ($filter->hygiene !== null) {
-            $q->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
+            $q->join('od_procedures as pc', function ($join) use ($filter) {
+                $join->on('pl.CodeNum', '=', 'pc.CodeNum')
+                    ->where('pc.office_id', '=', $filter->officeId);
+            })
                 ->where('pc.IsHygiene', $filter->hygiene ? 'true' : 'false');
         }
 

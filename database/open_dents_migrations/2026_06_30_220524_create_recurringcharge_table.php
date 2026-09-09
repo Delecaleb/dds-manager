@@ -4,53 +4,47 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('recurringcharge', function (Blueprint $table) {
 
-Schema::create('recurringcharge', function(Blueprint $table){
+            $table->integer('RecurringChargeNum');
 
-$table->integer('RecurringChargeNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->date('DateTimeCharge');
 
-$table->date('DateTimeCharge');
+            $table->integer('ChargeStatus');
 
-$table->integer('ChargeStatus');
+            $table->string('FamBal');
 
-$table->string('FamBal');
+            $table->string('PayPlanDue');
 
-$table->string('PayPlanDue');
+            $table->string('TotalDue');
 
-$table->string('TotalDue');
+            $table->string('RepeatAmt');
 
-$table->string('RepeatAmt');
+            $table->string('ChargeAmt');
 
-$table->string('ChargeAmt');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->integer('PayNum');
 
-$table->integer('PayNum');
+            $table->integer('CreditCardNum');
 
-$table->integer('CreditCardNum');
+            $table->text('ErrorMsg');
 
-$table->text('ErrorMsg');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('recurringcharge');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('recurringcharge');
+    }
 };

@@ -4,49 +4,43 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('insbluebook', function (Blueprint $table) {
 
-Schema::create('insbluebook', function(Blueprint $table){
+            $table->integer('InsBlueBookNum');
 
-$table->integer('InsBlueBookNum');
+            $table->integer('ProcCodeNum');
 
-$table->integer('ProcCodeNum');
+            $table->integer('CarrierNum');
 
-$table->integer('CarrierNum');
+            $table->integer('PlanNum');
 
-$table->integer('PlanNum');
+            $table->string('GroupNum');
 
-$table->string('GroupNum');
+            $table->string('InsPayAmt');
 
-$table->string('InsPayAmt');
+            $table->string('AllowedOverride');
 
-$table->string('AllowedOverride');
+            $table->date('DateTEntry');
 
-$table->date('DateTEntry');
+            $table->integer('ProcNum');
 
-$table->integer('ProcNum');
+            $table->date('ProcDate');
 
-$table->date('ProcDate');
+            $table->string('ClaimType');
 
-$table->string('ClaimType');
+            $table->integer('ClaimNum');
 
-$table->integer('ClaimNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('insbluebook');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('insbluebook');
+    }
 };

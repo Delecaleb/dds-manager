@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('ucum', function (Blueprint $table) {
 
-Schema::create('ucum', function(Blueprint $table){
+            $table->integer('UcumNum');
 
-$table->integer('UcumNum');
+            $table->string('UcumCode');
 
-$table->string('UcumCode');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->integer('IsInUse');
 
-$table->integer('IsInUse');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('ucum');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('ucum');
+    }
 };

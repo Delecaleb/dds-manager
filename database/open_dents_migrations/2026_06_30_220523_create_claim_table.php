@@ -4,195 +4,189 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('claim', function (Blueprint $table) {
 
-Schema::create('claim', function(Blueprint $table){
+            $table->integer('ClaimNum');
 
-$table->integer('ClaimNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->date('DateService');
 
-$table->date('DateService');
+            $table->date('DateSent');
 
-$table->date('DateSent');
+            $table->string('ClaimStatus');
 
-$table->string('ClaimStatus');
+            $table->date('DateReceived');
 
-$table->date('DateReceived');
+            $table->integer('PlanNum');
 
-$table->integer('PlanNum');
+            $table->integer('ProvTreat');
 
-$table->integer('ProvTreat');
+            $table->string('ClaimFee');
 
-$table->string('ClaimFee');
+            $table->string('InsPayEst');
 
-$table->string('InsPayEst');
+            $table->string('InsPayAmt');
 
-$table->string('InsPayAmt');
+            $table->string('DedApplied');
 
-$table->string('DedApplied');
+            $table->string('PreAuthString');
 
-$table->string('PreAuthString');
+            $table->string('IsProsthesis');
 
-$table->string('IsProsthesis');
+            $table->date('PriorDate');
 
-$table->date('PriorDate');
+            $table->string('ReasonUnderPaid');
 
-$table->string('ReasonUnderPaid');
+            $table->string('ClaimNote');
 
-$table->string('ClaimNote');
+            $table->string('ClaimType');
 
-$table->string('ClaimType');
+            $table->integer('ProvBill');
 
-$table->integer('ProvBill');
+            $table->integer('ReferringProv');
 
-$table->integer('ReferringProv');
+            $table->string('RefNumString');
 
-$table->string('RefNumString');
+            $table->integer('PlaceService');
 
-$table->integer('PlaceService');
+            $table->string('AccidentRelated');
 
-$table->string('AccidentRelated');
+            $table->date('AccidentDate');
 
-$table->date('AccidentDate');
+            $table->string('AccidentST');
 
-$table->string('AccidentST');
+            $table->integer('EmployRelated');
 
-$table->integer('EmployRelated');
+            $table->integer('IsOrtho');
 
-$table->integer('IsOrtho');
+            $table->integer('OrthoRemainM');
 
-$table->integer('OrthoRemainM');
+            $table->date('OrthoDate');
 
-$table->date('OrthoDate');
+            $table->integer('PatRelat');
 
-$table->integer('PatRelat');
+            $table->integer('PlanNum2');
 
-$table->integer('PlanNum2');
+            $table->integer('PatRelat2');
 
-$table->integer('PatRelat2');
+            $table->string('WriteOff');
 
-$table->string('WriteOff');
+            $table->integer('Radiographs');
 
-$table->integer('Radiographs');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->integer('ClaimForm');
 
-$table->integer('ClaimForm');
+            $table->integer('AttachedImages');
 
-$table->integer('AttachedImages');
+            $table->integer('AttachedModels');
 
-$table->integer('AttachedModels');
+            $table->string('AttachedFlags');
 
-$table->string('AttachedFlags');
+            $table->string('AttachmentID');
 
-$table->string('AttachmentID');
+            $table->string('CanadianMaterialsForwarded');
 
-$table->string('CanadianMaterialsForwarded');
+            $table->string('CanadianReferralProviderNum');
 
-$table->string('CanadianReferralProviderNum');
+            $table->integer('CanadianReferralReason');
 
-$table->integer('CanadianReferralReason');
+            $table->string('CanadianIsInitialLower');
 
-$table->string('CanadianIsInitialLower');
+            $table->date('CanadianDateInitialLower');
 
-$table->date('CanadianDateInitialLower');
+            $table->integer('CanadianMandProsthMaterial');
 
-$table->integer('CanadianMandProsthMaterial');
+            $table->string('CanadianIsInitialUpper');
 
-$table->string('CanadianIsInitialUpper');
+            $table->date('CanadianDateInitialUpper');
 
-$table->date('CanadianDateInitialUpper');
+            $table->integer('CanadianMaxProsthMaterial');
 
-$table->integer('CanadianMaxProsthMaterial');
+            $table->integer('InsSubNum');
 
-$table->integer('InsSubNum');
+            $table->integer('InsSubNum2');
 
-$table->integer('InsSubNum2');
+            $table->string('CanadaTransRefNum');
 
-$table->string('CanadaTransRefNum');
+            $table->date('CanadaEstTreatStartDate');
 
-$table->date('CanadaEstTreatStartDate');
+            $table->string('CanadaInitialPayment');
 
-$table->string('CanadaInitialPayment');
+            $table->integer('CanadaPaymentMode');
 
-$table->integer('CanadaPaymentMode');
+            $table->integer('CanadaTreatDuration');
 
-$table->integer('CanadaTreatDuration');
+            $table->integer('CanadaNumAnticipatedPayments');
 
-$table->integer('CanadaNumAnticipatedPayments');
+            $table->string('CanadaAnticipatedPayAmount');
 
-$table->string('CanadaAnticipatedPayAmount');
+            $table->string('PriorAuthorizationNumber');
 
-$table->string('PriorAuthorizationNumber');
+            $table->integer('SpecialProgramCode');
 
-$table->integer('SpecialProgramCode');
+            $table->string('UniformBillType');
 
-$table->string('UniformBillType');
+            $table->integer('MedType');
 
-$table->integer('MedType');
+            $table->string('AdmissionTypeCode');
 
-$table->string('AdmissionTypeCode');
+            $table->string('AdmissionSourceCode');
 
-$table->string('AdmissionSourceCode');
+            $table->string('PatientStatusCode');
 
-$table->string('PatientStatusCode');
+            $table->integer('CustomTracking');
 
-$table->integer('CustomTracking');
+            $table->date('DateResent');
 
-$table->date('DateResent');
+            $table->integer('CorrectionType');
 
-$table->integer('CorrectionType');
+            $table->string('ClaimIdentifier');
 
-$table->string('ClaimIdentifier');
+            $table->string('OrigRefNum');
 
-$table->string('OrigRefNum');
+            $table->integer('ProvOrderOverride');
 
-$table->integer('ProvOrderOverride');
+            $table->integer('OrthoTotalM');
 
-$table->integer('OrthoTotalM');
+            $table->string('ShareOfCost');
 
-$table->string('ShareOfCost');
+            $table->integer('SecUserNumEntry');
 
-$table->integer('SecUserNumEntry');
+            $table->date('SecDateEntry');
 
-$table->date('SecDateEntry');
+            $table->string('SecDateTEdit');
 
-$table->string('SecDateTEdit');
+            $table->integer('OrderingReferralNum');
 
-$table->integer('OrderingReferralNum');
+            $table->date('DateSentOrig');
 
-$table->date('DateSentOrig');
+            $table->date('DateIllnessInjuryPreg');
 
-$table->date('DateIllnessInjuryPreg');
+            $table->integer('DateIllnessInjuryPregQualifier');
 
-$table->integer('DateIllnessInjuryPregQualifier');
+            $table->date('DateOther');
 
-$table->date('DateOther');
+            $table->integer('DateOtherQualifier');
 
-$table->integer('DateOtherQualifier');
+            $table->integer('IsOutsideLab');
 
-$table->integer('IsOutsideLab');
+            $table->string('SecurityHash');
 
-$table->string('SecurityHash');
+            $table->text('Narrative');
 
-$table->text('Narrative');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('claim');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('claim');
+    }
 };

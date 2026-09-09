@@ -4,31 +4,25 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('patrestriction', function (Blueprint $table) {
 
-Schema::create('patrestriction', function(Blueprint $table){
+            $table->integer('PatRestrictionNum');
 
-$table->integer('PatRestrictionNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('PatRestrictType');
 
-$table->integer('PatRestrictType');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('patrestriction');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('patrestriction');
+    }
 };

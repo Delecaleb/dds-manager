@@ -31,7 +31,7 @@
   .daterangepicker select.monthselect,.daterangepicker select.yearselect{border:1px solid #d1d5db;border-radius:4px;font-size:13px}
   .daterangepicker .calendar-table th,.daterangepicker .calendar-table td{font-size:12px}
   .daterangepicker{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.12)}
-  .daterangepicker .ranges ul{width:140px}
+  .daterangepicker .ranges ul{width:160px}
   .daterangepicker .ranges li{font-size:12px;font-weight:500;border-radius:6px;margin:2px 6px;padding:6px 10px}
 </style>
 @endonce
@@ -71,13 +71,20 @@
       startDate: _startParam ? moment(_startParam, 'YYYY-MM-DD') : moment().startOf('month'),
       endDate:   _endParam ? moment(_endParam, 'YYYY-MM-DD') : moment(),
       ranges: {
-        'Today':        [moment(),                                        moment()],
-        'Yesterday':    [moment().subtract(1,'days'),                    moment().subtract(1,'days')],
-        'Last 7 Days':  [moment().subtract(6,'days'),                    moment()],
-        'Last 30 Days': [moment().subtract(29,'days'),                   moment()],
-        'This Month':   [moment().startOf('month'),                      moment()],
-        'Last Month':   [moment().subtract(1,'month').startOf('month'),  moment().subtract(1,'month').endOf('month')],
-        'This Year':    [moment().startOf('year'),                       moment()],
+        'Today':           [moment(),                                                       moment()],
+        'Yesterday':       [moment().subtract(1, 'days'),                                   moment().subtract(1, 'days')],
+        'This week':       [moment().startOf('week'),                                       moment().endOf('week')],
+        'Last week':       [moment().subtract(1, 'week').startOf('week'),                   moment().subtract(1, 'week').endOf('week')],
+        'Month to date':   [moment().startOf('month'),                                      moment()],
+        'This month':      [moment().startOf('month'),                                      moment().endOf('month')],
+        'Last month':      [moment().subtract(1, 'month').startOf('month'),                 moment().subtract(1, 'month').endOf('month')],
+        'Quarter to date': [moment().startOf('quarter'),                                    moment()],
+        'This quarter':    [moment().startOf('quarter'),                                    moment().endOf('quarter')],
+        'Last quarter':    [moment().subtract(1, 'quarter').startOf('quarter'),            moment().subtract(1, 'quarter').endOf('quarter')],
+        'This year':       [moment().startOf('year'),                                       moment().endOf('year')],
+        'Year to date':    [moment().startOf('year'),                                       moment()],
+        'Last year':       [moment().subtract(1, 'year').startOf('year'),                   moment().subtract(1, 'year').endOf('year')],
+        'Last 12 Months':  [moment().subtract(11, 'months').startOf('month'),               moment()],
       },
       locale: {
         format: 'MMM D, YYYY', separator: ' – ',

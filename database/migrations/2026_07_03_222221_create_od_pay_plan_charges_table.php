@@ -13,43 +13,25 @@ return new class extends Migration
     {
         Schema::create('od_pay_plan_charges', function (Blueprint $table) {
             $table->id();
-            $table->integer('PayPlanChargeNum');
-
-            $table->integer('PayPlanNum');
-
-            $table->integer('Guarantor');
-
-            $table->integer('PatNum');
-
-            $table->date('ChargeDate');
-
-            $table->string('Principal');
-
-            $table->string('Interest');
-
-            $table->text('Note');
-
-            $table->integer('ProvNum');
-
-            $table->integer('ClinicNum');
-
-            $table->integer('ChargeType');
-
-            $table->integer('ProcNum');
-
-            $table->date('SecDateTEntry');
-
-            $table->string('SecDateTEdit');
-
-            $table->integer('StatementNum');
-
-            $table->integer('FKey');
-
-            $table->integer('LinkType');
-
-            $table->integer('IsOffset');
-
-            $table->integer('IsDownPayment');
+            $table->integer('PayPlanChargeNum')->nullable();
+            $table->integer('PayPlanNum')->nullable();
+            $table->integer('Guarantor')->nullable();
+            $table->integer('PatNum')->nullable();
+            $table->date('ChargeDate')->nullable();
+            $table->string('Principal')->nullable();
+            $table->string('Interest')->nullable();
+            $table->text('Note')->nullable();
+            $table->integer('ProvNum')->nullable();
+            $table->integer('ClinicNum')->nullable();
+            $table->integer('ChargeType')->nullable();
+            $table->integer('ProcNum')->nullable();
+            $table->date('SecDateTEntry')->nullable();
+            $table->string('SecDateTEdit')->nullable();
+            $table->integer('StatementNum')->nullable();
+            $table->integer('FKey')->nullable();
+            $table->integer('LinkType')->nullable();
+            $table->integer('IsOffset')->nullable();
+            $table->integer('IsDownPayment')->nullable();
             $table->timestamps();
         });
     }

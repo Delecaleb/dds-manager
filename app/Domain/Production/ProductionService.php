@@ -3,6 +3,7 @@
 namespace App\Domain\Production;
 
 use App\Domain\Support\MetricFilter;
+use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\DB;
  *   NET PRODUCTION   = gross + adjustments - writeoffs
  *                      (adjustments are already signed, so adding them applies reductions;
  *                       writeoffs are positive, so they are subtracted)
- *   collection       = SUM(SplitAmt)
+ *   collection       = SUM(od_pay_splits.SplitAmt on DatePay) + SUM(od_claim_procs.InsPayAmt on DateCP)
  *
  * Filters: date range + clinics + providers apply to every metric. The `hygiene` dimension
  * applies only to procedure-derived figures (gross/visits/procedures/days), because
@@ -36,13 +37,18 @@ class ProductionService
         return round((float) $this->completedProcedures($filter)->sum('pl.ProcFee'), 2);
     }
 
-    /** Adjustments: signed sum (negatives reduce, positives add). */
+    /** Adjustments: signed sum (od_adjustments.AdjAmt minus od_claim_procs.WriteOff, matching Jarvis real app). */
     public function adjustments(MetricFilter $filter): float
     {
         $q = DB::table('od_adjustments as a')->whereBetween('a.AdjDate', [$filter->start, $filter->end]);
         $this->applyClinicProvider($q, $filter, 'a');
+        $adj = (float) $q->sum('a.AdjAmt');
 
-        return round((float) $q->sum('a.AdjAmt'), 2);
+        $qWo = DB::table('od_claim_procs as c')->whereBetween('c.ProcDate', [$filter->start, $filter->end]);
+        $this->applyClinicProvider($qWo, $filter, 'c');
+        $wo = (float) $qWo->sum('c.WriteOff');
+
+        return round($adj - $wo, 2);
     }
 
     /** Writeoffs: positive magnitude sum (subtracted from gross to reach net). */
@@ -54,13 +60,13 @@ class ProductionService
         return round((float) $q->sum('c.WriteOff'), 2);
     }
 
-    /** Net production = gross + adjustments(signed) - writeoffs (blueprint D3). */
+    /** Net production = gross + adjustments (where adjustments is signed net of writeoffs). */
     public function netProduction(MetricFilter $filter): float
     {
         return $this->netFrom(
             $this->grossProduction($filter),
             $this->adjustments($filter),
-            $this->writeOffs($filter)
+            0.0
         );
     }
 
@@ -68,10 +74,10 @@ class ProductionService
      * The NET-production FORMULA in one place (blueprint D3): gross + adjustments - writeoffs.
      *
      * Exposed for grouped reports (per-office / per-payor tables) that aggregate the
-     * components themselves but must not re-implement the formula. `$adjustments` must be
-     * the SIGNED SUM(AdjAmt); `$writeOffs` the positive SUM(WriteOff).
+     * components themselves but must not re-implement the formula. If `$adjustments` is
+     * already net of writeoffs, `$writeOffs` can be 0.0.
      */
-    public function netFrom(float $gross, float $adjustments, float $writeOffs): float
+    public function netFrom(float $gross, float $adjustments, float $writeOffs = 0.0): float
     {
         return round($gross + $adjustments - $writeOffs, 2);
     }
@@ -80,8 +86,15 @@ class ProductionService
     {
         $q = DB::table('od_pay_splits as p')->whereBetween('p.DatePay', [$filter->start, $filter->end]);
         $this->applyClinicProvider($q, $filter, 'p');
+        $pat = (float) $q->sum('p.SplitAmt');
 
-        return round((float) $q->sum('p.SplitAmt'), 2);
+        $qIns = DB::table('od_claim_procs as cp')
+            ->whereBetween('cp.DateCP', [$filter->start, $filter->end])
+            ->where('cp.Status', '!=', 0);
+        $this->applyClinicProvider($qIns, $filter, 'cp');
+        $ins = (float) $qIns->sum('cp.InsPayAmt');
+
+        return round($pat + $ins, 2);
     }
 
     public function collectionRate(MetricFilter $filter): float
@@ -93,7 +106,10 @@ class ProductionService
 
     public function patientVisits(MetricFilter $filter): int
     {
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($filter->officeId);
+
         return (int) $this->completedProcedures($filter)
+            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
             ->distinct()
             ->count(DB::raw($this->visitKeyExpr()));
     }
@@ -152,7 +168,7 @@ class ProductionService
         $gross = round((float) ($row->gross ?? 0), 2);
         $adj = $this->adjustments($filter);
         $wo = $this->writeOffs($filter);
-        $net = $this->netFrom($gross, $adj, $wo);
+        $net = $this->netFrom($gross, $adj, 0.0);
         $coll = $this->collection($filter);
         $visits = (int) ($row->patient_visits ?? 0);
         $procs = (int) ($row->procedures ?? 0);
@@ -184,8 +200,17 @@ class ProductionService
             ->whereBetween('pl.ProcDate', [$filter->start, $filter->end]);
 
         if ($filter->hygiene !== null) {
-            $q->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
-                ->where('pc.IsHygiene', $filter->hygiene ? 'true' : 'false');
+            $q->join('od_procedures as pc', function ($join) use ($filter) {
+                $join->on('pl.CodeNum', '=', 'pc.CodeNum')
+                    ->where('pc.office_id', '=', $filter->officeId);
+            })->where(function ($q) use ($filter) {
+                if ($filter->hygiene) {
+                    $q->whereIn('pc.IsHygiene', ['true', '1', 1, true]);
+                } else {
+                    $q->whereIn('pc.IsHygiene', ['false', '0', 0, false])
+                        ->orWhereNull('pc.IsHygiene');
+                }
+            });
         }
 
         $this->applyClinicProvider($q, $filter, 'pl');
@@ -195,6 +220,8 @@ class ProductionService
 
     protected function applyClinicProvider(Builder $q, MetricFilter $filter, string $alias): void
     {
+        $q->where("{$alias}.office_id", $filter->officeId);
+
         if ($filter->clinics) {
             $q->whereIn("{$alias}.ClinicNum", $filter->clinics);
         }

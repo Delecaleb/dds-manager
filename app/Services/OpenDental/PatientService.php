@@ -4,13 +4,9 @@ namespace App\Services\OpenDental;
 
 class PatientService
 {
-
     public function __construct(
         protected OpenDentalClient $client
-    ) {
-    }
-
-
+    ) {}
 
     public function all($params = [])
     {
@@ -56,31 +52,26 @@ class PatientService
             $response = $this->client->get(
                 'patients',
                 [
-                    'Offset' => $offset
+                    'Offset' => $offset,
                 ]
             );
-
 
             if (empty($response)) {
                 break;
             }
-
 
             $patients = array_merge(
                 $patients,
                 $response
             );
 
-
             if (count($response) < 1000) {
                 break;
             }
 
-
             $offset += 1000;
 
         }
-
 
         return $patients;
 

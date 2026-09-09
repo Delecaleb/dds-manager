@@ -4,65 +4,59 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('smstomobile', function (Blueprint $table) {
 
-Schema::create('smstomobile', function(Blueprint $table){
+            $table->integer('SmsToMobileNum');
 
-$table->integer('SmsToMobileNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->string('GuidMessage');
 
-$table->string('GuidMessage');
+            $table->string('GuidBatch');
 
-$table->string('GuidBatch');
+            $table->string('SmsPhoneNumber');
 
-$table->string('SmsPhoneNumber');
+            $table->string('MobilePhoneNumber');
 
-$table->string('MobilePhoneNumber');
+            $table->integer('IsTimeSensitive');
 
-$table->integer('IsTimeSensitive');
+            $table->integer('MsgType');
 
-$table->integer('MsgType');
+            $table->text('MsgText');
 
-$table->text('MsgText');
+            $table->integer('SmsStatus');
 
-$table->integer('SmsStatus');
+            $table->integer('MsgParts');
 
-$table->integer('MsgParts');
+            $table->string('MsgChargeUSD');
 
-$table->string('MsgChargeUSD');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->string('CustErrorText');
 
-$table->string('CustErrorText');
+            $table->date('DateTimeSent');
 
-$table->date('DateTimeSent');
+            $table->date('DateTimeTerminated');
 
-$table->date('DateTimeTerminated');
+            $table->integer('IsHidden');
 
-$table->integer('IsHidden');
+            $table->string('MsgDiscountUSD');
 
-$table->string('MsgDiscountUSD');
+            $table->string('SecDateTEdit');
 
-$table->string('SecDateTEdit');
+            $table->integer('SecUserNumEntry');
 
-$table->integer('SecUserNumEntry');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('smstomobile');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('smstomobile');
+    }
 };

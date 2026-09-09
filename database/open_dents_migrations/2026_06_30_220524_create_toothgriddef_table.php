@@ -4,43 +4,37 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('toothgriddef', function (Blueprint $table) {
 
-Schema::create('toothgriddef', function(Blueprint $table){
+            $table->integer('ToothGridDefNum');
 
-$table->integer('ToothGridDefNum');
+            $table->string('NameInternal');
 
-$table->string('NameInternal');
+            $table->string('NameShowing');
 
-$table->string('NameShowing');
+            $table->integer('CellType');
 
-$table->integer('CellType');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->integer('ColumnWidth');
 
-$table->integer('ColumnWidth');
+            $table->integer('CodeNum');
 
-$table->integer('CodeNum');
+            $table->integer('ProcStatus');
 
-$table->integer('ProcStatus');
+            $table->integer('SheetFieldDefNum');
 
-$table->integer('SheetFieldDefNum');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('toothgriddef');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('toothgriddef');
+    }
 };

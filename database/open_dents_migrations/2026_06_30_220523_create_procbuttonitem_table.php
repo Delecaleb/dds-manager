@@ -4,37 +4,31 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('procbuttonitem', function (Blueprint $table) {
 
-Schema::create('procbuttonitem', function(Blueprint $table){
+            $table->integer('ProcButtonItemNum');
 
-$table->integer('ProcButtonItemNum');
+            $table->integer('ProcButtonNum');
 
-$table->integer('ProcButtonNum');
+            $table->string('OldCode');
 
-$table->string('OldCode');
+            $table->integer('AutoCodeNum');
 
-$table->integer('AutoCodeNum');
+            $table->integer('CodeNum');
 
-$table->integer('CodeNum');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('procbuttonitem');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('procbuttonitem');
+    }
 };

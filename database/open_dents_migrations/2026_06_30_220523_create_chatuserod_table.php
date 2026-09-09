@@ -4,51 +4,45 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('chatuserod', function (Blueprint $table) {
 
-Schema::create('chatuserod', function(Blueprint $table){
+            $table->integer('ChatUserodNum');
 
-$table->integer('ChatUserodNum');
+            $table->integer('UserNum');
 
-$table->integer('UserNum');
+            $table->integer('UserStatus');
 
-$table->integer('UserStatus');
+            $table->date('DateTimeStatusReset');
 
-$table->date('DateTimeStatusReset');
+            $table->text('Photo');
 
-$table->text('Photo');
+            $table->string('PhotoCrop');
 
-$table->string('PhotoCrop');
+            $table->integer('OpenBackground');
 
-$table->integer('OpenBackground');
+            $table->integer('CloseKeepRunning');
 
-$table->integer('CloseKeepRunning');
+            $table->integer('MuteNotifications');
 
-$table->integer('MuteNotifications');
+            $table->integer('DismissNotifySecs');
 
-$table->integer('DismissNotifySecs');
+            $table->integer('MuteImportantNotifications');
 
-$table->integer('MuteImportantNotifications');
+            $table->integer('DismissImportantNotifySecs');
 
-$table->integer('DismissImportantNotifySecs');
+            $table->integer('PlayNotificationSound');
 
-$table->integer('PlayNotificationSound');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('chatuserod');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('chatuserod');
+    }
 };

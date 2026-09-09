@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('cloudaddress', function (Blueprint $table) {
 
-Schema::create('cloudaddress', function(Blueprint $table){
+            $table->integer('CloudAddressNum');
 
-$table->integer('CloudAddressNum');
+            $table->string('IpAddress');
 
-$table->string('IpAddress');
+            $table->integer('UserNumLastConnect');
 
-$table->integer('UserNumLastConnect');
+            $table->date('DateTimeLastConnect');
 
-$table->date('DateTimeLastConnect');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('cloudaddress');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('cloudaddress');
+    }
 };

@@ -4,61 +4,55 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('carecreditwebresponse', function (Blueprint $table) {
 
-Schema::create('carecreditwebresponse', function(Blueprint $table){
+            $table->integer('CareCreditWebResponseNum');
 
-$table->integer('CareCreditWebResponseNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->integer('PayNum');
 
-$table->integer('PayNum');
+            $table->string('RefNumber');
 
-$table->string('RefNumber');
+            $table->string('Amount');
 
-$table->string('Amount');
+            $table->string('WebToken');
 
-$table->string('WebToken');
+            $table->string('ProcessingStatus');
 
-$table->string('ProcessingStatus');
+            $table->date('DateTimeEntry');
 
-$table->date('DateTimeEntry');
+            $table->date('DateTimePending');
 
-$table->date('DateTimePending');
+            $table->date('DateTimeCompleted');
 
-$table->date('DateTimeCompleted');
+            $table->date('DateTimeExpired');
 
-$table->date('DateTimeExpired');
+            $table->date('DateTimeLastError');
 
-$table->date('DateTimeLastError');
+            $table->text('LastResponseStr');
 
-$table->text('LastResponseStr');
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->string('ServiceType');
 
-$table->string('ServiceType');
+            $table->string('TransType');
 
-$table->string('TransType');
+            $table->string('MerchantNumber');
 
-$table->string('MerchantNumber');
+            $table->integer('HasLogged');
 
-$table->integer('HasLogged');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('carecreditwebresponse');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('carecreditwebresponse');
+    }
 };

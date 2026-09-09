@@ -2,35 +2,36 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\SyncsForOffices;
 use App\Services\Sync\ClaimProcSyncService;
 use Illuminate\Console\Command;
 
 class SyncOpenDentalClaimProcs extends Command
 {
+    use SyncsForOffices;
+
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'sync:claimprocs';
+    protected $signature = 'sync:claimprocs
+                            {--office-id= : Specific office ID to target (defaults to all active offices)}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Sync claim procedures from OpenDental to local database';
+    protected $description = 'Sync claim procedures from OpenDental to local database (supports optional --office-id)';
 
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
-        $this->info('start Syncing claim procedures...');
-        logger('Claimproc started');
-        $syncService = app(ClaimProcSyncService::class);
-        $syncService->sync();
-        logger('Claimproc finished');
-        $this->info('finished Syncing claim procedures...');
+        return $this->syncEachOffice('claim procedures', function ($office) {
+            app(ClaimProcSyncService::class)->forOffice($office)->sync();
+        });
     }
 }

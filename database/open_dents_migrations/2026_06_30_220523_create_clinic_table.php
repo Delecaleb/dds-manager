@@ -4,109 +4,103 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('clinic', function (Blueprint $table) {
 
-Schema::create('clinic', function(Blueprint $table){
+            $table->integer('ClinicNum');
 
-$table->integer('ClinicNum');
+            $table->string('Description');
 
-$table->string('Description');
+            $table->string('Address');
 
-$table->string('Address');
+            $table->string('Address2');
 
-$table->string('Address2');
+            $table->string('City');
 
-$table->string('City');
+            $table->string('State');
 
-$table->string('State');
+            $table->string('Zip');
 
-$table->string('Zip');
+            $table->string('Phone');
 
-$table->string('Phone');
+            $table->string('BankNumber');
 
-$table->string('BankNumber');
+            $table->integer('DefaultPlaceService');
 
-$table->integer('DefaultPlaceService');
+            $table->integer('InsBillingProv');
 
-$table->integer('InsBillingProv');
+            $table->string('Fax');
 
-$table->string('Fax');
+            $table->integer('EmailAddressNum');
 
-$table->integer('EmailAddressNum');
+            $table->integer('DefaultProv');
 
-$table->integer('DefaultProv');
+            $table->date('SmsContractDate');
 
-$table->date('SmsContractDate');
+            $table->string('SmsMonthlyLimit');
 
-$table->string('SmsMonthlyLimit');
+            $table->integer('IsMedicalOnly');
 
-$table->integer('IsMedicalOnly');
+            $table->string('BillingAddress');
 
-$table->string('BillingAddress');
+            $table->string('BillingAddress2');
 
-$table->string('BillingAddress2');
+            $table->string('BillingCity');
 
-$table->string('BillingCity');
+            $table->string('BillingState');
 
-$table->string('BillingState');
+            $table->string('BillingZip');
 
-$table->string('BillingZip');
+            $table->string('PayToAddress');
 
-$table->string('PayToAddress');
+            $table->string('PayToAddress2');
 
-$table->string('PayToAddress2');
+            $table->string('PayToCity');
 
-$table->string('PayToCity');
+            $table->string('PayToState');
 
-$table->string('PayToState');
+            $table->string('PayToZip');
 
-$table->string('PayToZip');
+            $table->integer('UseBillAddrOnClaims');
 
-$table->integer('UseBillAddrOnClaims');
+            $table->integer('Region');
 
-$table->integer('Region');
+            $table->integer('ItemOrder');
 
-$table->integer('ItemOrder');
+            $table->integer('IsInsVerifyExcluded');
 
-$table->integer('IsInsVerifyExcluded');
+            $table->string('Abbr');
 
-$table->string('Abbr');
+            $table->string('MedLabAccountNum');
 
-$table->string('MedLabAccountNum');
+            $table->integer('IsConfirmEnabled');
 
-$table->integer('IsConfirmEnabled');
+            $table->integer('IsConfirmDefault');
 
-$table->integer('IsConfirmDefault');
+            $table->integer('IsNewPatApptExcluded');
 
-$table->integer('IsNewPatApptExcluded');
+            $table->integer('IsHidden');
 
-$table->integer('IsHidden');
+            $table->integer('ExternalID');
 
-$table->integer('ExternalID');
+            $table->string('SchedNote');
 
-$table->string('SchedNote');
+            $table->integer('HasProcOnRx');
 
-$table->integer('HasProcOnRx');
+            $table->string('TimeZone');
 
-$table->string('TimeZone');
+            $table->string('EmailAliasOverride');
 
-$table->string('EmailAliasOverride');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('clinic');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('clinic');
+    }
 };

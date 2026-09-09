@@ -6,6 +6,7 @@ use App\Models\Office;
 use App\Services\Sync\AppointmentSyncService;
 use App\Services\Sync\PatientSyncService;
 use App\Services\Sync\ProcedureLogSyncService;
+use App\Services\Sync\SyncReportService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -114,6 +115,38 @@ class OfficeController extends Controller
         session(['active_office_id' => $officeId]);
 
         return redirect()->back()->with('status', 'Switched active office location.');
+    }
+
+    public function syncReport(Office $office, SyncReportService $syncReportService): JsonResponse
+    {
+        $report = $syncReportService->getReportForOffice($office);
+
+        return response()->json($report);
+    }
+
+    public function syncModule(Request $request, Office $office, SyncReportService $syncReportService): JsonResponse
+    {
+        $request->validate([
+            'module' => 'required|string',
+        ]);
+
+        $moduleKey = (string) $request->input('module');
+
+        ob_start();
+
+        try {
+            $result = $syncReportService->syncModuleForOffice($office, $moduleKey);
+            ob_end_clean();
+
+            return response()->json($result);
+        } catch (Exception $e) {
+            ob_end_clean();
+
+            return response()->json([
+                'success' => false,
+                'error' => "Sync failed for {$moduleKey}: ".$e->getMessage(),
+            ], 500);
+        }
     }
 
     public function syncNow(Office $office): JsonResponse

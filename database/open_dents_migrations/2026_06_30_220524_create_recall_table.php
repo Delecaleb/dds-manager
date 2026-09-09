@@ -4,57 +4,51 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('recall', function (Blueprint $table) {
 
-Schema::create('recall', function(Blueprint $table){
+            $table->integer('RecallNum');
 
-$table->integer('RecallNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->date('DateDueCalc');
 
-$table->date('DateDueCalc');
+            $table->date('DateDue');
 
-$table->date('DateDue');
+            $table->date('DatePrevious');
 
-$table->date('DatePrevious');
+            $table->integer('RecallInterval');
 
-$table->integer('RecallInterval');
+            $table->integer('RecallStatus');
 
-$table->integer('RecallStatus');
+            $table->text('Note');
 
-$table->text('Note');
+            $table->integer('IsDisabled');
 
-$table->integer('IsDisabled');
+            $table->string('DateTStamp');
 
-$table->string('DateTStamp');
+            $table->integer('RecallTypeNum');
 
-$table->integer('RecallTypeNum');
+            $table->string('DisableUntilBalance');
 
-$table->string('DisableUntilBalance');
+            $table->date('DisableUntilDate');
 
-$table->date('DisableUntilDate');
+            $table->date('DateScheduled');
 
-$table->date('DateScheduled');
+            $table->integer('Priority');
 
-$table->integer('Priority');
+            $table->string('TimePatternOverride');
 
-$table->string('TimePatternOverride');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('recall');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('recall');
+    }
 };

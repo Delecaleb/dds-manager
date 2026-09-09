@@ -4,35 +4,29 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('payortype', function (Blueprint $table) {
 
-Schema::create('payortype', function(Blueprint $table){
+            $table->integer('PayorTypeNum');
 
-$table->integer('PayorTypeNum');
+            $table->integer('PatNum');
 
-$table->integer('PatNum');
+            $table->date('DateStart');
 
-$table->date('DateStart');
+            $table->string('SopCode');
 
-$table->string('SopCode');
+            $table->text('Note');
 
-$table->text('Note');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('payortype');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('payortype');
+    }
 };

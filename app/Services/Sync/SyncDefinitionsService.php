@@ -25,9 +25,4 @@ class SyncDefinitionsService extends BaseQuerySyncService
     {
         return null;
     }
-
-    protected function module(): string
-    {
-        return 'definitions';
-    }
 }

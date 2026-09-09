@@ -4,33 +4,27 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
+    public function up()
+    {
 
-public function up()
-{
+        Schema::create('loginattempt', function (Blueprint $table) {
 
-Schema::create('loginattempt', function(Blueprint $table){
+            $table->integer('LoginAttemptNum');
 
-$table->integer('LoginAttemptNum');
+            $table->string('UserName');
 
-$table->string('UserName');
+            $table->integer('LoginType');
 
-$table->integer('LoginType');
+            $table->date('DateTFail');
 
-$table->date('DateTFail');
+        });
 
+    }
 
-
-});
-
-}
-
-
-public function down()
-{
-Schema::dropIfExists('loginattempt');
-}
-
+    public function down()
+    {
+        Schema::dropIfExists('loginattempt');
+    }
 };
