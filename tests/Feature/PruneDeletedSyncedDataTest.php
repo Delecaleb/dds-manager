@@ -15,7 +15,7 @@ class PruneDeletedSyncedDataTest extends TestCase
 
     public function test_prune_deleted_command_dry_run_identifies_hard_deleted_records_without_deleting(): void
     {
-        Office::create(['id' => 1, 'name' => '8 Mile', 'is_active' => true]);
+        Office::updateOrCreate(['id' => 1], ['name' => '8 Mile', 'is_active' => true]);
 
         // Insert 3 local procedure log records
         OdProcedureLog::create(['office_id' => 1, 'ProcNum' => 1001, 'ProcDate' => '2026-08-05', 'ProcFee' => 150]);
@@ -38,6 +38,7 @@ class PruneDeletedSyncedDataTest extends TestCase
             'table' => 'od_procedure_logs',
             '--start-date' => '2026-08-01',
             '--end-date' => '2026-08-07',
+            '--office-id' => 1,
             '--dry-run' => true,
         ])->assertExitCode(0);
 
@@ -49,7 +50,7 @@ class PruneDeletedSyncedDataTest extends TestCase
 
     public function test_prune_deleted_command_removes_hard_deleted_records_and_updates_sync_log(): void
     {
-        Office::create(['id' => 1, 'name' => '8 Mile', 'is_active' => true]);
+        Office::updateOrCreate(['id' => 1], ['name' => '8 Mile', 'is_active' => true]);
 
         // Insert 3 local procedure log records
         OdProcedureLog::create(['office_id' => 1, 'ProcNum' => 2001, 'ProcDate' => '2026-08-05', 'ProcFee' => 150]);
@@ -72,6 +73,7 @@ class PruneDeletedSyncedDataTest extends TestCase
             'table' => 'od_procedure_logs',
             '--start-date' => '2026-08-01',
             '--end-date' => '2026-08-07',
+            '--office-id' => 1,
         ])->assertExitCode(0);
 
         // Record 2003 should be purged from database
@@ -90,7 +92,7 @@ class PruneDeletedSyncedDataTest extends TestCase
 
     public function test_prune_deleted_full_scan_loops_all_existing_records_and_updates_sync_log(): void
     {
-        Office::create(['id' => 1, 'name' => '8 Mile', 'is_active' => true]);
+        Office::updateOrCreate(['id' => 1], ['name' => '8 Mile', 'is_active' => true]);
 
         OdProcedureLog::create(['office_id' => 1, 'ProcNum' => 3001, 'ProcDate' => '2024-01-10', 'ProcFee' => 100]);
         OdProcedureLog::create(['office_id' => 1, 'ProcNum' => 3002, 'ProcDate' => '2025-05-15', 'ProcFee' => 200]); // Deleted in OD
@@ -108,6 +110,7 @@ class PruneDeletedSyncedDataTest extends TestCase
         $this->artisan('sync:prune-deleted', [
             'table' => 'od_procedure_logs',
             '--full' => true,
+            '--office-id' => 1,
         ])->assertExitCode(0);
 
         $this->assertDatabaseHas('od_procedure_logs', ['ProcNum' => 3001]);
@@ -123,7 +126,7 @@ class PruneDeletedSyncedDataTest extends TestCase
 
     public function test_prune_deleted_current_year_purges_orphans_in_current_year(): void
     {
-        Office::create(['id' => 1, 'name' => '8 Mile', 'is_active' => true]);
+        Office::updateOrCreate(['id' => 1], ['name' => '8 Mile', 'is_active' => true]);
 
         $currentYearDate = now()->startOfYear()->addDays(10)->toDateString();
 
@@ -143,6 +146,7 @@ class PruneDeletedSyncedDataTest extends TestCase
         $this->artisan('sync:prune-deleted', [
             'table' => 'od_procedure_logs',
             '--current-year' => true,
+            '--office-id' => 1,
         ])->assertExitCode(0);
 
         $this->assertDatabaseHas('od_procedure_logs', ['ProcNum' => 4001]);

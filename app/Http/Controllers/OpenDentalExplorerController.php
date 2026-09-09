@@ -15,7 +15,7 @@ use Illuminate\View\View;
 class OpenDentalExplorerController extends Controller
 {
     /**
-     * Map of native OpenDental table names to local fallback tables.
+     * Map of native OpenDental table names to local synced tables.
      */
     protected array $openDentalNativeTables = [
         'patient' => 'od_patients',
@@ -25,25 +25,22 @@ class OpenDentalExplorerController extends Controller
         'provider' => 'od_providers',
         'paysplit' => 'od_pay_splits',
         'treatmentplan' => 'treatment_plans',
-        'claim' => 'od_claims',
+        'treatplanattach' => 'od_treatment_plan_attachments',
         'claimproc' => 'od_claim_procs',
         'claimpayment' => 'od_claim_payments',
         'adjustment' => 'od_adjustments',
-        'payplan' => 'od_pay_plans',
         'payplancharge' => 'od_pay_plan_charges',
         'payment' => 'od_payments',
         'deposit' => 'od_deposits',
         'recall' => 'od_recalls',
         'recalltype' => 'od_recall_types',
         'schedule' => 'od_schedules',
-        'insplan' => 'od_ins_plans',
+        'insplan' => 'od_insplans',
         'carrier' => 'od_carriers',
         'definition' => 'od_definitions',
-        'clinic' => 'od_clinics',
-        'operatory' => 'od_operatories',
-        'userod' => 'od_user_ods',
         'histappointment' => 'od_histappointments',
         'statement' => 'od_statements',
+        'patientbalance' => 'od_patient_balances',
     ];
 
     /**
@@ -68,6 +65,14 @@ class OpenDentalExplorerController extends Controller
         'claimpayment' => ['CheckDate', 'CheckAmt', 'CheckNum', 'DepositNum', 'ClinicNum'],
         'od_deposits' => ['DateDeposit', 'Amount'],
         'deposit' => ['DateDeposit', 'Amount'],
+        'od_patients' => ['PatNum', 'LName', 'FName', 'MiddleI', 'Birthdate', 'PatStatus', 'Gender', 'Position', 'SecDateEntry'],
+        'patient' => ['PatNum', 'LName', 'FName', 'MiddleI', 'Birthdate', 'PatStatus', 'Gender', 'Position', 'SecDateEntry'],
+        'od_treatment_plan_attachments' => ['TreatPlanAttachNum', 'TreatPlanNum', 'ProcNum', 'Priority', 'SecDateTEdit'],
+        'treatplanattach' => ['TreatPlanAttachNum', 'TreatPlanNum', 'ProcNum', 'Priority', 'SecDateTEdit'],
+        'od_insplans' => ['PlanNum', 'GroupName', 'GroupNum', 'PlanType', 'CarrierNum'],
+        'insplan' => ['PlanNum', 'GroupName', 'GroupNum', 'PlanType', 'CarrierNum'],
+        'od_statements' => ['StatementNum', 'PatNum', 'DateSent', 'IsSent', 'Mode_'],
+        'statement' => ['StatementNum', 'PatNum', 'DateSent', 'IsSent', 'Mode_'],
     ];
 
     /**
@@ -117,17 +122,17 @@ class OpenDentalExplorerController extends Controller
         'treatment_plans' => 'treatmentplan',
         'treatmentplans' => 'treatmentplan',
 
-        'od_claim' => 'claim',
-        'od_claims' => 'claim',
-        'claims' => 'claim',
+        'od_treatment_plan_attachment' => 'treatplanattach',
+        'od_treatment_plan_attachments' => 'treatplanattach',
+        'treatment_plan_attachments' => 'treatplanattach',
+        'treatplanattach' => 'treatplanattach',
+        'treatplanattachment' => 'treatplanattach',
+        'treatplanattachments' => 'treatplanattach',
+        'od_treatplanattach' => 'treatplanattach',
 
         'od_adjustment' => 'adjustment',
         'od_adjustments' => 'adjustment',
         'adjustments' => 'adjustment',
-
-        'od_pay_plan' => 'payplan',
-        'od_pay_plans' => 'payplan',
-        'pay_plans' => 'payplan',
 
         'od_pay_plan_charge' => 'payplancharge',
         'od_pay_plan_charges' => 'payplancharge',
@@ -155,7 +160,11 @@ class OpenDentalExplorerController extends Controller
 
         'od_ins_plan' => 'insplan',
         'od_ins_plans' => 'insplan',
+        'od_insplan' => 'insplan',
+        'od_insplans' => 'insplan',
         'ins_plans' => 'insplan',
+        'insplans' => 'insplan',
+        'insplan' => 'insplan',
 
         'od_carrier' => 'carrier',
         'od_carriers' => 'carrier',
@@ -164,18 +173,6 @@ class OpenDentalExplorerController extends Controller
         'od_definition' => 'definition',
         'od_definitions' => 'definition',
         'definitions' => 'definition',
-
-        'od_clinic' => 'clinic',
-        'od_clinics' => 'clinic',
-        'clinics' => 'clinic',
-
-        'od_operatory' => 'operatory',
-        'od_operatories' => 'operatory',
-        'operatories' => 'operatory',
-
-        'od_user_od' => 'userod',
-        'od_user_ods' => 'userod',
-        'user_ods' => 'userod',
 
         'od_histappointment' => 'histappointment',
         'od_histappointments' => 'histappointment',
@@ -192,6 +189,12 @@ class OpenDentalExplorerController extends Controller
         'od_statements' => 'statement',
         'statements' => 'statement',
         'statement' => 'statement',
+
+        'od_patient_balance' => 'patientbalance',
+        'od_patient_balances' => 'patientbalance',
+        'patient_balances' => 'patientbalance',
+        'patientbalance' => 'patientbalance',
+        'patientbalances' => 'patientbalance',
     ];
 
     public function __construct(
@@ -287,6 +290,7 @@ class OpenDentalExplorerController extends Controller
                 return response()->json([
                     'source_type' => 'OpenDental Realtime API',
                     'table' => $odTableName,
+                    'office_id' => $activeOfficeId,
                     'count' => count($rows),
                     'execution_time_ms' => $executionTimeMs,
                     'columns' => $actualColumns,
@@ -380,6 +384,7 @@ class OpenDentalExplorerController extends Controller
         return response()->json([
             'source_type' => 'Local Synced Database',
             'table' => $resolvedTable,
+            'office_id' => $activeOfficeId,
             'count' => count($rows),
             'execution_time_ms' => $executionTimeMs,
             'columns' => $actualColumns,
@@ -604,33 +609,52 @@ class OpenDentalExplorerController extends Controller
     {
         $primaryKeyMap = [
             'od_patients' => 'PatNum',
+            'patient' => 'PatNum',
             'od_procedure_logs' => 'ProcNum',
+            'procedurelog' => 'ProcNum',
             'od_procedures' => 'CodeNum',
+            'procedurecode' => 'CodeNum',
             'od_appointments' => 'AptNum',
+            'appointment' => 'AptNum',
             'od_providers' => 'ProvNum',
+            'provider' => 'ProvNum',
             'od_pay_splits' => 'SplitNum',
+            'paysplit' => 'SplitNum',
             'treatment_plans' => 'TreatPlanNum',
-            'od_claims' => 'ClaimNum',
+            'treatmentplan' => 'TreatPlanNum',
+            'od_treatment_plan_attachments' => 'TreatPlanAttachNum',
+            'treatplanattach' => 'TreatPlanAttachNum',
             'od_claim_procs' => 'ClaimProcNum',
+            'claimproc' => 'ClaimProcNum',
             'od_adjustments' => 'AdjNum',
-            'od_pay_plans' => 'PayPlanNum',
+            'adjustment' => 'AdjNum',
             'od_pay_plan_charges' => 'PayPlanChargeNum',
+            'payplancharge' => 'PayPlanChargeNum',
             'od_payments' => 'PayNum',
+            'payment' => 'PayNum',
             'od_deposits' => 'DepositNum',
+            'deposit' => 'DepositNum',
             'od_claim_payments' => 'ClaimPaymentNum',
+            'claimpayment' => 'ClaimPaymentNum',
             'od_recalls' => 'RecallNum',
+            'recall' => 'RecallNum',
             'od_recall_types' => 'RecallTypeNum',
+            'recalltype' => 'RecallTypeNum',
             'od_schedules' => 'ScheduleNum',
+            'schedule' => 'ScheduleNum',
+            'od_insplans' => 'PlanNum',
             'od_ins_plans' => 'PlanNum',
+            'insplan' => 'PlanNum',
             'od_carriers' => 'CarrierNum',
+            'carrier' => 'CarrierNum',
             'od_definitions' => 'DefNum',
-            'od_clinics' => 'ClinicNum',
-            'od_operatories' => 'OperatoryNum',
-            'od_user_ods' => 'UserNum',
+            'definition' => 'DefNum',
             'od_histappointments' => 'HistApptNum',
             'histappointment' => 'HistApptNum',
             'od_statements' => 'StatementNum',
             'statement' => 'StatementNum',
+            'od_patient_balances' => 'PatNum',
+            'patientbalance' => 'PatNum',
         ];
 
         if (isset($primaryKeyMap[$table])) {
@@ -905,8 +929,39 @@ class OpenDentalExplorerController extends Controller
 
         // 3. Compute Diff Sets
         $intersectKeys = array_values(array_intersect($localKeys, $liveKeys));
-        $orphanKeys = array_values(array_diff($localKeys, $liveKeys)); // in local, deleted in live OD
+        $potentialOrphanKeys = array_values(array_diff($localKeys, $liveKeys)); // in local, not in live range
         $missingKeys = array_values(array_diff($liveKeys, $localKeys)); // in live OD, missing in local
+
+        // Double check potential orphans against full OpenDental table to ensure they are true orphans (not false positives due to date mismatch)
+        $orphanKeys = [];
+        if (! empty($potentialOrphanKeys) && empty($liveError)) {
+            foreach (array_chunk($potentialOrphanKeys, 500) as $chunk) {
+                try {
+                    $inClause = implode(',', array_map('intval', $chunk));
+                    $odCheckSql = "SELECT {$primaryKey} FROM {$odTableName} WHERE {$primaryKey} IN ({$inClause})";
+                    $foundRows = $this->queryService->forOffice($targetOffice)->shortQuery($odCheckSql);
+                    $foundKeys = array_map('strval', array_column($foundRows, $primaryKey));
+
+                    $trueOrphans = array_values(array_diff($chunk, $foundKeys));
+                    $orphanKeys = array_merge($orphanKeys, $trueOrphans);
+
+                    $foundInOd = array_values(array_intersect($chunk, $foundKeys));
+                    if (! empty($foundInOd)) {
+                        foreach ($foundRows as $frow) {
+                            $fr = (array) $frow;
+                            $pkVal = (string) $fr[$primaryKey];
+                            $liveKeys[] = $pkVal;
+                            $liveRowsByPk[$pkVal] = $fr;
+                            $intersectKeys[] = $pkVal;
+                        }
+                    }
+                } catch (Exception) {
+                    $orphanKeys = array_merge($orphanKeys, $chunk);
+                }
+            }
+        } else {
+            $orphanKeys = $potentialOrphanKeys;
+        }
 
         $criticalCols = $this->criticalColumnsMap[$resolvedTable]
             ?? $this->criticalColumnsMap[$odTableName]
@@ -930,6 +985,7 @@ class OpenDentalExplorerController extends Controller
                     'status_label' => 'Modified in OpenDental (Data Discrepancy)',
                     'status_badge' => 'blue',
                     'pk' => $k,
+                    'office_id' => $localData['office_id'] ?? $officeId,
                     'primary_key_name' => $primaryKey,
                     'source' => 'both',
                     'field_diffs' => $fieldDiffs,
@@ -944,6 +1000,7 @@ class OpenDentalExplorerController extends Controller
                     'status_label' => 'Synced & Matched',
                     'status_badge' => 'emerald',
                     'pk' => $k,
+                    'office_id' => $localData['office_id'] ?? $officeId,
                     'primary_key_name' => $primaryKey,
                     'source' => 'both',
                     'field_diffs' => [],
@@ -953,7 +1010,7 @@ class OpenDentalExplorerController extends Controller
             }
         }
 
-        // Orphans (Present in Local DB only - deleted in OpenDental)
+        // Orphans (Present in Local DB only - strictly confirmed deleted in OpenDental)
         foreach ($orphanKeys as $k) {
             $localData = $localRowsByPk[$k] ?? [];
             $relationalWarning = $this->checkRelationalIntegrity($resolvedTable, $officeId, $localData);
@@ -962,6 +1019,7 @@ class OpenDentalExplorerController extends Controller
                 'status_label' => 'Deleted in OpenDental (Orphan in Local DB)',
                 'status_badge' => 'red',
                 'pk' => $k,
+                'office_id' => $localData['office_id'] ?? $officeId,
                 'primary_key_name' => $primaryKey,
                 'source' => 'local_only',
                 'field_diffs' => [],
@@ -977,6 +1035,7 @@ class OpenDentalExplorerController extends Controller
                 'status_label' => 'Missing from Local DB (Sync Needed)',
                 'status_badge' => 'amber',
                 'pk' => $k,
+                'office_id' => $officeId,
                 'primary_key_name' => $primaryKey,
                 'source' => 'live_only',
                 'field_diffs' => [],
@@ -993,6 +1052,7 @@ class OpenDentalExplorerController extends Controller
             'success' => true,
             'table' => $odTableName,
             'local_table' => $resolvedTable,
+            'office_id' => $officeId,
             'primary_key' => $primaryKey,
             'date_column' => $dateCol,
             'start_date' => $startDate,
@@ -1070,29 +1130,35 @@ class OpenDentalExplorerController extends Controller
             'payment' => 'PayDate',
             'treatment_plans' => 'DateTP',
             'treatmentplan' => 'DateTP',
+            'od_treatment_plan_attachments' => 'SecDateTEdit',
+            'treatplanattach' => 'SecDateTEdit',
             'od_schedules' => 'SchedDate',
             'schedule' => 'SchedDate',
             'od_recalls' => 'DateDue',
             'recall' => 'DateDue',
-            'od_patients' => 'DateFirstVisit',
-            'patient' => 'DateFirstVisit',
+            'od_patients' => 'SecDateEntry',
+            'patient' => 'SecDateEntry',
             'od_claim_payments' => 'SecDateTEdit',
             'claimpayment' => 'SecDateTEdit',
             'od_pay_plan_charges' => 'ChargeDate',
             'payplancharge' => 'ChargeDate',
             'od_deposits' => 'DateDeposit',
             'deposit' => 'DateDeposit',
-            'od_histappointments' => 'AptDateTime',
-            'histappointment' => 'AptDateTime',
+            'od_histappointments' => 'HistDate',
+            'histappointment' => 'HistDate',
             'od_statements' => 'DateSent',
             'statement' => 'DateSent',
+            'od_insplans' => 'SecDateTEdit',
+            'insplan' => 'SecDateTEdit',
+            'od_patient_balances' => 'DateTStamp',
+            'patientbalance' => 'DateTStamp',
         ];
 
-        if (isset($map[$table])) {
+        if (isset($map[$table]) && in_array($map[$table], $columns, true)) {
             return $map[$table];
         }
 
-        foreach (['AptDateTime', 'ProcDate', 'AdjDate', 'PayDate', 'DatePay', 'DateTP', 'DateTStamp', 'created_at'] as $candidate) {
+        foreach (['AptDateTime', 'ProcDate', 'AdjDate', 'DatePay', 'PayDate', 'DateTP', 'SchedDate', 'DateDue', 'SecDateEntry', 'SecDateTEdit', 'DateDeposit', 'DateSent', 'HistDate', 'ChargeDate', 'DateFirstVisit', 'DateTStamp', 'created_at'] as $candidate) {
             if (in_array($candidate, $columns, true)) {
                 return $candidate;
             }

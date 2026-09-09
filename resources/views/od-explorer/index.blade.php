@@ -14,7 +14,7 @@
       <div class="flex items-center gap-2">
         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
           <i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-600"></i>
-          Location: {{ $currentOffice->name ?? 'Default Office' }}
+          Location: {{ $currentOffice->name ?? 'Default Office' }} (Office #{{ $currentOffice->id ?? 1 }})
         </span>
       </div>
     </div>
@@ -70,28 +70,25 @@
               <option value="procedurelog">procedurelog (od_procedure_logs)</option>
               <option value="procedurecode">procedurecode (od_procedures)</option>
               <option value="treatmentplan">treatmentplan (treatment_plans)</option>
+              <option value="treatplanattach">treatplanattach (od_treatment_plan_attachments)</option>
             </optgroup>
             <optgroup label="💳 Financials, Billing & Claims">
               <option value="adjustment">adjustment (od_adjustments)</option>
               <option value="payment">payment (od_payments)</option>
               <option value="paysplit">paysplit (od_pay_splits)</option>
               <option value="claimproc">claimproc (od_claim_procs)</option>
-              <option value="claim">claim (od_claims)</option>
               <option value="claimpayment">claimpayment (od_claim_payments)</option>
               <option value="statement">statement (od_statements)</option>
-              <option value="payplan">payplan (od_pay_plans)</option>
               <option value="payplancharge">payplancharge (od_pay_plan_charges)</option>
               <option value="deposit">deposit (od_deposits)</option>
+              <option value="patientbalance">patientbalance (od_patient_balances)</option>
             </optgroup>
             <optgroup label="🏢 Practice & Patient Setup">
               <option value="patient">patient (od_patients)</option>
               <option value="provider">provider (od_providers)</option>
-              <option value="insplan">insplan (od_ins_plans)</option>
+              <option value="insplan">insplan (od_insplans)</option>
               <option value="carrier">carrier (od_carriers)</option>
               <option value="definition">definition (od_definitions)</option>
-              <option value="clinic">clinic (od_clinics)</option>
-              <option value="operatory">operatory (od_operatories)</option>
-              <option value="userod">userod (od_user_ods)</option>
             </optgroup>
           </select>
         </div>
@@ -270,6 +267,7 @@
             <thead class="sticky top-0 bg-slate-100 border-b border-slate-200 z-10 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
               <tr>
                 <th class="px-4 py-2.5">Status</th>
+                <th class="px-4 py-2.5">Office ID</th>
                 <th class="px-4 py-2.5">Primary Key</th>
                 <th class="px-4 py-2.5">Patient ID</th>
                 <th class="px-4 py-2.5">Date & Time</th>
@@ -281,7 +279,7 @@
             </thead>
             <tbody id="diffTableBody">
               <tr>
-                <td colspan="8" class="p-12 text-center text-slate-400">
+                <td colspan="9" class="p-12 text-center text-slate-400">
                   <div class="flex flex-col items-center justify-center gap-2">
                     <svg class="animate-spin w-6 h-6 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
                     <p class="font-medium text-xs text-slate-600">Comparing OpenDental Live vs Local Database...</p>
@@ -564,7 +562,7 @@
           if (window.lucide) lucide.createIcons();
 
           if (res.error) {
-            tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-600 font-semibold text-xs">Error: ' + escHtml(res.error) + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-slate-600 font-semibold text-xs">Error: ' + escHtml(res.error) + '</td></tr>';
             return;
           }
 
@@ -576,7 +574,7 @@
           btn.disabled = false;
           btn.innerHTML = '<i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Run Comparison';
           if (window.lucide) lucide.createIcons();
-          tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-600 font-semibold text-xs">Failed: ' + escHtml(err.message) + '</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-slate-600 font-semibold text-xs">Failed: ' + escHtml(err.message) + '</td></tr>';
         });
     }
 
@@ -665,7 +663,7 @@
     function renderCompareTable() {
       var tbody = document.getElementById('diffTableBody');
       if (!_diffResult || !_diffResult.diff_rows || !_diffResult.diff_rows.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 text-xs">No records found matching criteria.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-slate-400 text-xs">No records found matching criteria.</td></tr>';
         return;
       }
 
@@ -683,7 +681,7 @@
       }
 
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 text-xs">No rows found matching active filter/search.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-slate-400 text-xs">No rows found matching active filter/search.</td></tr>';
         return;
       }
 
@@ -706,6 +704,7 @@
           actionBtn = '<span class="text-slate-400 text-[11px]">Synced</span>';
         }
 
+        var offId = item.office_id || (d && d.office_id) || (_diffResult ? _diffResult.office_id : '—');
         var patId = d.PatNum || d.patient_id || d.PatientNum || '—';
         var dateVal = d.AptDateTime || d.ProcDate || d.AdjDate || d.DatePay || d.PayDate || d.DateTP || d.DateDue || '—';
         var statusVal = (d.AptStatus !== undefined) ? 'Status ' + d.AptStatus : (d.ProcStatus || d.ProcCode || '—');
@@ -733,6 +732,7 @@
 
         return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
           '<td class="px-4 py-2.5">' + statusBadge + '</td>' +
+          '<td class="px-4 py-2.5 font-mono text-[11px]"><span class="inline-flex items-center px-2 py-0.5 rounded font-bold bg-slate-100 text-slate-700 border border-slate-200">#' + escHtml(offId) + '</span></td>' +
           '<td class="px-4 py-2.5 font-mono font-bold text-slate-900">' + escHtml(item.pk) + '</td>' +
           '<td class="px-4 py-2.5 font-medium text-slate-700">' + escHtml(patId) + '</td>' +
           '<td class="px-4 py-2.5 font-mono text-[11px] text-slate-600">' + escHtml(dateVal) + '</td>' +
@@ -864,9 +864,10 @@
       }
 
       var csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += '"Status","Primary Key","Data Source","JSON Payload"\r\n';
+      csvContent += '"Status","Office ID","Primary Key","Data Source","JSON Payload"\r\n';
       rows.forEach(function (r) {
-        csvContent += '"' + r.status_label + '","' + r.pk + '","' + r.source + '","' + JSON.stringify(r.data || {}).replace(/"/g, '""') + '"\r\n';
+        var offId = r.office_id || (r.data && r.data.office_id) || (_diffResult ? _diffResult.office_id : '');
+        csvContent += '"' + r.status_label + '","' + offId + '","' + r.pk + '","' + r.source + '","' + JSON.stringify(r.data || {}).replace(/"/g, '""') + '"\r\n';
       });
 
       var link = document.createElement("a");

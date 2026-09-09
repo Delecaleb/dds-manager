@@ -734,4 +734,42 @@ class OpenDentalExplorerTest extends TestCase
         $this->assertNotEmpty($rows[0]['relational_issue']);
         $this->assertStringContainsString('Parent Payment #99999 is missing', $rows[0]['relational_issue']);
     }
+
+    public function test_od_explorer_includes_office_id_in_responses_and_views(): void
+    {
+        $user = User::factory()->create();
+        $office1 = Office::create(['id' => 1, 'name' => 'Main Clinic', 'is_active' => true]);
+
+        // 1. Index page includes Office # and Office ID column header
+        $indexRes = $this->actingAs($user)->withSession(['active_office_id' => 1])->get('/open-dental-explorer');
+        $indexRes->assertOk();
+        $indexRes->assertSee('Office #1');
+        $indexRes->assertSee('Office ID');
+
+        // 2. Query response includes office_id
+        DB::table('od_patients')->insert([
+            ['office_id' => 1, 'PatNum' => 101, 'LName' => 'Smith', 'FName' => 'John'],
+        ]);
+
+        $queryRes = $this->actingAs($user)->withSession(['active_office_id' => 1])->postJson('/open-dental-explorer/query', [
+            'source' => 'local_db',
+            'table' => 'patient',
+        ]);
+        $queryRes->assertOk();
+        $this->assertEquals(1, $queryRes->json('office_id'));
+
+        // 3. Reconcile diff response includes office_id at root and in diff_rows
+        $mockQueryService = $this->mock(QueryService::class);
+        $mockQueryService->shouldReceive('forOffice')->andReturnSelf();
+        $mockQueryService->shouldReceive('shortQuery')->andReturn([
+            ['PatNum' => 101, 'LName' => 'Smith', 'FName' => 'John'],
+        ]);
+
+        $diffRes = $this->actingAs($user)->withSession(['active_office_id' => 1])->postJson('/open-dental-explorer/reconcile-diff', [
+            'table' => 'patient',
+        ]);
+        $diffRes->assertOk();
+        $this->assertEquals(1, $diffRes->json('office_id'));
+        $this->assertEquals(1, $diffRes->json('diff_rows.0.office_id'));
+    }
 }

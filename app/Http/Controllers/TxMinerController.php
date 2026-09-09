@@ -560,8 +560,13 @@ class TxMinerController extends Controller
             }
         }
 
+        $officeId = Office::getActiveOfficeId();
+
         // Select required columns and join procedure codes
-        $query->leftJoin('od_procedures as pc_drill', 'pl.CodeNum', '=', 'pc_drill.CodeNum')
+        $query->leftJoin('od_procedures as pc_drill', function ($join) use ($officeId) {
+            $join->on('pl.CodeNum', '=', 'pc_drill.CodeNum')
+                ->where('pc_drill.office_id', '=', $officeId);
+        })
             ->select([
                 'pl.PatNum',
                 'pl.ProvNum',

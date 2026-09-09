@@ -495,4 +495,67 @@ class TxMinerTest extends TestCase
         $response->assertStatus(200);
         $this->assertStringContainsString('text/csv', $response->headers->get('content-type'));
     }
+
+    public function test_tx_miner_multi_office_isolation(): void
+    {
+        $office2 = Office::create(['name' => 'Branch Office', 'is_active' => true]);
+        $user = User::factory()->superAdmin()->create();
+
+        // Office 1 Provider and Office 2 Provider
+        $prov1 = OdProvider::create(['office_id' => $this->office->id, 'ProvNum' => 10, 'LName' => 'Alpha', 'IsHidden' => 'false']);
+        $prov2 = OdProvider::create(['office_id' => $office2->id, 'ProvNum' => 10, 'LName' => 'Beta', 'IsHidden' => 'false']);
+
+        // Office 1 Procedure and Office 2 Procedure sharing CodeNum 50
+        $proc1 = OdProcedure::create(['office_id' => $this->office->id, 'CodeNum' => 50, 'ProcCode' => 'D0120', 'Descript' => 'Office 1 Exam']);
+        $proc2 = OdProcedure::create(['office_id' => $office2->id, 'CodeNum' => 50, 'ProcCode' => 'D2740', 'Descript' => 'Office 2 Crown']);
+
+        // Procedure log in Office 1 ($400 TP)
+        OdProcedureLog::create([
+            'office_id' => $this->office->id,
+            'ProcNum' => 101,
+            'PatNum' => 1,
+            'ProvNum' => 10,
+            'ClinicNum' => 0,
+            'CodeNum' => 50,
+            'ProcDate' => '2026-07-15',
+            'ProcFee' => '400.00',
+            'ProcStatus' => 'TP',
+        ]);
+
+        // Procedure log in Office 2 ($900 TP)
+        OdProcedureLog::create([
+            'office_id' => $office2->id,
+            'ProcNum' => 201,
+            'PatNum' => 1,
+            'ProvNum' => 10,
+            'ClinicNum' => 0,
+            'CodeNum' => 50,
+            'ProcDate' => '2026-07-15',
+            'ProcFee' => '900.00',
+            'ProcStatus' => 'TP',
+        ]);
+
+        // Verify Office 1
+        $res1 = $this->actingAs($user)->withSession(['active_office_id' => $this->office->id])
+            ->getJson(route('tx-miner.data', ['month' => '2026-07']));
+        $res1->assertOk();
+        $row1 = collect($res1->json('data'))->firstWhere('month_group', '2026-07');
+        $this->assertEquals('$ 400.00', $row1['total_tx_plan']);
+
+        // Verify Office 2
+        $res2 = $this->actingAs($user)->withSession(['active_office_id' => $office2->id])
+            ->getJson(route('tx-miner.data', ['month' => '2026-07']));
+        $res2->assertOk();
+        $row2 = collect($res2->json('data'))->firstWhere('month_group', '2026-07');
+        $this->assertEquals('$ 900.00', $row2['total_tx_plan']);
+
+        // Verify Drilldown for Office 1 does not duplicate or leak Office 2 procedure description
+        $drill1 = $this->actingAs($user)->withSession(['active_office_id' => $this->office->id])
+            ->get(route('tx-miner.drilldown', ['month' => '2026-07', 'metric' => 'total_tx_plan']));
+        $drill1->assertOk();
+        $drill1->assertSee('Office 1 Exam');
+        $drill1->assertDontSee('Office 2 Crown');
+        $drill1->assertSee('$ 400.00');
+        $drill1->assertDontSee('$ 800.00'); // ensuring row wasn't duplicated
+    }
 }

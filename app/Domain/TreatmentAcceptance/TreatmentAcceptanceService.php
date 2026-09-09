@@ -111,7 +111,10 @@ class TreatmentAcceptanceService
             ->whereBetween('pl.ProcDate', [$filter->start, $filter->end]);
 
         if ($filter->hygiene !== null) {
-            $q->join('od_procedures as pc', 'pl.CodeNum', '=', 'pc.CodeNum')
+            $q->join('od_procedures as pc', function ($join) use ($filter) {
+                $join->on('pl.CodeNum', '=', 'pc.CodeNum')
+                    ->where('pc.office_id', '=', $filter->officeId);
+            })
                 ->where('pc.IsHygiene', $filter->hygiene ? 'true' : 'false');
         }
 

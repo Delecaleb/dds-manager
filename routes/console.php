@@ -76,6 +76,25 @@ Schedule::command('snapshot:daily-schedule --future-days=60')
     ->onOneServer();
 
 /*
+| ORPHAN DATA PRUNING (runs twice daily: 07:30 AM EST before morning snapshot & 19:30 PM EST)
+| Incremental pruning automatically removes records added today that were deleted in Open Dental across all active offices,
+| logging each run to sync_log_prune.
+*/
+Schedule::command('sync:prune-deleted --today')
+    ->dailyAt('07:30')
+    ->timezone('America/New_York')
+    ->withoutOverlapping(120)
+    ->runInBackground()
+    ->onOneServer();
+
+Schedule::command('sync:prune-deleted --today')
+    ->dailyAt('19:30')
+    ->timezone('America/New_York')
+    ->withoutOverlapping(120)
+    ->runInBackground()
+    ->onOneServer();
+
+/*
 | NOTE: Heavy range-backfill commands (`sync:*-range`) are kept on-demand
 | for initial setups and manual backfills via CLI / UI Sync Requests to avoid
 | overloading OpenDental servers during regular scheduled runs.
