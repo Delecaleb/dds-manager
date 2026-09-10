@@ -38,7 +38,7 @@
   </section>
 
   <!-- ── TABS ───────────────────────────────────────────── -->
-  <section class="px-8 bg-white border-b border-gray-200 flex gap-6 text-sm font-bold text-gray-400">
+  <section class="px-8 bg-white border-b border-gray-200 flex flex-nowrap overflow-x-auto gap-6 text-sm font-bold text-gray-400 dds-tab-nav">
     <button id="summaryTab" class="border-b-4 border-[#00c58e] text-gray-900 pb-2 pt-4 transition">Summary</button>
     <button id="detailTab"
       class="border-b-4 border-transparent hover:text-gray-700 pb-2 pt-4 transition">Detail</button>

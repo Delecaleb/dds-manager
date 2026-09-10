@@ -36,9 +36,9 @@
     </div>
   </section>
 
-  <section class="px-8 pt-4 bg-white border-b border-gray-200">
-    <div class="flex space-x-6">
-      <button class="border-b-2 border-emerald-500 text-emerald-600 font-bold text-sm pb-3">Default</button>
+  <section class="px-8 pt-4 bg-white border-b border-gray-200 overflow-x-auto">
+    <div class="flex flex-nowrap overflow-x-auto space-x-6 dds-tab-nav">
+      <button class="border-b-2 border-emerald-500 text-emerald-600 font-bold text-sm pb-3 whitespace-nowrap flex-shrink-0">Default</button>
     </div>
   </section>
 

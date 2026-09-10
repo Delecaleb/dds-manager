@@ -29,7 +29,7 @@
         </button>
     </header>
 
-    <nav class="bg-white border-b border-gray-200 px-6 flex gap-6 text-sm font-medium text-gray-500">
+    <nav class="bg-white border-b border-gray-200 px-6 flex gap-6 text-sm font-medium text-gray-500 dds-tab-nav flex-nowrap overflow-x-auto">
         <a href="{{ route('front-office.index') }}"
             class="border-b-2 border-transparent hover:text-gray-700 py-3.5 px-1">Schedule</a>
         <a href="{{ route('front-office.tasks') }}"

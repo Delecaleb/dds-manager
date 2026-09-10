@@ -45,7 +45,7 @@
 
         <!-- Tabs -->
         <div class="border-b border-slate-200">
-            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+            <nav class="-mb-px flex flex-nowrap overflow-x-auto space-x-8 dds-tab-nav" aria-label="Tabs">
                 <button type="button"
                     class="tab-btn active border-emerald-500 text-emerald-600 whitespace-nowrap py-4 px-1 border-b-2 font-semibold text-sm transition-colors"
                     data-target="#tab-month" data-tab="month">

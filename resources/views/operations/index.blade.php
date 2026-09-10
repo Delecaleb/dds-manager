@@ -170,7 +170,7 @@
 
             {{-- Main tab nav --}}
             <div
-                class="border-b border-slate-200 w-full flex flex-wrap gap-x-6 gap-y-2 text-slate-400 font-medium text-sm pt-2">
+                class="border-b border-slate-200 w-full flex flex-nowrap overflow-x-auto gap-x-6 text-slate-400 font-medium text-sm pt-2 dds-tab-nav">
                 @foreach ($tabs as $slug => $label)
                     <a href="{{ route('operations.tab', $slug) }}" data-ops-tab="{{ $slug }}"
                         class="ops-tab pb-2 border-b-2 transition-all duration-150 whitespace-nowrap

@@ -137,17 +137,51 @@
             min-height: 115px;
             height: 100%;
         }
+
+        /* Mobile overrides for calendar and sidebar */
+        @media (max-width: 767.98px) {
+            #apt-sidebar {
+                position: fixed !important;
+                top: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                left: auto !important;
+                width: 100% !important;
+                max-width: 340px !important;
+                z-index: 60 !important;
+                box-shadow: -4px 0 25px rgba(0, 0, 0, 0.25) !important;
+            }
+
+            .fc .fc-col-header-cell-cushion {
+                font-size: 0.7rem;
+                padding: 4px 2px;
+            }
+
+            .fc-datagrid-cell-cushion {
+                font-size: 0.65rem;
+                padding: 4px 2px;
+            }
+
+            .fc .fc-timegrid-slot-label-cushion {
+                font-size: 0.62rem;
+            }
+
+            .fc-daygrid-day,
+            .fc-daygrid-day-frame {
+                min-height: 80px;
+            }
+        }
     </style>
-    <header class="bg-white border-b border-gray-100 px-8 py-4 flex justify-between items-center">
+    <header class="bg-white border-b border-gray-100 px-4 md:px-8 py-3 md:py-4 flex justify-between items-center">
         <div class="flex items-center space-x-2">
-            <h1 class="text-3xl font-extrabold tracking-tight text-gray-900">Calendar</h1>
+            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">Calendar</h1>
         </div>
     </header>
     <div class="flex flex-col bg-slate-50" style="min-height: calc(100vh - 64px);">
 
         {{-- ══════════════════ TOP TOOLBAR ══════════════════ --}}
-        <div class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0">
-            <div class="flex items-center gap-3">
+        <div class="bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+            <div class="flex flex-wrap items-center gap-2 md:gap-3">
                 <div id="singleDateWrapper"
                     class="relative flex items-center border border-slate-300 rounded px-3 py-1.5 gap-2 bg-white shadow-sm">
                     <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor"
@@ -166,44 +200,39 @@
                     <x-daterange-picker id="calDateRange" on-apply="onCalendarRangeApply" />
                 </div>
 
-                <select id="clinicFilter"
-                    class="border border-slate-300 rounded px-3 py-1.5 text-sm font-medium text-slate-700 bg-white shadow-sm focus:outline-none focus:border-emerald-500 min-w-[120px]">
-                    <option>8 Mile</option>
-                </select>
-
                 <button id="refreshBtn"
-                    class="border border-emerald-500 text-emerald-600 px-5 py-1.5 rounded text-sm font-semibold hover:bg-emerald-50 transition shadow-sm">
+                    class="border border-emerald-500 text-emerald-600 px-4 md:px-5 py-1.5 rounded text-sm font-semibold hover:bg-emerald-50 transition shadow-sm">
                     Refresh
                 </button>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 md:gap-3">
                 <div id="viewToggleWrapper" class="flex bg-slate-100 rounded-md border border-slate-200 p-0.5 gap-0.5">
-                    <button class="view-btn px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
+                    <button class="view-btn px-3 md:px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
                         data-view="dayGridMonth">Month</button>
-                    <button class="view-btn px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
+                    <button class="view-btn px-3 md:px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
                         data-view="resourceTimeGridWeek">Week</button>
-                    <button class="view-btn active px-4 py-1.5 text-xs font-medium rounded transition-all"
+                    <button class="view-btn active px-3 md:px-4 py-1.5 text-xs font-medium rounded transition-all"
                         data-view="resourceTimeGridDay">Day</button>
                 </div>
             </div>
         </div>
 
         {{-- ══════════════════ TABS ══════════════════ --}}
-        <div class="bg-white border-b border-slate-200 px-6">
-            <nav class="flex gap-6">
+        <div class="bg-white border-b border-slate-200 px-4 md:px-6">
+            <nav class="flex gap-6 dds-tab-nav flex-nowrap overflow-x-auto">
                 <button id="tab-calendar"
-                    class="cal-tab py-2.5 text-sm font-bold text-slate-900 border-b-2 border-emerald-500"
+                    class="cal-tab py-2.5 text-sm font-bold text-slate-900 border-b-2 border-emerald-500 flex-shrink-0 whitespace-nowrap"
                     data-target="view-calendar">
                     Appointments Calendar
                 </button>
                 <button id="tab-details"
-                    class="cal-tab py-2.5 text-sm font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-colors"
+                    class="cal-tab py-2.5 text-sm font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-colors flex-shrink-0 whitespace-nowrap"
                     data-target="view-details">
                     Appointment Details
                 </button>
                 <button id="tab-capacity"
-                    class="cal-tab py-2.5 text-sm font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-colors"
+                    class="cal-tab py-2.5 text-sm font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-colors flex-shrink-0 whitespace-nowrap"
                     data-target="view-capacity">
                     Appointment Capacity
                 </button>
@@ -213,53 +242,55 @@
         <div id="view-calendar" class="flex flex-col flex-1 overflow-hidden">
 
             {{-- ══════════════════ STATS ROW ══════════════════ --}}
-            <div class="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-10 flex-shrink-0">
-                <div>
-                    <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
-                        <span id="stat-production-title">Production</span>
-                        <span class="text-slate-400 cursor-help" id="stat-production-help"
-                            title="Display $ amount of what has been produced for the day">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </span>
-                    </p>
-                    <p class="text-xl font-bold text-slate-900" id="stat-production">—</p>
+            <div class="bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
+                <div class="flex items-center gap-6 sm:gap-10 flex-wrap">
+                    <div>
+                        <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
+                            <span id="stat-production-title">Production</span>
+                            <span class="text-slate-400 cursor-help" id="stat-production-help"
+                                title="Display $ amount of what has been produced for the day">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </span>
+                        </p>
+                        <p class="text-xl font-bold text-slate-900" id="stat-production">—</p>
+                    </div>
+                    <div id="stat-scheduled-container" class="cursor-pointer group rounded-lg p-1.5 -m-1.5 transition hover:bg-emerald-50/60" title="Click to view scheduled production breakdown" onclick="openScheduledProductionModal()">
+                        <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1.5">
+                            <span id="stat-scheduled-title">Scheduled Production</span>
+                            <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                Breakdown
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </span>
+                        </p>
+                        <p class="text-xl font-bold text-slate-900 group-hover:text-emerald-700 transition-colors" id="stat-scheduled">—</p>
+                    </div>
                 </div>
-                <div id="stat-scheduled-container" class="cursor-pointer group rounded-lg p-1.5 -m-1.5 transition hover:bg-emerald-50/60" title="Click to view scheduled production breakdown" onclick="openScheduledProductionModal()">
-                    <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1.5">
-                        <span id="stat-scheduled-title">Scheduled Production</span>
-                        <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                            Breakdown
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                            </svg>
-                        </span>
-                    </p>
-                    <p class="text-xl font-bold text-slate-900 group-hover:text-emerald-700 transition-colors" id="stat-scheduled">—</p>
-                </div>
-                <div class="ml-auto flex items-center gap-2">
+                <div class="flex items-center gap-2">
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="activeColumnsToggle" class="sr-only peer" checked>
                         <div class="w-9 h-5 bg-slate-200 rounded-full peer peer-checked:bg-emerald-500
                      after:content-[''] after:absolute after:top-[2px] after:left-[2px]
                      after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
                      peer-checked:after:translate-x-full"></div>
-                        <span class="ml-2 text-sm font-medium text-slate-600">Active Columns only</span>
+                        <span class="ml-2 text-xs sm:text-sm font-medium text-slate-600">Active Columns only</span>
                     </label>
                 </div>
             </div>
 
             {{-- ══════════════════ NAV BAR ══════════════════ --}}
-            <div class="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between flex-shrink-0">
+            <div class="bg-white border-b border-slate-200 px-4 md:px-6 py-2 flex items-center justify-between gap-2 flex-shrink-0">
                 <button id="prevBtn" class="p-1.5 rounded border border-slate-300 hover:bg-slate-50 transition">
                     <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
-                <div class="flex items-center gap-3 text-sm">
-                    <span id="calDateLabel" class="font-bold text-slate-900 text-base"></span>
+                <div class="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm truncate">
+                    <span id="calDateLabel" class="font-bold text-slate-900 text-sm md:text-base truncate"></span>
                     <span class="text-slate-300">|</span>
                     <span id="liveTime" class="font-medium text-slate-500"></span>
                 </div>
@@ -272,7 +303,7 @@
 
             {{-- ══════════════════ PROVIDER HEADER ══════════════════ --}}
             <div id="provider-header"
-                class="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 overflow-x-auto select-none flex-shrink-0">
+                class="bg-white border-b border-slate-200 px-4 md:px-6 py-2.5 flex items-center gap-3 overflow-x-auto select-none flex-shrink-0 dds-tabs-scroll">
                 <!-- Rendered dynamically -->
             </div>
 
@@ -311,9 +342,9 @@
 
         </div>
 
-        <div id="view-details" class="hidden flex-col flex-1 overflow-y-auto bg-slate-50 p-6">
+        <div id="view-details" class="hidden flex-col flex-1 overflow-y-auto bg-slate-50 p-4 md:p-6">
             {{-- Filters --}}
-            <div class="flex gap-4 mb-6">
+            <div class="flex flex-col sm:flex-row gap-3 md:gap-4 mb-4 md:mb-6">
                 <div class="flex flex-col flex-1">
                     <label class="text-xs font-bold text-slate-900 mb-1">Provider(s)</label>
                     <select id="detailsFilterProvider"
@@ -335,32 +366,32 @@
             </div>
 
             {{-- White container for DataTable --}}
-            <div class="bg-white border border-slate-200 p-0 flex flex-col flex-1 h-full relative">
+            <div class="bg-white border border-slate-200 p-0 flex flex-col flex-1 h-full relative rounded-lg overflow-hidden">
                 {{-- Toolbar inside the table container --}}
-                <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-                    <div class="flex text-sm">
+                <div class="px-4 md:px-5 py-3 md:py-4 border-b border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div class="flex text-sm dds-tab-nav flex-nowrap overflow-x-auto">
                         <button
-                            class="bg-green-100 text-green-700 font-medium px-4 py-1.5 border border-transparent rounded-sm hover:bg-green-200 transition">Top
+                            class="bg-green-100 text-green-700 font-medium px-4 py-1.5 border border-transparent rounded-sm hover:bg-green-200 transition flex-shrink-0 whitespace-nowrap">Top
                             20%</button>
                         <button
-                            class="bg-yellow-100/70 text-yellow-700 font-medium px-4 py-1.5 border border-transparent 0 rounded-sm ml-1 hover:bg-yellow-200 transition">Mid
+                            class="bg-yellow-100/70 text-yellow-700 font-medium px-4 py-1.5 border border-transparent 0 rounded-sm ml-1 hover:bg-yellow-200 transition flex-shrink-0 whitespace-nowrap">Mid
                             Tier</button>
                         <button
-                            class="bg-red-100 text-red-600 font-medium px-4 py-1.5 border border-transparent rounded-sm ml-1 hover:bg-red-200 transition">Bottom
+                            class="bg-red-100 text-red-600 font-medium px-4 py-1.5 border border-transparent rounded-sm ml-1 hover:bg-red-200 transition flex-shrink-0 whitespace-nowrap">Bottom
                             20%</button>
                     </div>
-                    <div class="flex items-center gap-3 text-sm">
-                        <div class="relative">
+                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 md:gap-3 text-sm">
+                        <div class="relative flex-1 sm:flex-initial">
                             <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none"
                                 stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
                             <input type="text" id="detailsSearch" placeholder="Search"
-                                class="border border-slate-300 pl-9 pr-3 py-1.5 text-slate-700 w-64 focus:outline-emerald-500">
+                                class="border border-slate-300 pl-9 pr-3 py-1.5 text-slate-700 w-full sm:w-64 focus:outline-emerald-500 rounded-sm">
                         </div>
                         <button id="exportDetailsCsvBtn" onclick="exportAppointmentDetailsCsv()"
-                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5">
+                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5 flex-shrink-0">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
@@ -539,30 +570,30 @@
             </div>
         </div>
 
-        <div id="view-capacity" class="hidden flex-col flex-1 bg-slate-50 p-6 relative">
-            <div class="bg-white rounded-lg shadow-sm w-full p-5 border border-slate-200 flex flex-col flex-1">
+        <div id="view-capacity" class="hidden flex-col flex-1 bg-slate-50 p-4 md:p-6 relative overflow-y-auto">
+            <div class="bg-white rounded-lg shadow-sm w-full p-4 md:p-5 border border-slate-200 flex flex-col flex-1">
 
                 {{-- Header Actions --}}
-                <div class="flex items-center justify-between mb-4 flex-shrink-0">
-                    <div class="flex items-center gap-1 text-xs">
-                        <span class="px-3 py-1.5 font-semibold text-emerald-700 bg-emerald-100 rounded-sm">Top
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4 flex-shrink-0">
+                    <div class="flex items-center gap-1 text-xs dds-tab-nav flex-nowrap overflow-x-auto">
+                        <span class="px-3 py-1.5 font-semibold text-emerald-700 bg-emerald-100 rounded-sm flex-shrink-0 whitespace-nowrap">Top
                             20%</span>
-                        <span class="px-3 py-1.5 font-semibold text-yellow-700 bg-yellow-100 rounded-sm">Mid Tier</span>
-                        <span class="px-3 py-1.5 font-semibold text-red-700 bg-red-100/70 rounded-sm">Bottom 20%</span>
+                        <span class="px-3 py-1.5 font-semibold text-yellow-700 bg-yellow-100 rounded-sm flex-shrink-0 whitespace-nowrap">Mid Tier</span>
+                        <span class="px-3 py-1.5 font-semibold text-red-700 bg-red-100/70 rounded-sm flex-shrink-0 whitespace-nowrap">Bottom 20%</span>
                     </div>
 
-                    <div class="flex items-center gap-3 text-sm">
-                        <div class="relative">
+                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 md:gap-3 text-sm">
+                        <div class="relative flex-1 sm:flex-initial">
                             <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none"
                                 stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
                             <input type="text" id="capacitySearch" placeholder="Search"
-                                class="border border-slate-300 pl-9 pr-3 py-1.5 rounded-sm text-slate-700 w-48 focus:outline-emerald-500">
+                                class="border border-slate-300 pl-9 pr-3 py-1.5 rounded-sm text-slate-700 w-full sm:w-48 focus:outline-emerald-500">
                         </div>
                         <button id="exportCapacityCsvBtn" onclick="exportAppointmentCapacityCsv()"
-                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5">
+                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5 flex-shrink-0">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
@@ -2266,18 +2297,18 @@
     <x-app-components.datatable-modal id="capacity-breakdown-modal" />
 
     {{-- Scheduled Production Breakdown Modal --}}
-    <div id="scheduled-prod-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+    <div id="scheduled-prod-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+        <div class="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
             {{-- Modal Header --}}
-            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
+            <div class="px-4 md:px-6 py-3 md:py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-2.5 sm:gap-3">
+                    <div class="p-1.5 sm:p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-base font-bold text-white">Scheduled Production Breakdown</h3>
+                        <h3 class="text-sm sm:text-base font-bold text-white">Scheduled Production Breakdown</h3>
                         <p class="text-xs text-slate-400 font-medium" id="sched-modal-date">—</p>
                     </div>
                 </div>
@@ -2290,38 +2321,38 @@
             </div>
 
             {{-- Summary Cards Header --}}
-            <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 grid grid-cols-3 gap-4 flex-shrink-0">
+            <div class="bg-slate-50 border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 flex-shrink-0">
                 <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
                     <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Scheduled Production</p>
-                    <p class="text-2xl font-black text-emerald-600" id="sched-modal-total">—</p>
+                    <p class="text-xl sm:text-2xl font-black text-emerald-600" id="sched-modal-total">—</p>
                 </div>
                 <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
                     <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Scheduled Appointments</p>
-                    <p class="text-2xl font-black text-slate-800" id="sched-modal-count">—</p>
+                    <p class="text-xl sm:text-2xl font-black text-slate-800" id="sched-modal-count">—</p>
                 </div>
                 <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
                     <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Active Providers</p>
-                    <p class="text-2xl font-black text-slate-800" id="sched-modal-prov-count">—</p>
+                    <p class="text-xl sm:text-2xl font-black text-slate-800" id="sched-modal-prov-count">—</p>
                 </div>
             </div>
 
             {{-- Modal Navigation Tabs --}}
-            <div class="bg-white border-b border-slate-200 px-6 flex-shrink-0">
-                <nav class="flex gap-6">
-                    <button onclick="switchSchedTab('provider')" id="sched-tab-provider" class="sched-modal-tab py-3 text-xs font-bold text-slate-900 border-b-2 border-emerald-500">
+            <div class="bg-white border-b border-slate-200 px-4 md:px-6 flex-shrink-0">
+                <nav class="flex gap-4 md:gap-6 dds-tab-nav flex-nowrap overflow-x-auto">
+                    <button onclick="switchSchedTab('provider')" id="sched-tab-provider" class="sched-modal-tab py-3 text-xs font-bold text-slate-900 border-b-2 border-emerald-500 flex-shrink-0 whitespace-nowrap">
                         By Provider
                     </button>
-                    <button onclick="switchSchedTab('procedure')" id="sched-tab-procedure" class="sched-modal-tab py-3 text-xs font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition">
+                    <button onclick="switchSchedTab('procedure')" id="sched-tab-procedure" class="sched-modal-tab py-3 text-xs font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition flex-shrink-0 whitespace-nowrap">
                         By Procedure
                     </button>
-                    <button onclick="switchSchedTab('appointments')" id="sched-tab-appointments" class="sched-modal-tab py-3 text-xs font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition">
+                    <button onclick="switchSchedTab('appointments')" id="sched-tab-appointments" class="sched-modal-tab py-3 text-xs font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition flex-shrink-0 whitespace-nowrap">
                         Itemized Appointments
                     </button>
                 </nav>
             </div>
 
             {{-- Modal Body Content --}}
-            <div class="p-6 flex-1 overflow-y-auto bg-slate-50">
+            <div class="p-3 md:p-6 flex-1 overflow-y-auto bg-slate-50">
                 {{-- Tab 1: By Provider --}}
                 <div id="sched-view-provider" class="sched-modal-view space-y-3">
                     <!-- Rendered dynamically -->

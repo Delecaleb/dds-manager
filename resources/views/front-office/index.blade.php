@@ -45,7 +45,7 @@
         </button>
     </header>
 
-    <nav class="bg-white border-b border-gray-200 px-6 flex gap-6 text-sm font-medium text-gray-500">
+    <nav class="bg-white border-b border-gray-200 px-6 flex flex-nowrap overflow-x-auto gap-6 text-sm font-medium text-gray-500 dds-tab-nav" id="foTabNav">
         <a href="{{ route('front-office.index') }}"
             class="fo-nav-link border-b-2 py-3.5 px-1 transition-colors {{ ($activeTab ?? 'schedule') === 'schedule' ? 'border-emerald-500 text-emerald-600' : 'border-transparent hover:text-gray-700' }}">Schedule</a>
         <a href="{{ route('front-office.tasks') }}"

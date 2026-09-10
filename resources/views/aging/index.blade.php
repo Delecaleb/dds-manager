@@ -31,7 +31,7 @@
   </section>
 
   <!-- Tab Bar -->
-  <section class="px-8 bg-white border-b border-gray-200 flex gap-6 text-sm font-medium text-gray-500">
+  <section class="px-8 bg-white border-b border-gray-200 flex flex-nowrap overflow-x-auto gap-6 text-sm font-medium text-gray-500 dds-tab-nav">
     <button class="tab-btn border-b-2 border-emerald-500 text-emerald-600 font-bold pb-3 pt-4"
       data-tab="responsible_party">Responsible Party</button>
     <button class="tab-btn border-b-2 border-transparent hover:text-gray-700 pb-3 pt-4" data-tab="by_office">By

@@ -218,6 +218,8 @@
       border-left: none;
       border-right: none;
       border-top: none;
+      flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .main-tab:hover {
@@ -241,6 +243,8 @@
       background: #fff;
       color: #4b5563;
       transition: all .15s;
+      flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .sc-sub-tab:hover {
@@ -261,7 +265,7 @@
   </header>
 
   <section class="bg-white border-b border-gray-200 px-8 py-4">
-    <div class="flex flex-wrap items-center gap-3">
+    <div class="flex items-center gap-3">
       <x-daterange-picker on-apply="onDrpApply" />
       <span id="fetchError" class="hidden text-xs text-red-600 font-medium">
         <i class="fa-solid fa-triangle-exclamation mr-1"></i>Failed to load data.
@@ -269,7 +273,7 @@
     </div>
   </section>
 
-  <section class="px-8 bg-white border-b border-gray-200 flex gap-6 text-sm font-medium text-gray-500">
+  <section class="px-8 bg-white border-b border-gray-200 flex gap-6 text-sm font-medium text-gray-500 dds-tab-nav flex-nowrap overflow-x-auto">
     <button class="main-tab active" id="tabSummary" onclick="switchMainTab('summary')">Summary</button>
     <button class="main-tab" id="tabScoreCards" onclick="switchMainTab('score-cards')">Score Cards</button>
   </section>
@@ -585,8 +589,8 @@
 
     {{-- Header row: sub-tabs + filters --}}
     <div class="flex items-center justify-between flex-wrap gap-3">
-      <div class="flex items-center gap-2">
-        <h2 class="text-lg font-bold text-gray-800 mr-3">Score Cards</h2>
+      <div class="flex items-center gap-2 dds-tab-nav flex-nowrap overflow-x-auto">
+        <h2 class="text-lg font-bold text-gray-800 mr-3 flex-shrink-0">Score Cards</h2>
         <button class="sc-sub-tab active" id="scTabProd" onclick="switchScTab('production')">Production</button>
         <button class="sc-sub-tab" id="scTabColl" onclick="switchScTab('collection')">Collection</button>
       </div>
@@ -630,7 +634,7 @@
 
       {{-- Tier tabs + search + export --}}
       <div class="flex items-center justify-between flex-wrap gap-3 px-5 py-4 border-b border-gray-200">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 dds-tab-nav flex-nowrap overflow-x-auto">
           <button class="sc-tier-btn active-all" data-tier="all" onclick="scSetTier('all')">All</button>
           <button class="sc-tier-btn" data-tier="top" onclick="scSetTier('top')">Top 20%</button>
           <button class="sc-tier-btn" data-tier="mid" onclick="scSetTier('mid')">Mid Tier</button>

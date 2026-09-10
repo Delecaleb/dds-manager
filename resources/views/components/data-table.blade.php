@@ -84,4 +84,16 @@
 thead .dt-col-sticky { z-index: 35; background: #f9fafb; }
 tfoot .dt-col-sticky { z-index: 25; background: #f9fafb; }
 tr:hover .dt-col-sticky { background: #f8fafc; }
+
+@media (max-width: 767.98px) {
+    .dt-col-sticky,
+    thead .dt-col-sticky,
+    tfoot .dt-col-sticky,
+    tr:hover .dt-col-sticky {
+        position: static !important;
+        left: auto !important;
+        box-shadow: none !important;
+        z-index: auto !important;
+    }
+}
 </style>

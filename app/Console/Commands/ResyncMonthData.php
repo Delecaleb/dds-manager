@@ -82,6 +82,7 @@ class ResyncMonthData extends Command
             'sync:insplan' => 'Insurance Plans',
             'sync:carriers' => 'Insurance Carriers',
             'sync:providers' => 'Providers',
+            'sync:procedures' => 'Procedure Codes',
             'sync:patients' => 'Patients',
             'sync:appointments' => 'Appointments',
             'sync:histappointments' => 'Historical Appointments',
@@ -91,11 +92,14 @@ class ResyncMonthData extends Command
             'sync:payment' => 'Payments',
             'sync:paysplits' => 'Pay Splits',
             'sync:claimpayments' => 'Claim Payments & Checks',
-            'sync:treatmentplans' => 'Treatment Plans',
-            'sync:treatmentplanattachments' => 'Treatment Plan Attachments',
+            'sync:deposit' => 'Deposits',
+            'sync:payplancharges' => 'Pay Plan Charges',
+            'sync:treatment-plans' => 'Treatment Plans',
+            'sync:treatment-plan-attachments' => 'Treatment Plan Attachments',
             'sync:schedules' => 'Schedules',
             'sync:recalls' => 'Recalls',
             'sync:recall-types' => 'Recall Types',
+            'sync:statements' => 'Statements',
         ];
 
         foreach ($offices as $office) {

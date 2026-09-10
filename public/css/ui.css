@@ -513,3 +513,213 @@ table.dataTable tfoot tr > .dtfc-fixed-right {
     border-color: #00bfa5;
     box-shadow: 0 0 0 1px #00bfa5;
 }
+
+/* ============================================================================
+   UNIVERSAL TAB HORIZONTAL SCROLLING
+   Ensures tab bars slide smoothly horizontally on mobile/small viewports
+   without wrapping into vertical blocks or overflowing the viewport.
+   ============================================================================ */
+.dds-tab-nav,
+.dds-tabs-scroll,
+.ops-tab-nav,
+.nav-tabs,
+nav[aria-label="Tabs"],
+nav[role="tablist"],
+.tab-container,
+#rcmTabNav,
+#rcmTierPills,
+.tier-pills,
+#foTabNav,
+.portal-tabs-nav,
+nav.flex.gap-6,
+nav.flex.gap-8,
+section.border-b > div.flex,
+section.border-b > nav.flex,
+div.border-b > nav.flex,
+ul.border-b.flex {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important;  /* IE/Edge */
+    max-width: 100% !important;
+}
+
+/* Hide scrollbar for Chrome, Safari, Opera */
+.dds-tab-nav::-webkit-scrollbar,
+.dds-tabs-scroll::-webkit-scrollbar,
+.ops-tab-nav::-webkit-scrollbar,
+.nav-tabs::-webkit-scrollbar,
+nav[aria-label="Tabs"]::-webkit-scrollbar,
+nav[role="tablist"]::-webkit-scrollbar,
+#rcmTabNav::-webkit-scrollbar,
+#rcmTierPills::-webkit-scrollbar,
+.tier-pills::-webkit-scrollbar,
+#foTabNav::-webkit-scrollbar,
+section.border-b > div.flex::-webkit-scrollbar,
+section.border-b > nav.flex::-webkit-scrollbar,
+div.border-b > nav.flex::-webkit-scrollbar,
+ul.border-b.flex::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+/* Tab items stay on a single line and never shrink */
+.dds-tab,
+.ops-tab,
+.fo-nav-link,
+.tab-btn,
+.rcm-tab,
+.tier-btn,
+.sc-tier-btn,
+.main-tab,
+.sc-sub-tab,
+.deposit-tab,
+.aging-tab,
+.portal-tab-btn,
+.nav-tabs a,
+.nav-tabs button,
+nav[aria-label="Tabs"] a,
+nav[aria-label="Tabs"] button,
+ul.border-b.flex a,
+ul.border-b.flex button,
+ul.border-b.flex li {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}
+
+/* ============================================================================
+   MOBILE RESPONSIVENESS & COLUMN UNSTICKING (< 768px)
+   1. Unfix vertical/horizontal fixed columns of tables on mobile
+   2. Enable natural horizontal touch swiping on all data tables
+   3. Scale modals, cards, and filter bars for mobile viewports
+   ============================================================================ */
+@media (max-width: 767.98px) {
+    /* ── Disable sticky / frozen columns on mobile screens ── */
+    .dds-stick,
+    .dds-stick-2,
+    .dt-col-sticky,
+    .dds-stick-shadow,
+    thead th.dds-stick,
+    thead th.dds-stick-2,
+    thead th.dt-col-sticky,
+    thead .dt-col-sticky,
+    .dds-table thead th.dds-stick,
+    .dds-table thead th.dds-stick-2,
+    .dds-table thead .dt-col-sticky,
+    .dds-table thead .dds-stick,
+    .dds-table thead .dds-stick-2,
+    tbody td.dds-stick,
+    tbody td.dds-stick-2,
+    tbody td.dt-col-sticky,
+    .dds-table tbody td.dds-stick,
+    .dds-table tbody td.dds-stick-2,
+    .dds-table tbody .dt-col-sticky,
+    .dds-table tbody .dds-stick,
+    .dds-table tbody .dds-stick-2,
+    tbody tr:hover td.dds-stick,
+    tbody tr:hover td.dds-stick-2,
+    tbody tr:hover td.dt-col-sticky,
+    tbody tr:hover .dds-stick,
+    tbody tr:hover .dds-stick-2,
+    tbody tr:hover .dt-col-sticky,
+    tfoot td.dds-stick,
+    tfoot td.dds-stick-2,
+    tfoot td.dt-col-sticky,
+    .dds-table tfoot td.dds-stick,
+    .dds-table tfoot td.dds-stick-2,
+    .dds-table tfoot .dt-col-sticky,
+    .dds-table tfoot .dds-stick,
+    .dds-table tfoot .dds-stick-2,
+    table.dataTable thead tr > .dtfc-fixed-left,
+    table.dataTable thead tr > .dtfc-fixed-right,
+    table.dataTable tbody tr > .dtfc-fixed-left,
+    table.dataTable tbody tr > .dtfc-fixed-right,
+    table.dataTable tfoot tr > .dtfc-fixed-left,
+    table.dataTable tfoot tr > .dtfc-fixed-right,
+    th[class*="sticky-col"],
+    td[class*="sticky-col"],
+    .sticky-left-col,
+    .dtfc-fixed-left,
+    .dtfc-fixed-right,
+    table th.sticky[class*="left-"],
+    table td.sticky[class*="left-"],
+    table th.sticky[class*="left"],
+    table td.sticky[class*="left"],
+    table th[class*="sticky"][class*="left"],
+    table td[class*="sticky"][class*="left"],
+    table th[class*="left-0"],
+    table td[class*="left-0"],
+    table th[class*="left-10"],
+    table td[class*="left-10"],
+    table th[class*="left-["],
+    table td[class*="left-["],
+    th.sticky.left-0,
+    td.sticky.left-0,
+    th.sticky.left-10,
+    td.sticky.left-10,
+    th.sticky.left-\[144px\],
+    td.sticky.left-\[144px\],
+    th.sticky.left-\[200px\],
+    td.sticky.left-\[200px\],
+    th.sticky.left-\[260px\],
+    td.sticky.left-\[260px\],
+    div.sticky.left-0,
+    div.sticky.left-10 {
+        position: static !important;
+        left: auto !important;
+        right: auto !important;
+        box-shadow: none !important;
+        z-index: auto !important;
+        border-right: 1px solid var(--dds-border, #e5e7eb) !important;
+    }
+
+    /* ── Touch table scrolling container on mobile ── */
+    .dds-table-scroll,
+    .overflow-x-auto,
+    div[style*="overflow-x: auto"] {
+        -webkit-overflow-scrolling: touch !important;
+        max-width: 100vw;
+    }
+
+    /* ── Responsive Filter Controls on Mobile ── */
+    .filter-bar,
+    section[class*="border-b"][class*="flex"],
+    div[class*="flex-wrap items-center"] {
+        gap: 0.5rem !important;
+    }
+
+    /* ── Responsive Modals on Mobile ── */
+    .dds-modal {
+        padding: 0.5rem !important;
+    }
+
+    .dds-modal-panel {
+        width: 100% !important;
+        max-width: 98vw !important;
+        max-height: 92vh !important;
+        border-radius: 0.5rem !important;
+    }
+
+    /* ── DataTables controls on Mobile ── */
+    .dataTables_length,
+    .dt-length,
+    .dataTables_filter,
+    .dt-search,
+    .dataTables_info,
+    .dt-info,
+    .dataTables_paginate,
+    .dt-paging {
+        float: none !important;
+        text-align: center !important;
+        justify-content: center !important;
+        width: 100% !important;
+        margin: 0.35rem 0 !important;
+    }
+}

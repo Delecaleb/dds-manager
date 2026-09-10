@@ -35,7 +35,7 @@
             </div>
 
             <!-- Portal Navigation Tabs -->
-            <div class="flex gap-8 border-b border-slate-200 text-sm font-medium">
+            <div class="flex flex-nowrap overflow-x-auto gap-8 border-b border-slate-200 text-sm font-medium dds-tab-nav portal-tabs-nav">
                 <button type="button" id="tabPatientsBtn"
                     class="portal-tab-btn border-b-2 border-emerald-500 text-slate-900 pb-3 font-bold flex items-center gap-2 cursor-pointer transition-all">
                     <i data-lucide="users" class="w-4 h-4"></i> Patients
