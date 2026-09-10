@@ -19,7 +19,7 @@ class HardDeleteSyncService
      * @var array<string, array{
      *     od_table: string,
      *     pk: string,
-     *     date_col: string,
+     *     date_cols: array<string>,
      *     is_datetime: bool
      * }>
      */
@@ -27,103 +27,103 @@ class HardDeleteSyncService
         'od_procedure_logs' => [
             'od_table' => 'procedurelog',
             'pk' => 'ProcNum',
-            'date_col' => 'ProcDate',
+            'date_cols' => ['ProcDate', 'DateEntryC', 'DateTP'],
             'is_datetime' => false,
         ],
         'od_appointments' => [
             'od_table' => 'appointment',
             'pk' => 'AptNum',
-            'date_col' => 'AptDateTime',
+            'date_cols' => ['AptDateTime'],
             'is_datetime' => true,
         ],
         'od_adjustments' => [
             'od_table' => 'adjustment',
             'pk' => 'AdjNum',
-            'date_col' => 'AdjDate',
+            'date_cols' => ['AdjDate', 'DateEntry', 'SecDateTEdit'],
             'is_datetime' => false,
         ],
         'od_claim_procs' => [
             'od_table' => 'claimproc',
             'pk' => 'ClaimProcNum',
-            'date_col' => 'ProcDate',
+            'date_cols' => ['ProcDate', 'DateCP', 'DateEntry'],
             'is_datetime' => false,
         ],
         'od_pay_splits' => [
             'od_table' => 'paysplit',
             'pk' => 'SplitNum',
-            'date_col' => 'DatePay',
+            'date_cols' => ['DatePay', 'DateEntry', 'SecDateTEdit'],
             'is_datetime' => false,
         ],
         'od_payments' => [
             'od_table' => 'payment',
             'pk' => 'PayNum',
-            'date_col' => 'PayDate',
+            'date_cols' => ['PayDate', 'DateEntry', 'SecDateTEdit'],
             'is_datetime' => false,
         ],
         'od_claim_payments' => [
             'od_table' => 'claimpayment',
             'pk' => 'ClaimPaymentNum',
-            'date_col' => 'SecDateTEdit',
+            'date_cols' => ['CheckDate', 'DateIssued', 'SecDateTEdit'],
             'is_datetime' => false,
         ],
         'od_recalls' => [
             'od_table' => 'recall',
             'pk' => 'RecallNum',
-            'date_col' => 'DateDue',
+            'date_cols' => ['DateDue'],
             'is_datetime' => false,
         ],
         'od_schedules' => [
             'od_table' => 'schedule',
             'pk' => 'ScheduleNum',
-            'date_col' => 'SchedDate',
+            'date_cols' => ['SchedDate'],
             'is_datetime' => false,
         ],
         'treatment_plans' => [
             'od_table' => 'treatplan',
             'pk' => 'TreatPlanNum',
-            'date_col' => 'DateTP',
+            'date_cols' => ['DateTP'],
             'is_datetime' => false,
         ],
         'od_patients' => [
             'od_table' => 'patient',
             'pk' => 'PatNum',
-            'date_col' => 'SecDateEntry',
+            'date_cols' => ['SecDateEntry', 'DateFirstVisit'],
             'is_datetime' => false,
         ],
         'od_pay_plan_charges' => [
             'od_table' => 'payplancharge',
             'pk' => 'PayPlanChargeNum',
-            'date_col' => 'ChargeDate',
+            'date_cols' => ['ChargeDate', 'SecDateTEdit'],
             'is_datetime' => false,
         ],
         'od_treatment_plan_attachments' => [
             'od_table' => 'treatplanattach',
             'pk' => 'TreatPlanAttachNum',
-            'date_col' => 'SecDateTEdit',
+            'date_cols' => ['SecDateTEdit'],
             'is_datetime' => false,
         ],
         'od_deposits' => [
             'od_table' => 'deposit',
             'pk' => 'DepositNum',
-            'date_col' => 'DateDeposit',
+            'date_cols' => ['DateDeposit'],
             'is_datetime' => false,
         ],
         'od_statements' => [
             'od_table' => 'statement',
             'pk' => 'StatementNum',
-            'date_col' => 'DateSent',
+            'date_cols' => ['DateSent'],
             'is_datetime' => false,
         ],
         'od_histappointments' => [
             'od_table' => 'histappointment',
-            'pk' => 'HistAptNum',
-            'date_col' => 'HistDate',
+            'pk' => 'HistApptNum',
+            'date_cols' => ['HistDate', 'AptDateTime'],
             'is_datetime' => false,
         ],
         'od_insplans' => [
             'od_table' => 'insplan',
             'pk' => 'PlanNum',
-            'date_col' => 'SecDateTEdit',
+            'date_cols' => ['SecDateTEdit'],
             'is_datetime' => false,
         ],
     ];
@@ -210,19 +210,24 @@ class HardDeleteSyncService
             $remoteCount = 0;
 
             if (! empty($localKeys)) {
-                // Process in chunks of 500 keys to avoid SQL query length limits
                 foreach (array_chunk($localKeys, 500) as $chunk) {
-                    $inClause = implode(',', $chunk);
-                    $odSql = "SELECT {$pk} FROM {$odTable} WHERE {$pk} IN ({$inClause})";
-
-                    $odRows = $this->queryService->shortQuery($odSql);
-                    $chunkRemoteKeys = array_map('intval', array_column($odRows, $pk));
+                    $chunkRemoteKeys = $this->fetchRemotePrimaryKeys($odTable, $pk, $chunk, $officeId);
                     $remoteCount += count($chunkRemoteKeys);
 
                     $chunkOrphans = array_values(array_diff($chunk, $chunkRemoteKeys));
                     if (! empty($chunkOrphans)) {
                         $orphanKeys = array_merge($orphanKeys, $chunkOrphans);
                     }
+                }
+            }
+
+            // Safety Circuit Breaker: If all records are reported as orphans for a non-empty table (> 10 items),
+            // verify connectivity before destructive deletion.
+            if (! $dryRun && ! empty($orphanKeys) && count($orphanKeys) === $localCount && $localCount >= 10) {
+                $checkSql = "SELECT COUNT(*) as cnt FROM {$odTable}";
+                $testRes = $this->queryService->shortQuery($checkSql);
+                if (empty($testRes) || ! is_array($testRes)) {
+                    throw new Exception("Safety Circuit Breaker: Remote table '{$odTable}' could not be verified for office [{$officeId}]. Aborting prune to prevent data loss.");
                 }
             }
 
@@ -353,8 +358,6 @@ class HardDeleteSyncService
 
             $pk = $config['pk'];
             $odTable = $config['od_table'];
-            $dateCol = $config['date_col'];
-            $isDateTime = $config['is_datetime'];
 
             if (! Schema::hasTable($tableKey)) {
                 $this->finishPruneLog($pruneLog, 0, 0, 0, $dryRun);
@@ -375,47 +378,17 @@ class HardDeleteSyncService
                 ];
             }
 
-            // 1. Fetch local primary keys added/dated within the window for this office
-            $localQuery = DB::table($tableKey)->where('office_id', $officeId);
-            $hasDateCol = Schema::hasColumn($tableKey, $dateCol);
-            $hasCreatedAt = Schema::hasColumn($tableKey, 'created_at');
-
-            if ($tableKey === 'od_patients') {
-                // For patient table: capture records by SecDateEntry, DateFirstVisit, or created_at
-                $localQuery->where(function ($q) use ($dateCol, $startDate, $endDate, $hasCreatedAt) {
-                    $q->whereBetween($dateCol, [$startDate, $endDate]);
-                    if (Schema::hasColumn('od_patients', 'DateFirstVisit')) {
-                        $q->orWhereBetween('DateFirstVisit', [$startDate, $endDate]);
-                    }
-                    if ($hasCreatedAt) {
-                        $q->orWhereBetween('created_at', ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
-                    }
-                });
-            } elseif ($hasDateCol) {
-                if ($isDateTime) {
-                    $localQuery->whereBetween($dateCol, ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
-                } else {
-                    $localQuery->whereBetween($dateCol, [$startDate, $endDate]);
-                }
-            } elseif ($hasCreatedAt) {
-                $localQuery->whereBetween('created_at', ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
-            }
-
-            $localKeys = array_map('intval', $localQuery->pluck($pk)->toArray());
+            // 1. Fetch local primary keys associated with the date window across all date columns
+            $localKeys = $this->fetchLocalKeysByDateRange($tableKey, $startDate, $endDate, $officeId, $config);
             $localCount = count($localKeys);
 
             // 2. Query OpenDental directly by primary keys (WHERE pk IN (...))
-            // This ensures we check if the data exists anywhere in OpenDental, preventing false positives
             $orphanKeys = [];
             $remoteCount = 0;
 
             if (! empty($localKeys)) {
                 foreach (array_chunk($localKeys, 500) as $chunk) {
-                    $inClause = implode(',', $chunk);
-                    $odSql = "SELECT {$pk} FROM {$odTable} WHERE {$pk} IN ({$inClause})";
-
-                    $odRows = $this->queryService->shortQuery($odSql);
-                    $chunkRemoteKeys = array_map('intval', array_column($odRows, $pk));
+                    $chunkRemoteKeys = $this->fetchRemotePrimaryKeys($odTable, $pk, $chunk, $officeId);
                     $remoteCount += count($chunkRemoteKeys);
 
                     // Any key not returned by OpenDental does NOT exist in OpenDental (True Orphan)
@@ -423,6 +396,15 @@ class HardDeleteSyncService
                     if (! empty($chunkOrphans)) {
                         $orphanKeys = array_merge($orphanKeys, $chunkOrphans);
                     }
+                }
+            }
+
+            // Safety Circuit Breaker: If 100% of records are reported orphan for a large dataset, verify remote connection
+            if (! $dryRun && ! empty($orphanKeys) && count($orphanKeys) === $localCount && $localCount >= 10) {
+                $checkSql = "SELECT COUNT(*) as cnt FROM {$odTable}";
+                $testRes = $this->queryService->shortQuery($checkSql);
+                if (empty($testRes) || ! is_array($testRes)) {
+                    throw new Exception("Safety Circuit Breaker: Remote table '{$odTable}' could not be verified for office [{$officeId}]. Aborting prune to prevent data loss.");
                 }
             }
 
@@ -464,6 +446,112 @@ class HardDeleteSyncService
             }
             throw $e;
         }
+    }
+
+    /**
+     * Query OpenDental for a batch of primary keys and extract returned keys case-insensitively.
+     *
+     * @param  string  $odTable  Native OpenDental table name
+     * @param  string  $pk  Primary key column name
+     * @param  int[]  $chunk  Batch of primary keys
+     * @param  int  $officeId  Target office ID
+     * @return int[]
+     *
+     * @throws Exception
+     */
+    protected function fetchRemotePrimaryKeys(string $odTable, string $pk, array $chunk, int $officeId): array
+    {
+        if (empty($chunk)) {
+            return [];
+        }
+
+        $inClause = implode(',', $chunk);
+        $odSql = "SELECT {$pk} FROM {$odTable} WHERE {$pk} IN ({$inClause})";
+
+        $odRows = $this->queryService->shortQuery($odSql);
+
+        if (! is_array($odRows)) {
+            throw new Exception("OpenDental API query failed or returned non-array response for table '{$odTable}' (Office ID: {$officeId}). Response: ".json_encode($odRows));
+        }
+
+        if (isset($odRows['Error']) || isset($odRows['error']) || isset($odRows['Message'])) {
+            $err = $odRows['Error'] ?? $odRows['error'] ?? $odRows['Message'];
+            throw new Exception("OpenDental API error for table '{$odTable}' (Office ID: {$officeId}): {$err}");
+        }
+
+        $remoteKeys = [];
+        foreach ($odRows as $row) {
+            $rowArr = (array) $row;
+            foreach ($rowArr as $k => $v) {
+                if (strcasecmp($k, $pk) === 0 && is_numeric($v)) {
+                    $remoteKeys[] = (int) $v;
+                    break;
+                }
+            }
+        }
+
+        return array_values(array_unique($remoteKeys));
+    }
+
+    /**
+     * Fetch local primary keys associated with a date range across multi-date columns.
+     *
+     * @return int[]
+     */
+    protected function fetchLocalKeysByDateRange(
+        string $tableKey,
+        string $startDate,
+        string $endDate,
+        int $officeId,
+        array $config
+    ): array {
+        $pk = $config['pk'];
+        $dateCols = $config['date_cols'] ?? (isset($config['date_col']) ? [$config['date_col']] : []);
+        $isDateTime = (bool) ($config['is_datetime'] ?? false);
+
+        $query = DB::table($tableKey)->where('office_id', $officeId);
+
+        $validCols = [];
+        foreach ($dateCols as $col) {
+            if (Schema::hasColumn($tableKey, $col)) {
+                $validCols[] = $col;
+            }
+        }
+
+        $hasCreatedAt = Schema::hasColumn($tableKey, 'created_at');
+
+        if (! empty($validCols) || $hasCreatedAt) {
+            $query->where(function ($q) use ($validCols, $isDateTime, $hasCreatedAt, $startDate, $endDate) {
+                $first = true;
+                foreach ($validCols as $col) {
+                    $colIsDt = $isDateTime || str_contains(strtolower($col), 'time') || str_contains(strtolower($col), 'stamp');
+                    $clause = function ($sub) use ($col, $colIsDt, $startDate, $endDate) {
+                        if ($colIsDt) {
+                            $sub->whereBetween($col, ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
+                        } else {
+                            $sub->whereBetween($col, [$startDate, $endDate]);
+                        }
+                    };
+
+                    if ($first) {
+                        $q->where($clause);
+                        $first = false;
+                    } else {
+                        $q->orWhere($clause);
+                    }
+                }
+
+                if ($hasCreatedAt) {
+                    if ($first) {
+                        $q->whereBetween('created_at', ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
+                    } else {
+                        $q->orWhereBetween('created_at', ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
+                    }
+                }
+            });
+        }
+
+        return array_values(array_map('intval', $query->pluck($pk)->toArray()));
     }
 
     /**

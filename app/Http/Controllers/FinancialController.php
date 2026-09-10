@@ -510,7 +510,10 @@ class FinancialController extends Controller
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
         $type = $request->input('type', '');
-        $officeId = Office::getActiveOfficeId();
+        $officeInput = $request->input('office_id');
+        $officeId = ($officeInput !== null && $officeInput !== '' && $officeInput !== 'all')
+            ? (int) $officeInput
+            : ($officeInput === 'all' ? null : Office::getActiveOfficeId());
 
         $rows = match ($type) {
             'gross_production' => $this->bkGrossProduction($start, $end, $officeId),
@@ -533,12 +536,19 @@ class FinancialController extends Controller
     private function bkGrossProduction(string $start, string $end, ?int $officeId = null): array
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $patNameExpr = $isSqlite ? "(p.LName || ', ' || p.FName)" : "CONCAT(p.LName, ', ', p.FName)";
+        $provIdExpr = $isSqlite ? "(pr.ProvNum || ' - ' || pr.Abbr)" : "CONCAT(pr.ProvNum, ' - ', pr.Abbr)";
+        $provNameExpr = $isSqlite
+            ? "CASE WHEN pr.PName IS NOT NULL AND pr.PName != '' THEN (pr.LName || ', ' || pr.PName) ELSE pr.LName END"
+            : "CASE WHEN pr.PName IS NOT NULL AND pr.PName != '' THEN CONCAT(pr.LName, ', ', pr.PName) ELSE pr.LName END";
+
         $rows = DB::select("
             SELECT
-                p.PatNum        AS patient_id,
-                CONCAT(p.LName, ', ', p.FName)               AS patient_name,
-                CONCAT(pr.ProvNum, ' - ', pr.Abbr)           AS provider_ids,
-                CONCAT(pr.LName, ', ', pr.PName)             AS providers,
+                p.PatNum                                      AS patient_id,
+                {$patNameExpr}                                AS patient_name,
+                {$provIdExpr}                                 AS provider_ids,
+                {$provNameExpr}                               AS providers,
                 pl.ProcDate                                   AS dates,
                 SUM(pl.ProcFee)                               AS amount
             FROM od_procedure_logs pl
@@ -567,14 +577,21 @@ class FinancialController extends Controller
     private function bkNetProduction(string $start, string $end, ?int $officeId = null): array
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $patNameExpr = $isSqlite ? "(p.LName || ', ' || p.FName)" : "CONCAT(p.LName, ', ', p.FName)";
+        $provIdExpr = $isSqlite ? "(pr.ProvNum || ' - ' || pr.Abbr)" : "CONCAT(pr.ProvNum, ' - ', pr.Abbr)";
+        $provNameExpr = $isSqlite
+            ? "CASE WHEN pr.PName IS NOT NULL AND pr.PName != '' THEN (pr.LName || ', ' || pr.PName) ELSE pr.LName END"
+            : "CASE WHEN pr.PName IS NOT NULL AND pr.PName != '' THEN CONCAT(pr.LName, ', ', pr.PName) ELSE pr.LName END";
+
         $rows = DB::select("
             SELECT patient_id, patient_name, provider_ids, providers, dates, amount
             FROM (
                 SELECT
                     p.PatNum                                          AS patient_id,
-                    CONCAT(p.LName, ', ', p.FName)                   AS patient_name,
-                    CONCAT(pr.ProvNum, ' - ', pr.Abbr)               AS provider_ids,
-                    CONCAT(pr.LName, ', ', pr.PName)                 AS providers,
+                    {$patNameExpr}                                    AS patient_name,
+                    {$provIdExpr}                                     AS provider_ids,
+                    {$provNameExpr}                                   AS providers,
                     pl.ProcDate                                       AS dates,
                     SUM(pl.ProcFee)                                   AS amount
                 FROM od_procedure_logs pl
@@ -590,26 +607,26 @@ class FinancialController extends Controller
 
                 SELECT
                     p.PatNum                                          AS patient_id,
-                    CONCAT(p.LName, ', ', p.FName)                   AS patient_name,
-                    COALESCE(CONCAT(pr.ProvNum, ' - ', pr.Abbr), '') AS provider_ids,
-                    COALESCE(CONCAT(pr.LName, ', ', pr.PName), '')   AS providers,
+                    {$patNameExpr}                                    AS patient_name,
+                    COALESCE({$provIdExpr}, '')                       AS provider_ids,
+                    COALESCE({$provNameExpr}, '')                     AS providers,
                     a.AdjDate                                         AS dates,
-                    a.AdjAmt                                          AS amount
+                    SUM(a.AdjAmt)                                     AS amount
                 FROM od_adjustments a
                 JOIN od_patients  p  ON a.PatNum  = p.PatNum AND p.office_id = ?
                 LEFT JOIN od_providers pr ON a.ProvNum = pr.ProvNum AND pr.office_id = ?
                 WHERE a.office_id = ?
                   AND a.AdjDate BETWEEN ? AND ?
+                GROUP BY p.PatNum, p.LName, p.FName,
+                         pr.ProvNum, pr.Abbr, pr.LName, pr.PName, a.AdjDate
 
                 UNION ALL
 
-                -- Writeoffs reduce net (stored positive → shown negative) so the ledger
-                -- total reconciles with Net = gross + adjustments − writeoffs (D3).
                 SELECT
                     p.PatNum                                          AS patient_id,
-                    CONCAT(p.LName, ', ', p.FName)                   AS patient_name,
-                    COALESCE(CONCAT(pr.ProvNum, ' - ', pr.Abbr), '') AS provider_ids,
-                    COALESCE(CONCAT(pr.LName, ', ', pr.PName), '')   AS providers,
+                    {$patNameExpr}                                    AS patient_name,
+                    COALESCE({$provIdExpr}, '')                       AS provider_ids,
+                    COALESCE({$provNameExpr}, '')                     AS providers,
                     cp.ProcDate                                       AS dates,
                     -SUM(cp.WriteOff)                                 AS amount
                 FROM od_claim_procs cp
@@ -645,10 +662,16 @@ class FinancialController extends Controller
         $isSqlite = DB::connection()->getDriverName() === 'sqlite';
         $patNameExpr = $isSqlite ? "(p.LName || ', ' || p.FName)" : "CONCAT(p.LName, ', ', p.FName)";
         $provIdExpr = $isSqlite ? "(pr.ProvNum || ' - ' || pr.Abbr)" : "CONCAT(pr.ProvNum, ' - ', pr.Abbr)";
-        $provNameExpr = $isSqlite ? "(pr.LName || ', ' || pr.PName)" : "CONCAT(pr.LName, ', ', pr.PName)";
+        $provNameExpr = $isSqlite
+            ? "CASE WHEN pr.PName IS NOT NULL AND pr.PName != '' THEN (pr.LName || ', ' || pr.PName) ELSE pr.LName END"
+            : "CASE WHEN pr.PName IS NOT NULL AND pr.PName != '' THEN CONCAT(pr.LName, ', ', pr.PName) ELSE pr.LName END";
 
         $defMap = DB::table('od_definitions')
-            ->where('office_id', $officeId)
+            ->where(function ($q) use ($officeId) {
+                if ($officeId !== null) {
+                    $q->where('office_id', $officeId)->orWhere('office_id', 1);
+                }
+            })
             ->where('Category', 1)
             ->pluck('ItemName', 'DefNum')
             ->toArray();
@@ -660,7 +683,7 @@ class FinancialController extends Controller
                 COALESCE({$provIdExpr}, '')                       AS provider_ids,
                 COALESCE({$provNameExpr}, '')                     AS providers,
                 a.AdjDate                                         AS dates,
-                a.AdjAmt                                          AS amount,
+                SUM(a.AdjAmt)                                     AS amount,
                 a.AdjType                                         AS adj_type_id,
                 'adjustment'                                      AS source_type
             FROM od_adjustments a
@@ -668,6 +691,9 @@ class FinancialController extends Controller
             LEFT JOIN od_providers pr ON a.ProvNum = pr.ProvNum AND pr.office_id = ?
             WHERE a.office_id = ?
               AND a.AdjDate BETWEEN ? AND ?
+            GROUP BY p.PatNum, p.LName, p.FName,
+                     pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
+                     a.AdjDate, a.AdjType
 
             UNION ALL
 
@@ -715,12 +741,14 @@ class FinancialController extends Controller
         $isSqlite = DB::connection()->getDriverName() === 'sqlite';
         $patNameExpr = $isSqlite ? "(p.LName || ', ' || p.FName)" : "CONCAT(p.LName, ', ', p.FName)";
         $provIdExpr = $isSqlite ? "(pr.ProvNum || ' - ' || pr.Abbr)" : "CONCAT(pr.ProvNum, ' - ', pr.Abbr)";
-        $provNameExpr = $isSqlite ? "(pr.LName || ', ' || pr.PName)" : "CONCAT(pr.LName, ', ', pr.PName)";
+        $provNameExpr = $isSqlite
+            ? "CASE WHEN pr.PName IS NOT NULL AND pr.PName != '' THEN (pr.LName || ', ' || pr.PName) ELSE pr.LName END"
+            : "CASE WHEN pr.PName IS NOT NULL AND pr.PName != '' THEN CONCAT(pr.LName, ', ', pr.PName) ELSE pr.LName END";
 
         $rows = DB::select("
             SELECT
-                p.PatNum                                          AS patient_id,
-                {$patNameExpr}                                    AS patient_name,
+                COALESCE(p.PatNum, ps.PatNum, 0)                  AS patient_id,
+                COALESCE({$patNameExpr}, 'Patient Payment')       AS patient_name,
                 COALESCE({$provIdExpr}, '')                       AS provider_ids,
                 COALESCE({$provNameExpr}, '')                     AS providers,
                 ps.DatePay                                        AS dates,
@@ -730,31 +758,35 @@ class FinancialController extends Controller
             LEFT JOIN od_providers pr ON ps.ProvNum = pr.ProvNum AND pr.office_id = ?
             WHERE ps.office_id = ?
               AND ps.DatePay BETWEEN ? AND ?
-            GROUP BY p.PatNum, p.LName, p.FName,
+            GROUP BY p.PatNum, ps.PatNum, p.LName, p.FName,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
                      ps.DatePay
+
             UNION ALL
+
             SELECT
-                p.PatNum                                          AS patient_id,
+                COALESCE(p.PatNum, cp.PatNum, 0)                 AS patient_id,
                 COALESCE({$patNameExpr}, 'Insurance Payment')     AS patient_name,
                 COALESCE({$provIdExpr}, '')                       AS provider_ids,
                 COALESCE({$provNameExpr}, '')                     AS providers,
-                cp.DateCP                                         AS dates,
+                cp_pay.CheckDate                                  AS dates,
                 SUM(cp.InsPayAmt)                                 AS amount
-            FROM od_claim_procs cp
+            FROM od_claim_payments cp_pay
+            JOIN od_claim_procs cp ON cp.ClaimPaymentNum = cp_pay.ClaimPaymentNum AND cp.office_id = ?
             LEFT JOIN od_patients  p  ON cp.PatNum  = p.PatNum AND p.office_id = ?
             LEFT JOIN od_providers pr ON cp.ProvNum = pr.ProvNum AND pr.office_id = ?
-            WHERE cp.office_id = ?
-              AND cp.DateCP BETWEEN ? AND ?
-              AND cp.Status != 0
+            WHERE cp_pay.office_id = ?
+              AND cp_pay.CheckDate BETWEEN ? AND ?
               AND cp.InsPayAmt != 0
             GROUP BY p.PatNum, p.LName, p.FName,
+                     cp.PatNum,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
-                     cp.DateCP
+                     cp_pay.CheckDate
+
             ORDER BY dates, patient_name
         ", [
             $officeId, $officeId, $officeId, $start, $end,
-            $officeId, $officeId, $officeId, $start, $end,
+            $officeId, $officeId, $officeId, $officeId, $start, $end,
         ]);
 
         return array_map(fn ($r) => [
