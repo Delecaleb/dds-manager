@@ -27,8 +27,9 @@ class DepositSlipController extends Controller
         $offices = Office::where('is_active', true)->orderBy('name')->get();
         $activeOfficeId = Office::getActiveOfficeId();
         $clinics = $this->clinics->all($activeOfficeId);
+        $activeClinicNum = $this->clinics->getActiveClinicNum($activeOfficeId);
 
-        return view('deposit.index', compact('offices', 'activeOfficeId', 'clinics'));
+        return view('deposit.index', compact('offices', 'activeOfficeId', 'clinics', 'activeClinicNum'));
     }
 
     /**
@@ -89,8 +90,12 @@ class DepositSlipController extends Controller
             ? (int) $officeInput
             : ($officeInput === 'all' ? null : Office::getActiveOfficeId());
 
-        $clinicNum = ($request->filled('clinic_num') && $request->input('clinic_num') !== 'all')
-            ? (int) $request->input('clinic_num')
+        $clinicInput = $request->input('clinic_id') ?? $request->input('clinic_num');
+        if ($clinicInput === null && $officeId !== null) {
+            $clinicInput = $this->clinics->getActiveClinicNum($officeId);
+        }
+        $clinicNum = ($clinicInput !== null && $clinicInput !== '' && $clinicInput !== 'all')
+            ? (int) $clinicInput
             : null;
 
         $paymentTable = (new OdPayment)->getTable();

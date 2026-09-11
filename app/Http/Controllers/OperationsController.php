@@ -120,6 +120,7 @@ class OperationsController extends Controller
 
         $officeId = Office::getActiveOfficeId() ?? 1;
         $clinics = $this->clinics->all($officeId);
+        $activeClinicNum = $this->clinics->getActiveClinicNum($officeId);
 
         return view('operations.index', [
             'tabs' => $this->tabs(),
@@ -127,6 +128,7 @@ class OperationsController extends Controller
             'activeTab' => $tab,
             'activeSubtab' => $subtab ?: $this->defaultSubtab($tab),
             'clinics' => $clinics,
+            'activeClinicNum' => $activeClinicNum,
         ]);
     }
 
@@ -143,7 +145,16 @@ class OperationsController extends Controller
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->endOfMonth()->toDateString());
         $subtab = $subtab ?: $this->defaultSubtab($tab);
-        $clinics = array_filter(explode(',', (string) $request->input('clinics', '')), 'strlen');
+
+        $clinicsInput = $request->input('clinics') ?? $request->input('clinic_num') ?? $request->input('clinic_id');
+        if ($clinicsInput === 'all' || $clinicsInput === 'all_clinics') {
+            $clinics = [];
+        } elseif ($clinicsInput !== null && $clinicsInput !== '') {
+            $clinics = array_values(array_filter(explode(',', (string) $clinicsInput), 'strlen'));
+        } else {
+            $activeClinic = $this->clinics->getActiveClinicNum($officeId);
+            $clinics = $activeClinic !== null ? [(string) $activeClinic] : [];
+        }
 
         $chrome = [
             'tab' => $tab,
@@ -240,9 +251,15 @@ class OperationsController extends Controller
      */
     public function drilldown(Request $request)
     {
-        $officeId = Office::getActiveOfficeId() ?? 1;
+        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : (Office::getActiveOfficeId() ?? 1);
         $metric = $request->input('metric');
-        $clinicNum = $request->input('clinic_num');
+        $clinicNum = $request->input('clinic_num') ?? $request->input('clinic_id');
+        if ($clinicNum === null && $officeId !== null) {
+            $clinicNum = $this->clinics->getActiveClinicNum($officeId);
+        }
+        if ($clinicNum === 'all' || $clinicNum === '' || $clinicNum === 'all_clinics') {
+            $clinicNum = null;
+        }
         $provNum = $request->input('prov_num');
         $start = $request->input('start_date', $request->input('start', now()->startOfMonth()->toDateString()));
         $end = $request->input('end_date', $request->input('end', now()->toDateString()));

@@ -135,9 +135,9 @@
                     <select id="opsLocation"
                         class="w-full appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 font-medium text-slate-700 pr-8 shadow-sm focus:outline-none">
                         @if (isset($clinics) && count($clinics) > 1)
-                            <option value="">All Locations</option>
+                            <option value="" {{ ($activeClinicNum ?? null) === null ? 'selected' : '' }}>All Locations</option>
                             @foreach ($clinics as $clinicId => $clinicName)
-                                <option value="{{ $clinicId }}">{{ $clinicName }}</option>
+                                <option value="{{ $clinicId }}" {{ ($activeClinicNum ?? null) !== null && (string)$clinicId === (string)$activeClinicNum ? 'selected' : '' }}>{{ $clinicName }}</option>
                             @endforeach
                         @elseif (isset($clinics) && count($clinics) === 1)
                             @foreach ($clinics as $clinicId => $clinicName)

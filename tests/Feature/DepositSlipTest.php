@@ -177,4 +177,117 @@ class DepositSlipTest extends TestCase
         $resAll->assertOk();
         $this->assertEquals(1000.00, $resAll->json('summary.total_amount'));
     }
+
+    public function test_deposit_slip_multi_clinic_scoping_and_session_persistence(): void
+    {
+        $user = User::factory()->create();
+
+        $office = Office::create([
+            'name' => 'Metro Dental Group',
+            'is_active' => true,
+        ]);
+
+        DB::table('od_clinics')->insert([
+            ['office_id' => $office->id, 'ClinicNum' => 10, 'Description' => 'North Clinic', 'Abbr' => 'North', 'ItemOrder' => 1],
+            ['office_id' => $office->id, 'ClinicNum' => 20, 'Description' => 'South Clinic', 'Abbr' => 'South', 'ItemOrder' => 2],
+        ]);
+
+        DB::table('od_definitions')->insert([
+            ['office_id' => $office->id, 'DefNum' => 201, 'Category' => 10, 'ItemName' => 'Cash'],
+            ['office_id' => $office->id, 'DefNum' => 202, 'Category' => 10, 'ItemName' => 'Check'],
+        ]);
+
+        // Payment for Clinic 10 ($400 Cash)
+        DB::table('od_payments')->insert([
+            'office_id' => $office->id,
+            'PayNum' => 8001,
+            'ClinicNum' => 10,
+            'PayAmt' => 400.00,
+            'PayDate' => '2026-08-15',
+            'PayType' => 201,
+        ]);
+
+        // Claim Payment for Clinic 10 ($600)
+        DB::table('od_claim_payments')->insert([
+            'office_id' => $office->id,
+            'ClaimPaymentNum' => 8002,
+            'ClinicNum' => 10,
+            'CheckAmt' => 600.00,
+            'CheckDate' => '2026-08-15',
+            'DateIssued' => '2026-08-15',
+            'CheckNum' => 'CHK10',
+            'CarrierName' => 'MetLife',
+            'PayType' => 0,
+        ]);
+
+        // Payment for Clinic 20 ($750 Check)
+        DB::table('od_payments')->insert([
+            'office_id' => $office->id,
+            'PayNum' => 8003,
+            'ClinicNum' => 20,
+            'PayAmt' => 750.00,
+            'PayDate' => '2026-08-15',
+            'PayType' => 202,
+        ]);
+
+        // Claim Payment for Clinic 20 ($1250)
+        DB::table('od_claim_payments')->insert([
+            'office_id' => $office->id,
+            'ClaimPaymentNum' => 8004,
+            'ClinicNum' => 20,
+            'CheckAmt' => 1250.00,
+            'CheckDate' => '2026-08-15',
+            'DateIssued' => '2026-08-15',
+            'CheckNum' => 'CHK20',
+            'CarrierName' => 'Guardian',
+            'PayType' => 0,
+        ]);
+
+        // 1. When session active clinic is 10
+        $res10 = $this->actingAs($user)
+            ->withSession([
+                'active_office_id' => $office->id,
+                "active_clinic_id_{$office->id}" => 10,
+            ])
+            ->getJson(route('deposits.data', [
+                'start_date' => '2026-08-01',
+                'end_date' => '2026-08-31',
+            ]));
+
+        $res10->assertOk();
+        $this->assertEquals(1000.00, $res10->json('summary.total_amount')); // 400 + 600
+        $this->assertCount(2, $res10->json('deposits'));
+        $this->assertEquals('North Clinic', $res10->json('deposits.0.location'));
+
+        // 2. When session active clinic is 20
+        $res20 = $this->actingAs($user)
+            ->withSession([
+                'active_office_id' => $office->id,
+                "active_clinic_id_{$office->id}" => 20,
+            ])
+            ->getJson(route('deposits.data', [
+                'start_date' => '2026-08-01',
+                'end_date' => '2026-08-31',
+            ]));
+
+        $res20->assertOk();
+        $this->assertEquals(2000.00, $res20->json('summary.total_amount')); // 750 + 1250
+        $this->assertCount(2, $res20->json('deposits'));
+        $this->assertEquals('South Clinic', $res20->json('deposits.0.location'));
+
+        // 3. Explicit clinic_num=all
+        $resAll = $this->actingAs($user)
+            ->withSession([
+                'active_office_id' => $office->id,
+                "active_clinic_id_{$office->id}" => 10,
+            ])
+            ->getJson(route('deposits.data', [
+                'start_date' => '2026-08-01',
+                'end_date' => '2026-08-31',
+                'clinic_num' => 'all',
+            ]));
+
+        $resAll->assertOk();
+        $this->assertEquals(3000.00, $resAll->json('summary.total_amount')); // 1000 + 2000
+    }
 }

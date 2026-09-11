@@ -31,6 +31,21 @@
       </div>
     </div>
 
+    @if(isset($clinics) && count($clinics) > 1)
+    <div class="relative min-w-[180px]" id="clinicSelectWrapper">
+      <select id="clinicSelect"
+        class="w-full appearance-none bg-white border border-gray-300 rounded px-3 py-1.5 text-sm font-medium text-gray-700 focus:outline-none focus:border-[#00c58e] shadow-xs cursor-pointer pr-8">
+        <option value="all" {{ ($activeClinicNum ?? null) === null ? 'selected' : '' }}>All Clinics</option>
+        @foreach($clinics as $cNum => $cName)
+          <option value="{{ $cNum }}" {{ ($activeClinicNum ?? null) !== null && (string)$cNum === (string)$activeClinicNum ? 'selected' : '' }}>{{ $cName }}</option>
+        @endforeach
+      </select>
+      <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-400">
+        <i data-lucide="chevron-down" class="w-4 h-4"></i>
+      </div>
+    </div>
+    @endif
+
     <button id="refreshBtn"
       class="bg-white border border-[#00c58e] text-[#00c58e] px-5 py-1.5 rounded text-sm font-bold hover:bg-emerald-50 transition shadow-xs cursor-pointer">
       Refresh
@@ -498,9 +513,13 @@
       $('#detailTfoot').addClass('hidden');
 
       var officeId = $('#officeSelect').val();
+      var clinicNum = $('#clinicSelect').length ? $('#clinicSelect').val() : null;
       var params = { start_date: start, end_date: end };
       if (officeId && officeId !== '') {
         params.office_id = officeId;
+      }
+      if (clinicNum && clinicNum !== '') {
+        params.clinic_num = clinicNum;
       }
 
       $.get('{{ route("deposits.data") }}', params)
@@ -612,6 +631,10 @@
     window.onDrpApply = function (start, end) { fetchDeposits(start, end); };
 
     $('#officeSelect').on('change', function () {
+      fetchDeposits();
+    });
+
+    $('#clinicSelect').on('change', function () {
       fetchDeposits();
     });
 
