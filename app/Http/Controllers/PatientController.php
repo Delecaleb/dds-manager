@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\ProcStatus;
 use App\Models\OdAppointment;
 use App\Models\OdPatient;
@@ -24,15 +25,17 @@ class PatientController extends Controller
         protected AccountModuleService $ar
     ) {}
 
-    public function index()
+    public function index(ClinicRegistry $clinicRegistry)
     {
         $exportColumns = self::getExportableColumns();
-        $clinics = Office::all();
+        $officeId = Office::getActiveOfficeId();
+        $clinics = $clinicRegistry->all($officeId);
+        $activeClinicNum = $clinicRegistry->getActiveClinicNum($officeId);
 
-        return view('patients.index', compact('exportColumns', 'clinics'));
+        return view('patients.index', compact('exportColumns', 'clinics', 'activeClinicNum'));
     }
 
-    public function data()
+    public function data(Request $request, ClinicRegistry $clinicRegistry)
     {
         $officeId = Office::getActiveOfficeId();
         $query = OdPatient::query()
@@ -68,6 +71,16 @@ class PatientController extends Controller
                     ->whereColumn('od_pay_splits.PatNum', 'od_patients.PatNum');
             }, 'lifetime_collection');
 
+        // Resolve Clinic Scoping
+        $clinicNum = $request->input('clinic_id') ?? $request->input('clinic_num');
+        if ($clinicNum === null) {
+            $clinicNum = $clinicRegistry->getActiveClinicNum($officeId);
+        }
+
+        if ($clinicNum !== null && $clinicNum !== '' && $clinicNum !== 'all') {
+            $query->where('od_patients.ClinicNum', (int) $clinicNum);
+        }
+
         return DataTables::eloquent($query)
             ->addColumn('id', fn ($patient) => $patient->PatNum)
             ->addColumn('name', fn ($patient) => trim(($patient->LName ?? '').' '.($patient->FName ?? '')))
@@ -91,11 +104,6 @@ class PatientController extends Controller
             ->addColumn('address', fn ($patient) => trim(($patient->Address ?? '').' '.($patient->Address2 ?? '')))
             ->addColumn('city', fn ($patient) => $patient->City ?? '')
             ->addColumn('state', fn ($patient) => $patient->State ?? '')
-            ->addColumn('zip', fn ($patient) => $patient->Zip ?? '')
-            ->addColumn('work_phone', fn ($patient) => $patient->WkPhone ?? '')
-            ->addColumn('home_phone', fn ($patient) => $patient->HmPhone ?? '')
-            ->addColumn('mobile_phone', fn ($patient) => $patient->WirelessPhone ?? '')
-            ->addColumn('email', fn ($patient) => $patient->Email ?? '')
             ->addColumn('zip', fn ($patient) => $patient->Zip ?? '')
             ->addColumn('work_phone', fn ($patient) => $patient->WkPhone ?? '')
             ->addColumn('home_phone', fn ($patient) => $patient->HmPhone ?? '')
@@ -617,21 +625,25 @@ class PatientController extends Controller
         ];
     }
 
-    protected function buildExportQuery(Request $request)
+    protected function buildExportQuery(Request $request, ?ClinicRegistry $clinicRegistry = null)
     {
+        $clinicRegistry = $clinicRegistry ?? app(ClinicRegistry::class);
+        $officeId = Office::getActiveOfficeId();
         $query = OdPatient::query();
 
         // Location / Clinic filter
-        if ($request->filled('clinic_id')) {
-            $clinicId = $request->get('clinic_id');
-            if ($clinicId !== 'all' && is_numeric($clinicId)) {
-                $query->where('office_id', $clinicId);
-            }
+        $clinicNum = $request->input('clinic_id') ?? $request->input('clinic_num');
+        if ($clinicNum === null) {
+            $clinicNum = $clinicRegistry->getActiveClinicNum($officeId);
+        }
+
+        if ($clinicNum !== null && $clinicNum !== '' && $clinicNum !== 'all') {
+            $query->where('od_patients.ClinicNum', (int) $clinicNum);
         }
 
         // Status filter
         if ($request->filled('status') && $request->get('status') !== 'all') {
-            $query->where('PatStatus', $request->get('status'));
+            $query->where('od_patients.PatStatus', $request->get('status'));
         }
 
         // Keyword search filter
@@ -642,15 +654,15 @@ class PatientController extends Controller
                 $concatSql2 = DB::getDriverName() === 'sqlite' ? "(LName || ', ' || FName)" : "CONCAT(LName, ', ', FName)";
 
                 $query->where(function ($q) use ($kw, $concatSql1, $concatSql2) {
-                    $q->where('PatNum', 'like', "%{$kw}%")
-                        ->orWhere('FName', 'like', "%{$kw}%")
-                        ->orWhere('LName', 'like', "%{$kw}%")
-                        ->orWhere('Email', 'like', "%{$kw}%")
-                        ->orWhere('WirelessPhone', 'like', "%{$kw}%")
-                        ->orWhere('HmPhone', 'like', "%{$kw}%")
-                        ->orWhere('WkPhone', 'like', "%{$kw}%")
-                        ->orWhere('City', 'like', "%{$kw}%")
-                        ->orWhere('Zip', 'like', "%{$kw}%")
+                    $q->where('od_patients.PatNum', 'like', "%{$kw}%")
+                        ->orWhere('od_patients.FName', 'like', "%{$kw}%")
+                        ->orWhere('od_patients.LName', 'like', "%{$kw}%")
+                        ->orWhere('od_patients.Email', 'like', "%{$kw}%")
+                        ->orWhere('od_patients.WirelessPhone', 'like', "%{$kw}%")
+                        ->orWhere('od_patients.HmPhone', 'like', "%{$kw}%")
+                        ->orWhere('od_patients.WkPhone', 'like', "%{$kw}%")
+                        ->orWhere('od_patients.City', 'like', "%{$kw}%")
+                        ->orWhere('od_patients.Zip', 'like', "%{$kw}%")
                         ->orWhereRaw("{$concatSql1} like ?", ["%{$kw}%"])
                         ->orWhereRaw("{$concatSql2} like ?", ["%{$kw}%"]);
                 });
@@ -702,9 +714,9 @@ class PatientController extends Controller
         return $query;
     }
 
-    public function exportData(Request $request)
+    public function exportData(Request $request, ClinicRegistry $clinicRegistry)
     {
-        $query = $this->buildExportQuery($request);
+        $query = $this->buildExportQuery($request, $clinicRegistry);
         $total = (clone $query)->count();
 
         // Selected Columns
@@ -757,9 +769,9 @@ class PatientController extends Controller
         ]);
     }
 
-    public function exportDownload(Request $request)
+    public function exportDownload(Request $request, ClinicRegistry $clinicRegistry)
     {
-        $query = $this->buildExportQuery($request);
+        $query = $this->buildExportQuery($request, $clinicRegistry);
         $total = (clone $query)->count();
 
         // Selected Columns

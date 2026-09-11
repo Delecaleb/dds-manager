@@ -15,13 +15,13 @@
                 <div class="relative w-48">
                     <select id="globalClinicSelect"
                         class="w-full appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer">
-                        <option value="all">All Locations</option>
+                        <option value="all" {{ ($activeClinicNum ?? null) === null ? 'selected' : '' }}>All Clinics</option>
                         @if(isset($clinics) && count($clinics))
-                            @foreach($clinics as $c)
-                                <option value="{{ $c->id ?? $c->ClinicNum ?? $loop->index + 1 }}">{{ $c->name ?? $c->Description ?? 'Clinic '.$loop->iteration }}</option>
+                            @foreach($clinics as $cNum => $cName)
+                                <option value="{{ $cNum }}" {{ ($activeClinicNum ?? null) !== null && (string)$cNum === (string)$activeClinicNum ? 'selected' : '' }}>{{ $cName }}</option>
                             @endforeach
                         @else
-                            <option value="1" selected>{{ \App\Models\Office::getActiveOffice()?->name ?? 'Main Office' }}</option>
+                            <option value="0" selected>{{ \App\Models\Office::getActiveOffice()?->name ?? 'Main Office' }}</option>
                         @endif
                     </select>
                     <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-500">
@@ -227,13 +227,13 @@
 
                     <!-- Filter 3: Clinic / Office -->
                     <div>
-                        <label for="expClinic" class="block text-xs font-bold text-slate-700 mb-1.5">Location / Clinic</label>
+                        <label for="expClinic" class="block text-xs font-bold text-slate-700 mb-1.5">Clinic Location</label>
                         <select id="expClinic"
                             class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer">
-                            <option value="all">All Locations</option>
+                            <option value="all" {{ ($activeClinicNum ?? null) === null ? 'selected' : '' }}>All Clinics</option>
                             @if(isset($clinics) && count($clinics))
-                                @foreach($clinics as $c)
-                                    <option value="{{ $c->id ?? $c->ClinicNum ?? $loop->iteration }}">{{ $c->name ?? $c->Description ?? 'Clinic '.$loop->iteration }}</option>
+                                @foreach($clinics as $cNum => $cName)
+                                    <option value="{{ $cNum }}" {{ ($activeClinicNum ?? null) !== null && (string)$cNum === (string)$activeClinicNum ? 'selected' : '' }}>{{ $cName }}</option>
                                 @endforeach
                             @endif
                         </select>
@@ -637,6 +637,9 @@
                 ajax: {
                     url: "{{ route('patients.data') }}",
                     type: "GET",
+                    data: function (d) {
+                        d.clinic_id = $('#globalClinicSelect').val();
+                    },
                     beforeSend: function () { $("#tableSkeleton").removeClass('hidden'); },
                     complete: function () { $("#tableSkeleton").addClass('hidden'); }
                 },
@@ -734,6 +737,10 @@
             $("#resetBtn").on('click', function () {
                 $("#searchInput").val("");
                 table.search("").draw();
+            });
+
+            $("#globalClinicSelect").on('change', function () {
+                table.ajax.reload();
             });
 
             // Export Modal in Tab 1
