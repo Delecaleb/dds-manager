@@ -682,8 +682,10 @@ class OperationsAnalyticsService
      * @param  string[]  $group  subset of ['provider','date']
      * @param  int[]  $clinics
      */
-    public function productionDetails(string $start, string $end, array $group = [], array $clinics = []): array
+    public function productionDetails(string $start, string $end, array $group = [], array $clinics = [], ?int $officeId = null): array
     {
+        $officeId = $this->resolveOfficeId($officeId);
+        $this->clinicNames = $this->clinics->all($officeId);
         $dims = array_values(array_intersect(['provider', 'date'], $group));
         $columns = $this->productionDetailColumns($dims);
         $rows = $this->productionDetailRows($start, $end, $dims, $clinics, $officeId);
