@@ -6,6 +6,7 @@ use App\Domain\Patient\PatientService;
 use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
 use App\Models\ClaimProcs;
@@ -51,10 +52,11 @@ class DashboardController extends Controller
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
         $officeId = Office::getActiveOfficeId();
+        $filter = MetricFilter::fromRequest($request);
 
         return response()->json(array_merge(
-            $financial->filterAnalysis($start, $end, $officeId),
-            $patients->getPatientAnalytics($start, $end, $officeId)
+            $financial->filterAnalysis($start, $end, $officeId, $filter->clinics),
+            $patients->getPatientAnalytics($start, $end, $officeId, $filter->clinics)
         ));
     }
 

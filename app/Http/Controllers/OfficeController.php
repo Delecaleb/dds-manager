@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ClinicRegistry;
 use App\Models\Office;
 use App\Services\Sync\AppointmentSyncService;
 use App\Services\Sync\PatientSyncService;
@@ -115,6 +116,30 @@ class OfficeController extends Controller
         session(['active_office_id' => $officeId]);
 
         return redirect()->back()->with('status', 'Switched active office location.');
+    }
+
+    public function switchClinic(Request $request, ClinicRegistry $clinicRegistry): RedirectResponse
+    {
+        $request->validate([
+            'clinic_num' => 'required',
+            'office_id' => 'nullable|exists:offices,id',
+        ]);
+
+        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : Office::getActiveOfficeId();
+        $clinicNum = $request->input('clinic_num');
+
+        if ($officeId && $clinicNum !== 'all') {
+            $clinicRegistry->setActiveClinicNum((int) $clinicNum, $officeId);
+            $clinicName = $clinicRegistry->name((int) $clinicNum, $officeId);
+            $message = "Switched active clinic to '{$clinicName}'.";
+        } else {
+            if ($officeId) {
+                session()->forget("active_clinic_id_{$officeId}");
+            }
+            $message = 'Viewing all clinics for location.';
+        }
+
+        return redirect()->back()->with('status', $message);
     }
 
     public function syncReport(Office $office, SyncReportService $syncReportService): JsonResponse

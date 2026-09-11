@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\AgingController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepositSlipController;
 use App\Http\Controllers\FinancialController;
@@ -29,10 +30,15 @@ Route::get('/', function () {
 Route::middleware('auth')->group(function () {
     // Shared user profile & location switching
     Route::post('offices/switch', [OfficeController::class, 'switch'])->name('offices.switch');
+    Route::post('clinics/switch', [OfficeController::class, 'switchClinic'])->name('clinics.switch');
     Route::get('offices/{office}/sync-report', [OfficeController::class, 'syncReport'])->name('offices.sync-report');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // System Configuration
+    Route::get('configuration', [ConfigurationController::class, 'index'])->name('configuration.index');
+    Route::get('configuration/{tab}/{subtab?}/{action?}/{subaction?}', [ConfigurationController::class, 'index'])->name('configuration.tab');
 
     // Super Admin: User and Access Privilege Management
     Route::middleware('super_admin')->prefix('admin')->name('admin.')->group(function () {

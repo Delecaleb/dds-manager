@@ -48,6 +48,10 @@
                             </x-dropdown-link>
                         @endif
 
+                        <x-dropdown-link :href="url('/configuration/basic')">
+                            {{ __('Configuration') }}
+                        </x-dropdown-link>
+
                         <x-dropdown-link :href="route('profile.edit')">
                             {{ __('Profile') }}
                         </x-dropdown-link>
@@ -107,6 +111,10 @@
                         {{ __('User Management') }}
                     </x-responsive-nav-link>
                 @endif
+
+                <x-responsive-nav-link :href="url('/configuration/basic')">
+                    {{ __('Configuration') }}
+                </x-responsive-nav-link>
 
                 <x-responsive-nav-link :href="route('profile.edit')">
                     {{ __('Profile') }}

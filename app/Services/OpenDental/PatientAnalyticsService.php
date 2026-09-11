@@ -17,20 +17,21 @@ class PatientAnalyticsService
         private readonly PatientVisitService $patientVisits,
     ) {}
 
-    public function getPatientAnalytics($start, $end, ?int $officeId = null)
+    public function getPatientAnalytics($start, $end, ?int $officeId = null, array $clinics = [])
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
-        $filter = new MetricFilter($start, $end, [], [], null, $officeId);
+        $filter = new MetricFilter($start, $end, $clinics, [], null, $officeId);
+        $clinicNums = $filter->clinics;
 
-        $scheduled = (new OdAppointment)->scheduledPatients($start, $end, $officeId);
+        $scheduled = (new OdAppointment)->scheduledPatients($start, $end, $officeId, $clinicNums);
 
         // Patient visits = distinct patient-per-day among completed procedures
-        $visited = $this->patientVisits->patientVisits($start, $end, [], [], $officeId);
+        $visited = $this->patientVisits->patientVisits($start, $end, $clinicNums, [], $officeId);
 
         // New patients: single source of truth from PatientVisitService
-        $newPatientVisit = $this->patientVisits->newPatientCount($start, $end, [], [], $officeId);
+        $newPatientVisit = $this->patientVisits->newPatientCount($start, $end, $clinicNums, [], $officeId);
 
-        $newPatientsScheduled = (new OdAppointment)->newPatientsScheduled($start, $end, $officeId);
+        $newPatientsScheduled = (new OdAppointment)->newPatientsScheduled($start, $end, $officeId, $clinicNums);
 
         // Average net production per patient visit.
         $patientAvgProduction = $visited > 0

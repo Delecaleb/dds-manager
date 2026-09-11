@@ -48,10 +48,31 @@ final class MetricFilter
             ? (int) $request->input('office_id')
             : Office::getActiveOfficeId();
 
+        $clinics = [];
+        if ($request->has('clinics')) {
+            $raw = (array) $request->input('clinics', []);
+            if (! in_array('all', $raw, true)) {
+                $clinics = array_values(array_map('intval', array_filter($raw, fn ($v) => $v !== '' && $v !== null && $v !== 'all')));
+            }
+        } elseif ($request->has('clinic_num') || $request->has('clinic')) {
+            $raw = $request->input('clinic_num') ?? $request->input('clinic');
+            if ($raw !== 'all' && $raw !== '' && $raw !== null) {
+                $clinics = [(int) $raw];
+            }
+        } else {
+            $clinicRegistry = app(ClinicRegistry::class);
+            if ($officeId && $clinicRegistry->isMultiOffice($officeId)) {
+                $activeClinic = $clinicRegistry->getActiveClinicNum($officeId);
+                if ($activeClinic !== null) {
+                    $clinics = [$activeClinic];
+                }
+            }
+        }
+
         return new self(
             $request->input('start_date', now()->startOfMonth()->toDateString()),
             $request->input('end_date', now()->toDateString()),
-            array_values(array_filter((array) $request->input('clinics', []))),
+            $clinics,
             array_values(array_filter((array) $request->input('providers', []))),
             null,
             $officeId

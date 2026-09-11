@@ -29,7 +29,7 @@ class ClinicRegistry
         $activeOffice = Office::find($officeId);
         $primaryName = $activeOffice?->name ?: config('clinics.primary_name', 'Main Office');
 
-        $map = [0 => $primaryName];
+        $map = [];
 
         if (Schema::hasTable('od_clinics')) {
             $query = DB::table('od_clinics');
@@ -37,13 +37,17 @@ class ClinicRegistry
                 $query->where('office_id', $officeId);
             }
 
-            $rows = $query->get(['ClinicNum', 'Description', 'Abbr']);
+            $rows = $query->orderBy('ItemOrder')->orderBy('ClinicNum')->get(['ClinicNum', 'Description', 'Abbr']);
             foreach ($rows as $r) {
                 $name = trim((string) ($r->Description ?: $r->Abbr));
                 if ($name !== '') {
                     $map[(int) $r->ClinicNum] = $name;
                 }
             }
+        }
+
+        if (empty($map)) {
+            $map = [0 => $primaryName];
         }
 
         return $this->maps[$officeId] = $map;
@@ -70,5 +74,39 @@ class ClinicRegistry
     public function isMultiOffice(?int $officeId = null): bool
     {
         return count($this->all($officeId)) > 1;
+    }
+
+    /**
+     * Get the active clinic number for the specified office.
+     * Persisted per office in session('active_clinic_id_{officeId}').
+     */
+    public function getActiveClinicNum(?int $officeId = null): ?int
+    {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
+        if (! $officeId) {
+            return null;
+        }
+
+        $sessionKey = "active_clinic_id_{$officeId}";
+        if (session()->has($sessionKey)) {
+            $saved = session($sessionKey);
+            $clinics = $this->all($officeId);
+            if (is_numeric($saved) && array_key_exists((int) $saved, $clinics)) {
+                return (int) $saved;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Set and persist the active clinic number for an office.
+     */
+    public function setActiveClinicNum(int $clinicNum, ?int $officeId = null): void
+    {
+        $officeId = $officeId ?? Office::getActiveOfficeId();
+        if ($officeId) {
+            session(["active_clinic_id_{$officeId}" => $clinicNum]);
+        }
     }
 }

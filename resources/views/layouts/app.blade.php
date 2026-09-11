@@ -250,16 +250,16 @@
                     class="p-2 rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none">
                     <i data-lucide="menu" class="w-6 h-6"></i>
                 </button>
-                <div class="flex items-center gap-2">
-                    <i data-lucide="bar-chart-big" class="text-blue-600 w-5 h-5"></i>
-                    <span class="font-bold text-md tracking-tight text-slate-900">DDS Manager</span>
-                </div>
             </div>
             <div class="flex items-center gap-3">
                 @php
                     $allOffices = \App\Models\Office::where('is_active', true)->get();
                     $activeOfficeId = \App\Models\Office::getActiveOfficeId();
                     $currentOffice = $allOffices->firstWhere('id', $activeOfficeId) ?? $allOffices->first();
+                    $clinicRegistry = app(\App\Domain\Support\ClinicRegistry::class);
+                    $isMultiClinic = $activeOfficeId ? $clinicRegistry->isMultiOffice($activeOfficeId) : false;
+                    $officeClinics = $isMultiClinic ? $clinicRegistry->all($activeOfficeId) : [];
+                    $activeClinicNum = $isMultiClinic ? $clinicRegistry->getActiveClinicNum($activeOfficeId) : null;
                 @endphp
                 @if($allOffices->count() > 0)
                     <form method="POST" action="{{ route('offices.switch') }}" class="flex items-center gap-2">
@@ -275,6 +275,26 @@
                             </select>
                         </div>
                     </form>
+
+                    @if($isMultiClinic)
+                        <form method="POST" action="{{ route('clinics.switch') }}" class="flex items-center gap-2">
+                            @csrf
+                            <input type="hidden" name="office_id" value="{{ $activeOfficeId }}">
+                            <div class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/80 rounded-lg text-xs font-semibold text-indigo-900 border border-indigo-200 shadow-xs">
+                                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-indigo-600"></i>
+                                <select name="clinic_num" onchange="this.form.submit()" class="bg-transparent font-semibold text-indigo-900 text-xs focus:outline-none cursor-pointer">
+                                    <option value="all" {{ $activeClinicNum === null ? 'selected' : '' }}>
+                                        All Clinics
+                                    </option>
+                                    @foreach($officeClinics as $cNum => $cName)
+                                        <option value="{{ $cNum }}" {{ $activeClinicNum !== null && $cNum == $activeClinicNum ? 'selected' : '' }}>
+                                            Clinic: {{ $cName }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </form>
+                    @endif
 
                     <!-- Header Live Sync Report Button -->
                     <button onclick="window.openGlobalSyncReport({{ $activeOfficeId ?? ($allOffices->first()->id ?? 1) }}, '{{ addslashes($currentOffice->name ?? 'Office') }}')" type="button"
@@ -308,9 +328,6 @@
                         <div class="px-4 py-2.5 border-b border-slate-100">
                             <p class="text-xs font-bold text-slate-900">{{ auth()->user()->name }}</p>
                             <p class="text-[11px] text-slate-400 truncate">{{ auth()->user()->email }}</p>
-                            <span class="inline-block mt-1 text-[9px] font-semibold px-2 py-0.5 rounded-full border {{ auth()->user()->getRoleBadgeClass() }}">
-                                {{ auth()->user()->getRoleName() }}
-                            </span>
                         </div>
 
                         @if(auth()->user()->isSuperAdmin())
@@ -320,6 +337,12 @@
                                 <span>User & Access Management</span>
                             </a>
                         @endif
+
+                        <a href="{{ url('/configuration/basic') }}"
+                            class="flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors">
+                            <i data-lucide="sliders" class="w-4 h-4 text-slate-400"></i>
+                            <span>Configuration</span>
+                        </a>
 
                         <a href="{{ route('profile.edit') }}"
                             class="flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors">

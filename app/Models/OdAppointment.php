@@ -80,28 +80,32 @@ class OdAppointment extends Model
         return $query->whereBetween('AptDateTime', [$startDate, $endDate]);
     }
 
-    public function scheduledPatients($start, $end, ?int $officeId = null)
+    public function scheduledPatients($start, $end, ?int $officeId = null, array $clinics = [])
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
         $startDate = substr($start, 0, 10).' 00:00:00';
         $endDate = substr($end, 0, 10).' 23:59:59';
 
-        return (int) DB::table('od_appointments')
+        $q = DB::table('od_appointments')
             ->where('office_id', $officeId)
             ->whereIn('AptStatus', [1, 2])
-            ->whereBetween('AptDateTime', [$startDate, $endDate])
-            ->selectRaw(MetricDefinitions::scheduledPatients('cnt'))
-            ->value('cnt');
+            ->whereBetween('AptDateTime', [$startDate, $endDate]);
+
+        if (! empty($clinics)) {
+            $q->whereIn('ClinicNum', $clinics);
+        }
+
+        return (int) $q->selectRaw(MetricDefinitions::scheduledPatients('cnt'))->value('cnt');
     }
 
-    public function newPatientsScheduled($start, $end, ?int $officeId = null)
+    public function newPatientsScheduled($start, $end, ?int $officeId = null, array $clinics = [])
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
         $startDate = substr($start, 0, 10).' 00:00:00';
         $endDate = substr($end, 0, 10).' 23:59:59';
         $startDay = substr($start, 0, 10);
 
-        return (int) DB::table('od_appointments as a')
+        $q = DB::table('od_appointments as a')
             ->where('a.office_id', $officeId)
             ->whereBetween('a.AptDateTime', [$startDate, $endDate])
             ->whereIn('a.AptStatus', [1, 2])
@@ -123,9 +127,13 @@ class OdAppointment extends Model
                     ->whereColumn('pl.PatNum', 'a.PatNum')
                     ->where('pl.ProcDate', '<', $startDay)
                     ->whereIn('pl.ProcStatus', ['C', '2', 'D']);
-            })
-            ->distinct()
-            ->count('a.PatNum');
+            });
+
+        if (! empty($clinics)) {
+            $q->whereIn('a.ClinicNum', $clinics);
+        }
+
+        return (int) $q->distinct()->count('a.PatNum');
     }
 
     public function patient()

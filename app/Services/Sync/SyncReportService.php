@@ -132,6 +132,12 @@ class SyncReportService
                 'service_class' => SyncInsplanService::class,
                 'icon' => 'shield-check',
             ],
+            'clinics' => [
+                'label' => 'Clinics',
+                'table' => 'od_clinics',
+                'service_class' => ClinicSyncService::class,
+                'icon' => 'map-pin',
+            ],
             'daily_schedule_snapshots' => [
                 'label' => 'Daily Snapshots',
                 'table' => 'od_daily_schedule_snapshots',
