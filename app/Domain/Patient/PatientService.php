@@ -32,17 +32,26 @@ class PatientService
      * Returns a query builder (columns: PatNum, first_date) for use in:
      *   ->joinSub($patients->firstVisitCohort(), 'fv', 'pl.PatNum', '=', 'fv.PatNum')
      */
-    public function firstVisitCohort(?int $officeId = null): Builder
+    public function firstVisitCohort(?int $officeId = null, int|string|array|null $clinicId = null): Builder
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
         $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
-        return DB::table('od_procedure_logs')
+        $q = DB::table('od_procedure_logs')
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
             ->where('office_id', $officeId)
             ->whereIn('ProcStatus', ProcStatus::completed())
-            ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes)
-            ->groupBy('PatNum');
+            ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes);
+
+        if ($clinicId !== null && $clinicId !== 'all' && $clinicId !== '') {
+            if (is_array($clinicId)) {
+                $q->whereIn('ClinicNum', $clinicId);
+            } else {
+                $q->where('ClinicNum', (int) $clinicId);
+            }
+        }
+
+        return $q->groupBy('PatNum');
     }
 
     /**
@@ -52,14 +61,25 @@ class PatientService
      *
      * @param  string  $dateAlias  column alias for the first-visit date (default 'first_date')
      */
-    public function firstVisitCohortSql(string $dateAlias = 'first_date', ?int $officeId = null): string
+    public function firstVisitCohortSql(string $dateAlias = 'first_date', ?int $officeId = null, int|string|array|null $clinicId = null): string
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
         $completed = ProcStatus::inList(ProcStatus::completed());
         $notBroken = ProcCode::notBrokenAppointmentSql('', $officeId);
 
+        $clinicClause = '';
+        if ($clinicId !== null && $clinicId !== 'all' && $clinicId !== '') {
+            if (is_array($clinicId)) {
+                $escaped = implode(',', array_map('intval', $clinicId));
+                $clinicClause = " AND ClinicNum IN ({$escaped})";
+            } else {
+                $clinicNumInt = (int) $clinicId;
+                $clinicClause = " AND ClinicNum = {$clinicNumInt}";
+            }
+        }
+
         return "SELECT PatNum, MIN(ProcDate) AS {$dateAlias} "
-            ."FROM od_procedure_logs WHERE office_id = {$officeId} AND ProcStatus IN ({$completed}) AND {$notBroken} GROUP BY PatNum";
+            ."FROM od_procedure_logs WHERE office_id = {$officeId} AND ProcStatus IN ({$completed}) AND {$notBroken}{$clinicClause} GROUP BY PatNum";
     }
 
     /** Patients seen (any completed procedure) in the period. */

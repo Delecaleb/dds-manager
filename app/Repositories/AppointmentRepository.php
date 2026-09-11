@@ -11,7 +11,7 @@ class AppointmentRepository
      * Retrieve appointments with relationships eager-loaded, within a date range.
      * Filter dynamically active apt status logic.
      */
-    public function getAppointmentsByDateRange(string $start, string $end, ?string $clinicId = null): Collection
+    public function getAppointmentsByDateRange(string $start, string $end, int|string|null $clinicId = null): Collection
     {
         // AptDateTime may be stored either as OpenDental's raw ISO string with
         // a 'T' separator (varchar) or as a normalized MySQL DATETIME, depending
@@ -30,8 +30,8 @@ class AppointmentRepository
         // 1=Scheduled, 2=Complete, 4=ASAP, 5=Broken
         $query->whereIn('AptStatus', [1, 2, 4, 5]);
 
-        if ($clinicId && $clinicId !== 'all') {
-            $query->where('ClinicNum', $clinicId);
+        if ($clinicId !== null && $clinicId !== '' && $clinicId !== 'all') {
+            $query->where('ClinicNum', (int) $clinicId);
         }
 
         return $query->get();

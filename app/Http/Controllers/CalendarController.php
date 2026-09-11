@@ -34,18 +34,22 @@ class CalendarController extends Controller
     {
         $start = $request->get('start') ?? date('Y-m-d');
         $end = $request->get('end') ?? date('Y-m-d');
+        $officeId = Office::getActiveOfficeId();
+        $clinicNum = $this->resolveClinicNum($request, $officeId);
 
-        Log::info("Fetching appointments from OpenDental API for date range: {$start} to {$end}");
+        Log::info("Fetching appointments from OpenDental API for date range: {$start} to {$end}, clinic: ".($clinicNum ?? 'all'));
 
-        return response()->json($calendar->events($start, $end));
+        return response()->json($calendar->events($start, $end, $clinicNum));
     }
 
     public function getResources(Request $request, CalendarService $calendar)
     {
         $date = $request->get('date') ?? date('Y-m-d');
         $activeOnly = $request->get('active_only') == '1';
+        $officeId = Office::getActiveOfficeId();
+        $clinicNum = $this->resolveClinicNum($request, $officeId);
 
-        return response()->json($calendar->resources($date, $date, $activeOnly));
+        return response()->json($calendar->resources($date, $date, $activeOnly, $clinicNum));
     }
 
     /**
@@ -67,21 +71,34 @@ class CalendarController extends Controller
         $start = $request->get('start') ?? $request->get('date') ?? date('Y-m-d');
         $end = $request->get('end') ?? $request->get('date') ?? $start;
         $officeId = Office::getActiveOfficeId();
+        $clinicNum = $this->resolveClinicNum($request, $officeId);
 
-        $gross = (float) OdProcedureLog::query()
+        $grossQuery = OdProcedureLog::query()
             ->whereIn('ProcStatus', ['C', '2'])
-            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $grossQuery->where('ClinicNum', $clinicNum);
+        }
+        $gross = (float) $grossQuery
             ->selectRaw('COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
 
-        $adjustments = (float) OdAdjustment::query()
-            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+        $adjQuery = OdAdjustment::query()
+            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $adjQuery->where('ClinicNum', $clinicNum);
+        }
+        $adjustments = (float) $adjQuery
             ->selectRaw('COALESCE(SUM(CAST(AdjAmt AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
 
-        $writeoffs = (float) DB::table('od_claim_procs as c')
+        $woQuery = DB::table('od_claim_procs as c')
             ->where('c.office_id', $officeId)
-            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null && Schema::hasColumn('od_claim_procs', 'ClinicNum')) {
+            $woQuery->where('c.ClinicNum', $clinicNum);
+        }
+        $writeoffs = (float) $woQuery
             ->selectRaw('COALESCE(SUM(CAST(c.WriteOff AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
 
@@ -90,9 +107,13 @@ class CalendarController extends Controller
         $scheduled = $gross;
 
         // Fetch active providers in this date range
-        $providerApts = OdAppointment::query()
+        $providerAptsQuery = OdAppointment::query()
             ->whereIn('AptStatus', [1, 2, 4, 5])
-            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $providerAptsQuery->where('ClinicNum', $clinicNum);
+        }
+        $providerApts = $providerAptsQuery
             ->with('provider')
             ->get();
 
@@ -154,6 +175,7 @@ class CalendarController extends Controller
         $start = $request->input('start') ?: date('Y-m-d');
         $end = $request->input('end') ?: $start;
         $officeId = Office::getActiveOfficeId();
+        $clinicNum = $this->resolveClinicNum($request, $officeId);
 
         $startDateTime = substr($start, 0, 10).' 00:00:00';
         $endDateTime = substr($end, 0, 10).' 23:59:59';
@@ -166,8 +188,14 @@ class CalendarController extends Controller
 
         $operatoryMap = [];
         if (Schema::hasTable('od_operatories')) {
-            $operatoryMap = DB::table('od_operatories')
-                ->where('office_id', $officeId)
+            $operatoryQuery = DB::table('od_operatories')
+                ->where('office_id', $officeId);
+            if ($clinicNum !== null && Schema::hasColumn('od_operatories', 'ClinicNum')) {
+                $operatoryQuery->where(function ($q) use ($clinicNum) {
+                    $q->where('ClinicNum', $clinicNum)->orWhere('ClinicNum', 0);
+                });
+            }
+            $operatoryMap = $operatoryQuery
                 ->pluck('OpName', 'OperatoryNum')
                 ->toArray();
         }
@@ -191,6 +219,10 @@ class CalendarController extends Controller
             ->with(['patient', 'provider'])
             ->whereIn('od_appointments.AptStatus', [1, 2, 4, 5])
             ->whereBetween('od_appointments.AptDateTime', [$startDateTime, $endDateTime]);
+
+        if ($clinicNum !== null) {
+            $query->where('od_appointments.ClinicNum', $clinicNum);
+        }
 
         if ($status = $request->input('status')) {
             $query->where('od_appointments.AptStatus', $status);
@@ -476,20 +508,26 @@ class CalendarController extends Controller
         $start = $request->get('start') ?? date('Y-m-d');
         $end = $request->get('end') ?? $start;
         $officeId = Office::getActiveOfficeId();
+        $clinicNum = $this->resolveClinicNum($request, $officeId);
 
         $startDateTime = substr($start, 0, 10).' 00:00:00';
         $endDateTime = substr($end, 0, 10).' 23:59:59';
 
-        // We fetch scheduled & completed appointments for the date frame using indexed AptDateTime range.
-        $appointments = OdAppointment::whereBetween('AptDateTime', [$startDateTime, $endDateTime])
+        $query = OdAppointment::whereBetween('AptDateTime', [$startDateTime, $endDateTime])
             ->whereIn('AptStatus', [1, 2, 4, 5])
             ->where(function ($q) {
                 $q->whereNull('SecDateTEntry')->orWhere('SecDateTEntry', '!=', '0001-01-01T00:00:00');
             })
             ->where(function ($q) {
                 $q->whereNull('Op')->orWhere('Op', '!=', 3);
-            })
-            ->get();
+            });
+
+        if ($clinicNum !== null) {
+            $query->where('ClinicNum', $clinicNum);
+        }
+
+        // We fetch scheduled & completed appointments for the date frame using indexed AptDateTime range.
+        $appointments = $query->get();
 
         // Calculate aggregate metrics
         $scheduledApts = $appointments->count();
@@ -532,10 +570,15 @@ class CalendarController extends Controller
         $avgNewPatientLeadTime = count($newPatLeadTimes) > 0 ? array_sum($newPatLeadTimes) / count($newPatLeadTimes) : 0;
         $avgEmergLeadTime = count($emergLeadTimes) > 0 ? array_sum($emergLeadTimes) / count($emergLeadTimes) : 0;
 
+        $locationName = $this->clinics->name($clinicNum ?? 0, $officeId);
+        if ($clinicNum === null && $this->clinics->hasClinics($officeId)) {
+            $locationName = 'All Locations';
+        }
+
         // Mock tiers heavily matching the requested UI visually
         $data = [
             [
-                'location' => $this->clinics->name(0, $officeId),
+                'location' => $locationName,
                 'scheduled_appointments' => $scheduledApts,
                 'provider_count' => $providerCount,
                 'booked_hours' => number_format($bookedMinutes / 60, 2),
@@ -561,6 +604,8 @@ class CalendarController extends Controller
         $start = $request->get('start') ?? $request->get('date') ?? date('Y-m-d');
         $end = $request->get('end') ?? $start;
         $type = $request->get('type', 'scheduled_appointments');
+        $officeId = Office::getActiveOfficeId();
+        $clinicNum = $this->resolveClinicNum($request, $officeId);
 
         $startDateTime = substr($start, 0, 10).' 00:00:00';
         $endDateTime = substr($end, 0, 10).' 23:59:59';
@@ -573,6 +618,10 @@ class CalendarController extends Controller
             ->where(function ($q) {
                 $q->whereNull('Op')->orWhere('Op', '!=', 3);
             });
+
+        if ($clinicNum !== null) {
+            $query->where('ClinicNum', $clinicNum);
+        }
 
         if ($type === 'avg_lead_new') {
             $query->whereIn('IsNewPatient', ['1', 1, 'true', true]);
@@ -673,12 +722,19 @@ class CalendarController extends Controller
     {
         $start = $request->get('start') ?? $request->get('date') ?? date('Y-m-d');
         $end = $request->get('end') ?? $request->get('date') ?? $start;
+        $officeId = Office::getActiveOfficeId();
+        $clinicNum = $this->resolveClinicNum($request, $officeId);
 
-        $scheduledAppointments = OdAppointment::query()
+        $query = OdAppointment::query()
             ->with(['patient', 'provider', 'procedureLogs'])
             ->where('AptStatus', '1')
-            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
-            ->get();
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+
+        if ($clinicNum !== null) {
+            $query->where('ClinicNum', $clinicNum);
+        }
+
+        $scheduledAppointments = $query->get();
 
         $totalScheduled = 0;
         $providerTotals = [];
@@ -757,52 +813,73 @@ class CalendarController extends Controller
         $start = $request->get('start') ?? date('Y-m-01');
         $end = $request->get('end') ?? date('Y-m-t');
         $officeId = Office::getActiveOfficeId();
+        $clinicNum = $this->resolveClinicNum($request, $officeId);
 
         // 1. Gross production per date
-        $grossByDate = OdProcedureLog::query()
+        $grossQuery = OdProcedureLog::query()
             ->whereIn('ProcStatus', ['C', '2'])
-            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $grossQuery->where('ClinicNum', $clinicNum);
+        }
+        $grossByDate = $grossQuery
             ->selectRaw("DATE(REPLACE(ProcDate, 'T', ' ')) as date_str, COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0) AS total")
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
 
         // 2. Adjustments per date
-        $adjByDate = OdAdjustment::query()
-            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+        $adjQuery = OdAdjustment::query()
+            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $adjQuery->where('ClinicNum', $clinicNum);
+        }
+        $adjByDate = $adjQuery
             ->selectRaw("DATE(REPLACE(AdjDate, 'T', ' ')) as date_str, COALESCE(SUM(CAST(AdjAmt AS DECIMAL(12,2))), 0) AS total")
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
 
         // 3. Writeoffs per date
-        $woByDate = DB::table('od_claim_procs as c')
+        $woQuery = DB::table('od_claim_procs as c')
             ->where('c.office_id', $officeId)
-            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null && Schema::hasColumn('od_claim_procs', 'ClinicNum')) {
+            $woQuery->where('c.ClinicNum', $clinicNum);
+        }
+        $woByDate = $woQuery
             ->selectRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) as date_str, COALESCE(SUM(CAST(c.WriteOff AS DECIMAL(12,2))), 0) AS total")
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
 
-        // 3. Scheduled production per date
-        $schedByDate = OdAppointment::query()
+        // 4. Scheduled production per date
+        $schedQuery = OdAppointment::query()
             ->join('od_procedure_logs as pl', 'pl.AptNum', '=', 'od_appointments.AptNum')
             ->where('od_appointments.AptStatus', '1')
-            ->whereRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $schedQuery->where('od_appointments.ClinicNum', $clinicNum);
+        }
+        $schedByDate = $schedQuery
             ->selectRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) as date_str, COALESCE(SUM(CAST(pl.ProcFee AS DECIMAL(12,2))), 0) AS total")
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
 
-        // 4. Appointments count per date
-        $aptsByDate = OdAppointment::query()
+        // 5. Appointments count per date
+        $aptsQuery = OdAppointment::query()
             ->whereIn('AptStatus', [1, 2, 4, 5])
-            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $aptsQuery->where('ClinicNum', $clinicNum);
+        }
+        $aptsByDate = $aptsQuery
             ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date_str, COUNT(*) as total_apts")
             ->groupBy('date_str')
             ->pluck('total_apts', 'date_str');
 
-        // 5. New Patients (first completed procedure cohort) per date
-        $newPtsByDate = DB::table('od_procedure_logs as pl')
+        // 6. New Patients (first completed procedure cohort) per date
+        $newPtsQuery = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->joinSub(
-                $this->patients->firstVisitCohort($officeId),
+                $this->patients->firstVisitCohort($officeId, $clinicNum),
                 'fv',
                 'pl.PatNum',
                 '=',
@@ -810,7 +887,11 @@ class CalendarController extends Controller
             )
             ->whereIn('pl.ProcStatus', ['C', '2'])
             ->whereRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) = DATE(REPLACE(fv.first_date, 'T', ' '))")
-            ->whereRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $newPtsQuery->where('pl.ClinicNum', $clinicNum);
+        }
+        $newPtsByDate = $newPtsQuery
             ->selectRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) as date_str, COUNT(DISTINCT pl.PatNum) as total")
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
@@ -867,5 +948,15 @@ class CalendarController extends Controller
         }
 
         return response()->json($result);
+    }
+
+    private function resolveClinicNum(Request $request, int|string $officeId): ?int
+    {
+        $clinicNum = $request->input('clinic_id') ?? $request->input('clinic_num') ?? $this->clinics->getActiveClinicNum($officeId);
+        if ($clinicNum === 'all' || $clinicNum === '' || $clinicNum === null) {
+            return null;
+        }
+
+        return (int) $clinicNum;
     }
 }

@@ -76,6 +76,11 @@ class ClinicRegistry
         return count($this->all($officeId)) > 1;
     }
 
+    public function hasClinics(?int $officeId = null): bool
+    {
+        return $this->isMultiOffice($officeId);
+    }
+
     /**
      * Get the active clinic number for the specified office.
      * Persisted per office in session('active_clinic_id_{officeId}').

@@ -12,19 +12,25 @@ class CalendarResourceTransformer
     /**
      * Map the required 10 operatories in order, optionally filtering only active ones.
      */
-    public static function transform(Collection $appointments, bool $activeOnly = false): array
+    public static function transform(Collection $appointments, bool $activeOnly = false, int|string|null $clinicId = null): array
     {
         $officeId = Office::getActiveOfficeId();
 
         $dbOps = collect();
         if (Schema::hasTable('od_operatories')) {
-            $dbOps = DB::table('od_operatories')
+            $query = DB::table('od_operatories')
                 ->where('office_id', $officeId)
                 ->where(function ($q) {
                     $q->whereNull('IsHidden')->orWhereIn('IsHidden', ['false', '0', 0, false]);
-                })
-                ->orderBy('ItemOrder')
-                ->get();
+                });
+
+            if ($clinicId !== null && $clinicId !== '' && $clinicId !== 'all' && Schema::hasColumn('od_operatories', 'ClinicNum')) {
+                $query->where(function ($q) use ($clinicId) {
+                    $q->where('ClinicNum', (int) $clinicId)->orWhere('ClinicNum', 0)->orWhereNull('ClinicNum');
+                });
+            }
+
+            $dbOps = $query->orderBy('ItemOrder')->get();
         }
 
         $resources = [];

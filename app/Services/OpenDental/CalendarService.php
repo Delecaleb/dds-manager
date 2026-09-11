@@ -12,17 +12,17 @@ class CalendarService
         protected AppointmentRepository $appointments
     ) {}
 
-    public function events($start, $end)
+    public function events($start, $end, int|string|null $clinicId = null)
     {
-        $collection = $this->appointments->getAppointmentsByDateRange($start, $end);
+        $collection = $this->appointments->getAppointmentsByDateRange($start, $end, $clinicId);
 
         return $collection->map(fn ($apt) => CalendarEventTransformer::transform($apt))->toArray();
     }
 
-    public function resources($start, $end, $activeOnly = false)
+    public function resources($start, $end, $activeOnly = false, int|string|null $clinicId = null)
     {
-        $collection = $this->appointments->getAppointmentsByDateRange($start, $end);
+        $collection = $this->appointments->getAppointmentsByDateRange($start, $end, $clinicId);
 
-        return CalendarResourceTransformer::transform($collection, $activeOnly);
+        return CalendarResourceTransformer::transform($collection, $activeOnly, $clinicId);
     }
 }
