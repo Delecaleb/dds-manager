@@ -369,7 +369,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $snapQuery->where('prov_num', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $snapQuery->where('clinic_num', $clinicNum);
             }
 
@@ -422,7 +422,7 @@ class OperationsController extends Controller
 
                 if ($provNum) {
                     $apptsQuery->where('a.ProvNum', $provNum);
-                } elseif ($clinicNum) {
+                } elseif ($clinicNum !== null) {
                     $apptsQuery->where('a.ClinicNum', $clinicNum);
                 }
 
@@ -489,7 +489,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $query->where('pl.ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $query->where('pl.ClinicNum', $clinicNum);
             }
 
@@ -543,7 +543,7 @@ class OperationsController extends Controller
             if ($provNum) {
                 $splitsQuery->where('ProvNum', $provNum);
                 $claimsQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $splitsQuery->where('ClinicNum', $clinicNum);
                 $claimsQuery->where('ClinicNum', $clinicNum);
             }
@@ -630,7 +630,7 @@ class OperationsController extends Controller
                 $logsQuery->where('ProvNum', $provNum);
                 $adjsQuery->where('ProvNum', $provNum);
                 $wosQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $logsQuery->where('ClinicNum', $clinicNum);
                 $adjsQuery->where('ClinicNum', $clinicNum);
                 $wosQuery->where('ClinicNum', $clinicNum);
@@ -722,7 +722,7 @@ class OperationsController extends Controller
                 ['key' => 'visit_date', 'label' => 'First Visit Date', 'type' => 'text'],
             ];
 
-            $clinicNums = (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) ? [$clinicNum] : [];
+            $clinicNums = ($clinicNum !== null) ? [$clinicNum] : [];
             $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums, [], $officeId);
 
             foreach ($nptVisits as $v) {
@@ -766,7 +766,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $snapQuery->where('prov_num', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $snapQuery->where('clinic_num', $clinicNum);
             }
 
@@ -798,7 +798,7 @@ class OperationsController extends Controller
 
                 if ($provNum) {
                     $apptsQuery->where('ProvNum', $provNum);
-                } elseif ($clinicNum) {
+                } elseif ($clinicNum !== null) {
                     $apptsQuery->where('ClinicNum', $clinicNum);
                 }
 
@@ -848,7 +848,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $snapQuery->where('prov_num', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $snapQuery->where('clinic_num', $clinicNum);
             }
 
@@ -881,7 +881,7 @@ class OperationsController extends Controller
 
                 if ($provNum) {
                     $apptsQuery->where('ProvNum', $provNum);
-                } elseif ($clinicNum) {
+                } elseif ($clinicNum !== null) {
                     $apptsQuery->where('ClinicNum', $clinicNum);
                 }
 
@@ -924,7 +924,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $snapQuery->where('prov_num', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $snapQuery->where('clinic_num', $clinicNum);
             }
 
@@ -957,7 +957,7 @@ class OperationsController extends Controller
 
                 if ($provNum) {
                     $unschedQuery->where('ProvNum', $provNum);
-                } elseif ($clinicNum) {
+                } elseif ($clinicNum !== null) {
                     $unschedQuery->where('ClinicNum', $clinicNum);
                 }
 
@@ -999,7 +999,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $schedQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $schedQuery->where('ClinicNum', $clinicNum);
             }
 
@@ -1021,7 +1021,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $apptQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $apptQuery->where('ClinicNum', $clinicNum);
             }
 
@@ -1091,7 +1091,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $logsQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $logsQuery->where('ClinicNum', $clinicNum);
             }
 
@@ -1157,7 +1157,7 @@ class OperationsController extends Controller
             if ($provNum) {
                 $adjsQuery->where('ProvNum', $provNum);
                 $wosQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $adjsQuery->where('ClinicNum', $clinicNum);
                 $wosQuery->where('ClinicNum', $clinicNum);
             }
@@ -1282,7 +1282,7 @@ class OperationsController extends Controller
             if ($provNum) {
                 $splitsQuery->where('s.ProvNum', $provNum);
                 $claimsQuery->where('cp.ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $splitsQuery->where('s.ClinicNum', $clinicNum);
                 $claimsQuery->where('cp.ClinicNum', $clinicNum);
             }
@@ -1374,7 +1374,7 @@ class OperationsController extends Controller
                 $wosQuery->where('ProvNum', $provNum);
                 $splitsQuery->where('ProvNum', $provNum);
                 $insSplitsQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $logsQuery->where('ClinicNum', $clinicNum);
                 $adjsQuery->where('ClinicNum', $clinicNum);
                 $wosQuery->where('ClinicNum', $clinicNum);
@@ -1479,15 +1479,18 @@ class OperationsController extends Controller
                 ['key' => 'count', 'label' => '# of Visit', 'type' => 'number', 'agg' => 'sum'],
             ];
 
+            $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
+
             $logsQuery = DB::table('od_procedure_logs')
                 ->where('office_id', $officeId)
                 ->select('PatNum', 'ProcDate')
+                ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes)
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end]);
 
             if ($provNum) {
                 $logsQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $logsQuery->where('ClinicNum', $clinicNum);
             }
 
@@ -1540,7 +1543,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $logsQuery->where('pl.ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $logsQuery->where('pl.ClinicNum', $clinicNum);
             }
 
@@ -1601,7 +1604,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $query->where('a.ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $query->where('a.ClinicNum', $clinicNum);
             }
 
@@ -1689,7 +1692,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $query->where('a.ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $query->where('a.ClinicNum', $clinicNum);
             }
 
@@ -1779,7 +1782,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $query->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $query->where('ClinicNum', $clinicNum);
             }
 
@@ -1823,17 +1826,20 @@ class OperationsController extends Controller
                 ['key' => 'services', 'label' => 'Services', 'type' => 'number', 'agg' => 'sum'],
             ];
 
+            $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
+
             $logs = DB::table('od_procedure_logs')
                 ->where('office_id', $officeId)
                 ->select('PatNum', 'ProcDate', 'ProvNum')
-                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes)
+                ->when($clinicNum !== null, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
                 ->get();
 
             $patMap = $mapPatients($logs->pluck('PatNum')->unique());
 
-            $clinicName = $clinicNum ? $this->clinics->name((int) $clinicNum, $officeId) : 'All Offices';
+            $clinicName = $clinicNum !== null ? $this->clinics->name((int) $clinicNum, $officeId) : 'All Offices';
             $patData = [];
 
             foreach ($logs as $log) {
@@ -1897,7 +1903,7 @@ class OperationsController extends Controller
                 })
                 ->where('pl.office_id', $officeId)
                 ->select('pl.PatNum', 'pl.ProcDate', 'pl.ProcFee', 'pc.ProcCode', 'fv.first_date')
-                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereBetween('pl.ProcDate', [$start, $end])
                 ->whereBetween('fv.first_date', [$start, $end])
@@ -1947,7 +1953,7 @@ class OperationsController extends Controller
                 ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
             ];
 
-            $clinicNums = (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) ? [$clinicNum] : [];
+            $clinicNums = ($clinicNum !== null) ? [$clinicNum] : [];
             $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums, [], $officeId);
             $totalProduction = 0;
             foreach ($nptVisits as $visit) {
@@ -1988,7 +1994,7 @@ class OperationsController extends Controller
                 ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
                 ->where('pl.office_id', $officeId)
                 ->select('pl.PatNum', 'fv.first_date')
-                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereBetween('pl.ProcDate', [$startWindow, $end.' 23:59:59'])
                 ->groupBy('pl.PatNum', 'fv.first_date')
@@ -2039,7 +2045,7 @@ class OperationsController extends Controller
             $logs = DB::table('od_procedure_logs')
                 ->where('office_id', $officeId)
                 ->select('PatNum', 'ProvNum', 'ProcDate')
-                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$startWindow, $end.' 23:59:59'])
                 ->get();
@@ -2131,7 +2137,7 @@ class OperationsController extends Controller
             $patsAll = DB::table('od_procedure_logs as pl')
                 ->where('pl.office_id', $officeId)
                 ->selectRaw('pl.PatNum, MAX(pl.ProcDate) as last_date')
-                ->when(! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
                 ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
                 ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $end.' 23:59:59'])
@@ -2196,7 +2202,7 @@ class OperationsController extends Controller
                 $logsQuery->where('ProvNum', $provNum);
                 $adjsQuery->where('ProvNum', $provNum);
                 $wosQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $logsQuery->where('ClinicNum', $clinicNum);
                 $adjsQuery->where('ClinicNum', $clinicNum);
                 $wosQuery->where('ClinicNum', $clinicNum);
@@ -2274,7 +2280,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $logsQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $logsQuery->where('ClinicNum', $clinicNum);
             }
 
@@ -2297,7 +2303,7 @@ class OperationsController extends Controller
             if ($provNum) {
                 $adjsQuery->where('ProvNum', $provNum);
                 $wosQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $adjsQuery->where('ClinicNum', $clinicNum);
                 $wosQuery->where('ClinicNum', $clinicNum);
             }
@@ -2400,7 +2406,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $logsQuery->where('ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $logsQuery->where('ClinicNum', $clinicNum);
             }
 
@@ -2441,7 +2447,7 @@ class OperationsController extends Controller
                 ->select('ProvNum', 'SchedDate', 'StartTime', 'StopTime')
                 ->where('SchedType', 1)
                 ->whereBetween('SchedDate', [$start, $end]);
-            if ($clinicNum) {
+            if ($clinicNum !== null) {
                 $schedQuery->where('ClinicNum', $clinicNum);
             }
             $scheds = $schedQuery->get();
@@ -2451,7 +2457,7 @@ class OperationsController extends Controller
                 ->select('ProvNum', 'AptDateTime', 'Pattern')
                 ->whereIn('AptStatus', [1, 2])
                 ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
-            if ($clinicNum) {
+            if ($clinicNum !== null) {
                 $apptQuery->where('ClinicNum', $clinicNum);
             }
             $appts = $apptQuery->get();
@@ -2527,7 +2533,7 @@ class OperationsController extends Controller
 
             if ($provNum) {
                 $query->where('pl.ProvNum', $provNum);
-            } elseif ($clinicNum) {
+            } elseif ($clinicNum !== null) {
                 $query->where('pl.ClinicNum', $clinicNum);
             }
 
@@ -2572,7 +2578,7 @@ class OperationsController extends Controller
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
                 ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
-                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->get();
 
             $isCompleted = $completedLogs->isNotEmpty();
@@ -2583,7 +2589,7 @@ class OperationsController extends Controller
                 ->where('ProcFee', '>', 0)
                 ->whereBetween('ProcDate', [$start, $end])
                 ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
-                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->get();
 
             $patMap = $mapPatients($targetLogs->pluck('PatNum')->unique());
@@ -2625,7 +2631,7 @@ class OperationsController extends Controller
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
                 ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
-                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->get();
 
             $patMap = $mapPatients($logs->pluck('PatNum')->unique());
@@ -2665,7 +2671,7 @@ class OperationsController extends Controller
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
                 ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
-                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->get();
 
             $schedLogs = DB::table('od_procedure_logs')
@@ -2675,7 +2681,7 @@ class OperationsController extends Controller
                 ->where('ProcFee', '>', 0)
                 ->whereBetween('ProcDate', [$start, $end])
                 ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
-                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->get();
 
             $patMap = $mapPatients($completedLogs->pluck('PatNum')->merge($schedLogs->pluck('PatNum'))->unique());
@@ -2733,7 +2739,7 @@ class OperationsController extends Controller
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
                 ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
-                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->get();
 
             $appts = DB::table('od_appointments')
@@ -2742,7 +2748,7 @@ class OperationsController extends Controller
                 ->whereIn('AptStatus', [1, 2])
                 ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59'])
                 ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
-                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->get();
 
             $patMap = $mapPatients($completedLogs->pluck('PatNum')->merge($appts->pluck('PatNum'))->unique());
@@ -2788,7 +2794,7 @@ class OperationsController extends Controller
                 ['key' => 'type', 'label' => 'Type', 'type' => 'text'],
             ];
 
-            $clinicNums = (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) ? [$clinicNum] : [];
+            $clinicNums = ($clinicNum !== null) ? [$clinicNum] : [];
             $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums, [], $officeId);
 
             $schedNptAppts = DB::table('od_appointments')
@@ -2798,7 +2804,7 @@ class OperationsController extends Controller
                 ->whereIn('AptStatus', [1, 2])
                 ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59'])
                 ->when($provNum, fn ($q) => $q->where('ProvNum', $provNum))
-                ->when($clinicNum, fn ($q) => $q->where('ClinicNum', $clinicNum))
+                ->when($clinicNum !== null, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->get();
 
             $patMap = $mapPatients(collect($nptVisits)->pluck('patient_id')->merge($schedNptAppts->pluck('PatNum'))->unique());
@@ -2836,8 +2842,8 @@ class OperationsController extends Controller
             $totals = [];
         } elseif ($metric === 'claims_day' || $metric === 'claims') {
             $clinicName = null;
-            if (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) {
-                $clinicName = $this->clinics->name((int) $clinicNum);
+            if ($clinicNum !== null) {
+                $clinicName = $this->clinics->name((int) $clinicNum, $officeId);
             }
             $dayLabel = date('M d, Y', strtotime($start));
             $title = ($clinicName ? ($clinicName.' - ') : '').'Claims & Daily Procedures ('.$dayLabel.')';
@@ -2879,7 +2885,7 @@ class OperationsController extends Controller
                 ->whereBetween('cp.ProcDate', [$start, $end])
                 ->whereIn('pl.ProcStatus', ProcStatus::completed());
 
-            if (! empty($clinicNum) && $clinicNum !== '0' && $clinicNum != 0) {
+            if ($clinicNum !== null) {
                 $procsQuery->where('cp.ClinicNum', $clinicNum);
             }
             if ($provNum) {

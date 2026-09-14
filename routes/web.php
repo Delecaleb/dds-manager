@@ -37,6 +37,21 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // System Configuration
+    Route::post('configuration/basic/save', [ConfigurationController::class, 'saveBasicSetting'])->name('configuration.basic.save');
+    Route::get('configuration/providers/data', [ConfigurationController::class, 'getProvidersData'])->name('configuration.providers.data');
+    Route::post('configuration/providers/toggle-visibility', [ConfigurationController::class, 'toggleProviderVisibility'])->name('configuration.providers.toggle-visibility');
+    Route::post('configuration/providers/set-specialty', [ConfigurationController::class, 'setProviderSpecialty'])->name('configuration.providers.set-specialty');
+    Route::post('configuration/providers/clear-settings', [ConfigurationController::class, 'clearProviderSettings'])->name('configuration.providers.clear-settings');
+    Route::post('configuration/providers/apply-defaults', [ConfigurationController::class, 'applyDefaultProviderSettings'])->name('configuration.providers.apply-defaults');
+    Route::get('configuration/goals/data', [ConfigurationController::class, 'getGoalsData'])->name('configuration.goals.data');
+    Route::post('configuration/goals/save-office', [ConfigurationController::class, 'saveOfficeGoal'])->name('configuration.goals.save-office');
+    Route::post('configuration/goals/save-specialty', [ConfigurationController::class, 'saveSpecialtyGoal'])->name('configuration.goals.save-specialty');
+    Route::post('configuration/goals/save-provider', [ConfigurationController::class, 'saveProviderGoal'])->name('configuration.goals.save-provider');
+    Route::post('configuration/kpis/save', [ConfigurationController::class, 'saveKpiConfig'])->name('configuration.kpis.save');
+    Route::post('configuration/kpis/custom/save', [ConfigurationController::class, 'saveCustomKpi'])->name('configuration.kpis.custom.save');
+    Route::post('configuration/kpis/custom/delete', [ConfigurationController::class, 'deleteCustomKpi'])->name('configuration.kpis.custom.delete');
+    Route::post('configuration/kpis/import-csv', [ConfigurationController::class, 'importKpiCsv'])->name('configuration.kpis.import-csv');
+    Route::post('configuration/eod/save', [ConfigurationController::class, 'saveEodConfig'])->name('configuration.eod.save');
     Route::get('configuration', [ConfigurationController::class, 'index'])->name('configuration.index');
     Route::get('configuration/{tab}/{subtab?}/{action?}/{subaction?}', [ConfigurationController::class, 'index'])->name('configuration.tab');
 

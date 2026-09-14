@@ -290,8 +290,14 @@
                 </div>
 
                 <div class="bg-white rounded-lg border border-slate-200/90 shadow-sm p-8 space-y-8">
-                    <div>
+                    <div class="flex items-center justify-between">
                         <h2 class="text-xl font-bold text-slate-900 tracking-tight">Basic Settings</h2>
+                        <span id="basicSettingsSavedToast" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-xs font-semibold opacity-0 transition-opacity duration-300">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Saved
+                        </span>
                     </div>
 
                     <!-- 1. Display Production Type -->
@@ -310,7 +316,7 @@
                                         <td class="px-5 py-3 font-medium text-slate-800">Gross Production</td>
                                         <td class="px-5 py-3 text-right">
                                             <label class="relative inline-flex items-center cursor-pointer select-none">
-                                                <input type="checkbox" name="display_production[gross]" class="sr-only dds-toggle-input" checked>
+                                                <input type="checkbox" name="display_production[gross]" data-basic-setting="display_gross_production" class="sr-only dds-toggle-input basic-setting-toggle" {{ ($basicSettings->display_gross_production ?? true) ? 'checked' : '' }}>
                                                 <div class="dds-toggle-track">
                                                     <div class="dds-toggle-knob">
                                                         <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -325,7 +331,7 @@
                                         <td class="px-5 py-3 font-medium text-slate-800">Net Production</td>
                                         <td class="px-5 py-3 text-right">
                                             <label class="relative inline-flex items-center cursor-pointer select-none">
-                                                <input type="checkbox" name="display_production[net]" class="sr-only dds-toggle-input" checked>
+                                                <input type="checkbox" name="display_production[net]" data-basic-setting="display_net_production" class="sr-only dds-toggle-input basic-setting-toggle" {{ ($basicSettings->display_net_production ?? true) ? 'checked' : '' }}>
                                                 <div class="dds-toggle-track">
                                                     <div class="dds-toggle-knob">
                                                         <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -340,7 +346,7 @@
                                         <td class="px-5 py-3 font-medium text-slate-800">Adjustment</td>
                                         <td class="px-5 py-3 text-right">
                                             <label class="relative inline-flex items-center cursor-pointer select-none">
-                                                <input type="checkbox" name="display_production[adjustment]" class="sr-only dds-toggle-input" checked>
+                                                <input type="checkbox" name="display_production[adjustment]" data-basic-setting="display_adjustment" class="sr-only dds-toggle-input basic-setting-toggle" {{ ($basicSettings->display_adjustment ?? true) ? 'checked' : '' }}>
                                                 <div class="dds-toggle-track">
                                                     <div class="dds-toggle-knob">
                                                         <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -372,7 +378,7 @@
                                         <td class="px-5 py-3 font-medium text-slate-800">Total New Patient Tile</td>
                                         <td class="px-5 py-3 text-right">
                                             <label class="relative inline-flex items-center cursor-pointer select-none">
-                                                <input type="checkbox" name="dashboard_visits[new_patient_tile]" class="sr-only dds-toggle-input" checked>
+                                                <input type="checkbox" name="dashboard_visits[new_patient_tile]" data-basic-setting="display_new_patient_tile" class="sr-only dds-toggle-input basic-setting-toggle" {{ ($basicSettings->display_new_patient_tile ?? true) ? 'checked' : '' }}>
                                                 <div class="dds-toggle-track">
                                                     <div class="dds-toggle-knob">
                                                         <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -387,7 +393,7 @@
                                         <td class="px-5 py-3 font-medium text-slate-800">New Patient Visits Figures Graph</td>
                                         <td class="px-5 py-3 text-right">
                                             <label class="relative inline-flex items-center cursor-pointer select-none">
-                                                <input type="checkbox" name="dashboard_visits[new_patient_graph]" class="sr-only dds-toggle-input" checked>
+                                                <input type="checkbox" name="dashboard_visits[new_patient_graph]" data-basic-setting="display_new_patient_graph" class="sr-only dds-toggle-input basic-setting-toggle" {{ ($basicSettings->display_new_patient_graph ?? true) ? 'checked' : '' }}>
                                                 <div class="dds-toggle-track">
                                                     <div class="dds-toggle-knob">
                                                         <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -402,7 +408,7 @@
                                         <td class="px-5 py-3 font-medium text-slate-800">Patient Visits Figures Graph</td>
                                         <td class="px-5 py-3 text-right">
                                             <label class="relative inline-flex items-center cursor-pointer select-none">
-                                                <input type="checkbox" name="dashboard_visits[patient_visits_graph]" class="sr-only dds-toggle-input" checked>
+                                                <input type="checkbox" name="dashboard_visits[patient_visits_graph]" data-basic-setting="display_patient_visits_graph" class="sr-only dds-toggle-input basic-setting-toggle" {{ ($basicSettings->display_patient_visits_graph ?? true) ? 'checked' : '' }}>
                                                 <div class="dds-toggle-track">
                                                     <div class="dds-toggle-knob">
                                                         <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -434,7 +440,7 @@
                                         <td class="px-5 py-3 font-medium text-slate-800">Inactive Patients</td>
                                         <td class="px-5 py-3 text-right">
                                             <label class="relative inline-flex items-center cursor-pointer select-none">
-                                                <input type="checkbox" name="front_office[inactive_patients]" class="sr-only dds-toggle-input" checked>
+                                                <input type="checkbox" name="front_office[inactive_patients]" data-basic-setting="front_office_inactive_patients" class="sr-only dds-toggle-input basic-setting-toggle" {{ ($basicSettings->front_office_inactive_patients ?? true) ? 'checked' : '' }}>
                                                 <div class="dds-toggle-track">
                                                     <div class="dds-toggle-knob">
                                                         <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -467,7 +473,7 @@
                                         <td class="px-5 py-3 font-medium text-slate-800">Collection Rate</td>
                                         <td class="px-5 py-3 text-center">
                                             <label class="relative inline-flex items-center cursor-pointer select-none">
-                                                <input type="radio" name="collection_rate_metric" value="net" class="sr-only dds-toggle-input" checked>
+                                                <input type="radio" name="collection_rate_metric" value="net" class="sr-only dds-toggle-input basic-setting-radio" {{ ($basicSettings->collection_rate_metric ?? 'net') === 'net' ? 'checked' : '' }}>
                                                 <div class="dds-toggle-track">
                                                     <div class="dds-toggle-knob">
                                                         <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -479,7 +485,7 @@
                                         </td>
                                         <td class="px-5 py-3 text-center">
                                             <label class="relative inline-flex items-center cursor-pointer select-none">
-                                                <input type="radio" name="collection_rate_metric" value="gross" class="sr-only dds-toggle-input">
+                                                <input type="radio" name="collection_rate_metric" value="gross" class="sr-only dds-toggle-input basic-setting-radio" {{ ($basicSettings->collection_rate_metric ?? 'net') === 'gross' ? 'checked' : '' }}>
                                                 <div class="dds-toggle-track">
                                                     <div class="dds-toggle-knob">
                                                         <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -623,7 +629,15 @@
                 <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-6 space-y-6">
                     <!-- Top Bar: Title + Actions -->
                     <div class="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                        <h3 class="text-2xl font-bold text-slate-900 leading-normal">Providers</h3>
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-2xl font-bold text-slate-900 leading-normal">Providers</h3>
+                            <span id="providerSavedToast" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-xs font-semibold opacity-0 transition-opacity duration-300">
+                                <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                                Saved
+                            </span>
+                        </div>
                         <div class="flex items-center space-x-2">
                             <button type="button" id="clearProviderSettingsBtn" class="appearance-none inline-flex items-center py-2 px-3 justify-center font-bold text-xs h-9 rounded-sm border-2 bg-white border-[#00bfa5] text-[#00bfa5] hover:bg-[#00bfa5] hover:text-white transition-colors cursor-pointer">
                                 Clear Settings
@@ -643,9 +657,9 @@
                         <div>
                             <label class="block font-bold mb-1 text-slate-800 text-xs">Location</label>
                             <select id="provLocationFilter" class="w-full bg-white border border-slate-300 rounded-sm px-3 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:border-[#00bfa5] h-9">
-                                <option value="">Select a Location</option>
+                                <option value="All Locations">All Locations</option>
                                 @foreach($locations as $loc)
-                                    <option value="{{ $loc }}" {{ $loc === '8 Mile' ? 'selected' : '' }}>{{ $loc }}</option>
+                                    <option value="{{ $loc }}">{{ $loc }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -715,20 +729,22 @@
                                     </tr>
                                 </thead>
                                 <tbody id="providersTbody">
-                                    @foreach($providers as $index => $row)
+                                    @forelse($providers as $index => $row)
                                         @php
                                             $isEven = ($index % 2 === 1);
                                         @endphp
                                         <tr class="provider-row {{ $isEven ? 'bg-white' : 'bg-slate-50/60' }} border-b border-slate-100 hover:bg-slate-100/60 transition-colors"
                                             data-name="{{ strtolower($row['name']) }}"
                                             data-location="{{ strtolower($row['location']) }}"
+                                            data-office-id="{{ $row['office_id'] }}"
                                             data-id="{{ $row['id'] }}"
+                                            data-specialty="{{ $row['specialty'] ?? '' }}"
                                             data-visible="{{ $row['visible'] ? 'visible' : 'hidden' }}">
                                             
                                             <!-- Visible switch -->
                                             <td class="px-3 py-2 text-center border-r border-slate-100 align-middle">
                                                 <label class="relative inline-flex items-center cursor-pointer select-none">
-                                                    <input type="checkbox" name="prov_visible[{{ $row['id'] }}]" class="sr-only dds-toggle-input" {{ $row['visible'] ? 'checked' : '' }}>
+                                                    <input type="checkbox" name="prov_visible[{{ $row['office_id'] }}][{{ $row['id'] }}]" class="sr-only dds-toggle-input prov-visible-toggle" {{ $row['visible'] ? 'checked' : '' }}>
                                                     <div class="dds-toggle-track">
                                                         <div class="dds-toggle-knob">
                                                             <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -740,28 +756,28 @@
                                             </td>
 
                                             <!-- Provider Name -->
-                                            <td class="px-3 py-2 font-medium text-slate-800 border-r border-slate-100 align-middle">{{ $row['name'] }}</td>
+                                            <td class="px-3 py-2 font-medium text-slate-800 border-r border-slate-100 align-middle prov-name-cell">{{ $row['name'] }}</td>
 
                                             <!-- Location -->
-                                            <td class="px-3 py-2 text-slate-700 border-r border-slate-100 align-middle">{{ $row['location'] }}</td>
+                                            <td class="px-3 py-2 text-slate-700 border-r border-slate-100 align-middle prov-location-cell">{{ $row['location'] }}</td>
 
                                             <!-- Provider ID -->
-                                            <td class="px-3 py-2 text-right font-medium text-slate-700 border-r border-slate-100 align-middle">{{ $row['id'] }}</td>
+                                            <td class="px-3 py-2 text-right font-medium text-slate-700 border-r border-slate-100 align-middle prov-id-cell">{{ $row['id'] }}</td>
 
                                             <!-- Last Active -->
-                                            <td class="px-3 py-2 text-right text-slate-700 border-r border-slate-100 align-middle">{{ $row['last_active'] }}</td>
+                                            <td class="px-3 py-2 text-right text-slate-700 border-r border-slate-100 align-middle prov-last-active-cell">{{ $row['last_active'] }}</td>
 
                                             <!-- Location Production -->
-                                            <td class="px-3 py-2 text-right font-semibold text-slate-800 border-r border-slate-100 align-middle">{{ $row['production'] }}</td>
+                                            <td class="px-3 py-2 text-right font-semibold text-slate-800 border-r border-slate-100 align-middle prov-prod-cell">{{ $row['production'] }}</td>
 
                                             <!-- Specialty toggles -->
                                             @foreach($specialties as $spec)
                                                 @php
-                                                    $isChecked = ($row['specialty'] === $spec);
+                                                    $isChecked = (($row['specialty'] ?? '') === $spec);
                                                 @endphp
                                                 <td class="px-2 py-2 text-center border-r border-slate-100 align-middle">
                                                     <label class="relative inline-flex items-center cursor-pointer select-none">
-                                                        <input type="checkbox" name="prov_spec[{{ $row['id'] }}][{{ $spec }}]" class="sr-only dds-toggle-input" {{ $isChecked ? 'checked' : '' }}>
+                                                        <input type="checkbox" name="prov_spec[{{ $row['office_id'] }}][{{ $row['id'] }}][{{ $spec }}]" data-specialty="{{ $spec }}" class="sr-only dds-toggle-input prov-specialty-toggle" {{ $isChecked ? 'checked' : '' }}>
                                                         <div class="dds-toggle-track">
                                                             <div class="dds-toggle-knob">
                                                                 <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -773,7 +789,13 @@
                                                 </td>
                                             @endforeach
                                         </tr>
-                                    @endforeach
+                                    @empty
+                                        <tr id="emptyProvidersRow">
+                                            <td colspan="{{ 6 + count($specialties) }}" class="py-8 text-center text-slate-500 text-xs font-medium bg-slate-50/50">
+                                                No providers found matching the selected criteria.
+                                            </td>
+                                        </tr>
+                                    @endforelse
                                 </tbody>
                             </table>
                         </div>
@@ -783,28 +805,30 @@
                             <div class="flex items-center space-x-4">
                                 <div class="flex items-center space-x-2">
                                     <span>Items per page</span>
-                                    <select class="bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#00bfa5]">
-                                        <option>10</option>
-                                        <option>25</option>
-                                        <option>50</option>
+                                    <select id="provPageSizeSelect" class="bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#00bfa5] cursor-pointer">
+                                        <option value="10">10</option>
+                                        <option value="25" selected>25</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                        <option value="all">All</option>
                                     </select>
                                 </div>
-                                <span>1-3 of 3 items</span>
+                                <span id="providerCountLabel">1-{{ min(25, count($providers)) }} of {{ count($providers) }} items</span>
                             </div>
 
                             <div class="flex items-center space-x-3">
                                 <div class="flex items-center space-x-1.5">
-                                    <select class="bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#00bfa5]">
-                                        <option>1</option>
+                                    <select id="provPageSelect" class="bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#00bfa5] cursor-pointer">
+                                        <option value="1">1</option>
                                     </select>
-                                    <span>of 1 pages</span>
+                                    <span id="provTotalPagesLabel">of {{ max(1, (int) ceil(count($providers) / 25)) }} pages</span>
                                 </div>
 
                                 <div class="flex items-center border border-slate-300 rounded overflow-hidden">
-                                    <button type="button" disabled class="px-2.5 py-1 text-slate-300 bg-white border-r border-slate-300 cursor-not-allowed">
+                                    <button type="button" id="provPrevPageBtn" disabled class="px-2.5 py-1 text-slate-400 bg-white border-r border-slate-300 cursor-not-allowed disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors">
                                         <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
                                     </button>
-                                    <button type="button" disabled class="px-2.5 py-1 text-slate-300 bg-white cursor-not-allowed">
+                                    <button type="button" id="provNextPageBtn" {{ count($providers) <= 25 ? 'disabled' : '' }} class="px-2.5 py-1 text-slate-600 bg-white hover:bg-slate-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                                         <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
                                     </button>
                                 </div>
@@ -933,6 +957,7 @@
                                             @endphp
                                             <tr class="goal-row {{ $isEven ? 'bg-white' : 'bg-slate-50/60' }} border-b border-slate-100 hover:bg-slate-100/60 transition-colors"
                                                 data-office="{{ strtolower($row['office']) }}"
+                                                data-office-id="{{ $row['office_id'] ?? $row['id'] }}"
                                                 data-id="{{ $row['id'] }}">
                                                 
                                                 <!-- Checkbox -->
@@ -948,42 +973,42 @@
 
                                                 <!-- Gross Production -->
                                                 <td class="px-2 py-2 border-r border-slate-100 align-middle">
-                                                    <input type="text" placeholder="$0" class="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
+                                                    <input type="text" placeholder="$0" data-field="gross_production" value="{{ $row['gross'] !== '' ? '$'.number_format((float)$row['gross'], 2) : '' }}" class="goal-input-office w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
                                                 </td>
 
                                                 <!-- Net Production -->
                                                 <td class="px-2 py-2 border-r border-slate-100 align-middle">
-                                                    <input type="text" placeholder="$0" class="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
+                                                    <input type="text" placeholder="$0" data-field="net_production" value="{{ $row['net'] !== '' ? '$'.number_format((float)$row['net'], 2) : '' }}" class="goal-input-office w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
                                                 </td>
 
                                                 <!-- Collection -->
                                                 <td class="px-2 py-2 border-r border-slate-100 align-middle">
-                                                    <input type="text" placeholder="$0" class="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
+                                                    <input type="text" placeholder="$0" data-field="collection" value="{{ $row['collection'] !== '' ? '$'.number_format((float)$row['collection'], 2) : '' }}" class="goal-input-office w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
                                                 </td>
 
                                                 <!-- Pts Visits -->
                                                 <td class="px-2 py-2 border-r border-slate-100 align-middle">
-                                                    <input type="text" placeholder="0" class="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
+                                                    <input type="text" placeholder="0" data-field="pts_visits" value="{{ $row['pts_visits'] !== '' ? $row['pts_visits'] : '' }}" class="goal-input-office w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
                                                 </td>
 
                                                 <!-- Npt Visits -->
                                                 <td class="px-2 py-2 border-r border-slate-100 align-middle">
-                                                    <input type="text" placeholder="0" class="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
+                                                    <input type="text" placeholder="0" data-field="npt_visits" value="{{ $row['npt_visits'] !== '' ? $row['npt_visits'] : '' }}" class="goal-input-office w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
                                                 </td>
 
                                                 <!-- Ini Bonding -->
                                                 <td class="px-2 py-2 border-r border-slate-100 align-middle">
-                                                    <input type="text" placeholder="0" class="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
+                                                    <input type="text" placeholder="0" data-field="ini_bonding" value="{{ $row['ini_bonding'] !== '' ? $row['ini_bonding'] : '' }}" class="goal-input-office w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
                                                 </td>
 
                                                 <!-- Hyg Visits -->
                                                 <td class="px-2 py-2 border-r border-slate-100 align-middle">
-                                                    <input type="text" placeholder="0" class="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
+                                                    <input type="text" placeholder="0" data-field="hyg_visits" value="{{ $row['hyg_visits'] !== '' ? $row['hyg_visits'] : '' }}" class="goal-input-office w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors">
                                                 </td>
 
                                                 <!-- Saved Icon -->
                                                 <td class="px-3 py-2 text-center align-middle">
-                                                    <div class="w-5 h-5 rounded-full bg-[#00bfa5] text-white flex items-center justify-center mx-auto shadow-xs">
+                                                    <div class="goal-saved-indicator w-5 h-5 rounded-full bg-[#00bfa5] text-white flex items-center justify-center mx-auto shadow-xs transition-opacity duration-300">
                                                         <svg width="12" height="9" viewBox="0 0 18 13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                                             <path d="M17 1L6 12L1 7"></path>
                                                         </svg>
@@ -1073,6 +1098,7 @@
                                             @endphp
                                             <tr class="goal-specialty-row {{ $isEven ? 'bg-white' : 'bg-slate-50/60' }} border-b border-slate-100 hover:bg-slate-100/60 transition-colors"
                                                 data-office="{{ strtolower($row['office']) }}"
+                                                data-office-id="{{ $row['office_id'] ?? $row['id'] }}"
                                                 data-id="{{ $row['id'] }}">
                                                 
                                                 <!-- Checkbox -->
@@ -1088,14 +1114,18 @@
 
                                                 <!-- Specialty Input Fields (Doctor, Hygiene, Oral Surgery, Clear Aligners, Perio, Pedo, Endo, Ortho, Prostho) -->
                                                 @foreach($goalSpecialties as $spec)
+                                                    @php
+                                                        $specField = strtolower(str_replace(' ', '_', $spec));
+                                                        $specVal = !empty($specialtyGoals[$row['id']][$specField]) ? '$'.number_format((float)$specialtyGoals[$row['id']][$specField], 2) : '';
+                                                    @endphp
                                                     <td class="px-2 py-2 border-r border-slate-100 align-middle">
-                                                        <input type="tel" placeholder="$0" class="v-money w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors" align="right">
+                                                        <input type="tel" placeholder="$0" data-field="{{ $specField }}" value="{{ $specVal }}" class="goal-input-specialty v-money w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors" align="right">
                                                     </td>
                                                 @endforeach
 
                                                 <!-- Saved Icon -->
                                                 <td class="px-3 py-2 text-center align-middle">
-                                                    <div class="w-5 h-5 rounded-full bg-[#00bfa5] text-white flex items-center justify-center mx-auto shadow-xs">
+                                                    <div class="goal-spec-saved-indicator w-5 h-5 rounded-full bg-[#00bfa5] text-white flex items-center justify-center mx-auto shadow-xs transition-opacity duration-300">
                                                         <svg width="12" height="9" viewBox="0 0 18 13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                                             <path d="M17 1L6 12L1 7"></path>
                                                         </svg>
@@ -1205,7 +1235,11 @@
                                             @endphp
                                             <tr class="goal-provider-row {{ $isEven ? 'bg-white' : 'bg-slate-50/60' }} border-b border-slate-100 hover:bg-slate-100/60 transition-colors"
                                                 data-office="{{ strtolower($row['office_name']) }}"
+                                                data-office-id="{{ $row['office_id'] }}"
+                                                data-provider-id="{{ $row['provider_id'] }}"
+                                                data-provider-name="{{ $row['provider_name'] }}"
                                                 data-provider-type="{{ strtolower($row['provider_type']) }}"
+                                                data-recurring="{{ !empty($row['recurring']) ? '1' : '0' }}"
                                                 data-id="{{ $row['id'] }}">
                                                 
                                                 <!-- Checkbox -->
@@ -1240,19 +1274,21 @@
 
                                                 <!-- Recurring -->
                                                 <td class="px-3 py-2 text-slate-700 border-r border-slate-100 align-middle">
-                                                    {{ $row['recurring'] ? 'Yes' : 'No' }}
+                                                    {{ !empty($row['recurring']) ? 'Yes' : 'No' }}
                                                 </td>
 
                                                 <!-- Production Goal -->
                                                 <td class="px-3 py-2 text-center border-r border-slate-100 align-middle min-w-[160px]">
-                                                    <input type="tel" placeholder="$0" value="{{ $row['goal'] }}" class="v-money w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors" align="right">
+                                                    <input type="tel" placeholder="$0" value="{{ $row['goal'] }}" data-field="production_goal" class="goal-input-provider v-money w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-right text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00bfa5] focus:bg-white transition-colors" align="right">
                                                 </td>
 
-                                                <!-- Action -->
+                                                <!-- Saved Icon -->
                                                 <td class="px-3 py-2 text-center align-middle">
-                                                    <button type="button" class="text-[#00bfa5] hover:text-[#008f7c] font-black text-lg tracking-widest leading-none px-2 py-1 rounded hover:bg-emerald-50 transition-colors cursor-pointer" title="Options">
-                                                        •••
-                                                    </button>
+                                                    <div class="goal-prov-saved-indicator w-5 h-5 rounded-full bg-[#00bfa5] text-white flex items-center justify-center mx-auto shadow-xs transition-opacity duration-300">
+                                                        <svg width="12" height="9" viewBox="0 0 18 13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                            <path d="M17 1L6 12L1 7"></path>
+                                                        </svg>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         @empty
@@ -3543,7 +3579,7 @@ There is no need to enter a Closed day for these holidays:
                             <!-- Group Averages toggle -->
                             <div class="mr-3 mt-2">
                                 <label for="toggle-2" class="relative inline-flex items-center cursor-pointer select-none dark:text-white text-xs">
-                                    <input type="checkbox" id="toggle-2" class="sr-only dds-toggle-input" checked>
+                                    <input type="checkbox" id="toggle-2" class="sr-only dds-toggle-input" {{ ($kpiGroupAverages ?? true) ? 'checked' : '' }}>
                                     <div class="dds-toggle-track mr-2">
                                         <div class="dds-toggle-knob">
                                             <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
@@ -3970,6 +4006,7 @@ There is no need to enter a Closed day for these holidays:
                                         @foreach($customKpis as $kpi)
                                             <tr role="row" class="kpi-row cat-custom subtab-custom odd:bg-gray-000 dark:odd:bg-gray-800 hover:bg-gray-100/60 dark:hover:bg-gray-750 transition-colors {{ $isKpiCustom ? '' : 'hidden' }}"
                                                 data-kpi-id="{{ $kpi['id'] }}"
+                                                data-kpi-key="{{ $kpi['kpi_key'] ?? $kpi['id'] }}"
                                                 data-subtab-group="custom"
                                                 data-category="custom"
                                                 data-line-of-business="{{ strtolower($kpi['line_of_business'] ?? '') }}"
@@ -5362,50 +5399,6 @@ There is no need to enter a Closed day for these holidays:
                 });
             }
 
-            // Provider Filters Live Handlers
-            const provSearchInput = document.getElementById('provSearchInput');
-            const provLocationFilter = document.getElementById('provLocationFilter');
-            const provVisibilityFilter = document.getElementById('provVisibilityFilter');
-
-            function filterProviders() {
-                const query = provSearchInput ? provSearchInput.value.trim().toLowerCase() : '';
-                const locVal = provLocationFilter ? provLocationFilter.value.trim().toLowerCase() : '';
-                const visVal = provVisibilityFilter ? provVisibilityFilter.value.trim().toLowerCase() : 'all';
-
-                const rows = document.querySelectorAll('.provider-row');
-                rows.forEach(row => {
-                    const name = row.getAttribute('data-name') || '';
-                    const id = row.getAttribute('data-id') || '';
-                    const loc = row.getAttribute('data-location') || '';
-                    const vis = row.getAttribute('data-visible') || '';
-
-                    const matchesQuery = !query || name.includes(query) || id.includes(query);
-                    const matchesLoc = !locVal || loc === locVal;
-                    const matchesVis = visVal === 'all' || vis === visVal;
-
-                    if (matchesQuery && matchesLoc && matchesVis) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
-            }
-
-            if (provSearchInput) provSearchInput.addEventListener('input', filterProviders);
-            if (provLocationFilter) provLocationFilter.addEventListener('change', filterProviders);
-            if (provVisibilityFilter) provVisibilityFilter.addEventListener('change', filterProviders);
-
-            // Provider Clear Settings Button
-            const clearProviderSettingsBtn = document.getElementById('clearProviderSettingsBtn');
-            if (clearProviderSettingsBtn) {
-                clearProviderSettingsBtn.addEventListener('click', function () {
-                    if (provSearchInput) provSearchInput.value = '';
-                    if (provLocationFilter) provLocationFilter.value = '';
-                    if (provVisibilityFilter) provVisibilityFilter.value = 'All';
-                    filterProviders();
-                });
-            }
-
             // Goals Subtab Switching
             document.querySelectorAll('.goals-subtab-btn').forEach(btn => {
                 btn.addEventListener('click', function (e) {
@@ -5441,6 +5434,718 @@ There is no need to enter a Closed day for these holidays:
                     cbs.forEach(cb => cb.checked = goalProvSelectAll.checked);
                 });
             }
+
+            const csrfToken = '{{ csrf_token() }}';
+
+            function debounce(func, wait = 400) {
+                let timeout;
+                return function (...args) {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(this, args), wait);
+                };
+            }
+
+            function flashSavedIndicator(row, indicatorSelector = '.goal-saved-indicator') {
+                const indicator = row ? row.querySelector(indicatorSelector) : null;
+                if (indicator) {
+                    indicator.classList.remove('opacity-0');
+                    indicator.classList.add('opacity-100', 'scale-110');
+                    setTimeout(() => {
+                        indicator.classList.remove('scale-110');
+                    }, 200);
+                    setTimeout(() => {
+                        indicator.classList.add('opacity-0');
+                    }, 2500);
+                }
+            }
+
+            // Auto-save Basic Settings
+            function flashBasicSavedToast() {
+                const toast = document.getElementById('basicSettingsSavedToast');
+                if (toast) {
+                    toast.classList.remove('opacity-0');
+                    toast.classList.add('opacity-100');
+                    setTimeout(() => {
+                        toast.classList.remove('opacity-100');
+                        toast.classList.add('opacity-0');
+                    }, 2000);
+                }
+            }
+
+            function saveBasicSettingField(key, value) {
+                fetch('/configuration/basic/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        key: key,
+                        value: value
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        flashBasicSavedToast();
+                    }
+                })
+                .catch(err => console.error('Error saving basic setting:', err));
+            }
+
+            document.querySelectorAll('.basic-setting-toggle').forEach(toggle => {
+                toggle.addEventListener('change', function () {
+                    const key = this.getAttribute('data-basic-setting');
+                    if (key) {
+                        saveBasicSettingField(key, this.checked);
+                    }
+                });
+            });
+
+            document.querySelectorAll('.basic-setting-radio').forEach(radio => {
+                radio.addEventListener('change', function () {
+                    if (this.checked) {
+                        saveBasicSettingField('collection_rate_metric', this.value);
+                    }
+                });
+            });
+
+            // ==========================================
+            // Provider Configuration Interactions & Pagination
+            // ==========================================
+            const specialtiesList = @json($specialties);
+            let allProviderRows = @json($providers);
+            let provCurrentPage = 1;
+            let provPageSize = 25;
+
+            function flashProviderSavedToast(msg = 'Saved') {
+                const toast = document.getElementById('providerSavedToast');
+                if (toast) {
+                    toast.innerHTML = `
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        ${msg}
+                    `;
+                    toast.classList.remove('opacity-0');
+                    toast.classList.add('opacity-100');
+                    setTimeout(() => {
+                        toast.classList.remove('opacity-100');
+                        toast.classList.add('opacity-0');
+                    }, 2000);
+                }
+            }
+
+            function renderProviderPage() {
+                const tbody = document.getElementById('providersTbody');
+                if (!tbody) return;
+
+                if (!allProviderRows || allProviderRows.length === 0) {
+                    tbody.innerHTML = `
+                        <tr id="emptyProvidersRow">
+                            <td colspan="${6 + specialtiesList.length}" class="py-8 text-center text-slate-500 text-xs font-medium bg-slate-50/50">
+                                No providers found matching the selected criteria.
+                            </td>
+                        </tr>
+                    `;
+                    const countLabel = document.getElementById('providerCountLabel');
+                    if (countLabel) countLabel.textContent = '0 items';
+                    const pageSelect = document.getElementById('provPageSelect');
+                    if (pageSelect) pageSelect.innerHTML = '<option value="1">1</option>';
+                    const totalPagesLabel = document.getElementById('provTotalPagesLabel');
+                    if (totalPagesLabel) totalPagesLabel.textContent = 'of 1 pages';
+                    const prevBtn = document.getElementById('provPrevPageBtn');
+                    if (prevBtn) { prevBtn.disabled = true; prevBtn.classList.add('cursor-not-allowed'); }
+                    const nextBtn = document.getElementById('provNextPageBtn');
+                    if (nextBtn) { nextBtn.disabled = true; nextBtn.classList.add('cursor-not-allowed'); }
+                    return;
+                }
+
+                const effectivePageSize = provPageSize === 'all' ? allProviderRows.length : parseInt(provPageSize, 10);
+                const totalPages = provPageSize === 'all' ? 1 : Math.max(1, Math.ceil(allProviderRows.length / effectivePageSize));
+
+                if (provCurrentPage > totalPages) provCurrentPage = totalPages;
+                if (provCurrentPage < 1) provCurrentPage = 1;
+
+                const startIndex = (provCurrentPage - 1) * effectivePageSize;
+                const endIndex = Math.min(startIndex + effectivePageSize, allProviderRows.length);
+                const pageRows = allProviderRows.slice(startIndex, endIndex);
+
+                let html = '';
+                pageRows.forEach((row, idx) => {
+                    const isEven = (idx % 2 === 1);
+                    let specialtyCells = '';
+                    specialtiesList.forEach(spec => {
+                        const isChecked = (row.specialty === spec);
+                        specialtyCells += `
+                            <td class="px-2 py-2 text-center border-r border-slate-100 align-middle">
+                                <label class="relative inline-flex items-center cursor-pointer select-none">
+                                    <input type="checkbox" name="prov_spec[${row.office_id}][${row.id}][${spec}]" data-specialty="${spec}" class="sr-only dds-toggle-input prov-specialty-toggle" ${isChecked ? 'checked' : ''}>
+                                    <div class="dds-toggle-track">
+                                        <div class="dds-toggle-knob">
+                                            <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </label>
+                            </td>
+                        `;
+                    });
+
+                    html += `
+                        <tr class="provider-row ${isEven ? 'bg-white' : 'bg-slate-50/60'} border-b border-slate-100 hover:bg-slate-100/60 transition-colors"
+                            data-name="${(row.name || '').toLowerCase()}"
+                            data-location="${(row.location || '').toLowerCase()}"
+                            data-office-id="${row.office_id}"
+                            data-id="${row.id}"
+                            data-specialty="${row.specialty || ''}"
+                            data-visible="${row.visible ? 'visible' : 'hidden'}">
+                            
+                            <td class="px-3 py-2 text-center border-r border-slate-100 align-middle">
+                                <label class="relative inline-flex items-center cursor-pointer select-none">
+                                    <input type="checkbox" name="prov_visible[${row.office_id}][${row.id}]" class="sr-only dds-toggle-input prov-visible-toggle" ${row.visible ? 'checked' : ''}>
+                                    <div class="dds-toggle-track">
+                                        <div class="dds-toggle-knob">
+                                            <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </label>
+                            </td>
+
+                            <td class="px-3 py-2 font-medium text-slate-800 border-r border-slate-100 align-middle prov-name-cell">${escapeHtml(row.name)}</td>
+                            <td class="px-3 py-2 text-slate-700 border-r border-slate-100 align-middle prov-location-cell">${escapeHtml(row.location)}</td>
+                            <td class="px-3 py-2 text-right font-medium text-slate-700 border-r border-slate-100 align-middle prov-id-cell">${row.id}</td>
+                            <td class="px-3 py-2 text-right text-slate-700 border-r border-slate-100 align-middle prov-last-active-cell">${row.last_active}</td>
+                            <td class="px-3 py-2 text-right font-semibold text-slate-800 border-r border-slate-100 align-middle prov-prod-cell">${row.production}</td>
+                            ${specialtyCells}
+                        </tr>
+                    `;
+                });
+
+                tbody.innerHTML = html;
+                attachProviderRowListeners();
+
+                // Update pagination bar
+                const countLabel = document.getElementById('providerCountLabel');
+                if (countLabel) {
+                    countLabel.textContent = `${startIndex + 1}-${endIndex} of ${allProviderRows.length} items`;
+                }
+
+                const pageSelect = document.getElementById('provPageSelect');
+                if (pageSelect) {
+                    let opts = '';
+                    for (let p = 1; p <= totalPages; p++) {
+                        opts += `<option value="${p}" ${p === provCurrentPage ? 'selected' : ''}>${p}</option>`;
+                    }
+                    pageSelect.innerHTML = opts;
+                }
+
+                const totalPagesLabel = document.getElementById('provTotalPagesLabel');
+                if (totalPagesLabel) {
+                    totalPagesLabel.textContent = `of ${totalPages} pages`;
+                }
+
+                const prevBtn = document.getElementById('provPrevPageBtn');
+                if (prevBtn) {
+                    prevBtn.disabled = (provCurrentPage <= 1);
+                    if (provCurrentPage <= 1) {
+                        prevBtn.classList.add('cursor-not-allowed', 'opacity-40');
+                        prevBtn.classList.remove('cursor-pointer');
+                    } else {
+                        prevBtn.classList.remove('cursor-not-allowed', 'opacity-40');
+                        prevBtn.classList.add('cursor-pointer');
+                    }
+                }
+
+                const nextBtn = document.getElementById('provNextPageBtn');
+                if (nextBtn) {
+                    nextBtn.disabled = (provCurrentPage >= totalPages);
+                    if (provCurrentPage >= totalPages) {
+                        nextBtn.classList.add('cursor-not-allowed', 'opacity-40');
+                        nextBtn.classList.remove('cursor-pointer');
+                    } else {
+                        nextBtn.classList.remove('cursor-not-allowed', 'opacity-40');
+                        nextBtn.classList.add('cursor-pointer');
+                    }
+                }
+            }
+
+            function loadFilteredProviders() {
+                const location = document.getElementById('provLocationFilter')?.value || '';
+                const type = document.getElementById('provTypeFilter')?.value || 'All';
+                const visibility = document.getElementById('provVisibilityFilter')?.value || 'All';
+                const production = document.getElementById('provProductionFilter')?.value || 'Last 12 Months';
+                const search = document.getElementById('provSearchInput')?.value || '';
+
+                const tbody = document.getElementById('providersTbody');
+                if (tbody) {
+                    tbody.style.opacity = '0.5';
+                }
+
+                const params = new URLSearchParams({
+                    location: location,
+                    type: type,
+                    visibility: visibility,
+                    production: production,
+                    search: search
+                });
+
+                fetch(`/configuration/providers/data?${params.toString()}`, {
+                    headers: { 'Accept': 'application/json' }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.rows) {
+                        allProviderRows = data.rows;
+                        provCurrentPage = 1;
+                        renderProviderPage();
+                    }
+                })
+                .catch(err => console.error('Error loading providers:', err))
+                .finally(() => {
+                    if (tbody) {
+                        tbody.style.opacity = '1';
+                    }
+                });
+            }
+
+            const debouncedLoadProviders = debounce(loadFilteredProviders, 300);
+
+            document.getElementById('provLocationFilter')?.addEventListener('change', loadFilteredProviders);
+            document.getElementById('provTypeFilter')?.addEventListener('change', loadFilteredProviders);
+            document.getElementById('provVisibilityFilter')?.addEventListener('change', loadFilteredProviders);
+            document.getElementById('provProductionFilter')?.addEventListener('change', loadFilteredProviders);
+            document.getElementById('provSearchInput')?.addEventListener('input', debouncedLoadProviders);
+
+            // Pagination Controls
+            document.getElementById('provPageSizeSelect')?.addEventListener('change', function () {
+                provPageSize = this.value;
+                provCurrentPage = 1;
+                renderProviderPage();
+            });
+
+            document.getElementById('provPageSelect')?.addEventListener('change', function () {
+                provCurrentPage = parseInt(this.value, 10) || 1;
+                renderProviderPage();
+            });
+
+            document.getElementById('provPrevPageBtn')?.addEventListener('click', function () {
+                if (provCurrentPage > 1) {
+                    provCurrentPage--;
+                    renderProviderPage();
+                }
+            });
+
+            document.getElementById('provNextPageBtn')?.addEventListener('click', function () {
+                const effectivePageSize = provPageSize === 'all' ? allProviderRows.length : parseInt(provPageSize, 10);
+                const totalPages = provPageSize === 'all' ? 1 : Math.max(1, Math.ceil(allProviderRows.length / effectivePageSize));
+                if (provCurrentPage < totalPages) {
+                    provCurrentPage++;
+                    renderProviderPage();
+                }
+            });
+
+            function attachProviderRowListeners() {
+                document.querySelectorAll('.prov-visible-toggle').forEach(toggle => {
+                    toggle.addEventListener('change', function () {
+                        const row = this.closest('.provider-row');
+                        if (!row) return;
+                        const officeId = row.getAttribute('data-office-id');
+                        const provId = row.getAttribute('data-id');
+                        const isVisible = this.checked;
+
+                        row.setAttribute('data-visible', isVisible ? 'visible' : 'hidden');
+
+                        const found = allProviderRows.find(p => p.id == provId && p.office_id == officeId);
+                        if (found) {
+                            found.visible = isVisible;
+                        }
+
+                        fetch('/configuration/providers/toggle-visibility', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                office_id: officeId,
+                                provider_id: provId,
+                                visible: isVisible
+                            })
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) {
+                                flashProviderSavedToast();
+                            }
+                        })
+                        .catch(err => console.error('Error toggling provider visibility:', err));
+                    });
+                });
+
+                document.querySelectorAll('.prov-specialty-toggle').forEach(toggle => {
+                    toggle.addEventListener('change', function () {
+                        const row = this.closest('.provider-row');
+                        if (!row) return;
+                        const officeId = row.getAttribute('data-office-id');
+                        const provId = row.getAttribute('data-id');
+                        const spec = this.getAttribute('data-specialty');
+                        const isChecked = this.checked;
+
+                        if (isChecked) {
+                            row.querySelectorAll('.prov-specialty-toggle').forEach(other => {
+                                if (other !== this) other.checked = false;
+                            });
+                            row.setAttribute('data-specialty', spec);
+                        } else {
+                            row.setAttribute('data-specialty', '');
+                        }
+
+                        const found = allProviderRows.find(p => p.id == provId && p.office_id == officeId);
+                        if (found) {
+                            found.specialty = isChecked ? spec : '';
+                        }
+
+                        fetch('/configuration/providers/set-specialty', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                office_id: officeId,
+                                provider_id: provId,
+                                specialty: isChecked ? spec : null
+                            })
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) {
+                                flashProviderSavedToast();
+                            }
+                        })
+                        .catch(err => console.error('Error setting provider specialty:', err));
+                    });
+                });
+            }
+
+            // Clear Settings Button
+            document.getElementById('clearProviderSettingsBtn')?.addEventListener('click', function () {
+                const loc = document.getElementById('provLocationFilter')?.value;
+                if (!confirm('Are you sure you want to clear custom provider settings?')) return;
+
+                fetch('/configuration/providers/clear-settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        office_id: loc && loc !== 'All Locations' ? loc : null
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        flashProviderSavedToast('Settings Cleared');
+                        loadFilteredProviders();
+                    }
+                })
+                .catch(err => console.error('Error clearing provider settings:', err));
+            });
+
+            // Apply Default Settings Button
+            document.getElementById('applyDefaultProviderSettingsBtn')?.addEventListener('click', function () {
+                const loc = document.getElementById('provLocationFilter')?.value;
+                if (!confirm('Apply default Open Dental provider specialties and visibility?')) return;
+
+                fetch('/configuration/providers/apply-defaults', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        office_id: loc && loc !== 'All Locations' ? loc : null
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        flashProviderSavedToast('Defaults Applied');
+                        loadFilteredProviders();
+                    }
+                })
+                .catch(err => console.error('Error applying default provider settings:', err));
+            });
+
+            // Export CSV Button
+            document.getElementById('exportProviderCsvBtn')?.addEventListener('click', function () {
+                if (!allProviderRows || allProviderRows.length === 0) return;
+
+                let csv = ['Visible,Provider,Location,Provider ID,Last Active,Location Production,Specialty'];
+                allProviderRows.forEach(row => {
+                    const vis = row.visible ? 'Visible' : 'Hidden';
+                    const name = (row.name || '').replace(/"/g, '""');
+                    const loc = (row.location || '').replace(/"/g, '""');
+                    const id = row.id || '';
+                    const lastActive = row.last_active || '--';
+                    const prod = (row.production || '$0').replace(/"/g, '""');
+                    const spec = (row.specialty || '').replace(/"/g, '""');
+
+                    csv.push(`"${vis}","${name}","${loc}","${id}","${lastActive}","${prod}","${spec}"`);
+                });
+
+                const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'providers_configuration.csv';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            });
+
+            attachProviderRowListeners();
+
+            // Auto-save Office Goal
+            function saveOfficeGoalField(input) {
+                const row = input.closest('.goal-row');
+                if (!row) return;
+
+                const officeId = row.getAttribute('data-office-id');
+                const month = document.getElementById('goalMonthFilter')?.value || 'September 2026';
+                const goalType = document.getElementById('goalTypeFilter')?.value || 'monthly';
+                const field = input.getAttribute('data-field');
+                let rawVal = input.value.replace(/[^0-9.-]/g, '');
+                const val = parseFloat(rawVal) || 0;
+
+                fetch('/configuration/goals/save-office', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        office_id: officeId,
+                        month: month,
+                        goal_type: goalType,
+                        field: field,
+                        value: val
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        flashSavedIndicator(row, '.goal-saved-indicator');
+                    }
+                })
+                .catch(err => console.error('Error saving office goal:', err));
+            }
+
+            const debouncedSaveOfficeGoal = debounce(saveOfficeGoalField, 500);
+            document.querySelectorAll('.goal-input-office').forEach(input => {
+                input.addEventListener('input', () => debouncedSaveOfficeGoal(input));
+                input.addEventListener('change', () => saveOfficeGoalField(input));
+            });
+
+            // Auto-save Specialty Goal
+            function saveSpecialtyGoalField(input) {
+                const row = input.closest('.goal-specialty-row');
+                if (!row) return;
+
+                const officeId = row.getAttribute('data-office-id');
+                const month = document.getElementById('goalSpecMonthFilter')?.value || 'September 2026';
+                const goalType = document.getElementById('goalSpecTypeFilter')?.value || 'monthly';
+                const field = input.getAttribute('data-field');
+                let rawVal = input.value.replace(/[^0-9.-]/g, '');
+                const val = parseFloat(rawVal) || 0;
+
+                fetch('/configuration/goals/save-specialty', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        office_id: officeId,
+                        month: month,
+                        goal_type: goalType,
+                        field: field,
+                        value: val
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        flashSavedIndicator(row, '.goal-spec-saved-indicator');
+                    }
+                })
+                .catch(err => console.error('Error saving specialty goal:', err));
+            }
+
+            const debouncedSaveSpecialtyGoal = debounce(saveSpecialtyGoalField, 500);
+            document.querySelectorAll('.goal-input-specialty').forEach(input => {
+                input.addEventListener('input', () => debouncedSaveSpecialtyGoal(input));
+                input.addEventListener('change', () => saveSpecialtyGoalField(input));
+            });
+
+            // Auto-save Provider Goal
+            function saveProviderGoalField(input) {
+                const row = input.closest('.goal-provider-row');
+                if (!row) return;
+
+                const officeId = row.getAttribute('data-office-id');
+                const providerId = row.getAttribute('data-provider-id');
+                const providerName = row.getAttribute('data-provider-name');
+                const providerType = row.getAttribute('data-provider-type');
+                const recurring = row.getAttribute('data-recurring') === '1';
+                const month = document.getElementById('goalProvMonthFilter')?.value || 'September 2026';
+                const goalType = document.getElementById('goalProvGoalTypeFilter')?.value || 'monthly';
+                let rawVal = input.value.replace(/[^0-9.-]/g, '');
+                const val = parseFloat(rawVal) || 0;
+
+                fetch('/configuration/goals/save-provider', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        office_id: officeId,
+                        provider_id: providerId,
+                        provider_name: providerName,
+                        provider_type: providerType,
+                        recurring: recurring,
+                        month: month,
+                        goal_type: goalType,
+                        goal: val
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        flashSavedIndicator(row, '.goal-prov-saved-indicator');
+                    }
+                })
+                .catch(err => console.error('Error saving provider goal:', err));
+            }
+
+            const debouncedSaveProviderGoal = debounce(saveProviderGoalField, 500);
+            document.querySelectorAll('.goal-input-provider').forEach(input => {
+                input.addEventListener('input', () => debouncedSaveProviderGoal(input));
+                input.addEventListener('change', () => saveProviderGoalField(input));
+            });
+
+            // Reload goals via AJAX when filters change
+            function loadOfficeGoalsData() {
+                const month = document.getElementById('goalMonthFilter')?.value || '';
+                const location = document.getElementById('goalLocationFilter')?.value || '';
+                const goalType = document.getElementById('goalTypeFilter')?.value || 'monthly';
+
+                fetch(`/configuration/goals/data?subtab=office&month=${encodeURIComponent(month)}&location=${encodeURIComponent(location)}&goal_type=${encodeURIComponent(goalType)}`, {
+                    headers: { 'Accept': 'application/json' }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.rows) {
+                        data.rows.forEach(r => {
+                            const row = document.querySelector(`.goal-row[data-office-id="${r.office_id}"]`);
+                            if (row) {
+                                const grossInput = row.querySelector('[data-field="gross_production"]');
+                                const netInput = row.querySelector('[data-field="net_production"]');
+                                const collInput = row.querySelector('[data-field="collection"]');
+                                const ptsInput = row.querySelector('[data-field="pts_visits"]');
+                                const nptInput = row.querySelector('[data-field="npt_visits"]');
+                                const iniInput = row.querySelector('[data-field="ini_bonding"]');
+                                const hygInput = row.querySelector('[data-field="hyg_visits"]');
+
+                                if (grossInput) grossInput.value = r.gross !== '' ? '$' + Number(r.gross).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+                                if (netInput) netInput.value = r.net !== '' ? '$' + Number(r.net).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+                                if (collInput) collInput.value = r.collection !== '' ? '$' + Number(r.collection).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+                                if (ptsInput) ptsInput.value = r.pts_visits !== '' ? r.pts_visits : '';
+                                if (nptInput) nptInput.value = r.npt_visits !== '' ? r.npt_visits : '';
+                                if (iniInput) iniInput.value = r.ini_bonding !== '' ? r.ini_bonding : '';
+                                if (hygInput) hygInput.value = r.hyg_visits !== '' ? r.hyg_visits : '';
+                            }
+                        });
+                    }
+                })
+                .catch(err => console.error('Error loading office goals:', err));
+            }
+
+            document.getElementById('goalMonthFilter')?.addEventListener('change', loadOfficeGoalsData);
+            document.getElementById('goalTypeFilter')?.addEventListener('change', loadOfficeGoalsData);
+
+            function loadSpecialtyGoalsData() {
+                const month = document.getElementById('goalSpecMonthFilter')?.value || '';
+                const location = document.getElementById('goalSpecLocationFilter')?.value || '';
+                const goalType = document.getElementById('goalSpecTypeFilter')?.value || 'monthly';
+
+                fetch(`/configuration/goals/data?subtab=specialties&month=${encodeURIComponent(month)}&location=${encodeURIComponent(location)}&goal_type=${encodeURIComponent(goalType)}`, {
+                    headers: { 'Accept': 'application/json' }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.rows) {
+                        data.rows.forEach(r => {
+                            const row = document.querySelector(`.goal-specialty-row[data-office-id="${r.office_id}"]`);
+                            if (row) {
+                                ['doctor', 'hygiene', 'oral_surgery', 'clear_aligners', 'perio', 'pedo', 'endo', 'ortho', 'prostho'].forEach(spec => {
+                                    const input = row.querySelector(`[data-field="${spec}"]`);
+                                    if (input) {
+                                        input.value = r[spec] !== '' ? '$' + Number(r[spec]).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+                                    }
+                                });
+                            }
+                        });
+                    }
+                })
+                .catch(err => console.error('Error loading specialty goals:', err));
+            }
+
+            document.getElementById('goalSpecMonthFilter')?.addEventListener('change', loadSpecialtyGoalsData);
+            document.getElementById('goalSpecTypeFilter')?.addEventListener('change', loadSpecialtyGoalsData);
+
+            function loadProviderGoalsData() {
+                const month = document.getElementById('goalProvMonthFilter')?.value || '';
+                const location = document.getElementById('goalProvLocationFilter')?.value || '';
+                const goalType = document.getElementById('goalProvGoalTypeFilter')?.value || 'monthly';
+
+                fetch(`/configuration/goals/data?subtab=providers&month=${encodeURIComponent(month)}&location=${encodeURIComponent(location)}&goal_type=${encodeURIComponent(goalType)}`, {
+                    headers: { 'Accept': 'application/json' }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.rows) {
+                        data.rows.forEach(r => {
+                            const row = document.querySelector(`.goal-provider-row[data-office-id="${r.office_id}"][data-provider-id="${r.provider_id}"]`);
+                            if (row) {
+                                const input = row.querySelector('[data-field="production_goal"]');
+                                if (input) {
+                                    input.value = r.goal !== '' ? '$' + Number(r.goal).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '';
+                                }
+                            }
+                        });
+                    }
+                })
+                .catch(err => console.error('Error loading provider goals:', err));
+            }
+
+            document.getElementById('goalProvMonthFilter')?.addEventListener('change', loadProviderGoalsData);
+            document.getElementById('goalProvGoalTypeFilter')?.addEventListener('change', loadProviderGoalsData);
 
             // Goals Location Filter (Office Subtab)
             const goalLocationFilter = document.getElementById('goalLocationFilter');
@@ -7354,121 +8059,185 @@ There is no need to enter a Closed day for these holidays:
                         return;
                     }
 
-                    // Create new row in tbody
-                    const tbody = document.getElementById('kpisTableTbody');
-                    if (tbody) {
-                        const newTr = document.createElement('tr');
-                        newTr.setAttribute('role', 'row');
-                        newTr.className = 'kpi-row cat-custom subtab-custom odd:bg-gray-000 dark:odd:bg-gray-800 hover:bg-gray-100/60 dark:hover:bg-gray-750 transition-colors';
-                        const newId = Date.now();
-                        newTr.setAttribute('data-kpi-id', newId);
-                        newTr.setAttribute('data-subtab-group', 'custom');
-                        newTr.setAttribute('data-category', 'custom');
-                        newTr.setAttribute('data-kpi-name', nameVal.toLowerCase());
-                        newTr.setAttribute('data-transaction', txVal.toLowerCase());
-                        newTr.setAttribute('data-display', kpiTypeVal.toLowerCase());
-                        newTr.setAttribute('data-line-of-business', lobVal.toLowerCase());
-                        newTr.setAttribute('data-kpi-desc', descVal.toLowerCase());
+                    fetch('/configuration/kpis/custom/save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            name: nameVal,
+                            transaction_type: txVal,
+                            kpi_type: kpiTypeVal,
+                            display: displayVal,
+                            line_of_business: lobVal,
+                            description: descVal
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.kpi) {
+                            const kpi = data.kpi;
+                            const tbody = document.getElementById('kpisTableTbody');
+                            if (tbody) {
+                                const newTr = document.createElement('tr');
+                                newTr.setAttribute('role', 'row');
+                                newTr.className = 'kpi-row cat-custom subtab-custom odd:bg-gray-000 dark:odd:bg-gray-800 hover:bg-gray-100/60 dark:hover:bg-gray-750 transition-colors';
+                                newTr.setAttribute('data-kpi-id', kpi.id);
+                                newTr.setAttribute('data-kpi-key', kpi.kpi_key || kpi.id);
+                                newTr.setAttribute('data-subtab-group', 'custom');
+                                newTr.setAttribute('data-category', 'custom');
+                                newTr.setAttribute('data-kpi-name', (kpi.name || nameVal).toLowerCase());
+                                newTr.setAttribute('data-transaction', (kpi.transaction || txVal).toLowerCase());
+                                newTr.setAttribute('data-display', (kpi.display || kpiTypeVal).toLowerCase());
+                                newTr.setAttribute('data-line-of-business', (kpi.line_of_business || lobVal).toLowerCase());
+                                newTr.setAttribute('data-kpi-desc', (kpi.description || descVal).toLowerCase());
 
-                        const safeName = escapeHtml(nameVal);
-                        const safeTx = escapeHtml(txVal);
-                        const safeDisplay = escapeHtml(displayVal);
-                        const safeDesc = escapeHtml(descVal);
+                                const safeName = escapeHtml(kpi.name || nameVal);
+                                const safeTx = escapeHtml(kpi.transaction || txVal);
+                                const safeDisplay = escapeHtml(kpi.display || displayVal);
+                                const safeDesc = escapeHtml(kpi.description || descVal);
 
-                        newTr.innerHTML = `
-                            <td role="cell" class="px-3 py-2 align-middle text-xs font-semibold dark:text-white border-white dark:border-gray-800 border kpi-cell-name">
-                                ${safeName}
-                            </td>
-                            <td role="cell" class="px-3 py-2 align-middle text-xs dark:text-white border-white dark:border-gray-800 border kpi-cell-transaction">
-                                ${safeTx}
-                            </td>
-                            <td role="cell" class="px-3 py-2 align-middle text-xs dark:text-white border-white dark:border-gray-800 border kpi-cell-display">
-                                ${safeDisplay}
-                            </td>
-                            <td role="cell" class="px-3 py-2 align-middle overflow-ellipsis overflow-hidden text-xs dark:text-white border-white dark:border-gray-800 border kpi-cell-description" style="min-width: 10rem;">
-                                ${safeDesc}
-                            </td>
-                            <td role="cell" class="px-3 py-2 align-middle text-xs dark:text-white border-white dark:border-gray-800 border text-center" style="min-width: 1%;">
-                                <div class="relative lels text-center kpi-action-container">
-                                    <span class="flex justify-center">
-                                        <button type="button" class="text-ja-green-200 focus:outline-none kpi-action-menu-btn" title="Actions">
-                                            <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="flex-shrink-0 align-middle inline-block w-6 h-6">
-                                                <path fill="currentColor" d="M2 10h4v4H2zM10 10h4v4h-4zM18 10h4v4h-4z"></path>
-                                            </svg>
-                                        </button>
-                                    </span>
-                                    <div class="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-800 dark:text-white z-50 bg-pointer mt-3 hidden absolute right-0 kpi-dropdown-menu rounded-sm text-left">
-                                        <button type="button" class="kpi-edit-btn flex items-center px-4 py-3 text-xs font-semibold focus:outline-none focus:bg-gray-000 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 w-full" style="outline: none;">
-                                            <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="flex-shrink-0 align-middle mr-1 inline-block w-5 h-5 text-ja-green-200">
-                                                <path d="M10.5 4H1v19h19v-9.5" stroke="currentColor" stroke-width="2"></path>
-                                                <path d="M19 1.52l3.561 3.562-11.574 11.574-5.045 1.484 1.484-5.046L19 1.52zM15.977 4.543l3.562 3.562" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
-                                            </svg>
-                                            Edit KPI
-                                        </button>
-                                        <button type="button" class="kpi-delete-btn flex items-center px-4 py-3 text-xs font-semibold text-rose-600 focus:outline-none hover:bg-rose-50 dark:hover:bg-rose-900/30 w-full">
-                                            <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="flex-shrink-0 align-middle mr-1 inline-block w-5 h-5 text-rose-500">
-                                                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                                            </svg>
-                                            Delete KPI
-                                        </button>
-                                    </div>
-                                </div>
-                            </td>
-                        `;
-                        tbody.appendChild(newTr);
+                                newTr.innerHTML = `
+                                    <td role="cell" class="px-3 py-2 align-middle text-xs font-semibold dark:text-white border-white dark:border-gray-800 border kpi-cell-name">
+                                        ${safeName}
+                                    </td>
+                                    <td role="cell" class="px-3 py-2 align-middle text-xs dark:text-white border-white dark:border-gray-800 border kpi-cell-transaction">
+                                        ${safeTx}
+                                    </td>
+                                    <td role="cell" class="px-3 py-2 align-middle text-xs dark:text-white border-white dark:border-gray-800 border kpi-cell-display">
+                                        ${safeDisplay}
+                                    </td>
+                                    <td role="cell" class="px-3 py-2 align-middle overflow-ellipsis overflow-hidden text-xs dark:text-white border-white dark:border-gray-800 border kpi-cell-description" style="min-width: 10rem;">
+                                        ${safeDesc}
+                                    </td>
+                                    <td role="cell" class="px-3 py-2 align-middle text-xs dark:text-white border-white dark:border-gray-800 border text-center" style="min-width: 1%;">
+                                        <div class="relative lels text-center kpi-action-container">
+                                            <span class="flex justify-center">
+                                                <button type="button" class="text-ja-green-200 focus:outline-none kpi-action-menu-btn" title="Actions">
+                                                    <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="flex-shrink-0 align-middle inline-block w-6 h-6">
+                                                        <path fill="currentColor" d="M2 10h4v4H2zM10 10h4v4h-4zM18 10h4v4h-4z"></path>
+                                                    </svg>
+                                                </button>
+                                            </span>
+                                            <div class="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-800 dark:text-white z-50 bg-pointer mt-3 hidden absolute right-0 kpi-dropdown-menu rounded-sm text-left">
+                                                <button type="button" class="kpi-edit-btn flex items-center px-4 py-3 text-xs font-semibold focus:outline-none focus:bg-gray-000 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 w-full" style="outline: none;">
+                                                    <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="flex-shrink-0 align-middle mr-1 inline-block w-5 h-5 text-ja-green-200">
+                                                        <path d="M10.5 4H1v19h19v-9.5" stroke="currentColor" stroke-width="2"></path>
+                                                        <path d="M19 1.52l3.561 3.562-11.574 11.574-5.045 1.484 1.484-5.046L19 1.52zM15.977 4.543l3.562 3.562" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+                                                    </svg>
+                                                    Edit KPI
+                                                </button>
+                                                <button type="button" class="kpi-delete-btn flex items-center px-4 py-3 text-xs font-semibold text-rose-600 focus:outline-none hover:bg-rose-50 dark:hover:bg-rose-900/30 w-full">
+                                                    <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="flex-shrink-0 align-middle mr-1 inline-block w-5 h-5 text-rose-500">
+                                                        <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                                                    </svg>
+                                                    Delete KPI
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                `;
+                                tbody.appendChild(newTr);
 
-                        // Attach listeners to new elements
-                        const menuBtn = newTr.querySelector('.kpi-action-menu-btn');
-                        const menu = newTr.querySelector('.kpi-dropdown-menu');
-                        if (menuBtn && menu) {
-                            menuBtn.addEventListener('click', function (e) {
-                                e.stopPropagation();
-                                const isHidden = menu.classList.contains('hidden');
-                                document.querySelectorAll('.kpi-dropdown-menu').forEach(m => m.classList.add('hidden'));
-                                if (isHidden) menu.classList.remove('hidden');
-                            });
+                                // Attach listeners to new elements
+                                const menuBtn = newTr.querySelector('.kpi-action-menu-btn');
+                                const menu = newTr.querySelector('.kpi-dropdown-menu');
+                                if (menuBtn && menu) {
+                                    menuBtn.addEventListener('click', function (e) {
+                                        e.stopPropagation();
+                                        const isHidden = menu.classList.contains('hidden');
+                                        document.querySelectorAll('.kpi-dropdown-menu').forEach(m => m.classList.add('hidden'));
+                                        if (isHidden) menu.classList.remove('hidden');
+                                    });
+                                }
+                                const delBtn = newTr.querySelector('.kpi-delete-btn');
+                                if (delBtn) {
+                                    bindKpiDeleteListener(delBtn);
+                                }
+                                const editBtn = newTr.querySelector('.kpi-edit-btn');
+                                if (editBtn) {
+                                    editBtn.addEventListener('click', function (e) {
+                                        e.stopPropagation();
+                                        document.querySelectorAll('.kpi-dropdown-menu').forEach(m => m.classList.add('hidden'));
+                                        openEditKpiModal(newTr);
+                                    });
+                                }
+                            }
+
+                            if (customKpiSuccessMsg) {
+                                customKpiSuccessMsg.style.display = 'block';
+                            }
+
+                            setTimeout(() => {
+                                if (customKpiSuccessMsg) {
+                                    customKpiSuccessMsg.style.display = 'none';
+                                }
+                                addCustomKpiForm.reset();
+                                switchKpisSubtab('custom', 'index', true);
+                            }, 800);
                         }
-                        const delBtn = newTr.querySelector('.kpi-delete-btn');
-                        if (delBtn) {
-                            delBtn.addEventListener('click', function (e) {
-                                e.stopPropagation();
-                                newTr.remove();
-                            });
-                        }
-                        const editBtn = newTr.querySelector('.kpi-edit-btn');
-                        if (editBtn) {
-                            editBtn.addEventListener('click', function (e) {
-                                e.stopPropagation();
-                                document.querySelectorAll('.kpi-dropdown-menu').forEach(m => m.classList.add('hidden'));
-                                openEditKpiModal(newTr);
-                            });
-                        }
-                    }
-
-                    if (customKpiSuccessMsg) {
-                        customKpiSuccessMsg.style.display = 'block';
-                    }
-
-                    setTimeout(() => {
-                        if (customKpiSuccessMsg) {
-                            customKpiSuccessMsg.style.display = 'none';
-                        }
-                        addCustomKpiForm.reset();
-                        switchKpisSubtab('custom', 'index', true);
-                    }, 800);
+                    })
+                    .catch(err => console.error('Error saving custom KPI:', err));
                 });
             }
 
-            // Delete KPI button (e.g. for Custom KPIs)
-            document.querySelectorAll('.kpi-delete-btn').forEach(btn => {
+            // Bind delete KPI action to backend
+            function bindKpiDeleteListener(btn) {
                 btn.addEventListener('click', function (e) {
                     e.stopPropagation();
                     const row = this.closest('.kpi-row');
-                    if (row) {
+                    if (!row) return;
+                    const id = row.getAttribute('data-kpi-id');
+                    const kpiKey = row.getAttribute('data-kpi-key') || id;
+
+                    fetch('/configuration/kpis/custom/delete', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            id: id,
+                            kpi_key: kpiKey
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            row.remove();
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error deleting custom KPI:', err);
                         row.remove();
-                    }
+                    });
                 });
-            });
+            }
+
+            document.querySelectorAll('.kpi-delete-btn').forEach(bindKpiDeleteListener);
+
+            // Group averages toggle backend save
+            const toggleGroupAverages = document.getElementById('toggle-2');
+            if (toggleGroupAverages) {
+                toggleGroupAverages.addEventListener('change', function () {
+                    fetch('/configuration/kpis/save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            kpi_key: 'group_averages',
+                            category: 'settings',
+                            is_enabled: toggleGroupAverages.checked
+                        })
+                    }).catch(err => console.error('Error saving group averages toggle:', err));
+                });
+            }
 
             // Close KPI, RCM, and Snapshot dropdowns on document click
             document.addEventListener('click', function () {
@@ -7526,7 +8295,57 @@ There is no need to enter a Closed day for these holidays:
                     const goalInput = row ? row.querySelector('.kpi-cell-goal') : null;
                     if (goalInput) {
                         goalInput.value = '0.0';
+                        saveKpiRowConfig(row);
                     }
+                });
+            });
+
+            function saveKpiRowConfig(row) {
+                if (!row) return;
+                const kpiKey = row.getAttribute('data-kpi-key') || row.getAttribute('data-kpi-id') || row.getAttribute('data-kpi-name') || '';
+                const category = row.getAttribute('data-category') || 'main';
+                const name = row.querySelector('.kpi-cell-name')?.textContent.trim() || '';
+                const desc = row.querySelector('.kpi-cell-description')?.textContent.trim() || '';
+                const goalInput = row.querySelector('.kpi-cell-goal');
+                const toggleInput = row.querySelector('.kpi-enable-toggle') || row.querySelector('.kpi-provider-toggle');
+                const isEnabled = toggleInput ? toggleInput.checked : true;
+                const targetGoal = goalInput ? (parseFloat(goalInput.value.replace(/[^0-9.-]/g, '')) || 0) : 0;
+
+                fetch('/configuration/kpis/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        kpi_key: kpiKey,
+                        category: category,
+                        name: name,
+                        description: desc,
+                        is_enabled: isEnabled,
+                        target_goal: targetGoal
+                    })
+                }).catch(err => console.error('Error saving KPI config:', err));
+            }
+
+            const debouncedSaveKpi = debounce(saveKpiRowConfig, 500);
+
+            document.querySelectorAll('.kpi-cell-goal').forEach(input => {
+                input.addEventListener('input', () => {
+                    const row = input.closest('.kpi-row');
+                    debouncedSaveKpi(row);
+                });
+                input.addEventListener('change', () => {
+                    const row = input.closest('.kpi-row');
+                    saveKpiRowConfig(row);
+                });
+            });
+
+            document.querySelectorAll('.kpi-enable-toggle, .kpi-provider-toggle').forEach(input => {
+                input.addEventListener('change', () => {
+                    const row = input.closest('tr');
+                    saveKpiRowConfig(row);
                 });
             });
 
@@ -7563,7 +8382,7 @@ There is no need to enter a Closed day for these holidays:
                     const nameCell = row.querySelector('.kpi-cell-name');
                     const descCell = row.querySelector('.kpi-cell-description');
                     const goalInput = row.querySelector('.kpi-cell-goal');
-                    const toggleInput = row.querySelector('.kpi-enable-toggle');
+                    const toggleInput = row.querySelector('.kpi-enable-toggle') || row.querySelector('.kpi-provider-toggle');
 
                     if (editKpiIdInput) editKpiIdInput.value = id;
                     if (editKpiNameInput) editKpiNameInput.value = nameCell ? nameCell.textContent.trim() : '';
@@ -7616,102 +8435,57 @@ There is no need to enter a Closed day for these holidays:
                     const enabled = editKpiEnabledInput ? editKpiEnabledInput.checked : true;
 
                     if (editingKpiRow) {
+                        const isCustom = editingKpiRow.getAttribute('data-category') === 'custom' || editingKpiRow.getAttribute('data-subtab-group') === 'custom';
+                        const kpiId = editingKpiRow.getAttribute('data-kpi-id');
+                        const kpiKey = editingKpiRow.getAttribute('data-kpi-key') || kpiId;
+                        const category = editingKpiRow.getAttribute('data-category') || 'main';
+
                         editingKpiRow.setAttribute('data-kpi-name', name.toLowerCase());
                         editingKpiRow.setAttribute('data-kpi-desc', desc.toLowerCase());
                         const nameCell = editingKpiRow.querySelector('.kpi-cell-name');
                         const descCell = editingKpiRow.querySelector('.kpi-cell-description');
                         const goalInput = editingKpiRow.querySelector('.kpi-cell-goal');
-                        const toggleInput = editingKpiRow.querySelector('.kpi-enable-toggle');
+                        const toggleInput = editingKpiRow.querySelector('.kpi-enable-toggle') || editingKpiRow.querySelector('.kpi-provider-toggle');
 
                         if (nameCell) nameCell.textContent = name;
                         if (descCell) descCell.textContent = desc;
                         if (goalInput) goalInput.value = goal;
                         if (toggleInput) toggleInput.checked = enabled;
-                    } else {
-                        // Create a new Custom KPI row
-                        const tbody = document.getElementById('kpisTableTbody');
-                        if (tbody) {
-                            const newId = Math.floor(900 + Math.random() * 100);
-                            const tr = document.createElement('tr');
-                            tr.className = 'kpi-row cat-custom odd:bg-gray-000 dark:odd:bg-gray-800 hover:bg-gray-100/60 dark:hover:bg-gray-750 transition-colors';
-                            tr.setAttribute('data-kpi-id', newId);
-                            tr.setAttribute('data-subtab-group', 'custom');
-                            tr.setAttribute('data-category', 'custom');
-                            tr.setAttribute('data-kpi-name', name.toLowerCase());
-                            tr.setAttribute('data-kpi-desc', desc.toLowerCase());
 
-                            tr.innerHTML = `
-                                <td role="cell" class="px-3 py-2 align-middle text-xs dark:text-white border-white dark:border-gray-800 border text-center" style="min-width: 0.1%;">
-                                    <label class="relative inline-flex items-center cursor-pointer select-none">
-                                        <input type="checkbox" class="sr-only dds-toggle-input kpi-enable-toggle" value="" ${enabled ? 'checked' : ''}>
-                                        <div class="dds-toggle-track">
-                                            <div class="dds-toggle-knob">
-                                                <svg class="dds-toggle-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </label>
-                                </td>
-                                <td role="cell" class="px-3 py-2 align-middle w-3/12 text-xs text-left dark:text-white border-white dark:border-gray-800 border" style="min-width: 0.1%;">
-                                    <div class="flex items-center justify-between font-semibold kpi-cell-name">
-                                        ${name}
-                                    </div>
-                                </td>
-                                <td role="cell" class="px-3 py-2 align-middle overflow-ellipsis overflow-hidden text-xs dark:text-white border-white dark:border-gray-800 border kpi-cell-description" style="min-width: initial; max-width: initial;">
-                                    ${desc}
-                                </td>
-                                <td role="cell" class="px-3 py-2 align-middle text-center w-2/12 goal-cell-td goal-cell text-xs dark:text-white border-white dark:border-gray-800 border" style="min-width: initial; max-width: initial;">
-                                    <div class="flex justify-between space-x-2">
-                                        <input type="number" step="any" placeholder="0.0" value="${goal}" debounce-events="keyup" class="w-full text-right border-gray-400 dark:bg-gray-800 rounded-sm p-1 border text-xs dark:text-white focus:outline-none focus:border-ja-green-200 kpi-cell-goal">
-                                        <button type="button" class="kpi-reset-goal-btn focus:outline-none hover:opacity-80" title="Reset Goal">
-                                            <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="flex-shrink-0 align-middle inline-block w-5 h-5 text-ja-green-200">
-                                                <path d="M15.363 4.773c2.318 1.267 3.909 3.734 4.392 5.701a8.5 8.5 0 11-16.653.708C3.317 9.815 4.044 8 5.272 6.5" stroke="currentColor" stroke-width="2"></path>
-                                                <path d="M14.59 9.74V4h5.74" stroke="currentColor" stroke-width="2"></path>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </td>
-                                <td role="cell" class="px-3 py-2 align-middle text-xs dark:text-white border-white dark:border-gray-800 border text-center" style="min-width: 1%;">
-                                    <div class="relative lels text-center kpi-action-container">
-                                        <span class="flex justify-center">
-                                            <button type="button" class="text-ja-green-200 focus:outline-none kpi-action-menu-btn" title="Actions">
-                                                <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="flex-shrink-0 align-middle inline-block w-6 h-6">
-                                                    <path fill="currentColor" d="M2 10h4v4H2zM10 10h4v4h-4zM18 10h4v4h-4z"></path>
-                                                </svg>
-                                            </button>
-                                        </span>
-                                        <div class="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-800 dark:text-white z-50 bg-pointer mt-3 hidden absolute right-0 kpi-dropdown-menu rounded-sm text-left">
-                                            <button type="button" class="kpi-edit-btn flex items-center px-4 py-3 text-xs font-semibold focus:outline-none focus:bg-gray-000 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 w-full" style="outline: none;">
-                                                <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="flex-shrink-0 align-middle mr-1 inline-block w-5 h-5 text-ja-green-200">
-                                                    <path d="M10.5 4H1v19h19v-9.5" stroke="currentColor" stroke-width="2"></path>
-                                                    <path d="M19 1.52l3.561 3.562-11.574 11.574-5.045 1.484 1.484-5.046L19 1.52zM15.977 4.543l3.562 3.562" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
-                                                </svg>
-                                                Edit KPI
-                                            </button>
-                                        </div>
-                                    </div>
-                                </td>
-                            `;
-
-                            tr.querySelector('.kpi-reset-goal-btn').addEventListener('click', function () {
-                                tr.querySelector('.kpi-cell-goal').value = '0.0';
-                            });
-
-                            tr.querySelector('.kpi-action-menu-btn').addEventListener('click', function (e) {
-                                e.stopPropagation();
-                                const m = tr.querySelector('.kpi-dropdown-menu');
-                                document.querySelectorAll('.kpi-dropdown-menu').forEach(menu => { if (menu !== m) menu.classList.add('hidden'); });
-                                if (m) m.classList.toggle('hidden');
-                            });
-
-                            tr.querySelector('.kpi-edit-btn').addEventListener('click', function (e) {
-                                e.stopPropagation();
-                                document.querySelectorAll('.kpi-dropdown-menu').forEach(m => m.classList.add('hidden'));
-                                openEditKpiModal(tr);
-                            });
-
-                            tbody.prepend(tr);
+                        if (isCustom) {
+                            fetch('/configuration/kpis/custom/save', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken,
+                                    'Accept': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    id: kpiId,
+                                    kpi_key: kpiKey,
+                                    name: name,
+                                    description: desc,
+                                    target_goal: parseFloat(goal) || 0,
+                                    is_enabled: enabled
+                                })
+                            }).catch(err => console.error('Error saving custom KPI:', err));
+                        } else {
+                            fetch('/configuration/kpis/save', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken,
+                                    'Accept': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    kpi_key: kpiKey,
+                                    category: category,
+                                    name: name,
+                                    description: desc,
+                                    target_goal: parseFloat(goal) || 0,
+                                    is_enabled: enabled
+                                })
+                            }).catch(err => console.error('Error saving KPI:', err));
                         }
                     }
 
@@ -7760,15 +8534,30 @@ There is no need to enter a Closed day for these holidays:
                     const file = e.target.files[0];
                     if (!file) return;
 
-                    const reader = new FileReader();
-                    reader.onload = function (evt) {
-                        const text = evt.target.result;
-                        const lines = text.split('\n').filter(l => l.trim().length > 0);
-                        if (lines.length > 1) {
-                            alert(`Successfully processed ${lines.length - 1} KPI entries from CSV.`);
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    fetch('/configuration/kpis/import-csv', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        },
+                        body: formData
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message || 'Successfully imported KPIs.');
+                            window.location.reload();
+                        } else {
+                            alert(data.message || 'Error importing CSV.');
                         }
-                    };
-                    reader.readAsText(file);
+                    })
+                    .catch(err => {
+                        console.error('Error uploading CSV:', err);
+                        alert('Error uploading CSV.');
+                    });
                 });
             }
 
@@ -8380,18 +9169,57 @@ There is no need to enter a Closed day for these holidays:
                 });
             });
 
+            // Helper to save EOD metric configuration
+            function saveEodMetric(metricKey, subtab, data) {
+                return fetch('/configuration/eod/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        metric_key: metricKey,
+                        subtab: subtab,
+                        ...data
+                    })
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        flashBasicSavedToast();
+                    }
+                    return res;
+                })
+                .catch(err => console.error('Error saving EOD configuration:', err));
+            }
+
             // Toggle checkbox change handler for EOD
             document.querySelectorAll('.eod-enable-toggle').forEach(toggle => {
                 toggle.addEventListener('change', function () {
-                    this.setAttribute('aria-checked', this.checked ? '1' : '0');
-                    this.value = this.checked ? 'true' : 'false';
+                    const isChecked = this.checked;
+                    this.setAttribute('aria-checked', isChecked ? '1' : '0');
+                    this.value = isChecked ? 'true' : 'false';
+                    const row = this.closest('.eod-metric-row');
+                    const metricId = row ? row.getAttribute('data-metric-id') : null;
+                    const subtab = row ? row.getAttribute('data-eod-subtab') : 'basics';
+                    if (metricId) {
+                        saveEodMetric(metricId, subtab, { is_enabled: isChecked });
+                    }
                 });
             });
 
             document.querySelectorAll('.eod-locked-toggle').forEach(toggle => {
                 toggle.addEventListener('change', function () {
-                    this.setAttribute('aria-checked', this.checked ? '1' : '0');
-                    this.value = this.checked ? 'true' : 'false';
+                    const isChecked = this.checked;
+                    this.setAttribute('aria-checked', isChecked ? '1' : '0');
+                    this.value = isChecked ? 'true' : 'false';
+                    const row = this.closest('.eod-metric-row');
+                    const metricId = row ? row.getAttribute('data-metric-id') : null;
+                    const subtab = row ? row.getAttribute('data-eod-subtab') : 'basics';
+                    if (metricId) {
+                        saveEodMetric(metricId, subtab, { is_locked: isChecked });
+                    }
                 });
             });
 
@@ -8453,6 +9281,8 @@ There is no need to enter a Closed day for these holidays:
                     e.preventDefault();
                     if (!editingEodRow) return;
 
+                    const metricId = editEodMetricId ? editEodMetricId.value : (editingEodRow.getAttribute('data-metric-id') || '');
+                    const subtab = editingEodRow.getAttribute('data-eod-subtab') || 'basics';
                     const newTitle = editEodTitleInput ? editEodTitleInput.value.trim() : '';
                     const newDesc = editEodDescriptionInput ? editEodDescriptionInput.value.trim() : '';
                     const newEnabled = editEodEnabledInput ? editEodEnabledInput.checked : false;
@@ -8475,6 +9305,13 @@ There is no need to enter a Closed day for these holidays:
                         lockedToggle.setAttribute('aria-checked', newLocked ? '1' : '0');
                         lockedToggle.value = newLocked ? 'true' : 'false';
                     }
+
+                    saveEodMetric(metricId, subtab, {
+                        title: newTitle,
+                        description: newDesc,
+                        is_enabled: newEnabled,
+                        is_locked: newLocked
+                    });
 
                     closeEditEodModal();
                 });

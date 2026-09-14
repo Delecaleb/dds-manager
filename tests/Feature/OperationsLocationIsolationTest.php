@@ -413,4 +413,137 @@ class OperationsLocationIsolationTest extends TestCase
         $this->assertEquals(0.0, $resOffice1['total']['gross']);
         $this->assertEquals(450.00, $resOffice2['total']['gross']);
     }
+
+    public function test_operations_offices_unique_pts_does_not_exceed_patient_visits_with_broken_appointments(): void
+    {
+        $service = app(OperationsAnalyticsService::class);
+
+        // Define broken appointment code (e.g. CodeNum 626 / D9986)
+        DB::table('od_procedures')->insert([
+            'office_id' => $this->office1->id,
+            'CodeNum' => 626,
+            'ProcCode' => 'D9986',
+            'Descript' => 'Missed Appointment',
+            'ProcCat' => 1,
+        ]);
+
+        // Regular completed proc code
+        DB::table('od_procedures')->insert([
+            'office_id' => $this->office1->id,
+            'CodeNum' => 10,
+            'ProcCode' => 'D0120',
+            'Descript' => 'Periodic Exam',
+            'ProcCat' => 1,
+        ]);
+
+        // Patient 1: Had valid completed proc on July 5
+        DB::table('od_procedure_logs')->insert([
+            'office_id' => $this->office1->id,
+            'ProcNum' => 101,
+            'PatNum' => 1,
+            'ClinicNum' => 1,
+            'ProvNum' => 1,
+            'CodeNum' => 10,
+            'ProcFee' => 150.00,
+            'ProcStatus' => 'C',
+            'ProcDate' => '2026-07-05',
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+
+        // Patient 2: Only had broken appointment code on July 10
+        DB::table('od_procedure_logs')->insert([
+            'office_id' => $this->office1->id,
+            'ProcNum' => 102,
+            'PatNum' => 2,
+            'ClinicNum' => 1,
+            'ProvNum' => 1,
+            'CodeNum' => 626,
+            'ProcFee' => 0.00,
+            'ProcStatus' => 'C',
+            'ProcDate' => '2026-07-10',
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+
+        $res = $service->offices('2026-07-01', '2026-07-31', 'default', [1], $this->office1->id);
+
+        // Patient 1 had 1 visit. Patient 2 should NOT count towards unique_pts because only broken appt.
+        $this->assertEquals(1, $res['total']['pts_visit']);
+        $this->assertEquals(1, $res['total']['unique_pts']);
+        $this->assertTrue($res['total']['unique_pts'] <= $res['total']['pts_visit']);
+    }
+
+    public function test_operations_drilldown_clinic_zero_does_not_leak_other_clinics(): void
+    {
+        // Seed Patient in Clinic 0
+        DB::table('od_patients')->insert([
+            'office_id' => $this->office1->id,
+            'PatNum' => 10,
+            'FName' => 'Alice',
+            'LName' => 'Smith',
+        ]);
+        DB::table('od_procedure_logs')->insert([
+            'office_id' => $this->office1->id,
+            'ProcNum' => 201,
+            'PatNum' => 10,
+            'ClinicNum' => 0,
+            'ProvNum' => 1,
+            'ProcFee' => 200.00,
+            'ProcStatus' => 'C',
+            'ProcDate' => '2026-07-05',
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+
+        // Seed Patient in Clinic 1
+        DB::table('od_patients')->insert([
+            'office_id' => $this->office1->id,
+            'PatNum' => 20,
+            'FName' => 'Bob',
+            'LName' => 'Jones',
+        ]);
+        DB::table('od_procedure_logs')->insert([
+            'office_id' => $this->office1->id,
+            'ProcNum' => 202,
+            'PatNum' => 20,
+            'ClinicNum' => 1,
+            'ProvNum' => 1,
+            'ProcFee' => 500.00,
+            'ProcStatus' => 'C',
+            'ProcDate' => '2026-07-05',
+            'MedicalCode' => '',
+            'ToothNum' => '',
+        ]);
+
+        // Request drilldown for Clinic 0
+        $responseClinic0 = $this->withSession(['active_office_id' => $this->office1->id])
+            ->get(route('operations.drilldown', [
+                'metric' => 'unique_pts',
+                'clinic_num' => '0',
+                'start_date' => '2026-07-01',
+                'end_date' => '2026-07-31',
+            ]));
+
+        $responseClinic0->assertOk();
+        $rows0 = $responseClinic0->original->getData()['rows'];
+
+        $this->assertCount(1, $rows0);
+        $this->assertEquals(10, $rows0[0]['pat_id']);
+
+        // Request drilldown for Clinic 1
+        $responseClinic1 = $this->withSession(['active_office_id' => $this->office1->id])
+            ->get(route('operations.drilldown', [
+                'metric' => 'unique_pts',
+                'clinic_num' => '1',
+                'start_date' => '2026-07-01',
+                'end_date' => '2026-07-31',
+            ]));
+
+        $responseClinic1->assertOk();
+        $rows1 = $responseClinic1->original->getData()['rows'];
+
+        $this->assertCount(1, $rows1);
+        $this->assertEquals(20, $rows1[0]['pat_id']);
+    }
 }

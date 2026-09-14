@@ -2,11 +2,31 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\GoalService;
+use App\Domain\Support\ProcStatus;
+use App\Models\BasicSetting;
+use App\Models\EodConfiguration;
+use App\Models\KpiConfiguration;
+use App\Models\Office;
+use App\Models\OfficeGoal;
+use App\Models\ProviderConfiguration;
+use App\Models\ProviderGoal;
+use App\Models\SpecialtyGoal;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ConfigurationController extends Controller
 {
+    public function __construct(
+        private readonly GoalService $goals,
+        private readonly ClinicRegistry $clinics,
+    ) {}
+
     /**
      * Configuration tabs (slug => label) matching Jarvis Analytics configuration pattern.
      *
@@ -280,35 +300,7 @@ class ConfigurationController extends Controller
             ],
         ];
 
-        $providers = [
-            [
-                'id' => 81,
-                'name' => 'Elias, Kathy - ELIAS',
-                'location' => '8 Mile',
-                'last_active' => '2026-09-02',
-                'production' => '$846,415',
-                'visible' => true,
-                'specialty' => 'Ortho',
-            ],
-            [
-                'id' => 64,
-                'name' => 'Haddow, Mason - HADD',
-                'location' => '8 Mile',
-                'last_active' => '2026-09-10',
-                'production' => '$32,100',
-                'visible' => true,
-                'specialty' => 'Ortho',
-            ],
-            [
-                'id' => 83,
-                'name' => 'Zeitoun, Ali - ZEITOUN',
-                'location' => '8 Mile',
-                'last_active' => '2026-09-10',
-                'production' => '$113,500',
-                'visible' => true,
-                'specialty' => 'Ortho',
-            ],
-        ];
+        $providers = $this->loadProviderRows();
 
         $specialties = [
             'General',
@@ -323,31 +315,71 @@ class ConfigurationController extends Controller
             'Other',
         ];
 
-        $locations = [
-            '8 Mile',
-            'ABKA Dental',
-            'Adrian',
-            'Charlotte',
-            'Humble Memorial Dental',
-            'Lansing',
-            'Livernois',
-            'Nassau Bay Dental',
-            'Plymouth',
-            'Premier Image Dentistry',
-        ];
+        $dbOffices = Office::query()->orderBy('id')->get();
+        $locations = $dbOffices->isNotEmpty()
+            ? $dbOffices->pluck('name')->toArray()
+            : [
+                '8 Mile',
+                'ABKA Dental',
+                'Adrian',
+                'Charlotte',
+                'Humble Memorial Dental',
+                'Lansing',
+                'Livernois',
+                'Nassau Bay Dental',
+                'Plymouth',
+                'Premier Image Dentistry',
+            ];
 
-        $officeGoals = [
-            ['id' => 15, 'office' => '8 Mile', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
-            ['id' => 19, 'office' => 'ABKA Dental', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
-            ['id' => 4, 'office' => 'Adrian', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
-            ['id' => 5, 'office' => 'Charlotte', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
-            ['id' => 17, 'office' => 'Humble Memorial Dental', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
-            ['id' => 7, 'office' => 'Lansing', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
-            ['id' => 14, 'office' => 'Livernois', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
-            ['id' => 18, 'office' => 'Nassau Bay Dental', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
-            ['id' => 16, 'office' => 'Plymouth', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
-            ['id' => 22, 'office' => 'Premier Image Dentistry', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
-        ];
+        $defaultYm = '2026-09';
+
+        $officeGoals = [];
+        $specialtyGoalsData = [];
+        if ($dbOffices->isNotEmpty()) {
+            foreach ($dbOffices as $off) {
+                $goal = $this->goals->getOfficeGoal($off->id, $defaultYm, 'monthly');
+                $officeGoals[] = [
+                    'id' => $off->id,
+                    'office_id' => $off->id,
+                    'clinic_num' => null,
+                    'office' => $off->name,
+                    'gross' => $goal && $goal->gross_production > 0 ? (float) $goal->gross_production : '',
+                    'net' => $goal && $goal->net_production > 0 ? (float) $goal->net_production : '',
+                    'collection' => $goal && $goal->collection > 0 ? (float) $goal->collection : '',
+                    'pts_visits' => $goal && $goal->pts_visits > 0 ? (int) $goal->pts_visits : '',
+                    'npt_visits' => $goal && $goal->npt_visits > 0 ? (int) $goal->npt_visits : '',
+                    'ini_bonding' => $goal && $goal->ini_bonding > 0 ? (int) $goal->ini_bonding : '',
+                    'hyg_visits' => $goal && $goal->hyg_visits > 0 ? (int) $goal->hyg_visits : '',
+                    'saved' => true,
+                ];
+
+                $sGoal = $this->goals->getSpecialtyGoal($off->id, $defaultYm, 'monthly');
+                $specialtyGoalsData[$off->id] = [
+                    'doctor' => $sGoal && $sGoal->doctor > 0 ? (float) $sGoal->doctor : '',
+                    'hygiene' => $sGoal && $sGoal->hygiene > 0 ? (float) $sGoal->hygiene : '',
+                    'oral_surgery' => $sGoal && $sGoal->oral_surgery > 0 ? (float) $sGoal->oral_surgery : '',
+                    'clear_aligners' => $sGoal && $sGoal->clear_aligners > 0 ? (float) $sGoal->clear_aligners : '',
+                    'perio' => $sGoal && $sGoal->perio > 0 ? (float) $sGoal->perio : '',
+                    'pedo' => $sGoal && $sGoal->pedo > 0 ? (float) $sGoal->pedo : '',
+                    'endo' => $sGoal && $sGoal->endo > 0 ? (float) $sGoal->endo : '',
+                    'ortho' => $sGoal && $sGoal->ortho > 0 ? (float) $sGoal->ortho : '',
+                    'prostho' => $sGoal && $sGoal->prostho > 0 ? (float) $sGoal->prostho : '',
+                ];
+            }
+        } else {
+            $officeGoals = [
+                ['id' => 15, 'office_id' => 15, 'clinic_num' => null, 'office' => '8 Mile', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
+                ['id' => 19, 'office_id' => 19, 'clinic_num' => null, 'office' => 'ABKA Dental', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
+                ['id' => 4, 'office_id' => 4, 'clinic_num' => null, 'office' => 'Adrian', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
+                ['id' => 5, 'office_id' => 5, 'clinic_num' => null, 'office' => 'Charlotte', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
+                ['id' => 17, 'office_id' => 17, 'clinic_num' => null, 'office' => 'Humble Memorial Dental', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
+                ['id' => 7, 'office_id' => 7, 'clinic_num' => null, 'office' => 'Lansing', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
+                ['id' => 14, 'office_id' => 14, 'clinic_num' => null, 'office' => 'Livernois', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
+                ['id' => 18, 'office_id' => 18, 'clinic_num' => null, 'office' => 'Nassau Bay Dental', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
+                ['id' => 16, 'office_id' => 16, 'clinic_num' => null, 'office' => 'Plymouth', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
+                ['id' => 22, 'office_id' => 22, 'clinic_num' => null, 'office' => 'Premier Image Dentistry', 'gross' => '', 'net' => '', 'collection' => '', 'pts_visits' => '', 'npt_visits' => '', 'ini_bonding' => '', 'hyg_visits' => '', 'saved' => true],
+            ];
+        }
 
         $goalSpecialties = [
             'Doctor',
@@ -462,38 +494,67 @@ class ConfigurationController extends Controller
             'Other',
         ];
 
-        $providerGoals = [
-            [
-                'id' => 1,
-                'office_id' => 15,
-                'office_name' => '8 Mile',
-                'provider_id' => 81,
-                'provider_name' => 'Elias, Kathy - ELIAS',
-                'provider_type' => 'Ortho',
-                'recurring' => true,
-                'goal' => '$50,000',
-            ],
-            [
-                'id' => 2,
-                'office_id' => 15,
-                'office_name' => '8 Mile',
-                'provider_id' => 64,
-                'provider_name' => 'Haddow, Mason - HADD',
-                'provider_type' => 'Ortho',
-                'recurring' => true,
-                'goal' => '$35,000',
-            ],
-            [
-                'id' => 3,
-                'office_id' => 15,
-                'office_name' => '8 Mile',
-                'provider_id' => 83,
-                'provider_name' => 'Zeitoun, Ali - ZEITOUN',
-                'provider_type' => 'Ortho',
-                'recurring' => false,
-                'goal' => '$25,000',
-            ],
-        ];
+        $providerGoals = [];
+        $dbProviders = DB::table('od_providers')
+            ->leftJoin('offices', 'od_providers.office_id', '=', 'offices.id')
+            ->select('od_providers.ProvNum', 'od_providers.PName', 'od_providers.PreferredName', 'od_providers.Abbr', 'od_providers.LName', 'od_providers.Specialty', 'od_providers.office_id', 'offices.name as office_name')
+            ->orderBy('od_providers.office_id')
+            ->get();
+
+        $i = 1;
+        foreach ($dbProviders as $p) {
+            $pGoal = $this->goals->getProviderGoal((int) $p->office_id, (int) $p->ProvNum, $defaultYm, 'monthly');
+            $first = $p->PName ?: ($p->PreferredName ?: ($p->Abbr ?? ''));
+            $provName = trim(($p->LName ?? '').', '.$first);
+            if ($provName === ',' || $provName === '') {
+                $provName = 'Provider '.$p->ProvNum;
+            }
+            $providerGoals[] = [
+                'id' => $i++,
+                'office_id' => (int) $p->office_id,
+                'office_name' => $p->office_name ?? ('Office '.$p->office_id),
+                'provider_id' => (int) $p->ProvNum,
+                'provider_name' => $provName,
+                'provider_type' => ! empty($p->Specialty) ? $p->Specialty : 'General',
+                'recurring' => $pGoal ? (bool) $pGoal->recurring : false,
+                'goal' => $pGoal && $pGoal->production_goal > 0 ? '$'.number_format($pGoal->production_goal, 0) : '',
+            ];
+        }
+
+        if (empty($providerGoals)) {
+            $providerGoals = [
+                [
+                    'id' => 1,
+                    'office_id' => 15,
+                    'office_name' => '8 Mile',
+                    'provider_id' => 81,
+                    'provider_name' => 'Elias, Kathy - ELIAS',
+                    'provider_type' => 'Ortho',
+                    'recurring' => true,
+                    'goal' => '$50,000',
+                ],
+                [
+                    'id' => 2,
+                    'office_id' => 15,
+                    'office_name' => '8 Mile',
+                    'provider_id' => 64,
+                    'provider_name' => 'Haddow, Mason - HADD',
+                    'provider_type' => 'Ortho',
+                    'recurring' => true,
+                    'goal' => '$35,000',
+                ],
+                [
+                    'id' => 3,
+                    'office_id' => 15,
+                    'office_name' => '8 Mile',
+                    'provider_id' => 83,
+                    'provider_name' => 'Zeitoun, Ali - ZEITOUN',
+                    'provider_type' => 'Ortho',
+                    'recurring' => false,
+                    'goal' => '$25,000',
+                ],
+            ];
+        }
 
         $reminders = [
             [
@@ -1820,6 +1881,122 @@ class ConfigurationController extends Controller
                 'enabled' => false,
             ],
         ];
+
+        $activeOfficeId = Office::getActiveOfficeId();
+        $activeClinicNum = $this->clinics->getActiveClinicNum();
+
+        // Fetch DB-persisted KPI configurations for this office (and global fallbacks)
+        $savedKpiRecords = KpiConfiguration::query()
+            ->where(function ($q) use ($activeOfficeId) {
+                $q->whereNull('office_id');
+                if ($activeOfficeId) {
+                    $q->orWhere('office_id', $activeOfficeId);
+                }
+            })
+            ->get();
+
+        // Map configs: office-specific overrides global null-office configs
+        $savedKpiConfigs = [];
+        foreach ($savedKpiRecords->whereNull('office_id') as $rec) {
+            $cat = strtolower((string) $rec->category);
+            $key = strtolower((string) $rec->kpi_key);
+            $savedKpiConfigs[$cat.'_'.$key] = $rec;
+            $savedKpiConfigs[$key] = $rec;
+            if ($rec->name) {
+                $savedKpiConfigs[$cat.'_'.Str::slug($rec->name, '_')] = $rec;
+                $savedKpiConfigs[Str::slug($rec->name, '_')] = $rec;
+            }
+        }
+        if ($activeOfficeId) {
+            foreach ($savedKpiRecords->where('office_id', $activeOfficeId) as $rec) {
+                $cat = strtolower((string) $rec->category);
+                $key = strtolower((string) $rec->kpi_key);
+                $savedKpiConfigs[$cat.'_'.$key] = $rec;
+                $savedKpiConfigs[$key] = $rec;
+                if ($rec->name) {
+                    $savedKpiConfigs[$cat.'_'.Str::slug($rec->name, '_')] = $rec;
+                    $savedKpiConfigs[Str::slug($rec->name, '_')] = $rec;
+                }
+            }
+        }
+
+        $mergeKpiDbOverrides = function (array $kpiList, string $category) use ($savedKpiConfigs): array {
+            return array_map(function (array $kpi) use ($savedKpiConfigs, $category) {
+                $cat = strtolower($category);
+                $id = strtolower((string) $kpi['id']);
+                $slug = Str::slug($kpi['name'] ?? '', '_');
+
+                $saved = $savedKpiConfigs[$cat.'_'.$id]
+                    ?? $savedKpiConfigs[$id]
+                    ?? $savedKpiConfigs[$cat.'_'.$slug]
+                    ?? $savedKpiConfigs[$slug]
+                    ?? null;
+
+                if ($saved) {
+                    $kpi['enabled'] = (bool) $saved->is_enabled;
+                    if ($saved->target_goal !== null) {
+                        $kpi['goal'] = (string) $saved->target_goal;
+                    }
+                    if (! empty($saved->name)) {
+                        $kpi['name'] = $saved->name;
+                    }
+                    if (! empty($saved->description)) {
+                        $kpi['description'] = $saved->description;
+                    }
+                }
+
+                return $kpi;
+            }, $kpiList);
+        };
+
+        $hygieneKpis = $mergeKpiDbOverrides($hygieneKpis, 'hygiene');
+        $doctorKpis = $mergeKpiDbOverrides($doctorKpis, 'doctor');
+        $officeKpis = $mergeKpiDbOverrides($officeKpis, 'office');
+        $providerHygieneKpis = $mergeKpiDbOverrides($providerHygieneKpis, 'provider_hygiene');
+        $providerDoctorKpis = $mergeKpiDbOverrides($providerDoctorKpis, 'provider_doctor');
+        $endoKpis = $mergeKpiDbOverrides($endoKpis, 'endo');
+        $perioKpis = $mergeKpiDbOverrides($perioKpis, 'perio');
+        $orthoKpis = $mergeKpiDbOverrides($orthoKpis, 'ortho');
+        $osKpis = $mergeKpiDbOverrides($osKpis, 'os');
+        $pedoKpis = $mergeKpiDbOverrides($pedoKpis, 'pedo');
+
+        // Built-in custom KPIs override
+        $customKpis = $mergeKpiDbOverrides($customKpis, 'custom');
+
+        // Dynamically append newly created custom KPIs from the database
+        $existingCustomKeys = array_map(fn ($c) => (string) ($c['id'] ?? ''), $customKpis);
+        $dbCustomRecords = $savedKpiRecords->where('category', 'custom');
+        foreach ($dbCustomRecords as $dbCustom) {
+            $isBuiltIn = in_array((string) $dbCustom->id, $existingCustomKeys, true)
+                || in_array((string) $dbCustom->kpi_key, $existingCustomKeys, true);
+
+            if (! $isBuiltIn) {
+                $customKpis[] = [
+                    'id' => $dbCustom->id,
+                    'kpi_key' => $dbCustom->kpi_key,
+                    'name' => $dbCustom->name,
+                    'transaction' => $dbCustom->transaction_type ?: 'Procedure Code',
+                    'display' => $dbCustom->kpi_type ?: ($dbCustom->display_type ?: 'Hygiene'),
+                    'line_of_business' => $dbCustom->line_of_business ?: 'Hygiene',
+                    'description' => $dbCustom->description ?: '',
+                    'goal' => (string) ($dbCustom->target_goal ?? 0.0),
+                    'enabled' => (bool) $dbCustom->is_enabled,
+                ];
+            }
+        }
+
+        $kpiGroupAverages = KpiConfiguration::where('kpi_key', 'group_averages')
+            ->where(function ($q) use ($activeOfficeId) {
+                $q->whereNull('office_id');
+                if ($activeOfficeId) {
+                    $q->orWhere('office_id', $activeOfficeId);
+                }
+            })
+            ->latest('id')
+            ->value('is_enabled');
+        if ($kpiGroupAverages === null) {
+            $kpiGroupAverages = true;
+        }
 
         $rcmUserMappings = [
             [
@@ -3272,6 +3449,65 @@ class ConfigurationController extends Controller
             ],
         ];
 
+        // Fetch DB-persisted EOD configurations for this office (and global fallbacks)
+        $savedEodRecords = EodConfiguration::query()
+            ->where(function ($q) use ($activeOfficeId) {
+                $q->whereNull('office_id');
+                if ($activeOfficeId) {
+                    $q->orWhere('office_id', $activeOfficeId);
+                }
+            })
+            ->get();
+
+        $savedEodConfigs = [];
+        foreach ($savedEodRecords->whereNull('office_id') as $rec) {
+            $sub = strtolower((string) $rec->subtab);
+            $key = strtolower((string) $rec->metric_key);
+            $savedEodConfigs[$sub.'_'.$key] = $rec;
+            $savedEodConfigs[$key] = $rec;
+            if ($rec->title) {
+                $savedEodConfigs[$sub.'_'.Str::slug($rec->title, '_')] = $rec;
+                $savedEodConfigs[Str::slug($rec->title, '_')] = $rec;
+            }
+        }
+        if ($activeOfficeId) {
+            foreach ($savedEodRecords->where('office_id', $activeOfficeId) as $rec) {
+                $sub = strtolower((string) $rec->subtab);
+                $key = strtolower((string) $rec->metric_key);
+                $savedEodConfigs[$sub.'_'.$key] = $rec;
+                $savedEodConfigs[$key] = $rec;
+                if ($rec->title) {
+                    $savedEodConfigs[$sub.'_'.Str::slug($rec->title, '_')] = $rec;
+                    $savedEodConfigs[Str::slug($rec->title, '_')] = $rec;
+                }
+            }
+        }
+
+        $eodMetrics = array_map(function (array $metric) use ($savedEodConfigs) {
+            $sub = strtolower((string) ($metric['subtab'] ?? 'basics'));
+            $id = strtolower((string) ($metric['id'] ?? ''));
+            $slug = Str::slug($metric['title'] ?? '', '_');
+
+            $saved = $savedEodConfigs[$sub.'_'.$id]
+                ?? $savedEodConfigs[$id]
+                ?? $savedEodConfigs[$sub.'_'.$slug]
+                ?? $savedEodConfigs[$slug]
+                ?? null;
+
+            if ($saved) {
+                $metric['enabled'] = (bool) $saved->is_enabled;
+                $metric['locked'] = (bool) $saved->is_locked;
+                if (! empty($saved->title)) {
+                    $metric['title'] = $saved->title;
+                }
+                if ($saved->description !== null) {
+                    $metric['description'] = $saved->description;
+                }
+            }
+
+            return $metric;
+        }, $eodMetrics);
+
         return view('configuration.index', [
             'tabs' => self::TABS,
             'activeTab' => $activeTab,
@@ -3314,6 +3550,7 @@ class ConfigurationController extends Controller
             'providers' => $providers,
             'specialties' => $specialties,
             'goalSpecialties' => $goalSpecialties,
+            'specialtyGoals' => $specialtyGoalsData,
             'providerTypes' => $providerTypes,
             'providerGoals' => $providerGoals,
             'months' => $months,
@@ -3329,6 +3566,921 @@ class ConfigurationController extends Controller
             'huddleMetrics' => $huddleMetrics,
             'eodSubtabs' => $eodSubtabs,
             'eodMetrics' => $eodMetrics,
+            'basicSettings' => BasicSetting::forOffice(Office::getActiveOfficeId(), $this->clinics->getActiveClinicNum()),
+            'kpiGroupAverages' => $kpiGroupAverages,
         ]);
+    }
+
+    /**
+     * AJAX endpoint to fetch goals data for the selected month, location, and goal type.
+     */
+    public function getGoalsData(Request $request): JsonResponse
+    {
+        $month = (string) $request->input('month', 'September 2026');
+        $yearMonth = $this->normalizeYearMonth($month);
+        $goalType = (string) $request->input('goal_type', 'monthly');
+        $location = (string) $request->input('location', '');
+        $subtab = (string) $request->input('subtab', 'office');
+
+        $dbOffices = Office::query()->orderBy('id')->get();
+        if ($location && $location !== 'All Locations') {
+            $dbOffices = $dbOffices->filter(fn ($o) => strtolower($o->name) === strtolower($location));
+        }
+
+        if ($subtab === 'office') {
+            $rows = [];
+            foreach ($dbOffices as $off) {
+                $goal = $this->goals->getOfficeGoal($off->id, $yearMonth, $goalType);
+                $rows[] = [
+                    'id' => $off->id,
+                    'office_id' => $off->id,
+                    'office' => $off->name,
+                    'gross' => $goal && $goal->gross_production > 0 ? (float) $goal->gross_production : '',
+                    'net' => $goal && $goal->net_production > 0 ? (float) $goal->net_production : '',
+                    'collection' => $goal && $goal->collection > 0 ? (float) $goal->collection : '',
+                    'pts_visits' => $goal && $goal->pts_visits > 0 ? (int) $goal->pts_visits : '',
+                    'npt_visits' => $goal && $goal->npt_visits > 0 ? (int) $goal->npt_visits : '',
+                    'ini_bonding' => $goal && $goal->ini_bonding > 0 ? (int) $goal->ini_bonding : '',
+                    'hyg_visits' => $goal && $goal->hyg_visits > 0 ? (int) $goal->hyg_visits : '',
+                ];
+            }
+
+            return response()->json(['success' => true, 'rows' => $rows]);
+        }
+
+        if ($subtab === 'specialties' || $subtab === 'specialty') {
+            $rows = [];
+            foreach ($dbOffices as $off) {
+                $sGoal = $this->goals->getSpecialtyGoal($off->id, $yearMonth, $goalType);
+                $rows[] = [
+                    'id' => $off->id,
+                    'office_id' => $off->id,
+                    'office' => $off->name,
+                    'doctor' => $sGoal && $sGoal->doctor > 0 ? (float) $sGoal->doctor : '',
+                    'hygiene' => $sGoal && $sGoal->hygiene > 0 ? (float) $sGoal->hygiene : '',
+                    'oral_surgery' => $sGoal && $sGoal->oral_surgery > 0 ? (float) $sGoal->oral_surgery : '',
+                    'clear_aligners' => $sGoal && $sGoal->clear_aligners > 0 ? (float) $sGoal->clear_aligners : '',
+                    'perio' => $sGoal && $sGoal->perio > 0 ? (float) $sGoal->perio : '',
+                    'pedo' => $sGoal && $sGoal->pedo > 0 ? (float) $sGoal->pedo : '',
+                    'endo' => $sGoal && $sGoal->endo > 0 ? (float) $sGoal->endo : '',
+                    'ortho' => $sGoal && $sGoal->ortho > 0 ? (float) $sGoal->ortho : '',
+                    'prostho' => $sGoal && $sGoal->prostho > 0 ? (float) $sGoal->prostho : '',
+                ];
+            }
+
+            return response()->json(['success' => true, 'rows' => $rows]);
+        }
+
+        if ($subtab === 'providers' || $subtab === 'provider') {
+            $rows = [];
+            $dbProvidersQuery = DB::table('od_providers')
+                ->leftJoin('offices', 'od_providers.office_id', '=', 'offices.id')
+                ->select('od_providers.ProvNum', 'od_providers.PName', 'od_providers.PreferredName', 'od_providers.Abbr', 'od_providers.LName', 'od_providers.Specialty', 'od_providers.office_id', 'offices.name as office_name');
+
+            if ($location && $location !== 'All Locations') {
+                $dbProvidersQuery->where('offices.name', $location);
+            }
+
+            $dbProviders = $dbProvidersQuery->get();
+            $i = 1;
+            foreach ($dbProviders as $p) {
+                $pGoal = $this->goals->getProviderGoal((int) $p->office_id, (int) $p->ProvNum, $yearMonth, $goalType);
+                $first = $p->PName ?: ($p->PreferredName ?: ($p->Abbr ?? ''));
+                $provName = trim(($p->LName ?? '').', '.$first);
+                if ($provName === ',' || $provName === '') {
+                    $provName = 'Provider '.$p->ProvNum;
+                }
+                $rows[] = [
+                    'id' => $i++,
+                    'office_id' => (int) $p->office_id,
+                    'office_name' => $p->office_name ?? ('Office '.$p->office_id),
+                    'provider_id' => (int) $p->ProvNum,
+                    'provider_name' => $provName,
+                    'provider_type' => ! empty($p->Specialty) ? $p->Specialty : 'General',
+                    'recurring' => $pGoal ? (bool) $pGoal->recurring : false,
+                    'goal' => $pGoal && $pGoal->production_goal > 0 ? (float) $pGoal->production_goal : '',
+                ];
+            }
+
+            return response()->json(['success' => true, 'rows' => $rows]);
+        }
+
+        return response()->json(['success' => true, 'rows' => []]);
+    }
+
+    /**
+     * AJAX endpoint to save an office goal field or entire row.
+     */
+    public function saveOfficeGoal(Request $request): JsonResponse
+    {
+        $officeId = (int) $request->input('office_id');
+        $clinicNum = $request->input('clinic_num') ? (int) $request->input('clinic_num') : null;
+        $month = (string) $request->input('month', 'September 2026');
+        $yearMonth = $this->normalizeYearMonth($month);
+        $goalType = (string) $request->input('goal_type', 'monthly');
+        $field = $request->input('field');
+        $value = (float) $request->input('value', 0);
+
+        $goal = OfficeGoal::firstOrNew([
+            'office_id' => $officeId,
+            'clinic_num' => $clinicNum,
+            'year_month' => $yearMonth,
+            'goal_type' => $goalType,
+        ]);
+
+        if ($field) {
+            $goal->{$field} = $value;
+        } else {
+            if ($request->has('gross_production')) {
+                $goal->gross_production = (float) $request->input('gross_production', 0);
+            }
+            if ($request->has('net_production')) {
+                $goal->net_production = (float) $request->input('net_production', 0);
+            }
+            if ($request->has('collection')) {
+                $goal->collection = (float) $request->input('collection', 0);
+            }
+            if ($request->has('pts_visits')) {
+                $goal->pts_visits = (int) $request->input('pts_visits', 0);
+            }
+            if ($request->has('npt_visits')) {
+                $goal->npt_visits = (int) $request->input('npt_visits', 0);
+            }
+            if ($request->has('ini_bonding')) {
+                $goal->ini_bonding = (int) $request->input('ini_bonding', 0);
+            }
+            if ($request->has('hyg_visits')) {
+                $goal->hyg_visits = (int) $request->input('hyg_visits', 0);
+            }
+        }
+
+        $goal->save();
+
+        return response()->json(['success' => true, 'goal' => $goal]);
+    }
+
+    /**
+     * AJAX endpoint to save a specialty goal.
+     */
+    public function saveSpecialtyGoal(Request $request): JsonResponse
+    {
+        $officeId = (int) $request->input('office_id');
+        $clinicNum = $request->input('clinic_num') ? (int) $request->input('clinic_num') : null;
+        $month = (string) $request->input('month', 'September 2026');
+        $yearMonth = $this->normalizeYearMonth($month);
+        $goalType = (string) $request->input('goal_type', 'monthly');
+        $field = $request->input('field');
+        $value = (float) $request->input('value', 0);
+
+        $goal = SpecialtyGoal::firstOrNew([
+            'office_id' => $officeId,
+            'clinic_num' => $clinicNum,
+            'year_month' => $yearMonth,
+            'goal_type' => $goalType,
+        ]);
+
+        if ($field) {
+            $goal->{$field} = $value;
+        } else {
+            $specs = ['doctor', 'hygiene', 'oral_surgery', 'clear_aligners', 'perio', 'pedo', 'endo', 'ortho', 'prostho'];
+            foreach ($specs as $sp) {
+                if ($request->has($sp)) {
+                    $goal->{$sp} = (float) $request->input($sp, 0);
+                }
+            }
+        }
+
+        $goal->save();
+
+        return response()->json(['success' => true, 'goal' => $goal]);
+    }
+
+    /**
+     * AJAX endpoint to save a provider goal.
+     */
+    public function saveProviderGoal(Request $request): JsonResponse
+    {
+        $officeId = (int) $request->input('office_id');
+        $provNum = (int) $request->input('provider_id');
+        $clinicNum = $request->input('clinic_num') ? (int) $request->input('clinic_num') : null;
+        $month = (string) $request->input('month', 'September 2026');
+        $yearMonth = $this->normalizeYearMonth($month);
+        $goalType = (string) $request->input('goal_type', 'monthly');
+        $goalAmount = (float) $request->input('goal', 0);
+        $providerName = $request->input('provider_name');
+        $providerType = $request->input('provider_type');
+        $recurring = (bool) $request->input('recurring', false);
+
+        $goal = ProviderGoal::firstOrNew([
+            'office_id' => $officeId,
+            'clinic_num' => $clinicNum,
+            'prov_num' => $provNum,
+            'year_month' => $yearMonth,
+            'goal_type' => $goalType,
+        ]);
+
+        $goal->production_goal = $goalAmount;
+        if ($providerName) {
+            $goal->provider_name = $providerName;
+        }
+        if ($providerType) {
+            $goal->provider_type = $providerType;
+        }
+        $goal->recurring = $recurring;
+        $goal->save();
+
+        return response()->json(['success' => true, 'goal' => $goal]);
+    }
+
+    /**
+     * AJAX endpoint to save a KPI configuration toggle or target.
+     */
+    public function saveKpiConfig(Request $request): JsonResponse
+    {
+        $kpiKey = (string) $request->input('kpi_key');
+        $category = (string) $request->input('category', 'main');
+        $officeId = $request->input('office_id') !== null && $request->input('office_id') !== '' ? (int) $request->input('office_id') : null;
+        $clinicNum = $request->input('clinic_num') !== null && $request->input('clinic_num') !== '' ? (int) $request->input('clinic_num') : null;
+        $isEnabled = filter_var($request->input('is_enabled', true), FILTER_VALIDATE_BOOLEAN);
+        $targetGoal = (float) $request->input('target_goal', 0);
+        $name = $request->input('name');
+        $desc = $request->input('description');
+
+        $attributes = [
+            'is_enabled' => $isEnabled,
+            'target_goal' => $targetGoal,
+        ];
+        if ($name !== null) {
+            $attributes['name'] = $name;
+        }
+        if ($desc !== null) {
+            $attributes['description'] = $desc;
+        }
+
+        $config = KpiConfiguration::updateOrCreate(
+            [
+                'office_id' => $officeId,
+                'clinic_num' => $clinicNum,
+                'kpi_key' => $kpiKey,
+                'category' => $category,
+            ],
+            $attributes
+        );
+
+        return response()->json(['success' => true, 'config' => $config]);
+    }
+
+    /**
+     * AJAX endpoint to save or create a custom KPI.
+     */
+    public function saveCustomKpi(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'transaction_type' => 'nullable|string|max:100',
+            'kpi_type' => 'nullable|string|max:100',
+            'display' => 'nullable|string|max:100',
+            'line_of_business' => 'nullable|string|max:100',
+            'description' => 'nullable|string',
+            'target_goal' => 'nullable|numeric',
+            'is_enabled' => 'nullable',
+            'id' => 'nullable',
+            'kpi_key' => 'nullable|string',
+        ]);
+
+        $officeId = $request->input('office_id') !== null && $request->input('office_id') !== '' ? (int) $request->input('office_id') : null;
+        $clinicNum = $request->input('clinic_num') !== null && $request->input('clinic_num') !== '' ? (int) $request->input('clinic_num') : null;
+
+        $id = $request->input('id');
+        $kpiKey = $request->input('kpi_key');
+
+        $config = null;
+        if ($id && is_numeric($id)) {
+            $config = KpiConfiguration::where('id', $id)->first();
+        } elseif ($kpiKey) {
+            $config = KpiConfiguration::where('kpi_key', $kpiKey)->where('category', 'custom')->first();
+        }
+
+        if (! $config) {
+            $generatedKey = 'custom_'.Str::slug($validated['name'], '_').'_'.time();
+            $config = new KpiConfiguration([
+                'office_id' => $officeId,
+                'clinic_num' => $clinicNum,
+                'kpi_key' => $generatedKey,
+                'category' => 'custom',
+            ]);
+        }
+
+        $config->name = $validated['name'];
+        $config->transaction_type = $validated['transaction_type'] ?? $config->transaction_type ?? 'Procedure Code';
+        $config->kpi_type = $validated['kpi_type'] ?? $config->kpi_type ?? 'Hygiene';
+        $config->display_type = $validated['display'] ?? $config->display_type ?? 'Count (#)';
+        $config->line_of_business = $validated['line_of_business'] ?? $config->line_of_business ?? 'Hygiene';
+        $config->description = $validated['description'] ?? $config->description ?? '';
+        $config->target_goal = isset($validated['target_goal']) ? (float) $validated['target_goal'] : (float) ($config->target_goal ?? 0);
+        $config->is_enabled = isset($validated['is_enabled']) ? filter_var($validated['is_enabled'], FILTER_VALIDATE_BOOLEAN) : ($config->is_enabled ?? true);
+        $config->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Custom KPI is successfully saved!',
+            'kpi' => [
+                'id' => $config->id,
+                'kpi_key' => $config->kpi_key,
+                'name' => $config->name,
+                'transaction' => $config->transaction_type ?: 'Procedure Code',
+                'display' => $config->kpi_type ?: ($config->display_type ?: 'Hygiene'),
+                'line_of_business' => $config->line_of_business ?: 'Hygiene',
+                'description' => $config->description ?: '',
+                'goal' => (string) ($config->target_goal ?? 0.0),
+                'enabled' => (bool) $config->is_enabled,
+            ],
+        ]);
+    }
+
+    /**
+     * AJAX endpoint to delete a custom KPI.
+     */
+    public function deleteCustomKpi(Request $request): JsonResponse
+    {
+        $id = $request->input('id');
+        $kpiKey = $request->input('kpi_key');
+
+        $query = KpiConfiguration::query();
+        if ($id && is_numeric($id)) {
+            $query->where('id', $id);
+        } elseif ($kpiKey) {
+            $query->where('kpi_key', $kpiKey);
+        } else {
+            return response()->json(['success' => false, 'message' => 'ID or KPI key is required.'], 422);
+        }
+
+        $deleted = $query->delete();
+
+        return response()->json(['success' => true, 'deleted' => (bool) $deleted]);
+    }
+
+    /**
+     * AJAX endpoint to import KPI goals and toggles from CSV.
+     */
+    public function importKpiCsv(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:5120',
+        ]);
+
+        $file = $request->file('file');
+        $content = file_get_contents($file->getRealPath());
+        $lines = explode("\n", trim($content));
+
+        if (empty($lines)) {
+            return response()->json(['success' => false, 'message' => 'CSV file is empty.'], 422);
+        }
+
+        $header = str_getcsv(array_shift($lines));
+        $updatedCount = 0;
+
+        $officeId = $request->input('office_id') !== null && $request->input('office_id') !== '' ? (int) $request->input('office_id') : null;
+        $clinicNum = $request->input('clinic_num') !== null && $request->input('clinic_num') !== '' ? (int) $request->input('clinic_num') : null;
+
+        foreach ($lines as $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+
+            $row = str_getcsv($line);
+            if (count($row) < 2) {
+                continue;
+            }
+
+            $enabledRaw = trim($row[0] ?? 'Yes');
+            $isEnabled = in_array(strtolower($enabledRaw), ['yes', '1', 'true', 'enabled']);
+            $name = trim($row[1] ?? '');
+            $description = isset($row[2]) ? trim($row[2]) : null;
+            $goalRaw = isset($row[3]) ? trim($row[3]) : '0.0';
+            $goal = (float) preg_replace('/[^0-9.-]/', '', $goalRaw);
+
+            if ($name === '') {
+                continue;
+            }
+
+            $slugKey = Str::slug($name, '_');
+
+            KpiConfiguration::updateOrCreate(
+                [
+                    'office_id' => $officeId,
+                    'clinic_num' => $clinicNum,
+                    'kpi_key' => $slugKey,
+                ],
+                [
+                    'name' => $name,
+                    'description' => $description,
+                    'is_enabled' => $isEnabled,
+                    'target_goal' => $goal,
+                    'category' => 'main',
+                ]
+            );
+
+            $updatedCount++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Successfully imported and updated {$updatedCount} KPI(s).",
+            'updated_count' => $updatedCount,
+        ]);
+    }
+
+    /**
+     * AJAX endpoint to save a basic configuration setting.
+     */
+    public function saveBasicSetting(Request $request): JsonResponse
+    {
+        $key = (string) $request->input('key');
+        $value = $request->input('value');
+        $officeId = $request->has('office_id') && $request->input('office_id') !== null ? (int) $request->input('office_id') : Office::getActiveOfficeId();
+        $clinicNum = $request->has('clinic_num') && $request->input('clinic_num') !== null ? (int) $request->input('clinic_num') : $this->clinics->getActiveClinicNum();
+
+        $setting = BasicSetting::firstOrNew([
+            'office_id' => $officeId,
+            'clinic_num' => $clinicNum,
+        ]);
+
+        $allowedBooleanKeys = [
+            'display_gross_production',
+            'display_net_production',
+            'display_adjustment',
+            'display_new_patient_tile',
+            'display_new_patient_graph',
+            'display_patient_visits_graph',
+            'front_office_inactive_patients',
+        ];
+
+        if (in_array($key, $allowedBooleanKeys, true)) {
+            $setting->{$key} = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        } elseif ($key === 'collection_rate_metric') {
+            $setting->collection_rate_metric = in_array($value, ['net', 'gross'], true) ? $value : 'net';
+        }
+
+        $setting->save();
+
+        return response()->json(['success' => true, 'setting' => $setting]);
+    }
+
+    /**
+     * Load dynamic provider rows with specialty mapping, visibility, last active date, and production.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function loadProviderRows(
+        ?string $locationFilter = null,
+        ?string $typeFilter = null,
+        ?string $visibilityFilter = null,
+        ?string $productionFilter = null,
+        ?string $searchQuery = null
+    ): array {
+        $dbProvidersQuery = DB::table('od_providers')
+            ->leftJoin('offices', 'od_providers.office_id', '=', 'offices.id')
+            ->select(
+                'od_providers.ProvNum',
+                'od_providers.LName',
+                'od_providers.PName',
+                'od_providers.PreferredName',
+                'od_providers.Abbr',
+                'od_providers.Specialty',
+                'od_providers.IsHidden',
+                'od_providers.office_id',
+                'offices.name as office_name'
+            );
+
+        if ($locationFilter && ! in_array($locationFilter, ['All Locations', 'Select a Location', ''], true)) {
+            if (is_numeric($locationFilter)) {
+                $dbProvidersQuery->where('od_providers.office_id', (int) $locationFilter);
+            } else {
+                $dbProvidersQuery->where('offices.name', $locationFilter);
+            }
+        }
+
+        $dbProviders = $dbProvidersQuery->orderBy('od_providers.office_id')->orderBy('od_providers.ProvNum')->get();
+
+        $defaultSpecialtyMap = [
+            0 => 'General',
+            1 => 'Hygiene',
+            2 => 'Pedo',
+            3 => 'Oral Surgery',
+            4 => 'Ortho',
+            5 => 'Endo',
+            6 => 'Perio',
+            7 => 'Prostho',
+            8 => 'Hygiene',
+            268 => 'Clear Aligners',
+        ];
+
+        if ($dbProviders->isEmpty()) {
+            $fallback = [
+                [
+                    'id' => 81,
+                    'office_id' => 15,
+                    'name' => 'Elias, Kathy - ELIAS',
+                    'location' => '8 Mile',
+                    'last_active' => '09/01/2026',
+                    'production' => '$50,000',
+                    'production_raw' => 50000.0,
+                    'visible' => true,
+                    'specialty' => 'Ortho',
+                ],
+                [
+                    'id' => 64,
+                    'office_id' => 15,
+                    'name' => 'Haddow, Mason - HADD',
+                    'location' => '8 Mile',
+                    'last_active' => '08/28/2026',
+                    'production' => '$35,000',
+                    'production_raw' => 35000.0,
+                    'visible' => true,
+                    'specialty' => 'Ortho',
+                ],
+                [
+                    'id' => 83,
+                    'office_id' => 15,
+                    'name' => 'Zeitoun, Ali - ZEITOUN',
+                    'location' => '8 Mile',
+                    'last_active' => '08/15/2026',
+                    'production' => '$25,000',
+                    'production_raw' => 25000.0,
+                    'visible' => false,
+                    'specialty' => 'Ortho',
+                ],
+            ];
+
+            $configs = DB::table('provider_configurations')
+                ->get()
+                ->keyBy(fn ($c) => $c->office_id.'_'.$c->prov_num);
+
+            $rows = [];
+            foreach ($fallback as $p) {
+                $key = $p['office_id'].'_'.$p['id'];
+                $cfg = $configs->get($key);
+                if ($cfg) {
+                    $p['visible'] = (bool) $cfg->is_visible;
+                    if ($cfg->specialty !== null) {
+                        $p['specialty'] = $cfg->specialty;
+                    }
+                }
+
+                if ($locationFilter && ! in_array($locationFilter, ['All Locations', 'Select a Location', ''], true)) {
+                    if (is_numeric($locationFilter) && (int) $locationFilter !== $p['office_id']) {
+                        continue;
+                    }
+                    if (! is_numeric($locationFilter) && strcasecmp($locationFilter, $p['location']) !== 0) {
+                        continue;
+                    }
+                }
+
+                if ($visibilityFilter && $visibilityFilter !== 'All') {
+                    if ($visibilityFilter === 'Visible' && ! $p['visible']) {
+                        continue;
+                    }
+                    if ($visibilityFilter === 'Hidden' && $p['visible']) {
+                        continue;
+                    }
+                }
+
+                if ($typeFilter && $typeFilter !== 'All') {
+                    if ($typeFilter === 'Set' && (empty($p['specialty']) || $p['specialty'] === 'Not Set')) {
+                        continue;
+                    }
+                    if ($typeFilter === 'Not Set' && (! empty($p['specialty']) && $p['specialty'] !== 'Not Set')) {
+                        continue;
+                    }
+                    if (! in_array($typeFilter, ['Set', 'Not Set'], true) && strcasecmp($p['specialty'], $typeFilter) !== 0) {
+                        continue;
+                    }
+                }
+
+                if ($searchQuery) {
+                    $q = strtolower($searchQuery);
+                    $match = str_contains(strtolower($p['name']), $q)
+                        || str_contains(strtolower($p['location']), $q)
+                        || str_contains((string) $p['id'], $q)
+                        || str_contains(strtolower($p['specialty']), $q);
+                    if (! $match) {
+                        continue;
+                    }
+                }
+
+                $rows[] = $p;
+            }
+
+            return $rows;
+        }
+
+        $startDate = match ($productionFilter) {
+            'Last 6 Months' => Carbon::now()->subMonths(6)->format('Y-m-d'),
+            'Last 24 Months' => Carbon::now()->subMonths(24)->format('Y-m-d'),
+            'Any' => null,
+            default => Carbon::now()->subMonths(12)->format('Y-m-d'),
+        };
+
+        $procLogsQuery = DB::table('od_procedure_logs')
+            ->select(
+                'office_id',
+                'ProvNum',
+                DB::raw('MAX(ProcDate) as last_active'),
+                DB::raw('SUM(ProcFee) as total_prod')
+            )
+            ->whereIn('ProcStatus', ProcStatus::completed());
+
+        if ($startDate) {
+            $procLogsQuery->where('ProcDate', '>=', $startDate);
+        }
+
+        $procMap = $procLogsQuery->groupBy('office_id', 'ProvNum')
+            ->get()
+            ->keyBy(fn ($r) => $r->office_id.'_'.$r->ProvNum);
+
+        $configs = DB::table('provider_configurations')
+            ->get()
+            ->keyBy(fn ($c) => $c->office_id.'_'.$c->prov_num);
+
+        $rows = [];
+        foreach ($dbProviders as $p) {
+            $first = $p->PName ?: ($p->PreferredName ?: ($p->Abbr ?? ''));
+            $provName = trim(($p->LName ?? '').', '.$first);
+            if (! empty($p->Abbr)) {
+                $provName .= ' - '.$p->Abbr;
+            }
+            if ($provName === ',' || $provName === '' || $provName === ' - ') {
+                $provName = 'Provider '.$p->ProvNum;
+            }
+
+            $locName = $p->office_name ?? ('Office '.$p->office_id);
+            $key = $p->office_id.'_'.$p->ProvNum;
+            $cfg = $configs->get($key);
+            $proc = $procMap->get($key);
+
+            $isHidden = in_array((string) $p->IsHidden, ['1', 'true', 'TRUE'], true);
+            $visible = $cfg ? (bool) $cfg->is_visible : (! $isHidden);
+            $specDefault = is_numeric($p->Specialty)
+                ? ($defaultSpecialtyMap[(int) $p->Specialty] ?? 'General')
+                : ($p->Specialty ?: 'General');
+            $specialty = $cfg && ! empty($cfg->specialty) ? $cfg->specialty : $specDefault;
+
+            $lastActive = '--';
+            if ($proc && $proc->last_active) {
+                try {
+                    $lastActive = Carbon::parse($proc->last_active)->format('m/d/Y');
+                } catch (\Throwable) {
+                    $lastActive = substr((string) $proc->last_active, 0, 10);
+                }
+            }
+            $prodVal = $proc ? (float) $proc->total_prod : 0.0;
+            $formattedProd = '$'.number_format($prodVal, 0);
+
+            // Filter: Visibility
+            if ($visibilityFilter && $visibilityFilter !== 'All') {
+                if ($visibilityFilter === 'Visible' && ! $visible) {
+                    continue;
+                }
+                if ($visibilityFilter === 'Hidden' && $visible) {
+                    continue;
+                }
+            }
+
+            // Filter: Provider Type / LOB
+            if ($typeFilter && $typeFilter !== 'All') {
+                if ($typeFilter === 'Set' && (empty($specialty) || $specialty === 'Not Set')) {
+                    continue;
+                }
+                if ($typeFilter === 'Not Set' && (! empty($specialty) && $specialty !== 'Not Set')) {
+                    continue;
+                }
+                if (! in_array($typeFilter, ['Set', 'Not Set'], true) && strcasecmp($specialty, $typeFilter) !== 0) {
+                    continue;
+                }
+            }
+
+            // Filter: Search
+            if ($searchQuery) {
+                $q = strtolower($searchQuery);
+                $match = str_contains(strtolower($provName), $q)
+                    || str_contains(strtolower($locName), $q)
+                    || str_contains((string) $p->ProvNum, $q)
+                    || str_contains(strtolower($specialty), $q);
+                if (! $match) {
+                    continue;
+                }
+            }
+
+            $rows[] = [
+                'id' => (int) $p->ProvNum,
+                'office_id' => (int) $p->office_id,
+                'name' => $provName,
+                'location' => $locName,
+                'last_active' => $lastActive,
+                'production' => $formattedProd,
+                'production_raw' => $prodVal,
+                'visible' => $visible,
+                'specialty' => $specialty,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * AJAX endpoint to fetch filtered provider list.
+     */
+    public function getProvidersData(Request $request): JsonResponse
+    {
+        $location = $request->input('location');
+        $type = $request->input('type');
+        $visibility = $request->input('visibility');
+        $production = $request->input('production');
+        $search = $request->input('search');
+
+        $rows = $this->loadProviderRows($location, $type, $visibility, $production, $search);
+
+        return response()->json([
+            'success' => true,
+            'rows' => $rows,
+            'total' => count($rows),
+        ]);
+    }
+
+    /**
+     * AJAX endpoint to toggle provider visibility.
+     */
+    public function toggleProviderVisibility(Request $request): JsonResponse
+    {
+        $officeId = (int) $request->input('office_id');
+        $provNum = (int) $request->input('provider_id');
+        $visible = filter_var($request->input('visible', true), FILTER_VALIDATE_BOOLEAN);
+
+        $cfg = ProviderConfiguration::firstOrNew([
+            'office_id' => $officeId,
+            'prov_num' => $provNum,
+        ]);
+        $cfg->is_visible = $visible;
+        $cfg->save();
+
+        return response()->json(['success' => true, 'config' => $cfg]);
+    }
+
+    /**
+     * AJAX endpoint to assign a provider specialty.
+     */
+    public function setProviderSpecialty(Request $request): JsonResponse
+    {
+        $officeId = (int) $request->input('office_id');
+        $provNum = (int) $request->input('provider_id');
+        $specialty = $request->input('specialty');
+
+        $cfg = ProviderConfiguration::firstOrNew([
+            'office_id' => $officeId,
+            'prov_num' => $provNum,
+        ]);
+        $cfg->specialty = $specialty ?: null;
+        $cfg->save();
+
+        return response()->json(['success' => true, 'config' => $cfg]);
+    }
+
+    /**
+     * AJAX endpoint to clear provider settings.
+     */
+    public function clearProviderSettings(Request $request): JsonResponse
+    {
+        $officeId = $request->input('office_id');
+
+        if ($officeId && ! in_array($officeId, ['All Locations', 'Select a Location', ''], true)) {
+            if (is_numeric($officeId)) {
+                ProviderConfiguration::where('office_id', (int) $officeId)->delete();
+            } else {
+                $office = Office::where('name', $officeId)->first();
+                if ($office) {
+                    ProviderConfiguration::where('office_id', $office->id)->delete();
+                } else {
+                    ProviderConfiguration::truncate();
+                }
+            }
+        } else {
+            ProviderConfiguration::truncate();
+        }
+
+        return response()->json(['success' => true, 'message' => 'Provider settings cleared']);
+    }
+
+    /**
+     * AJAX endpoint to apply default Open Dental provider settings.
+     */
+    public function applyDefaultProviderSettings(Request $request): JsonResponse
+    {
+        $officeId = $request->input('office_id');
+
+        $provQuery = DB::table('od_providers');
+        if ($officeId && ! in_array($officeId, ['All Locations', 'Select a Location', ''], true)) {
+            if (is_numeric($officeId)) {
+                $provQuery->where('office_id', (int) $officeId);
+            } else {
+                $office = Office::where('name', $officeId)->first();
+                if ($office) {
+                    $provQuery->where('office_id', $office->id);
+                }
+            }
+        }
+
+        $dbProviders = $provQuery->get();
+        $defaultSpecialtyMap = [
+            0 => 'General',
+            1 => 'Hygiene',
+            2 => 'Pedo',
+            3 => 'Oral Surgery',
+            4 => 'Ortho',
+            5 => 'Endo',
+            6 => 'Perio',
+            7 => 'Prostho',
+            8 => 'Hygiene',
+            268 => 'Clear Aligners',
+        ];
+
+        foreach ($dbProviders as $p) {
+            $spec = is_numeric($p->Specialty)
+                ? ($defaultSpecialtyMap[(int) $p->Specialty] ?? 'General')
+                : ($p->Specialty ?: 'General');
+            $isHidden = in_array((string) $p->IsHidden, ['1', 'true', 'TRUE'], true);
+
+            ProviderConfiguration::updateOrCreate(
+                [
+                    'office_id' => (int) $p->office_id,
+                    'prov_num' => (int) $p->ProvNum,
+                ],
+                [
+                    'is_visible' => ! $isHidden,
+                    'specialty' => $spec,
+                ]
+            );
+        }
+
+        return response()->json(['success' => true, 'message' => 'Default provider settings applied']);
+    }
+
+    /**
+     * AJAX endpoint to save an EOD metric configuration (toggle enable/locked or edit details).
+     */
+    public function saveEodConfig(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'metric_key' => 'required|string|max:100',
+            'subtab' => 'nullable|string|max:50',
+            'title' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'is_enabled' => 'nullable',
+            'is_locked' => 'nullable',
+            'office_id' => 'nullable',
+            'clinic_num' => 'nullable',
+        ]);
+
+        $metricKey = (string) $validated['metric_key'];
+        $subtab = (string) ($validated['subtab'] ?? 'basics');
+        $officeId = $request->input('office_id') !== null && $request->input('office_id') !== '' ? (int) $request->input('office_id') : Office::getActiveOfficeId();
+        $clinicNum = $request->input('clinic_num') !== null && $request->input('clinic_num') !== '' ? (int) $request->input('clinic_num') : null;
+
+        $config = EodConfiguration::firstOrNew([
+            'office_id' => $officeId,
+            'clinic_num' => $clinicNum,
+            'metric_key' => $metricKey,
+            'subtab' => $subtab,
+        ]);
+
+        if ($request->has('title')) {
+            $config->title = $validated['title'];
+        }
+        if ($request->has('description')) {
+            $config->description = $validated['description'];
+        }
+        if ($request->has('is_enabled')) {
+            $config->is_enabled = filter_var($request->input('is_enabled'), FILTER_VALIDATE_BOOLEAN);
+        }
+        if ($request->has('is_locked')) {
+            $config->is_locked = filter_var($request->input('is_locked'), FILTER_VALIDATE_BOOLEAN);
+        }
+
+        $config->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'EOD configuration saved successfully.',
+            'config' => $config,
+        ]);
+    }
+
+    private function normalizeYearMonth(string $month): string
+    {
+        try {
+            return Carbon::parse($month)->format('Y-m');
+        } catch (\Throwable) {
+            return Carbon::now()->format('Y-m');
+        }
     }
 }

@@ -7,6 +7,7 @@ use App\Domain\Patient\PatientService;
 use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\GoalService;
 use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
@@ -50,6 +51,7 @@ class OperationsAnalyticsService
         private readonly PayorService $payors,
         private readonly PatientVisitService $patientVisits,
         private readonly ScheduleSnapshotService $scheduleSnapshots,
+        private readonly GoalService $goals,
     ) {
         $this->clinicNames = $this->clinics->all();
     }
@@ -1014,9 +1016,10 @@ class OperationsAnalyticsService
         // --- ACTUAL METRICS ---
         $officeId = $this->resolveOfficeId($officeId);
         $this->clinicNames = $this->clinics->all($officeId);
+        $notBroken = ProcCode::notBrokenAppointmentSql('', $officeId);
         $actualProdQuery = DB::table('od_procedure_logs')
             ->where('office_id', $officeId)
-            ->selectRaw('ProcDate as d, SUM(ProcFee) as gross, COUNT(DISTINCT PatNum) as pts_visits')
+            ->selectRaw("ProcDate as d, SUM(ProcFee) as gross, COUNT(DISTINCT CASE WHEN {$notBroken} THEN PatNum END) as pts_visits")
             ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$start, $end]);
         if ($clinics) {
@@ -1202,7 +1205,12 @@ class OperationsAnalyticsService
                 $uns = (float) ($unschedTx[$d] ?? 0.0);
             }
 
-            $goal = 0.0;
+            $firstClinic = ! empty($clinics) ? (int) reset($clinics) : null;
+            $goalData = $this->goals->getOfficeGoalForDateRange($officeId, $start, $end, $firstClinic);
+            $totalConfiguredGoal = $goalData['net_production'] > 0 ? $goalData['net_production'] : $goalData['gross_production'];
+            $totalDaysInRange = max(1, count($dates));
+            $goal = $totalConfiguredGoal > 0 ? round($totalConfiguredGoal / $totalDaysInRange, 2) : 0.0;
+
             $bp = $ap != 0 ? $ap : $sp;
             $bp_pct_g = $goal > 0 ? round(($bp / $goal) * 100, 2) : 0.0;
             $ap_vs_g = $ap - $goal;
@@ -1233,7 +1241,10 @@ class OperationsAnalyticsService
         }
 
         $numDays = max(1, count($rows));
-        $tot_goal = array_sum(array_column($rows, 'goal'));
+        $firstClinic = ! empty($clinics) ? (int) reset($clinics) : null;
+        $goalData = $this->goals->getOfficeGoalForDateRange($officeId, $start, $end, $firstClinic);
+        $configuredTotGoal = $goalData['net_production'] > 0 ? $goalData['net_production'] : $goalData['gross_production'];
+        $tot_goal = $configuredTotGoal > 0 ? $configuredTotGoal : array_sum(array_column($rows, 'goal'));
         $tot_ap = array_sum(array_column($rows, 'actual_production'));
         $tot_ac = array_sum(array_column($rows, 'actual_collection'));
         $tot_apv = array_sum(array_column($rows, 'actual_pts_visit'));
@@ -1646,10 +1657,16 @@ class OperationsAnalyticsService
                 }
             }
 
-            // Production Goal = Hourly Goal (OpenDental) × scheduled hours in range.
-            $hourlyGoal = (float) ($prov->HourlyProdGoalAmt ?? 0);
-            $schedHours = (float) ($hours[$key] ?? 0);
-            $goal = ($hourlyGoal > 0 && $schedHours > 0) ? round($hourlyGoal * $schedHours, 2) : 0.00;
+            // Production Goal = check ProviderGoal from configuration or fallback to Hourly Goal (OpenDental) × scheduled hours in range.
+            $startMonth = Carbon::parse($start)->format('Y-m');
+            $configuredProvGoal = $this->goals->getProviderGoal($officeId, (int) $provNum, $startMonth, 'monthly', (int) $clinicNum);
+            if ($configuredProvGoal && $configuredProvGoal->production_goal > 0) {
+                $goal = (float) $configuredProvGoal->production_goal;
+            } else {
+                $hourlyGoal = (float) ($prov->HourlyProdGoalAmt ?? 0);
+                $schedHours = (float) ($hours[$key] ?? 0);
+                $goal = ($hourlyGoal > 0 && $schedHours > 0) ? round($hourlyGoal * $schedHours, 2) : 0.00;
+            }
 
             $curCnt = count($curByProv[$key] ?? []);
             $newCnt = count($newByProv[$key] ?? []);
@@ -2008,7 +2025,7 @@ class OperationsAnalyticsService
             ->selectRaw("ClinicNum,
                 SUM(ProcFee)                                  AS gross,
                 COUNT(*)                                      AS procedures,
-                COUNT(DISTINCT PatNum)                        AS unique_pts,
+                COUNT(DISTINCT CASE WHEN {$notBroken} THEN PatNum END) AS unique_pts,
                 COUNT(DISTINCT CASE WHEN {$notBroken} THEN {$concat} END) AS pts_visit,
                 COUNT(DISTINCT ProcDate)                      AS working_days")
             ->whereIn('ProcStatus', ProcStatus::completed())
@@ -2423,12 +2440,14 @@ class OperationsAnalyticsService
         $metrics = $this->newPatientMetrics($start, $end, $clinics, $officeId); // This gives NPT visits in the active selected range.
         $nptMtdVisits = array_sum(array_column($metrics, 'npt_visit'));
 
-        // Let's mock a goal proportionally for the prototype, since real goal logic isn't defined
-        $nptMtdGoal = $nptMtdVisits > 0 ? (int) ceil($nptMtdVisits * 1.5) : 30;
+        $firstClinic = ! empty($clinics) ? (int) reset($clinics) : null;
+        $mtdGoalData = $this->goals->getOfficeGoalForDateRange($officeId, $mtdStart, $end, $firstClinic);
+        $nptMtdGoal = $mtdGoalData['npt_visits'] > 0 ? $mtdGoalData['npt_visits'] : ($nptMtdVisits > 0 ? (int) ceil($nptMtdVisits * 1.5) : 30);
 
         $metricsYtd = $this->newPatientMetrics($ytdStart, $end, $clinics, $officeId);
         $nptYtdVisits = array_sum(array_column($metricsYtd, 'npt_visit'));
-        $nptYtdGoal = $nptYtdVisits > 0 ? (int) ceil($nptYtdVisits * 1.5) : 300;
+        $ytdGoalData = $this->goals->getOfficeGoalForDateRange($officeId, $ytdStart, $end, $firstClinic);
+        $nptYtdGoal = $ytdGoalData['npt_visits'] > 0 ? $ytdGoalData['npt_visits'] : ($nptYtdVisits > 0 ? (int) ceil($nptYtdVisits * 1.5) : 300);
 
         // 3. Age Brackets (Active patients with completed procedures in the last 24 months)
         $start24Months = date('Y-m-d', strtotime('-24 months', strtotime($end)));
@@ -4231,9 +4250,13 @@ class OperationsAnalyticsService
                 }
             }
 
+            $firstClinic = ! empty($clinics) ? (int) reset($clinics) : null;
+            $mtdGoalData = $this->goals->getOfficeGoalForDateRange($officeId, $mtdStart, $end, $firstClinic);
+            $ytdGoalData = $this->goals->getOfficeGoalForDateRange($officeId, $ytdStart, $end, $firstClinic);
+
             $goals = [
-                'mtd' => ['actual' => $mtdActual, 'goal' => 40],
-                'ytd' => ['actual' => $ytdActual, 'goal' => 200],
+                'mtd' => ['actual' => $mtdActual, 'goal' => $mtdGoalData['npt_visits'] > 0 ? $mtdGoalData['npt_visits'] : 40],
+                'ytd' => ['actual' => $ytdActual, 'goal' => $ytdGoalData['npt_visits'] > 0 ? $ytdGoalData['npt_visits'] : 200],
             ];
 
             // 4. New Patient Seen Volume

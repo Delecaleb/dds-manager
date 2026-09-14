@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Production\ProductionService;
+use App\Domain\Support\GoalService;
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
 use App\Models\OdAppointment;
@@ -19,6 +20,7 @@ class FrontOfficeController extends Controller
 {
     public function __construct(
         private readonly ProductionService $production,
+        private readonly GoalService $goals,
     ) {}
 
     public function index(Request $request)
@@ -65,8 +67,13 @@ class FrontOfficeController extends Controller
         // Prior Year: the SAME span, shifted back exactly one year.
         $priorYearProduction = $this->production->netProduction($priorYearFilter);
 
-        // Note: For now, $100k is used as simple monthly goal for UI ratio mapping till Goals system added.
-        $monthlyGoal = 109286.00;
+        $officeId = Office::getActiveOfficeId() ?? 1;
+        $goalRecord = $this->goals->getOfficeGoal($officeId, $monthYear, 'monthly');
+        if ($goalRecord && ($goalRecord->net_production > 0 || $goalRecord->gross_production > 0)) {
+            $monthlyGoal = $goalRecord->net_production > 0 ? (float) $goalRecord->net_production : (float) $goalRecord->gross_production;
+        } else {
+            $monthlyGoal = 109286.00;
+        }
         $pctGoal = $monthlyGoal > 0 ? round(($monthlyProduction / $monthlyGoal) * 100, 2) : 0;
 
         $productionDiff = round($monthlyProduction - $monthlyGoal, 2);
