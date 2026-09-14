@@ -17,7 +17,6 @@ use App\Services\OpenDental\AccountModuleService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Yajra\DataTables\Facades\DataTables;
 
 class PatientController extends Controller
 {
@@ -38,38 +37,7 @@ class PatientController extends Controller
     public function data(Request $request, ClinicRegistry $clinicRegistry)
     {
         $officeId = Office::getActiveOfficeId();
-        $query = OdPatient::query()
-            ->select('od_patients.*')
-            ->selectSub(function ($q) use ($officeId) {
-                // Fetch Guarantor Full Name via SubQuery Map securely
-                $concatSql = DB::getDriverName() === 'sqlite'
-                    ? "LName || ', ' || FName"
-                    : 'CONCAT(LName, ", ", FName)';
-
-                $q->from('od_patients as gp')
-                    ->selectRaw($concatSql)
-                    ->where('gp.office_id', $officeId)
-                    ->whereColumn('gp.PatNum', 'od_patients.Guarantor')
-                    ->limit(1);
-            }, 'guarantor_name')
-            ->selectSub(function ($q) use ($officeId) {
-                $q->from('od_appointments')
-                    ->selectRaw('MIN(AptDateTime)')
-                    ->where('office_id', $officeId)
-                    ->whereColumn('od_appointments.PatNum', 'od_patients.PatNum');
-            }, 'first_visit')
-            ->selectSub(function ($q) use ($officeId) {
-                $q->from('od_procedure_logs')
-                    ->selectRaw('COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0)')
-                    ->where('office_id', $officeId)
-                    ->whereColumn('od_procedure_logs.PatNum', 'od_patients.PatNum');
-            }, 'lifetime_production')
-            ->selectSub(function ($q) use ($officeId) {
-                $q->from('od_pay_splits')
-                    ->selectRaw('COALESCE(SUM(CAST(SplitAmt AS DECIMAL(12,2))), 0)')
-                    ->where('office_id', $officeId)
-                    ->whereColumn('od_pay_splits.PatNum', 'od_patients.PatNum');
-            }, 'lifetime_collection');
+        $query = OdPatient::query()->where('od_patients.office_id', $officeId);
 
         // Resolve Clinic Scoping
         $clinicNum = $request->input('clinic_id') ?? $request->input('clinic_num');
@@ -81,57 +49,199 @@ class PatientController extends Controller
             $query->where('od_patients.ClinicNum', (int) $clinicNum);
         }
 
-        return DataTables::eloquent($query)
-            ->addColumn('id', fn ($patient) => $patient->PatNum)
-            ->addColumn('name', fn ($patient) => trim(($patient->LName ?? '').' '.($patient->FName ?? '')))
-            ->addColumn('patient_id', fn ($patient) => $patient->PatNum)
-            ->addColumn('guarantor', fn ($patient) => $patient->guarantor_name ?? '')
-            ->addColumn('guarantor_id', fn ($patient) => $patient->Guarantor ?? '')
-            ->addColumn('age', function ($patient) {
-                $dobStr = $patient->Birthdate ?? null;
-                if ($dobStr && $dobStr !== '0001-01-01' && date_create($dobStr)) {
-                    return (new \DateTime($dobStr))->diff(new \DateTime)->y;
+        $recordsTotal = (clone $query)->count();
+
+        // Search Filter
+        $rawSearch = $request->input('search');
+        if (is_array($rawSearch)) {
+            $search = trim((string) ($rawSearch['value'] ?? ''));
+        } else {
+            $search = trim((string) ($rawSearch ?? ''));
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('LName', 'like', "%{$search}%")
+                    ->orWhere('FName', 'like', "%{$search}%")
+                    ->orWhere('PatNum', 'like', "%{$search}%")
+                    ->orWhere('Email', 'like', "%{$search}%")
+                    ->orWhere('WirelessPhone', 'like', "%{$search}%")
+                    ->orWhere('HmPhone', 'like', "%{$search}%")
+                    ->orWhere('City', 'like', "%{$search}%")
+                    ->orWhere(function ($nameQ) use ($search) {
+                        if (DB::getDriverName() === 'sqlite') {
+                            $nameQ->whereRaw("(LName || ' ' || FName) like ?", ["%{$search}%"]);
+                        } else {
+                            $nameQ->whereRaw("CONCAT(LName, ' ', FName) like ?", ["%{$search}%"]);
+                        }
+                    });
+            });
+        }
+
+        $recordsFiltered = ($search !== '') ? (clone $query)->count() : $recordsTotal;
+
+        // Sorting
+        $order = $request->input('order');
+        $orderColIdx = null;
+        $orderDir = 'asc';
+        if (is_array($order) && isset($order[0])) {
+            $orderColIdx = $order[0]['column'] ?? null;
+            $orderDir = strtolower((string) ($order[0]['dir'] ?? 'asc')) === 'desc' ? 'desc' : 'asc';
+        } elseif ($request->filled('order.0.column')) {
+            $orderColIdx = $request->input('order.0.column');
+            $orderDir = strtolower((string) $request->input('order.0.dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        }
+
+        $orderMap = [
+            0 => ['LName', 'FName'],
+            1 => 'PatNum',
+            3 => 'Guarantor',
+            5 => 'Gender',
+            6 => 'Address',
+            7 => 'City',
+            8 => 'State',
+            9 => 'Zip',
+            10 => 'WkPhone',
+            11 => 'HmPhone',
+            12 => 'WirelessPhone',
+            13 => 'Email',
+            14 => 'Birthdate',
+        ];
+
+        if (isset($orderMap[$orderColIdx])) {
+            $cols = (array) $orderMap[$orderColIdx];
+            foreach ($cols as $col) {
+                $query->orderBy($col, $orderDir);
+            }
+        } else {
+            $query->orderBy('LName', 'asc')->orderBy('FName', 'asc');
+        }
+
+        // Pagination
+        $start = max(0, (int) $request->input('start', 0));
+        $length = (int) $request->input('length', 20);
+
+        if ($length > 0) {
+            $query->skip($start)->take($length);
+        }
+
+        $patients = $query->get([
+            'PatNum', 'LName', 'FName', 'Guarantor', 'Birthdate', 'Gender',
+            'Address', 'Address2', 'City', 'State', 'Zip',
+            'WkPhone', 'HmPhone', 'WirelessPhone', 'Email', 'ClinicNum', 'office_id',
+        ]);
+
+        $patNums = $patients->pluck('PatNum')->all();
+        $guarantorIds = $patients->pluck('Guarantor')->filter()->unique()->all();
+
+        // Batch 1: Guarantor Names
+        $guarantorMap = [];
+        if (! empty($guarantorIds)) {
+            $guarantors = DB::table('od_patients')
+                ->where('office_id', $officeId)
+                ->whereIn('PatNum', $guarantorIds)
+                ->select('PatNum', 'LName', 'FName')
+                ->get();
+            foreach ($guarantors as $g) {
+                $guarantorMap[$g->PatNum] = trim(($g->LName ?? '').', '.($g->FName ?? ''));
+            }
+        }
+
+        // Batch 2: First Visit Date
+        $firstVisitMap = [];
+        if (! empty($patNums)) {
+            $firstVisitMap = DB::table('od_appointments')
+                ->where('office_id', $officeId)
+                ->whereIn('PatNum', $patNums)
+                ->groupBy('PatNum')
+                ->selectRaw('PatNum, MIN(AptDateTime) as first_visit')
+                ->pluck('first_visit', 'PatNum')
+                ->all();
+        }
+
+        // Batch 3: Lifetime Production
+        $prodMap = [];
+        if (! empty($patNums)) {
+            $prodMap = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
+                ->whereIn('PatNum', $patNums)
+                ->groupBy('PatNum')
+                ->selectRaw('PatNum, COALESCE(SUM(ProcFee), 0) as total_prod')
+                ->pluck('total_prod', 'PatNum')
+                ->all();
+        }
+
+        // Batch 4: Lifetime Collection
+        $colMap = [];
+        if (! empty($patNums)) {
+            $colMap = DB::table('od_pay_splits')
+                ->where('office_id', $officeId)
+                ->whereIn('PatNum', $patNums)
+                ->groupBy('PatNum')
+                ->selectRaw('PatNum, COALESCE(SUM(SplitAmt), 0) as total_col')
+                ->pluck('total_col', 'PatNum')
+                ->all();
+        }
+
+        $genderMap = [0 => 'Male', 1 => 'Female', 2 => 'Unknown'];
+        $now = new \DateTime;
+
+        $data = [];
+        foreach ($patients as $p) {
+            $age = 'N/A';
+            if ($p->Birthdate && $p->Birthdate !== '0001-01-01') {
+                try {
+                    $dob = new \DateTime($p->Birthdate);
+                    $age = $dob->diff($now)->y;
+                } catch (\Exception $e) {
+                    $age = 'N/A';
                 }
+            }
 
-                return 'N/A';
-            })
-            ->addColumn('gender', function ($patient) {
-                $genderMap = [0 => 'Male', 1 => 'Female', 2 => 'Unknown'];
-                $raw = $patient->Gender ?? '';
+            $gender = is_numeric($p->Gender) ? ($genderMap[(int) $p->Gender] ?? 'Unknown') : ($p->Gender ?: 'Unknown');
 
-                return is_numeric($raw) ? ($genderMap[intval($raw)] ?? 'Unknown') : ($raw ?: 'Unknown');
-            })
-            ->addColumn('address', fn ($patient) => trim(($patient->Address ?? '').' '.($patient->Address2 ?? '')))
-            ->addColumn('city', fn ($patient) => $patient->City ?? '')
-            ->addColumn('state', fn ($patient) => $patient->State ?? '')
-            ->addColumn('zip', fn ($patient) => $patient->Zip ?? '')
-            ->addColumn('work_phone', fn ($patient) => $patient->WkPhone ?? '')
-            ->addColumn('home_phone', fn ($patient) => $patient->HmPhone ?? '')
-            ->addColumn('mobile_phone', fn ($patient) => $patient->WirelessPhone ?? '')
-            ->addColumn('email', fn ($patient) => $patient->Email ?? '')
-            ->addColumn('birthdate', function ($patient) {
-                $dobStr = $patient->Birthdate ?? null;
-                if ($dobStr && $dobStr !== '0001-01-01' && date_create($dobStr)) {
-                    return (new \DateTime($dobStr))->format('M d, Y');
+            $birthdateFormatted = 'N/A';
+            if ($p->Birthdate && $p->Birthdate !== '0001-01-01') {
+                try {
+                    $birthdateFormatted = (new \DateTime($p->Birthdate))->format('M d, Y');
+                } catch (\Exception $e) {
+                    $birthdateFormatted = 'N/A';
                 }
+            }
 
-                return 'N/A';
-            })
-            ->addColumn('first_visit', function ($patient) {
-                return $patient->first_visit ? date('M d, Y', strtotime($patient->first_visit)) : 'N/A';
-            })
+            $fv = $firstVisitMap[$p->PatNum] ?? null;
+            $firstVisitFormatted = ($fv && $fv !== '0001-01-01 00:00:00') ? date('M d, Y', strtotime($fv)) : 'N/A';
 
-            ->addColumn('lifetime_value_production', fn ($patient) => floatval($patient->lifetime_production))
-            ->addColumn('lifetime_value_collection', fn ($patient) => floatval($patient->lifetime_collection))
-            ->addColumn('referral_source', fn ($patient) => 'N/A')
-            ->filterColumn('name', function ($query, $keyword) {
-                $query->where(function ($q) use ($keyword) {
-                    $q->where('LName', 'like', "%{$keyword}%")
-                        ->orWhere('FName', 'like', "%{$keyword}%")
-                        ->orWhereRaw("CONCAT(LName, ' ', FName) like ?", ["%{$keyword}%"]);
-                });
-            })
-            ->make(true);
+            $data[] = [
+                'id' => (int) $p->PatNum,
+                'name' => trim(($p->LName ?? '').' '.($p->FName ?? '')),
+                'patient_id' => (int) $p->PatNum,
+                'guarantor' => $guarantorMap[$p->Guarantor] ?? '',
+                'guarantor_id' => $p->Guarantor ?? '',
+                'age' => $age,
+                'gender' => $gender,
+                'address' => trim(($p->Address ?? '').' '.($p->Address2 ?? '')),
+                'city' => $p->City ?? '',
+                'state' => $p->State ?? '',
+                'zip' => $p->Zip ?? '',
+                'work_phone' => $p->WkPhone ?? '',
+                'home_phone' => $p->HmPhone ?? '',
+                'mobile_phone' => $p->WirelessPhone ?? '',
+                'email' => $p->Email ?? '',
+                'birthdate' => $birthdateFormatted,
+                'first_visit' => $firstVisitFormatted,
+                'lifetime_value_production' => (float) ($prodMap[$p->PatNum] ?? 0),
+                'lifetime_value_collection' => (float) ($colMap[$p->PatNum] ?? 0),
+                'referral_source' => 'N/A',
+            ];
+        }
+
+        return response()->json([
+            'draw' => (int) $request->input('draw', 1),
+            'recordsTotal' => (int) $recordsTotal,
+            'recordsFiltered' => (int) $recordsFiltered,
+            'data' => $data,
+        ]);
     }
 
     public function show($id, Request $request)
