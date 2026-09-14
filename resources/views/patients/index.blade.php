@@ -1,4 +1,39 @@
 <x-app-layout>
+    <style>
+        /* Patient Table Sticky Header & Column rules */
+        #patientsTable thead tr th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 20 !important;
+            background-color: #f8fafc !important;
+        }
+
+        #patientsTable thead tr th:first-child,
+        #patientsTable thead tr th.dds-stick {
+            position: sticky !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 40 !important;
+            background-color: #f8fafc !important;
+        }
+
+        #patientsTable tbody tr td:first-child,
+        #patientsTable tbody tr td.dds-stick {
+            position: sticky !important;
+            left: 0 !important;
+            z-index: 10 !important;
+            background-color: #ffffff !important;
+        }
+
+        #patientsTable tbody tr:hover td:first-child,
+        #patientsTable tbody tr:hover td.dds-stick,
+        #patientsTable tbody tr.group:hover td:first-child,
+        #patientsTable tbody tr.group:hover td.dds-stick,
+        #patientsTable tbody tr:hover td.sticky,
+        #patientsTable tbody tr.group:hover td.sticky {
+            background-color: #f8fafc !important;
+        }
+    </style>
     <div class="min-h-screen flex flex-col relative bg-slate-50">
 
         <!-- Top Header Banner -->
@@ -120,11 +155,11 @@
 
                     <!-- Patients Table Scroll Container (Hidden while loading) -->
                     <div id="patientsTableContainer" class="hidden overflow-x-auto overflow-y-auto custom-table-scrollbar" style="max-height: calc(100vh - 280px); min-height: 480px;">
-                        <table id="patientsTable" class="dds-table w-full text-left border-collapse table-auto">
-                            <thead>
-                                <tr class="bg-slate-50 text-slate-700 font-bold text-xs border-b border-slate-200">
+                        <table id="patientsTable" class="dds-table w-full text-left border-separate border-spacing-0 table-auto">
+                            <thead class="dds-head-sticky">
+                                <tr class="bg-slate-50 text-slate-700 font-bold text-xs">
                                     <th
-                                        class="p-3 bg-slate-50 sticky left-0 top-0 z-30 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] border-r border-slate-200 min-w-[260px] max-w-[260px]">
+                                        class="dds-stick dds-stick-shadow p-3 bg-slate-50 sticky left-0 top-0 z-40 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] border-b border-r border-slate-200 min-w-[260px] max-w-[260px]">
                                         <div class="flex items-center gap-3">
                                             <input type="checkbox" id="patientsSelectAll"
                                                 class="w-4 h-4 text-emerald-500 border-slate-300 rounded focus:ring-0 cursor-pointer">
@@ -134,27 +169,27 @@
                                             </span>
                                         </div>
                                     </th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[100px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Patient ID</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[150px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Guarantor</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[110px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Guarantor ID</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[70px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Age</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[90px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Gender</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[160px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Address</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> City</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[80px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> State</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[90px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> ZIP</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Work Phone</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Home Phone</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Mobile Phone</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[160px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Email</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[100px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Birth Date</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> First Visit</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[180px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Lifetime Value Production</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[180px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Lifetime Value Collection</span></th>
-                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 min-w-[140px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Referral Source</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[100px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Patient ID</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[150px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Guarantor</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[110px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Guarantor ID</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[70px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Age</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[90px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Gender</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[160px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Address</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> City</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[80px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> State</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[90px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> ZIP</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Work Phone</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Home Phone</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Mobile Phone</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[160px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Email</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[100px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Birth Date</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> First Visit</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[180px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Lifetime Value Production</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[180px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Lifetime Value Collection</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[140px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Referral Source</span></th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-100 text-xs text-slate-700 bg-white whitespace-nowrap">
+                            <tbody class="text-xs text-slate-700 bg-white whitespace-nowrap">
                             </tbody>
                         </table>
                     </div>
@@ -722,40 +757,42 @@
                     {
                         data: 'name',
                         name: 'name',
+                        className: 'dds-stick dds-stick-shadow sticky left-0 bg-white z-10 border-b border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] p-3 min-w-[260px] max-w-[260px]',
                         render: function (data, type, row) {
                             return `
-                        <div class="p-3 bg-white sticky left-0 group-hover:bg-slate-50/80 z-10 border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] flex items-center justify-between">
+                        <div class="flex items-center justify-between w-full">
                             <div class="flex items-center gap-3">
                                 <input type="checkbox" class="patient-row-chk w-4 h-4 text-emerald-500 border-slate-300 rounded focus:ring-0 cursor-pointer">
-                                <span class="font-medium">${data}</span>
+                                <span class="font-medium text-slate-900">${data}</span>
                             </div>
-                            <button onclick="openPatient(${row.id})" class="text-slate-400 hover:text-emerald-500 transition-colors p-1">
+                            <button onclick="openPatient(${row.id})" class="text-slate-400 hover:text-emerald-500 transition-colors p-1 cursor-pointer">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
                             </button>
                         </div>
                         `;
                         }
                     },
-                    { data: 'patient_id', name: 'PatNum' },
-                    { data: 'guarantor', name: 'guarantor_name', orderable: false, searchable: false },
-                    { data: 'guarantor_id', name: 'Guarantor' },
-                    { data: 'age', name: 'age', orderable: false, searchable: false },
-                    { data: 'gender', name: 'Gender' },
-                    { data: 'address', name: 'Address' },
-                    { data: 'city', name: 'City' },
-                    { data: 'state', name: 'State' },
-                    { data: 'zip', name: 'Zip' },
-                    { data: 'work_phone', name: 'WkPhone' },
-                    { data: 'home_phone', name: 'HmPhone' },
-                    { data: 'mobile_phone', name: 'WirelessPhone' },
-                    { data: 'email', name: 'Email' },
-                    { data: 'birthdate', name: 'Birthdate' },
-                    { data: 'first_visit', name: 'first_visit', orderable: false, searchable: false },
+                    { data: 'patient_id', name: 'PatNum', className: 'p-3 border-b border-slate-100' },
+                    { data: 'guarantor', name: 'guarantor_name', orderable: false, searchable: false, className: 'p-3 border-b border-slate-100' },
+                    { data: 'guarantor_id', name: 'Guarantor', className: 'p-3 border-b border-slate-100' },
+                    { data: 'age', name: 'age', orderable: false, searchable: false, className: 'p-3 border-b border-slate-100' },
+                    { data: 'gender', name: 'Gender', className: 'p-3 border-b border-slate-100' },
+                    { data: 'address', name: 'Address', className: 'p-3 border-b border-slate-100' },
+                    { data: 'city', name: 'City', className: 'p-3 border-b border-slate-100' },
+                    { data: 'state', name: 'State', className: 'p-3 border-b border-slate-100' },
+                    { data: 'zip', name: 'Zip', className: 'p-3 border-b border-slate-100' },
+                    { data: 'work_phone', name: 'WkPhone', className: 'p-3 border-b border-slate-100' },
+                    { data: 'home_phone', name: 'HmPhone', className: 'p-3 border-b border-slate-100' },
+                    { data: 'mobile_phone', name: 'WirelessPhone', className: 'p-3 border-b border-slate-100' },
+                    { data: 'email', name: 'Email', className: 'p-3 border-b border-slate-100' },
+                    { data: 'birthdate', name: 'Birthdate', className: 'p-3 border-b border-slate-100' },
+                    { data: 'first_visit', name: 'first_visit', orderable: false, searchable: false, className: 'p-3 border-b border-slate-100' },
                     {
                         data: 'lifetime_value_production',
                         name: 'lifetime_production',
                         orderable: false,
                         searchable: false,
+                        className: 'p-3 border-b border-slate-100',
                         render: function (data) { return data ? '$' + Number(data).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'; }
                     },
                     {
@@ -763,11 +800,15 @@
                         name: 'lifetime_value_collection',
                         orderable: false,
                         searchable: false,
+                        className: 'p-3 border-b border-slate-100',
                         render: function (data) { return data ? '$' + Number(data).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'; }
                     },
-                    { data: 'referral_source', name: 'referral_source', orderable: false, searchable: false }
+                    { data: 'referral_source', name: 'referral_source', orderable: false, searchable: false, className: 'p-3 border-b border-slate-100' }
                 ],
                 order: [[0, 'asc']],
+                createdRow: function (row, data, dataIndex) {
+                    $(row).addClass('hover:bg-slate-50/80 group');
+                },
                 drawCallback: function () {
                     hidePatientsLoading();
                     lucide.createIcons();
