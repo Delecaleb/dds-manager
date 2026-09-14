@@ -13,10 +13,6 @@
             <i data-lucide="stethoscope" class="w-5 h-5 text-blue-600"></i>
             <h1 class="text-xl font-bold text-slate-900 tracking-tight">Provider Portal</h1>
         </div>
-        <button class="inline-flex items-center gap-2 bg-slate-800 text-emerald-400 hover:bg-slate-700 text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
-            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
-            Quick Start Guide
-        </button>
     </div>
 
     {{-- ── Scrollable body ──────────────────────────────────────────────────── --}}
@@ -25,15 +21,6 @@
         {{-- ── Filter bar ───────────────────────────────────────────────────── --}}
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div class="flex flex-wrap items-center gap-3">
-
-                {{-- Location --}}
-                <div class="flex flex-col gap-0.5">
-                    <label class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Location</label>
-                    <select id="locationSelect"
-                        class="text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300 min-w-[120px]">
-                        <option value="">8 Mile</option>
-                    </select>
-                </div>
 
                 {{-- Provider type --}}
                 <div class="flex flex-col gap-0.5">

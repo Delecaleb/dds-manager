@@ -31,6 +31,11 @@ class DashboardPatientVisitsPerLocationTest extends TestCase
                 $table->integer('office_id')->nullable();
             });
         }
+
+        DB::table('od_procedures')->insert([
+            ['office_id' => $this->office->id, 'CodeNum' => 626, 'ProcCode' => 'D9986', 'Descript' => 'Missed Appointment'],
+            ['office_id' => $this->office->id, 'CodeNum' => 100, 'ProcCode' => 'D0120', 'Descript' => 'Exam'],
+        ]);
     }
 
     public function test_patient_visits_per_location_matches_total_patient_visits_calculation(): void

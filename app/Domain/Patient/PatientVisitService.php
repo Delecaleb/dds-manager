@@ -46,8 +46,7 @@ class PatientVisitService
         $clinicFilter = ! empty($clinics) ? 'AND pl_inner.ClinicNum IN ('.implode(',', array_map('intval', $clinics)).')' : '';
         $provFilter = ! empty($providers) ? 'AND pl_inner.ProvNum IN ('.implode(',', array_map('intval', $providers)).')' : '';
 
-        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
-        $excludedIn = "'".implode("', '", array_map('addslashes', $excludedCodes))."'";
+        $excludedIn = ProcCode::brokenAppointmentCodeNumsInList($officeId);
 
         $rows = DB::select("
             SELECT
@@ -193,8 +192,7 @@ class PatientVisitService
         $clinicFilter = ! empty($clinics) ? 'AND pl.ClinicNum IN ('.implode(',', array_map('intval', $clinics)).')' : '';
         $provFilter = ! empty($providers) ? 'AND pl.ProvNum IN ('.implode(',', array_map('intval', $providers)).')' : '';
 
-        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
-        $excludedIn = "'".implode("', '", array_map('addslashes', $excludedCodes))."'";
+        $excludedIn = ProcCode::brokenAppointmentCodeNumsInList($officeId);
 
         $rows = DB::select("
             SELECT

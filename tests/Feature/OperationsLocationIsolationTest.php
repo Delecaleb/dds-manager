@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Support\ProcCode;
 use App\Models\Office;
 use App\Models\User;
 use App\Services\OpenDental\OperationsAnalyticsService;
@@ -35,6 +36,8 @@ class OperationsLocationIsolationTest extends TestCase
             'name' => 'Uptown Dental',
             'is_active' => true,
         ]);
+
+        ProcCode::clearCache();
     }
 
     public function test_operations_offices_tab_is_isolated_between_tenants(): void
@@ -435,6 +438,8 @@ class OperationsLocationIsolationTest extends TestCase
             'Descript' => 'Periodic Exam',
             'ProcCat' => 1,
         ]);
+
+        ProcCode::clearCache();
 
         // Patient 1: Had valid completed proc on July 5
         DB::table('od_procedure_logs')->insert([

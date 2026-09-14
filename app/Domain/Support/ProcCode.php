@@ -46,9 +46,6 @@ final class ProcCode
                 ->all();
         }
 
-        // Always include legacy fallback ID '626'
-        $codeNums[] = '626';
-
         $result = array_values(array_unique($codeNums));
         self::$resolvedBrokenCodesCache[$cacheKey] = $result;
 
@@ -70,15 +67,24 @@ final class ProcCode
     {
         $nums = self::brokenAppointmentCodeNums($officeId);
 
+        if (empty($nums)) {
+            return "'-1'";
+        }
+
         return "'".implode("', '", array_map('addslashes', $nums))."'";
     }
 
     /**
-     * Raw SQL condition fragment: COALESCE({alias}.CodeNum, '') NOT IN ('626', ...)
+     * Raw SQL condition fragment: COALESCE({alias}.CodeNum, '') NOT IN (...)
      */
     public static function notBrokenAppointmentSql(string $alias = 'pl', ?int $officeId = null): string
     {
-        $list = self::brokenAppointmentCodeNumsInList($officeId);
+        $nums = self::brokenAppointmentCodeNums($officeId);
+        if (empty($nums)) {
+            return '1=1';
+        }
+
+        $list = "'".implode("', '", array_map('addslashes', $nums))."'";
         $col = $alias !== '' ? "{$alias}.CodeNum" : 'CodeNum';
 
         return "COALESCE({$col}, '') NOT IN ({$list})";

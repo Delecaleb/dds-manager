@@ -27,7 +27,7 @@ class PatientVisitCodeFilterTest extends TestCase
 
         // Insert procedures
         DB::table('od_procedures')->insert([
-            ['CodeNum' => 626, 'ProcCode' => 'D9999', 'Descript' => 'Excluded Code'],
+            ['CodeNum' => 626, 'ProcCode' => 'D9986', 'Descript' => 'Missed Appointment'],
             ['CodeNum' => 100, 'ProcCode' => 'D0120', 'Descript' => 'Exam'],
         ]);
 
@@ -84,7 +84,7 @@ class PatientVisitCodeFilterTest extends TestCase
         ]);
 
         DB::table('od_procedures')->insert([
-            ['CodeNum' => 626, 'ProcCode' => 'D9999', 'Descript' => 'Excluded Code'],
+            ['CodeNum' => 626, 'ProcCode' => 'D9986', 'Descript' => 'Missed Appointment'],
             ['CodeNum' => 101, 'ProcCode' => 'D1110', 'Descript' => 'Prophy'],
         ]);
 
