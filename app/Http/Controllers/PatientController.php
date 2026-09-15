@@ -739,13 +739,10 @@ class PatientController extends Controller
     {
         $clinicRegistry = $clinicRegistry ?? app(ClinicRegistry::class);
         $officeId = Office::getActiveOfficeId();
-        $query = OdPatient::query();
+        $query = OdPatient::query()->where('od_patients.office_id', $officeId);
 
         // Location / Clinic filter
         $clinicNum = $request->input('clinic_id') ?? $request->input('clinic_num');
-        if ($clinicNum === null) {
-            $clinicNum = $clinicRegistry->getActiveClinicNum($officeId);
-        }
 
         if ($clinicNum !== null && $clinicNum !== '' && $clinicNum !== 'all') {
             $query->where('od_patients.ClinicNum', (int) $clinicNum);

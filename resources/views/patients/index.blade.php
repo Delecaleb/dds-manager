@@ -236,12 +236,12 @@
                         </label>
                         <select id="expDateMode"
                             class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer">
-                            <option value="all">All Time</option>
+                            <option value="all" selected>All Time</option>
                             <option value="today">Today</option>
                             <option value="yesterday">Yesterday</option>
                             <option value="last_7_days">Last 7 Days</option>
                             <option value="last_30_days">Last 30 Days</option>
-                            <option value="this_month" selected>This Month</option>
+                            <option value="this_month">This Month</option>
                             <option value="last_month">Last Month</option>
                             <option value="this_year">Year to Date (YTD)</option>
                             <option value="custom">Custom Date Range</option>
@@ -825,8 +825,20 @@
             });
 
             $("#globalClinicSelect").on('change', function () {
+                let cVal = $(this).val();
+                if ($('#expClinic').length) {
+                    $('#expClinic').val(cVal);
+                }
                 showPatientsLoading();
                 table.ajax.reload();
+            });
+
+            $("#expClinic").on('change', function () {
+                let cVal = $(this).val();
+                if ($('#globalClinicSelect').length) {
+                    $('#globalClinicSelect').val(cVal);
+                }
+                fetchExportPreview(1);
             });
 
             $("#refreshPatients").on('click', function () {
@@ -848,20 +860,18 @@
             $("#confirmExportBtn").click(function () {
                 let currentSearchValue = $("#searchInput").val();
                 let customName = $("#exportFileName").val() || "patient_export";
+                let currentClinic = $("#globalClinicSelect").val();
                 $("#exportModal").addClass('hidden');
 
-                $.ajax({
-                    url: "{{ url('/patients/export') }}",
-                    method: 'POST',
-                    data: {
-                        _token: "{{csrf_token()}}",
-                        search: currentSearchValue,
-                        filename: customName
-                    },
-                    success: function (file) {
-                        window.location = file.url;
-                    }
+                let params = $.param({
+                    clinic_id: currentClinic,
+                    search: currentSearchValue,
+                    date_mode: 'all',
+                    status: 'all',
+                    filename: customName
                 });
+
+                window.location.href = "{{ route('patients.export-download') }}?" + params;
             });
 
             // ========================================================
@@ -969,7 +979,7 @@
 
             // Reset Filters
             $('#expResetFiltersBtn').on('click', function () {
-                $('#expDateMode').val('this_month').trigger('change');
+                $('#expDateMode').val('all').trigger('change');
                 $('#expClinic').val('all');
                 $('#expStatus').val('all');
                 $('#expSearch').val('');
