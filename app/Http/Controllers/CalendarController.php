@@ -104,7 +104,7 @@ class CalendarController extends Controller
 
         $produced = $this->production->netFrom($gross, $adjustments, $writeoffs);
 
-        // Scheduled production: Total booked fee value of appointments in Scheduled status (AptStatus = 1) in the date range
+        // Scheduled production: Total booked fee value of appointments in Scheduled (1) and Completed (2) status in the date range
         $schedQuery = DB::table('od_appointments as a')
             ->join('od_procedure_logs as pl', function ($join) use ($officeId) {
                 $join->on('a.AptNum', '=', 'pl.AptNum');
@@ -112,7 +112,7 @@ class CalendarController extends Controller
                     $join->where('pl.office_id', '=', $officeId);
                 }
             })
-            ->whereIn('a.AptStatus', [1, '1'])
+            ->whereIn('a.AptStatus', [1, 2, '1', '2'])
             ->whereRaw("DATE(REPLACE(a.AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
 
         if ($officeId && Schema::hasColumn('od_appointments', 'office_id')) {
@@ -748,7 +748,7 @@ class CalendarController extends Controller
 
         $query = OdAppointment::query()
             ->with(['patient', 'provider', 'procedureLogs'])
-            ->where('AptStatus', '1')
+            ->whereIn('AptStatus', [1, 2, '1', '2'])
             ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
 
         if ($clinicNum !== null) {
