@@ -200,13 +200,13 @@
         var onLoading = typeof opts.onLoading === 'function' ? opts.onLoading : null;
 
         var $itemsPerPage = jQuery('#' + idPrefix + 'ItemsPerPage');
-        var $rangeInfo    = jQuery('#' + idPrefix + 'RangeInfo');
-        var $totalCount   = jQuery('#' + idPrefix + 'TotalCount');
-        var $pageSelect   = jQuery('#' + idPrefix + 'PageSelect');
-        var $totalPages   = jQuery('#' + idPrefix + 'TotalPages');
-        var $prevBtn      = jQuery('#' + idPrefix + 'PrevBtn');
-        var $nextBtn      = jQuery('#' + idPrefix + 'NextBtn');
-        var $selectAll    = jQuery('#' + idPrefix + 'SelectAll');
+        var $rangeInfo = jQuery('#' + idPrefix + 'RangeInfo');
+        var $totalCount = jQuery('#' + idPrefix + 'TotalCount');
+        var $pageSelect = jQuery('#' + idPrefix + 'PageSelect');
+        var $totalPages = jQuery('#' + idPrefix + 'TotalPages');
+        var $prevBtn = jQuery('#' + idPrefix + 'PrevBtn');
+        var $nextBtn = jQuery('#' + idPrefix + 'NextBtn');
+        var $selectAll = jQuery('#' + idPrefix + 'SelectAll');
 
         function update() {
             var info = tableApi.page.info();

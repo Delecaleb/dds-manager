@@ -1665,6 +1665,7 @@
         }
 
         let aptDetailsTable = null;
+        let aptDetailsPager = null;
         function initAptDetailsTable() {
             if (aptDetailsTable) return;
 
@@ -1756,6 +1757,9 @@
                 },
                 drawCallback: function () {
                     hideDetailsLoading();
+                    if (aptDetailsPager && typeof aptDetailsPager.update === 'function') {
+                        aptDetailsPager.update();
+                    }
                 },
                 footerCallback: function (row, data, start, end, display) {
                     var api = this.api();
@@ -1779,7 +1783,7 @@
                 }
             });
 
-            DDS.bindPagination(aptDetailsTable, 'details', { onLoading: showDetailsLoading });
+            aptDetailsPager = DDS.bindPagination(aptDetailsTable, 'details', { onLoading: showDetailsLoading });
 
             $('#calDate').on('change', function () {
                 syncDateRangeFromSinglePicker();
@@ -1852,6 +1856,7 @@
         }
 
         let aptCapacityTable = null;
+        let aptCapacityPager = null;
         function initAptCapacityTable() {
             if (aptCapacityTable) return;
 
@@ -1920,6 +1925,9 @@
                 },
                 drawCallback: function () {
                     hideCapacityLoading();
+                    if (aptCapacityPager && typeof aptCapacityPager.update === 'function') {
+                        aptCapacityPager.update();
+                    }
                 },
                 footerCallback: function (row, data, start, end, display) {
                     if (data.length > 0) {
@@ -1932,7 +1940,7 @@
                 }
             });
 
-            DDS.bindPagination(aptCapacityTable, 'capacity', { onLoading: showCapacityLoading });
+            aptCapacityPager = DDS.bindPagination(aptCapacityTable, 'capacity', { onLoading: showCapacityLoading });
 
             $('#calDate').on('change', function () {
                 if (aptCapacityTable) {
