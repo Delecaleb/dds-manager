@@ -938,7 +938,7 @@ class OpenDentalExplorerController extends Controller
             foreach (array_chunk($potentialOrphanKeys, 500) as $chunk) {
                 try {
                     $inClause = implode(',', array_map('intval', $chunk));
-                    $odCheckSql = "SELECT {$primaryKey} FROM {$odTableName} WHERE {$primaryKey} IN ({$inClause})";
+                    $odCheckSql = "SELECT * FROM {$odTableName} WHERE {$primaryKey} IN ({$inClause})";
                     $foundRows = $this->queryService->forOffice($targetOffice)->shortQuery($odCheckSql);
                     $foundKeys = array_map('strval', array_column($foundRows, $primaryKey));
 
