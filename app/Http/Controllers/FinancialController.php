@@ -650,17 +650,20 @@ class FinancialController extends Controller
             GROUP BY p.PatNum, p.LName, p.FName,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
                      pl.ProcDate
+            HAVING SUM(pl.ProcFee) != 0
             ORDER BY pl.ProcDate, p.LName
         ", $bindings);
 
-        return array_map(fn ($r) => [
+        $filteredRows = array_filter($rows, fn ($r) => round((float) $r->amount, 2) != 0.0);
+
+        return array_values(array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
             'providers' => $r->providers,
             'dates' => $r->dates,
             'amount' => round((float) $r->amount, 2),
-        ], $rows);
+        ], $filteredRows));
     }
 
     // ── Net Production (procedures + adjustments combined) ───────────────────
