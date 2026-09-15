@@ -192,6 +192,109 @@
         (root || document).querySelectorAll('table.dds-datatable').forEach(function (t) { DDS.dataTable(t); });
     };
 
+    // ── Reusable Custom Pagination Binder ──────────────────────────────────────
+    // Connects <x-table-pagination :id="$prefix" /> controls to a DataTables instance.
+    DDS.bindPagination = function (tableApi, idPrefix, opts) {
+        if (!tableApi || !idPrefix || !window.jQuery) return null;
+        opts = opts || {};
+        var onLoading = typeof opts.onLoading === 'function' ? opts.onLoading : null;
+
+        var $itemsPerPage = jQuery('#' + idPrefix + 'ItemsPerPage');
+        var $rangeInfo    = jQuery('#' + idPrefix + 'RangeInfo');
+        var $totalCount   = jQuery('#' + idPrefix + 'TotalCount');
+        var $pageSelect   = jQuery('#' + idPrefix + 'PageSelect');
+        var $totalPages   = jQuery('#' + idPrefix + 'TotalPages');
+        var $prevBtn      = jQuery('#' + idPrefix + 'PrevBtn');
+        var $nextBtn      = jQuery('#' + idPrefix + 'NextBtn');
+        var $selectAll    = jQuery('#' + idPrefix + 'SelectAll');
+
+        function update() {
+            var info = tableApi.page.info();
+            var totalRecords = info.recordsDisplay;
+            var totalPages = info.pages > 0 ? info.pages : 1;
+            var currentPage = info.page + 1; // 1-indexed
+
+            // 1. Items Range & Total Count
+            if (totalRecords === 0) {
+                $rangeInfo.text('0-0');
+                $totalCount.text('0');
+            } else {
+                var start = info.start + 1;
+                var end = info.end;
+                $rangeInfo.text(start + '-' + end);
+                $totalCount.text(Number(totalRecords).toLocaleString());
+            }
+
+            // 2. Items per page select sync
+            $itemsPerPage.val(info.length);
+
+            // 3. Page select dropdown options
+            var existingPages = $pageSelect.data('total-pages');
+            if (existingPages !== totalPages) {
+                var optionsHtml = '';
+                for (var p = 1; p <= totalPages; p++) {
+                    optionsHtml += '<option value="' + p + '">' + p + '</option>';
+                }
+                $pageSelect.html(optionsHtml);
+                $pageSelect.data('total-pages', totalPages);
+            }
+            $pageSelect.val(currentPage);
+            $totalPages.text(totalPages.toLocaleString());
+
+            // 4. Prev / Next buttons
+            var isFirst = (info.page === 0);
+            var isLast = (info.page >= totalPages - 1 || totalPages <= 1);
+            $prevBtn.prop('disabled', isFirst);
+            $nextBtn.prop('disabled', isLast);
+
+            // 5. Reset select all if present
+            if ($selectAll.length) {
+                $selectAll.prop('checked', false);
+            }
+        }
+
+        // Event Listeners
+        $itemsPerPage.off('change.ddsPagination').on('change.ddsPagination', function () {
+            var val = parseInt(jQuery(this).val(), 10);
+            if (onLoading) onLoading();
+            tableApi.page.len(val).draw('page');
+        });
+
+        $pageSelect.off('change.ddsPagination').on('change.ddsPagination', function () {
+            var targetPage = parseInt(jQuery(this).val(), 10) - 1;
+            if (targetPage >= 0) {
+                if (onLoading) onLoading();
+                tableApi.page(targetPage).draw('page');
+            }
+        });
+
+        $prevBtn.off('click.ddsPagination').on('click.ddsPagination', function () {
+            if (!jQuery(this).prop('disabled')) {
+                if (onLoading) onLoading();
+                tableApi.page('previous').draw('page');
+            }
+        });
+
+        $nextBtn.off('click.ddsPagination').on('click.ddsPagination', function () {
+            if (!jQuery(this).prop('disabled')) {
+                if (onLoading) onLoading();
+                tableApi.page('next').draw('page');
+            }
+        });
+
+        // Listen for table draw events automatically
+        tableApi.off('draw.ddsPagination').on('draw.ddsPagination', function () {
+            update();
+        });
+
+        // Initial sync
+        update();
+
+        return {
+            update: update
+        };
+    };
+
     /* ── Sorting-only preset ───────────────────────────────────────────────────
        Same DataTable, ORDER behavior only: no pager, no search box, no info line.
        This is what server-rendered analytics tables need — every row is already on

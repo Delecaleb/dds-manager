@@ -17,10 +17,12 @@ class DepositSlipTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Deposit Slip');
-        $response->assertSee('detailContainer');
-        $response->assertSee('data-sort="office"', false);
-        $response->assertSee('data-sort="patient_name"', false);
-        $response->assertSee('data-sort="amount"', false);
+        $response->assertSee('summaryTable');
+        $response->assertSee('detailTable');
+        $response->assertSee('summarySkeleton');
+        $response->assertSee('detailSkeleton');
+        $response->assertSee('Patient Name');
+        $response->assertSee('Payment Type');
     }
 
     public function test_deposit_slip_data_endpoint_returns_json(): void

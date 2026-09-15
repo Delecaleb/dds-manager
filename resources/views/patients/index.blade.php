@@ -78,7 +78,6 @@
                 <button type="button" id="tabExportDataBtn"
                     class="portal-tab-btn border-b-2 border-transparent text-slate-500 hover:text-slate-800 pb-3 flex items-center gap-2 cursor-pointer transition-all">
                     <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i> Export Data
-                    <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">New</span>
                 </button>
                 <button type="button" id="tabRemindersBtn"
                     class="portal-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 pb-3 cursor-pointer">
@@ -194,56 +193,7 @@
                         </table>
                     </div>
 
-                    <div id="custom-pagination-container"
-                        class="p-4 bg-white border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-3">
-                        <!-- Left: Items per page & counts -->
-                        <div class="flex items-center">
-                            <div tabindex="-1" class="flex items-center px-0">
-                                <label for="patientsItemsPerPage" class="hidden md:mr-2 md:inline-block font-medium text-slate-600">Items per page</label>
-                                <select id="patientsItemsPerPage" class="p-1.5 px-2 rounded border border-slate-300 bg-white text-slate-700 focus:outline-none focus:border-emerald-500 text-xs cursor-pointer">
-                                    <option value="10"> 10 </option>
-                                    <option value="20" selected> 20 </option>
-                                    <option value="30"> 30 </option>
-                                    <option value="40"> 40 </option>
-                                    <option value="50"> 50 </option>
-                                    <option value="60"> 60 </option>
-                                    <option value="70"> 70 </option>
-                                    <option value="80"> 80 </option>
-                                    <option value="90"> 90 </option>
-                                    <option value="100"> 100 </option>
-                                    <option value="150"> 150 </option>
-                                    <option value="200"> 200 </option>
-                                    <option value="250"> 250 </option>
-                                    <option value="500"> 500 </option>
-                                    <option value="1000"> 1000 </option>
-                                    <option value="-1"> All </option>
-                                </select>
-                            </div>
-                            <div class="md:px-3 md:flex md:items-center text-slate-600">
-                                <span class="hidden md:inline md:mr-1" id="patientsRangeInfo">0-0</span> of <span id="patientsTotalCount" class="font-bold text-slate-800 ml-1 mr-1">0</span> items
-                            </div>
-                        </div>
-
-                        <!-- Right: Page dropdown selector & Prev/Next buttons -->
-                        <div class="flex items-center gap-2">
-                            <div class="flex items-center px-2">
-                                <div class="mr-2">
-                                    <select id="patientsPageSelect" class="p-1.5 px-2 rounded border border-slate-300 bg-white text-slate-700 focus:outline-none focus:border-emerald-500 text-xs cursor-pointer">
-                                        <option value="1" selected> 1 </option>
-                                    </select>
-                                </div>
-                                <span class="text-slate-600">of <span id="patientsTotalPages" class="font-medium text-slate-800">1</span> <span class="ml-1 hidden md:inline">pages</span></span>
-                            </div>
-                            <div class="flex items-center">
-                                <button id="patientsPrevBtn" disabled type="button" class="py-1.5 px-3 rounded-l border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors" title="Previous Page">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="flex-shrink-0 stroke-current"><path d="M15 3l-8 9 8 9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                                </button>
-                                <button id="patientsNextBtn" disabled type="button" class="py-1.5 px-3 rounded-r border-t border-b border-r border-slate-300 bg-white text-slate-600 hover:bg-slate-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors" title="Next Page">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="flex-shrink-0 stroke-current"><path d="M9 21l8-9-8-9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <x-table-pagination id="patients" :default-length="20" />
                 </div>
             </div>
         </div>
@@ -812,7 +762,6 @@
                 drawCallback: function () {
                     hidePatientsLoading();
                     lucide.createIcons();
-                    updatePatientsPagination(this.api());
                 },
                 initComplete: function () {
                     let container = $('#columnCheckboxesContainer');
@@ -830,81 +779,8 @@
                 }
             });
 
-            function updatePatientsPagination(dtApi) {
-                if (!dtApi) return;
-                var info = dtApi.page.info();
-                var totalRecords = info.recordsDisplay;
-                var totalPages = info.pages > 0 ? info.pages : 1;
-                var currentPage = info.page + 1; // 1-indexed
-
-                // 1. Items Range & Total Count
-                if (totalRecords === 0) {
-                    $('#patientsRangeInfo').text('0-0');
-                    $('#patientsTotalCount').text('0');
-                } else {
-                    var start = info.start + 1;
-                    var end = info.end;
-                    $('#patientsRangeInfo').text(start + '-' + end);
-                    $('#patientsTotalCount').text(Number(totalRecords).toLocaleString());
-                }
-
-                // 2. Items per page select
-                var currentLen = info.length;
-                $('#patientsItemsPerPage').val(currentLen);
-
-                // 3. Page Number Dropdown
-                var $pageSelect = $('#patientsPageSelect');
-                var existingPages = $pageSelect.data('total-pages');
-                if (existingPages !== totalPages) {
-                    var optionsHtml = '';
-                    for (var p = 1; p <= totalPages; p++) {
-                        optionsHtml += '<option value="' + p + '">' + p + '</option>';
-                    }
-                    $pageSelect.html(optionsHtml);
-                    $pageSelect.data('total-pages', totalPages);
-                }
-                $pageSelect.val(currentPage);
-                $('#patientsTotalPages').text(totalPages.toLocaleString());
-
-                // 4. Prev / Next buttons
-                var isFirst = (info.page === 0);
-                var isLast = (info.page >= totalPages - 1 || totalPages <= 1);
-
-                $('#patientsPrevBtn').prop('disabled', isFirst);
-                $('#patientsNextBtn').prop('disabled', isLast);
-
-                // Reset select all checkbox on redraw
-                $('#patientsSelectAll').prop('checked', false);
-            }
-
-            // Pagination Event Handlers
-            $('#patientsItemsPerPage').on('change', function () {
-                var val = parseInt($(this).val(), 10);
-                showPatientsLoading();
-                table.page.len(val).draw('page');
-            });
-
-            $('#patientsPageSelect').on('change', function () {
-                var targetPage = parseInt($(this).val(), 10) - 1;
-                if (targetPage >= 0) {
-                    showPatientsLoading();
-                    table.page(targetPage).draw('page');
-                }
-            });
-
-            $('#patientsPrevBtn').on('click', function () {
-                if (!$(this).prop('disabled')) {
-                    showPatientsLoading();
-                    table.page('previous').draw('page');
-                }
-            });
-
-            $('#patientsNextBtn').on('click', function () {
-                if (!$(this).prop('disabled')) {
-                    showPatientsLoading();
-                    table.page('next').draw('page');
-                }
-            });
+            // Reusable custom pagination binder
+            DDS.bindPagination(table, 'patients', { onLoading: showPatientsLoading });
 
             // Select all row checkboxes
             $('#patientsSelectAll').on('change', function () {

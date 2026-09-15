@@ -9,6 +9,7 @@ use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use App\Models\Office;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,12 +21,20 @@ class KpisController extends Controller
 
     private readonly string $tpIn;
 
+    private readonly string $hygieneCodesIn;
+
     public function __construct(
         private readonly TreatmentAcceptanceService $txAcceptance,
         private readonly PatientService $patients,
     ) {
         $this->completedIn = ProcStatus::inList(ProcStatus::completed());
         $this->tpIn = ProcStatus::inList(ProcStatus::treatmentPlanned());
+        $this->hygieneCodesIn = "'".implode("','", [
+            'D1110', 'D1120', 'D4341', 'D4342', 'D4910', 'D4346', 'D4355',
+            'D1206', 'D1208', 'D0210', 'D1351', 'D9972', 'D9973', 'D9974', 'D9975', 'D4381',
+            '1110', '1120', '4341', '4342', '4910', '4346', '4355',
+            '1206', '1208', '0210', '1351', '4381',
+        ])."'";
     }
 
     public function index()
@@ -97,8 +106,10 @@ class KpisController extends Controller
                 COUNT(*)                                                                                AS total_procs,
                 COUNT(DISTINCT pl.ProcDate)                                                             AS work_days,
                 COUNT(DISTINCT {$patDate})                                                              AS visits,
-                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D4341','D4342','D4910','D4346','D4355')
+                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D4341','D4342','D4910','D4346','D4355','4341','4342','4910','4346','4355')
                                     THEN {$patDate} END)                                                AS perio_visits,
+                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D1110','D1120','D4341','D4342','D4910','D4346','D4355','1110','1120','4341','4342','4910','4346','4355')
+                                    THEN {$patDate} END)                                                AS hygiene_appts,
                 COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D1206','D1208','1206','1208') 
                                     THEN pl.PatNum END)                                                AS fluoride_count,
                 COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D4341','D4342','4341','4342') 
@@ -111,7 +122,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'true'
+              AND (pc.IsHygiene IN ('true', '1', 1) OR pc.ProcCode IN ({$this->hygieneCodesIn}))
               AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
         ", [$officeId, $officeId, $start, $end]);
@@ -134,7 +145,7 @@ class KpisController extends Controller
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             JOIN od_appointments a ON pl.AptNum = a.AptNum AND a.office_id = ?
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'true'
+              AND pc.IsHygiene IN ('true', '1', 1)
               AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'
@@ -179,7 +190,7 @@ class KpisController extends Controller
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             JOIN od_patients pt   ON pl.PatNum  = pt.PatNum AND pt.office_id = ?
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
+              AND pc.IsHygiene IN ('true', '1', 1) AND pl.ProcStatus IN ({$this->completedIn})
               AND pt.PatStatus = 'Patient'
               AND pl.ProcDate >= {$sub12}
         ", [$officeId, $officeId, $officeId]);
@@ -193,7 +204,7 @@ class KpisController extends Controller
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             JOIN od_patients pt   ON pl.PatNum  = pt.PatNum AND pt.office_id = ?
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
+              AND pc.IsHygiene IN ('true', '1', 1) AND pl.ProcStatus IN ({$this->completedIn})
               AND pt.PatStatus = 'Patient'
               AND pl.ProcDate >= {$sub6}
         ", [$officeId, $officeId, $officeId]);
@@ -209,7 +220,7 @@ class KpisController extends Controller
                 WHERE office_id = ? AND ProcStatus IN ({$this->tpIn}) AND ProcDate BETWEEN ? AND ?
             ) tp ON pl.PatNum = tp.PatNum
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
+              AND pc.IsHygiene IN ('true', '1', 1) AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
         ", [$officeId, $officeId, $start, $end, $officeId, $start, $end])->cnt ?? 0);
 
@@ -231,7 +242,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
+              AND pc.IsHygiene IN ('true', '1', 1) AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY pl.ProvNum
         ", [$officeId, $officeId, $start, $end]);
@@ -249,14 +260,14 @@ class KpisController extends Controller
             JOIN od_procedures pc    ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             JOIN od_appointments a   ON pl.AptNum  = a.AptNum AND a.office_id = ?
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn})
+              AND pc.IsHygiene IN ('true', '1', 1) AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'
               AND a.Pattern IS NOT NULL AND a.Pattern != ''
         ", [$officeId, $officeId, $officeId, $start, $end])->mins ?? 0);
 
         return [
-            'perio_pct' => $hygVisits > 0 ? round(($s->perio_visits ?? 0) / $hygVisits * 100, 2) : 0,
+            'perio_pct' => ($s->hygiene_appts ?? 0) > 0 ? round(($s->perio_visits ?? 0) / $s->hygiene_appts * 100, 2) : 0,
             'fluoride_per_day' => $workDays > 0 ? round(($s->fluoride_count ?? 0) / $workDays, 2) : 0,
             'avg_prod_per_day' => $workDays > 0 ? round($hygProd / $workDays, 2) : 0,
             'avg_prod_per_prov_day' => $avgProvProdPerDay,
@@ -298,7 +309,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'false'
+              AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL)
               AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
         ", [$officeId, $officeId, $start, $end]);
@@ -318,7 +329,7 @@ class KpisController extends Controller
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             WHERE a.office_id = ?
               AND a.AptStatus = 2
-              AND pc.IsHygiene = 'false'
+              AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL)
               AND pl.ProcStatus IN ({$this->completedIn})
               AND a.Pattern IS NOT NULL AND a.Pattern != ''
               AND DATE(a.AptDateTime) BETWEEN ? AND ?
@@ -337,7 +348,7 @@ class KpisController extends Controller
                 COUNT(DISTINCT CASE WHEN a.NextAptNum IS NOT NULL AND a.NextAptNum != '0' THEN a.PatNum END) AS with_next
             FROM od_appointments a
             WHERE a.office_id = ?
-              AND a.IsHygiene = 'false' 
+              AND (a.IsHygiene IN ('false', '0', 0) OR a.IsHygiene IS NULL)
               AND a.AptStatus = 2
               AND DATE(a.AptDateTime) BETWEEN ? AND ?
         ", [$officeId, $start, $end]);
@@ -348,7 +359,7 @@ class KpisController extends Controller
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             WHERE pl.office_id = ?
               AND pl.ProcStatus IN ({$this->completedIn}) 
-              AND pc.IsHygiene = 'false'
+              AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL)
               AND pl.ProcDate BETWEEN ? AND ?
               AND pc.ProcCode IN ('D0120', 'D0140', 'D0150', 'D0160', 'D0170', 'D0180')
         ", [$officeId, $officeId, $start, $end])->exam_cnt ?? 0);
@@ -384,7 +395,7 @@ class KpisController extends Controller
                 WHERE c.office_id = ? AND c.ProcStatus IN ({$this->completedIn}) AND tp.ProcStatus IN ({$this->tpIn})
             ) tp_same ON pl.PatNum = tp_same.PatNum AND pl.ProcDate = tp_same.ProcDate
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'false'
+              AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL)
               AND pl.ProcDate BETWEEN ? AND ?
         ", [
             $start, $end,
@@ -408,7 +419,7 @@ class KpisController extends Controller
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
+              AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL) AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
             GROUP BY pl.ProvNum
         ", [$officeId, $officeId, $start, $end]);
         if (count($docProviders) > 0) {
@@ -868,22 +879,28 @@ class KpisController extends Controller
 
         // We fetch the overall to get the 'avg' and 'total' rows.
         $overall = $this->hygieneKpis($start, $end, $officeId);
+        $clinicRegistry = app(ClinicRegistry::class);
 
         // Fetch distinct providers who have hygiene production
         $provs = DB::select("
             SELECT DISTINCT pl.ProvNum, pr.Abbr, pr.LName,
-                   'Unassigned' as Location
+                   COALESCE(pl.ClinicNum, 0) AS ClinicNum
             FROM od_procedure_logs pl
             JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
+              AND (pc.IsHygiene IN ('true', '1', 1) OR pc.ProcCode IN ({$this->hygieneCodesIn}))
+              AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
         ", [$officeId, $officeId, $officeId, $start, $end]);
+
+        $sub12Date = Carbon::parse($end)->subMonths(12)->toDateString();
+        $sub6Date = Carbon::parse($end)->subMonths(6)->toDateString();
 
         $providersList = [];
 
         foreach ($provs as $p) {
             $pId = $p->ProvNum;
+            $locName = $clinicRegistry->name((int) $p->ClinicNum, $officeId);
 
             $patDate = $this->concatPatDate('pl.PatNum', 'pl.ProcDate');
             $patTpDate = $this->concatPatDate('PatNum', 'DateTP');
@@ -896,7 +913,8 @@ class KpisController extends Controller
                     COUNT(*) AS total_procs,
                     COUNT(DISTINCT pl.ProcDate) AS work_days,
                     COUNT(DISTINCT {$patDate}) AS visits,
-                    COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D4341','D4342','D4910','D4346','D4355') THEN {$patDate} END) AS perio_visits,
+                    COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D4341','D4342','D4910','D4346','D4355','4341','4342','4910','4346','4355') THEN {$patDate} END) AS perio_visits,
+                    COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D1110','D1120','D4341','D4342','D4910','D4346','D4355','1110','1120','4341','4342','4910','4346','4355') THEN {$patDate} END) AS hygiene_appts,
                     COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D1206','D1208','1206','1208') THEN pl.PatNum END) AS fluoride_count,
                     COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D4341','D4342','4341','4342') THEN {$patDate} END) AS srp_count,
                     COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D0210','0210') THEN pl.PatNum END) AS fmx_count,
@@ -906,7 +924,8 @@ class KpisController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
                 WHERE pl.office_id = ?
-                  AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                  AND (pc.IsHygiene IN ('true', '1', 1) OR pc.ProcCode IN ({$this->hygieneCodesIn}))
+                  AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [$officeId, $officeId, $start, $end, $pId]);
 
             $hygProd = (float) ($s->total_prod ?? 0);
@@ -924,7 +943,7 @@ class KpisController extends Controller
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
                 JOIN od_appointments a ON pl.AptNum = a.AptNum AND a.office_id = ?
                 WHERE pl.office_id = ?
-                  AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.ProvNum = ?
+                  AND pc.IsHygiene IN ('true', '1', 1) AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.AptNum IS NOT NULL AND pl.AptNum != '0' AND pl.ProvNum = ?
             ", [$officeId, $officeId, $officeId, $start, $end, $pId]);
             $reapptRate = ($rapt->total ?? 0) > 0 ? round(($rapt->with_next ?? 0) / $rapt->total * 100, 2) : 0;
 
@@ -948,8 +967,8 @@ class KpisController extends Controller
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
                 JOIN od_patients pt ON pl.PatNum = pt.PatNum AND pt.office_id = ?
                 WHERE pl.office_id = ?
-                  AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN DATE_SUB(?, INTERVAL 12 MONTH) AND ? AND pl.ProvNum = ?
-            ", [$officeId, $officeId, $officeId, $end, $end, $pId]);
+                  AND pc.IsHygiene IN ('true', '1', 1) AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+            ", [$officeId, $officeId, $officeId, $sub12Date, $end, $pId]);
 
             $ret6 = DB::selectOne("
                 SELECT
@@ -959,15 +978,15 @@ class KpisController extends Controller
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
                 JOIN od_patients pt ON pl.PatNum = pt.PatNum AND pt.office_id = ?
                 WHERE pl.office_id = ?
-                  AND pc.IsHygiene = 'true' AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN DATE_SUB(?, INTERVAL 6 MONTH) AND ? AND pl.ProvNum = ?
-            ", [$officeId, $officeId, $officeId, $end, $end, $pId]);
+                  AND pc.IsHygiene IN ('true', '1', 1) AND pl.ProcStatus IN ({$this->completedIn}) AND pt.PatStatus = 'Patient' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+            ", [$officeId, $officeId, $officeId, $sub6Date, $end, $pId]);
 
             $providersList[] = [
-                'Location' => 'Main Office',
-                'location' => 'Main Office',
+                'Location' => $locName,
+                'location' => $locName,
                 'Provider' => $p->Abbr.' '.$p->LName,
                 'provider' => $p->Abbr.' '.$p->LName,
-                'perio_pct' => $hygVisits > 0 ? round(($s->perio_visits ?? 0) / $hygVisits * 100, 2) : 0,
+                'perio_pct' => ($s->hygiene_appts ?? 0) > 0 ? round(($s->perio_visits ?? 0) / $s->hygiene_appts * 100, 2) : 0,
                 'fluoride_per_day' => $workDays > 0 ? round(($s->fluoride_count ?? 0) / $workDays, 2) : 0,
                 'avg_prod_per_day' => $workDays > 0 ? round($hygProd / $workDays, 2) : 0,
                 'avg_prod_per_prov_day' => $workDays > 0 ? round($hygProd / $workDays, 2) : 0,
@@ -1015,7 +1034,7 @@ class KpisController extends Controller
             JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = ?
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             WHERE pl.office_id = ?
-              AND pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
+              AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL) AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ?
         ", [$officeId, $officeId, $officeId, $start, $end]);
 
         $providersList = [];
@@ -1034,7 +1053,7 @@ class KpisController extends Controller
                 FROM od_procedure_logs pl
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
                 WHERE pl.office_id = ?
-                  AND pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                  AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL) AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [$officeId, $officeId, $start, $end, $pId]);
             $docProd = (float) ($doc->total_prod ?? 0);
             $workDays = (int) ($doc->work_days ?? 0);
@@ -1047,7 +1066,7 @@ class KpisController extends Controller
                 JOIN od_procedure_logs pl ON a.AptNum = pl.AptNum AND pl.office_id = ?
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
                 WHERE a.office_id = ?
-                  AND a.AptStatus = 2 AND pc.IsHygiene = 'false' AND pl.ProcStatus IN ({$this->completedIn}) AND a.Pattern IS NOT NULL AND a.Pattern != '' AND DATE(a.AptDateTime) BETWEEN ? AND ? AND pl.ProvNum = ?
+                  AND a.AptStatus = 2 AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL) AND pl.ProcStatus IN ({$this->completedIn}) AND a.Pattern IS NOT NULL AND a.Pattern != '' AND DATE(a.AptDateTime) BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [$officeId, $officeId, $officeId, $start, $end, $pId]);
             $docAptCount = (int) ($apts->total_apts ?? 0);
             $avgAptMins = (float) ($apts->avg_mins ?? 0);
@@ -1061,7 +1080,7 @@ class KpisController extends Controller
                 SELECT COUNT(*) AS total, SUM(CASE WHEN NextAptNum IS NOT NULL AND NextAptNum != '0' THEN 1 ELSE 0 END) AS with_next
                 FROM od_appointments a
                 WHERE a.office_id = ?
-                  AND IsHygiene = 'false' AND AptStatus = 2 AND DATE(AptDateTime) BETWEEN ? AND ? AND ProvNum = ?
+                  AND (IsHygiene IN ('false', '0', 0) OR IsHygiene IS NULL) AND AptStatus = 2 AND DATE(AptDateTime) BETWEEN ? AND ? AND ProvNum = ?
             ", [$officeId, $start, $end, $pId]);
 
             // Exam count
@@ -1096,7 +1115,7 @@ class KpisController extends Controller
                 ) pt_hist ON pl.PatNum = pt_hist.PatNum
                 LEFT JOIN od_procedure_logs tp ON tp.PatNum = pl.PatNum AND tp.office_id = ? AND tp.ProcStatus IN ({$this->tpIn}) AND tp.DateTP IS NOT NULL AND tp.DateTP BETWEEN ? AND ?
                 WHERE pl.office_id = ?
-                  AND pc.IsHygiene = 'false' AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
+                  AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL) AND pl.ProcDate BETWEEN ? AND ? AND pl.ProvNum = ?
             ", [
                 $start,
                 $end,

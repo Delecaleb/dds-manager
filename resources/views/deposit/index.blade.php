@@ -75,172 +75,78 @@
           Export CSV
         </button>
       </div>
+        <!-- Summary Tab View -->
+      <div id="summaryTabContent" class="flex flex-col">
+        <!-- Skeleton Loader Section (Replaces table while loading) -->
+        <div id="summarySkeleton" class="w-full bg-white overflow-hidden" style="min-height: 300px;">
+          <x-table-skeleton />
+        </div>
 
-      <!-- Table area -->
-      <div id="summaryContainer" class="w-full overflow-x-auto border border-gray-100 rounded-sm">
-        <table class="w-full text-left border-collapse text-sm">
-          <thead class="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th data-sort="location" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 w-1/4 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Location</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 summary-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="type" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 w-1/2 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Payment Type</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 summary-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="amount" class="px-6 py-3 font-semibold bg-[#00c58e]/10 text-emerald-800 w-1/4 cursor-pointer select-none hover:bg-[#00c58e]/20 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Amount</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-emerald-600/50 summary-sort-icon"></i>
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody id="depositTbody" class="divide-y divide-gray-100">
-            <!-- Populated by JS -->
-            <tr>
-              <td colspan="3" class="text-center py-6 text-gray-400">Loading summary...</td>
-            </tr>
-          </tbody>
-          <tfoot id="depositTfoot" class="hidden">
-            <tr class="bg-gray-200/60 font-bold text-gray-800">
-              <td colspan="2" class="px-4 py-3 text-right">Total:</td>
-              <td id="tableTotalAmount" class="px-6 py-3 min-w-[150px]">$ 0.00</td>
-            </tr>
-          </tfoot>
-        </table>
+        <!-- Summary Table Container (Hidden while loading) -->
+        <div id="summaryTableContainer" class="hidden w-full overflow-x-auto border border-gray-100 rounded-sm">
+          <table id="summaryTable" class="w-full text-left border-collapse text-sm">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 w-1/4">Location</th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 w-1/2">Payment Type</th>
+                <th class="px-6 py-3 font-semibold bg-[#00c58e]/10 text-emerald-800 w-1/4 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody id="depositTbody" class="divide-y divide-gray-100">
+            </tbody>
+            <tfoot id="depositTfoot">
+              <tr class="bg-gray-200/60 font-bold text-gray-800">
+                <td colspan="2" class="px-4 py-3 text-right">Total:</td>
+                <td id="tableTotalAmount" class="px-6 py-3 min-w-[150px] text-right">$ 0.00</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <x-table-pagination id="summary" :default-length="10" />
       </div>
 
-      <!-- Detail Table area -->
-      <div id="detailContainer" class="hidden w-full overflow-x-auto border border-gray-100 rounded-sm">
-        <table class="dds-table dds-sortable w-full text-left border-collapse text-sm min-w-[1600px]">
-          <thead class="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th data-sort="office"
-                class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 dds-stick bg-gray-50 min-w-[140px] cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
+      <!-- Detail Tab View -->
+      <div id="detailTabContent" class="hidden flex flex-col">
+        <!-- Skeleton Loader Section (Replaces table while loading) -->
+        <div id="detailSkeleton" class="w-full bg-white overflow-hidden" style="min-height: 480px;">
+          <x-table-skeleton />
+        </div>
+
+        <!-- Detail Table Container (Hidden while loading) -->
+        <div id="detailTableContainer" class="hidden w-full overflow-x-auto border border-gray-100 rounded-sm">
+          <table id="detailTable" class="dds-table w-full text-left border-collapse text-sm min-w-[1600px]">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 dds-stick bg-gray-50 min-w-[140px]">
                   <span class="flex items-center"><input type="checkbox" id="selectAllDetails" class="mr-2 rounded border-gray-300 text-[#00c58e]" onclick="event.stopPropagation()">Office</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="patient_name" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Patient Name</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="patient_id" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Patient ID</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="provider" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Provider</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="provider_id" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Provider ID</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="date" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Date</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="payment_type" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Payment Type</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="type" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Type</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="insurance" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Insurance</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="bank" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Bank</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="check_number" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Check Number</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="unallocated" class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Unallocated</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-gray-300 detail-sort-icon"></i>
-                </div>
-              </th>
-              <th data-sort="amount" class="px-4 py-3 font-semibold bg-[#00c58e]/10 text-emerald-800 cursor-pointer select-none hover:bg-[#00c58e]/20 transition-colors">
-                <div class="flex items-center justify-between">
-                  <span>Amount</span>
-                  <i class="fa-solid fa-sort text-[11px] ml-1 text-emerald-600/50 detail-sort-icon"></i>
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody id="detailTbody" class="divide-y divide-gray-100">
-            <tr>
-              <td colspan="13" class="text-center py-6 text-gray-400">Loading details...</td>
-            </tr>
-          </tbody>
-          <tfoot id="detailTfoot" class="hidden">
-            <tr class="bg-gray-200/60 font-bold text-gray-800 text-right">
-              <td colspan="12" class="px-4 py-3">Total:</td>
-              <td id="detailTableTotalAmount" class="px-4 py-3 min-w-[120px] text-left">$ 0.00</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <!-- Pagination -->
-      <div class="p-4 flex flex-wrap items-center justify-between gap-4 text-xs font-medium text-gray-600 mt-4">
-        <div class="flex items-center gap-2">
-          <span>Items per page</span>
-          <select class="bg-white border border-gray-300 rounded px-2 py-1 focus:outline-none shadow-xs font-semibold">
-            <option>10</option>
-            <option>20</option>
-            <option>50</option>
-          </select>
-          <span class="ml-2" id="paginationSummary">1-0 of 0 items</span>
+                </th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Patient Name</th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Patient ID</th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Provider</th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Provider ID</th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Date</th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Payment Type</th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Type</th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Insurance</th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Bank</th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Check Number</th>
+                <th class="px-4 py-3 font-semibold text-gray-600 border-r border-gray-200">Unallocated</th>
+                <th class="px-4 py-3 font-semibold bg-[#00c58e]/10 text-emerald-800 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody id="detailTbody" class="divide-y divide-gray-100">
+            </tbody>
+            <tfoot id="detailTfoot">
+              <tr class="bg-gray-200/60 font-bold text-gray-800 text-right">
+                <td colspan="12" class="px-4 py-3 text-right">Total:</td>
+                <td id="detailTableTotalAmount" class="px-4 py-3 min-w-[120px] text-right">$ 0.00</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
 
-        <div class="flex items-center gap-1">
-          <select
-            class="bg-white border border-gray-300 rounded px-2 py-1 focus:outline-none shadow-xs mr-2 font-semibold font-mono">
-            <option>1</option>
-          </select>
-          <span>of 1 pages</span>
-          <button
-            class="p-1 px-2.5 border border-gray-300 rounded bg-white hover:bg-gray-50 text-gray-500 ml-3 shadow-xs transition-colors"><i
-              class="fa-solid fa-angle-left text-xs"></i></button>
-          <button
-            class="p-1 px-2.5 border border-gray-300 rounded bg-white hover:bg-gray-50 text-gray-500 shadow-xs transition-colors"><i
-              class="fa-solid fa-angle-right text-xs"></i></button>
-        </div>
+        <x-table-pagination id="detail" :default-length="20" />
       </div>
 
     </div>
@@ -252,232 +158,175 @@
     var _totalAmount = 0;
     var _currentTab = 'summary';
 
-    var _detailSortKey = null;
-    var _detailSortAsc = true;
-    var _summarySortKey = null;
-    var _summarySortAsc = true;
+    var summaryTable = null;
+    var detailTable = null;
 
-    // Canonical formatter (single source: DDS.fmt.money in ui.js).
-    function fmtMoney(v) {
-      return DDS.fmt.money(v);
+    function showSummaryLoading() {
+      $('#summarySkeleton').removeClass('hidden');
+      $('#summaryTableContainer').addClass('hidden');
     }
 
-    function renderSummary(data, total) {
-      var tbody = $('#depositTbody');
-      tbody.empty();
-
-      if (!data || data.length === 0) {
-        tbody.html('<tr><td colspan="3" class="text-center py-6 text-gray-400">No summary data found for this period.</td></tr>');
-        $('#depositTfoot').addClass('hidden');
-        if (_currentTab === 'summary') $('#paginationSummary').text('0 items');
-        return;
-      }
-
-      data.forEach(function (dep) {
-        var locHtml = '';
-        if (dep.location) {
-          locHtml = `<div class="flex items-center justify-between text-gray-600">
-            <span>${dep.location}</span>
-            <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-gray-300"></i>
-          </div>`;
-        }
-
-        var tr = `<tr class="hover:bg-gray-50 transition even:bg-gray-50/50">
-          <td class="px-4 py-3 min-w-[200px] w-1/4 border-r border-white font-medium text-xs text-gray-700">${locHtml}</td>
-          <td class="px-4 py-3 w-1/2 border-r border-white font-medium text-xs text-gray-600">${dep.type}</td>
-          <td class="px-6 py-3 min-w-[150px] w-1/4 font-medium text-xs text-gray-700">${fmtMoney(dep.amount)}</td>
-        </tr>`;
-        tbody.append(tr);
-      });
-
-      $('#tableTotalAmount').text(fmtMoney(total));
-      $('#depositTfoot').removeClass('hidden');
-      if (_currentTab === 'summary') $('#paginationSummary').text(`1-${data.length} of ${data.length} items`);
+    function hideSummaryLoading() {
+      $('#summarySkeleton').addClass('hidden');
+      $('#summaryTableContainer').removeClass('hidden');
     }
 
-    function renderDetail(data, total) {
-      var tbody = $('#detailTbody');
-      tbody.empty();
-
-      if (!data || data.length === 0) {
-        tbody.html('<tr><td colspan="13" class="text-center py-6 text-gray-400">No detail data found for this period.</td></tr>');
-        $('#detailTfoot').addClass('hidden');
-        if (_currentTab === 'detail') $('#paginationSummary').text('0 items');
-        return;
-      }
-
-      data.forEach(function (det) {
-        var locHtml = `<input type="checkbox" class="mr-2 rounded border-gray-300 text-[#00c58e]">
-          <span class="mr-2">${det.office || ''}</span>
-          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-gray-300"></i>`;
-
-        var patientHtml = `<div class="flex items-center justify-between">
-            <span>${det.patient_name || ''}</span>
-            <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-gray-300"></i>
-          </div>`;
-
-        var patIdHtml = `<div class="flex items-center justify-between">
-            <span>${det.patient_id ?? ''}</span>
-            <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-gray-300"></i>
-          </div>`;
-
-        var provHtml = `<div class="flex items-center justify-between">
-            <span>${det.provider || ''}</span>
-            <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-gray-300"></i>
-          </div>`;
-
-        var tr = `<tr class="hover:bg-gray-50 transition even:bg-white text-xs text-gray-600">
-          <td class="px-4 py-2 border-r border-gray-100 bg-white dds-stick flex items-center shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">${locHtml}</td>
-          <td class="px-4 py-2 border-r border-gray-100">${patientHtml}</td>
-          <td class="px-4 py-2 border-r border-gray-100">${patIdHtml}</td>
-          <td class="px-4 py-2 border-r border-gray-100">${provHtml}</td>
-          <td class="px-4 py-2 border-r border-gray-100">${det.provider_id ?? ''}</td>
-          <td class="px-4 py-2 border-r border-gray-100">${det.date || ''}</td>
-          <td class="px-4 py-2 border-r border-gray-100">${det.payment_type || ''}</td>
-          <td class="px-4 py-2 border-r border-gray-100">${det.type || ''}</td>
-          <td class="px-4 py-2 border-r border-gray-100">${det.insurance || ''}</td>
-          <td class="px-4 py-2 border-r border-gray-100">${det.bank || ''}</td>
-          <td class="px-4 py-2 border-r border-gray-100">${det.check_number || ''}</td>
-          <td class="px-4 py-2 border-r border-gray-100">${det.unallocated || ''}</td>
-          <td class="px-4 py-2 bg-[#00c58e]/5 text-gray-800 font-medium">${fmtMoney(det.amount)}</td>
-        </tr>`;
-        tbody.append(tr);
-      });
-
-      $('#detailTableTotalAmount').text(fmtMoney(total));
-      $('#detailTfoot').removeClass('hidden');
-      if (_currentTab === 'detail') $('#paginationSummary').text(`1-${data.length} of ${data.length} items`);
-      if (window.DDS && DDS.sortableRefresh && $('#detailContainer table').length) DDS.sortableRefresh($('#detailContainer table')[0]);
+    function showDetailLoading() {
+      $('#detailSkeleton').removeClass('hidden');
+      $('#detailTableContainer').addClass('hidden');
     }
 
-    function sortDetailData(key) {
-      if (_detailSortKey === key) {
-        _detailSortAsc = !_detailSortAsc;
-      } else {
-        _detailSortKey = key;
-        _detailSortAsc = true;
-      }
-
-      updateDetailSortIcons();
-      applyDetailSortAndRender();
+    function hideDetailLoading() {
+      $('#detailSkeleton').addClass('hidden');
+      $('#detailTableContainer').removeClass('hidden');
     }
 
-    function updateDetailSortIcons() {
-      $('#detailContainer th[data-sort]').each(function () {
-        var thKey = $(this).attr('data-sort');
-        var icon = $(this).find('.detail-sort-icon');
-        if (thKey === _detailSortKey) {
-          icon.removeClass('fa-sort fa-sort-up fa-sort-down text-gray-300 text-emerald-600/50')
-              .addClass(_detailSortAsc ? 'fa-sort-up text-[#00c58e]' : 'fa-sort-down text-[#00c58e]');
-        } else {
-          icon.removeClass('fa-sort-up fa-sort-down text-[#00c58e]')
-              .addClass('fa-sort ' + (thKey === 'amount' ? 'text-emerald-600/50' : 'text-gray-300'));
+    function initSummaryTable() {
+      if (summaryTable) return;
+
+      summaryTable = DDS.dataTable(document.getElementById('summaryTable'), {
+        data: _depositsData,
+        processing: false,
+        serverSide: false,
+        paging: true,
+        pageLength: 10,
+        lengthChange: false,
+        info: false,
+        searching: true,
+        ordering: true,
+        dom: 'rt',
+        layout: { topStart: null, topEnd: null, bottomStart: null, bottomEnd: null },
+        columns: [
+          {
+            data: 'location',
+            name: 'location',
+            render: function (data) {
+              return data
+                ? `<div class="flex items-center justify-between text-gray-600"><span>${data}</span><i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-gray-300"></i></div>`
+                : '—';
+            }
+          },
+          {
+            data: 'type',
+            name: 'type',
+            render: function (data) {
+              return data || 'Uncategorized Payment';
+            }
+          },
+          {
+            data: 'amount',
+            name: 'amount',
+            className: 'text-right',
+            render: function (data, type) {
+              if (type === 'sort' || type === 'type') return parseFloat(data) || 0;
+              return DDS.fmt.money(data);
+            }
+          }
+        ],
+        createdRow: function (row, data, dataIndex) {
+          $(row).addClass('hover:bg-gray-50 transition even:bg-gray-50/50');
+          $('td', row).addClass('px-4 py-3 font-medium text-xs text-gray-700 border-r border-white');
+          $('td:eq(0)', row).addClass('min-w-[200px] w-1/4');
+          $('td:eq(1)', row).addClass('w-1/2 text-gray-600');
+          $('td:eq(2)', row).addClass('min-w-[150px] w-1/4 text-emerald-800 bg-[#00c58e]/10 text-right font-medium');
+        },
+        drawCallback: function () {
+          hideSummaryLoading();
+        },
+        footerCallback: function (row, data, start, end, display) {
+          var api = this.api();
+          var total = api.column(2, { search: 'applied' }).data().reduce(function (a, b) {
+            return (parseFloat(a) || 0) + (parseFloat(b) || 0);
+          }, 0);
+          $('#tableTotalAmount').text(DDS.fmt.money(total));
         }
       });
+
+      DDS.bindPagination(summaryTable, 'summary', { onLoading: showSummaryLoading });
     }
 
-    function getFilteredDetails() {
-      var term = $('#searchInput').val().toLowerCase().trim();
-      if (!term) return _detailsData.slice();
-      return _detailsData.filter(function (det) {
-        return Object.values(det).some(function (val) {
-          return String(val).toLowerCase().includes(term);
-        });
-      });
-    }
+    function initDetailTable() {
+      if (detailTable) return;
 
-    function applyDetailSortAndRender() {
-      var list = getFilteredDetails();
-
-      if (_detailSortKey) {
-        list.sort(function (a, b) {
-          var valA = a[_detailSortKey] ?? '';
-          var valB = b[_detailSortKey] ?? '';
-
-          if (_detailSortKey === 'amount' || _detailSortKey === 'patient_id' || _detailSortKey === 'provider_id') {
-            var numA = parseFloat(valA) || 0;
-            var numB = parseFloat(valB) || 0;
-            return _detailSortAsc ? numA - numB : numB - numA;
+      detailTable = DDS.dataTable(document.getElementById('detailTable'), {
+        data: _detailsData,
+        processing: false,
+        serverSide: false,
+        paging: true,
+        pageLength: 20,
+        lengthChange: false,
+        info: false,
+        searching: true,
+        ordering: true,
+        dom: 'rt',
+        layout: { topStart: null, topEnd: null, bottomStart: null, bottomEnd: null },
+        columns: [
+          {
+            data: 'office',
+            name: 'office',
+            className: 'dds-stick bg-white',
+            render: function (data) {
+              return `<div class="flex items-center"><input type="checkbox" class="detail-row-chk mr-2 rounded border-gray-300 text-[#00c58e]"><span class="mr-2">${data || ''}</span><i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-gray-300"></i></div>`;
+            }
+          },
+          {
+            data: 'patient_name',
+            name: 'patient_name',
+            render: function (data) {
+              return data ? `<div class="flex items-center justify-between"><span>${data}</span><i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-gray-300"></i></div>` : '';
+            }
+          },
+          {
+            data: 'patient_id',
+            name: 'patient_id',
+            render: function (data) {
+              return (data !== null && data !== undefined && data !== '') ? `<div class="flex items-center justify-between"><span>${data}</span><i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-gray-300"></i></div>` : '';
+            }
+          },
+          {
+            data: 'provider',
+            name: 'provider',
+            render: function (data) {
+              return data ? `<div class="flex items-center justify-between"><span>${data}</span><i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-gray-300"></i></div>` : '';
+            }
+          },
+          { data: 'provider_id', name: 'provider_id', defaultContent: '' },
+          { data: 'date', name: 'date', defaultContent: '' },
+          { data: 'payment_type', name: 'payment_type', defaultContent: '' },
+          { data: 'type', name: 'type', defaultContent: '' },
+          { data: 'insurance', name: 'insurance', defaultContent: '' },
+          { data: 'bank', name: 'bank', defaultContent: '' },
+          { data: 'check_number', name: 'check_number', defaultContent: '' },
+          { data: 'unallocated', name: 'unallocated', defaultContent: '' },
+          {
+            data: 'amount',
+            name: 'amount',
+            className: 'text-right',
+            render: function (data, type) {
+              if (type === 'sort' || type === 'type') return parseFloat(data) || 0;
+              return DDS.fmt.money(data);
+            }
           }
-
-          if (_detailSortKey === 'date') {
-            var dateA = new Date(valA).getTime() || 0;
-            var dateB = new Date(valB).getTime() || 0;
-            return _detailSortAsc ? dateA - dateB : dateB - dateA;
-          }
-
-          var strA = String(valA).toLowerCase();
-          var strB = String(valB).toLowerCase();
-          if (strA < strB) return _detailSortAsc ? -1 : 1;
-          if (strA > strB) return _detailSortAsc ? 1 : -1;
-          return 0;
-        });
-      }
-
-      var total = list.reduce(function (sum, d) { return sum + (parseFloat(d.amount) || 0); }, 0);
-      renderDetail(list, total);
-    }
-
-    function sortSummaryData(key) {
-      if (_summarySortKey === key) {
-        _summarySortAsc = !_summarySortAsc;
-      } else {
-        _summarySortKey = key;
-        _summarySortAsc = true;
-      }
-
-      updateSummarySortIcons();
-      applySummarySortAndRender();
-    }
-
-    function updateSummarySortIcons() {
-      $('#summaryContainer th[data-sort]').each(function () {
-        var thKey = $(this).attr('data-sort');
-        var icon = $(this).find('.summary-sort-icon');
-        if (thKey === _summarySortKey) {
-          icon.removeClass('fa-sort fa-sort-up fa-sort-down text-gray-300 text-emerald-600/50')
-              .addClass(_summarySortAsc ? 'fa-sort-up text-[#00c58e]' : 'fa-sort-down text-[#00c58e]');
-        } else {
-          icon.removeClass('fa-sort-up fa-sort-down text-[#00c58e]')
-              .addClass('fa-sort ' + (thKey === 'amount' ? 'text-emerald-600/50' : 'text-gray-300'));
+        ],
+        createdRow: function (row, data, dataIndex) {
+          $(row).addClass('hover:bg-gray-50 transition even:bg-white text-xs text-gray-600');
+          $('td', row).addClass('px-4 py-2 border-r border-gray-100');
+          $('td:eq(0)', row).addClass('dds-stick bg-white flex items-center shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]');
+          $('td:eq(12)', row).addClass('bg-[#00c58e]/5 text-gray-800 font-medium text-right');
+        },
+        drawCallback: function () {
+          hideDetailLoading();
+        },
+        footerCallback: function (row, data, start, end, display) {
+          var api = this.api();
+          var total = api.column(12, { search: 'applied' }).data().reduce(function (a, b) {
+            return (parseFloat(a) || 0) + (parseFloat(b) || 0);
+          }, 0);
+          $('#detailTableTotalAmount').text(DDS.fmt.money(total));
         }
       });
-    }
 
-    function getFilteredSummary() {
-      var term = $('#searchInput').val().toLowerCase().trim();
-      if (!term) return _depositsData.slice();
-      return _depositsData.filter(function (dep) {
-        return (dep.location && dep.location.toLowerCase().includes(term)) ||
-               (dep.type && dep.type.toLowerCase().includes(term)) ||
-               (dep.amount && String(dep.amount).includes(term));
-      });
-    }
-
-    function applySummarySortAndRender() {
-      var list = getFilteredSummary();
-
-      if (_summarySortKey) {
-        list.sort(function (a, b) {
-          var valA = a[_summarySortKey] ?? '';
-          var valB = b[_summarySortKey] ?? '';
-
-          if (_summarySortKey === 'amount') {
-            var numA = parseFloat(valA) || 0;
-            var numB = parseFloat(valB) || 0;
-            return _summarySortAsc ? numA - numB : numB - numA;
-          }
-
-          var strA = String(valA).toLowerCase();
-          var strB = String(valB).toLowerCase();
-          if (strA < strB) return _summarySortAsc ? -1 : 1;
-          if (strA > strB) return _summarySortAsc ? 1 : -1;
-          return 0;
-        });
-      }
-
-      var total = list.reduce(function (sum, d) { return sum + (parseFloat(d.amount) || 0); }, 0);
-      renderSummary(list, total);
+      DDS.bindPagination(detailTable, 'detail', { onLoading: showDetailLoading });
     }
 
     function fetchDeposits(start, end) {
@@ -493,24 +342,8 @@
         }
       }
 
-      var skelSummary = '';
-      for (let i = 0; i < 3; i++) {
-        skelSummary += '<tr class="animate-pulse"><td class="px-4 py-3"><div class="h-4 bg-gray-200 rounded w-3/4"></div></td><td class="px-4 py-3"><div class="h-4 bg-gray-200 rounded w-1/2"></div></td><td class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-1/4"></div></td></tr>';
-      }
-      $('#depositTbody').html(skelSummary);
-      $('#depositTfoot').addClass('hidden');
-
-      var skelDetail = '';
-      for (let i = 0; i < 5; i++) {
-        skelDetail += '<tr class="animate-pulse">';
-        for (let c = 0; c < 13; c++) skelDetail += '<td class="px-4 py-3"><div class="h-3 bg-gray-200 rounded w-full"></div></td>';
-        skelDetail += '</tr>';
-      }
-      if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable('#detailContainer table')) {
-        $('#detailContainer table').DataTable().destroy();
-      }
-      $('#detailTbody').html(skelDetail);
-      $('#detailTfoot').addClass('hidden');
+      showSummaryLoading();
+      showDetailLoading();
 
       var officeId = $('#officeSelect').val();
       var clinicNum = $('#clinicSelect').length ? $('#clinicSelect').val() : null;
@@ -526,18 +359,34 @@
         .done(function (res) {
           _depositsData = res.deposits || [];
           _detailsData = res.details || [];
-          _totalAmount = res.summary.total_amount || 0;
-          applySummarySortAndRender();
-          applyDetailSortAndRender();
+          _totalAmount = res.summary ? res.summary.total_amount : 0;
+
+          if (!summaryTable) {
+            initSummaryTable();
+          } else {
+            summaryTable.clear().rows.add(_depositsData).draw();
+          }
+
+          if (!detailTable) {
+            initDetailTable();
+          } else {
+            detailTable.clear().rows.add(_detailsData).draw();
+          }
         })
         .fail(function () {
-          $('#depositTbody').html('<tr><td colspan="3" class="text-center py-6 text-red-500">Failed to load summary data.</td></tr>');
-          $('#detailTbody').html('<tr><td colspan="13" class="text-center py-6 text-red-500">Failed to load detail data.</td></tr>');
+          hideSummaryLoading();
+          hideDetailLoading();
+          if (summaryTable) {
+            summaryTable.clear().draw();
+          }
+          if (detailTable) {
+            detailTable.clear().draw();
+          }
         });
     }
 
     function downloadCsv(filename, rows) {
-      var csvFile = new Blob([rows.join('\n')], { type: 'text/csv' });
+      var csvFile = new Blob([rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
       var downloadLink = document.createElement('a');
       downloadLink.download = filename;
       downloadLink.href = window.URL.createObjectURL(csvFile);
@@ -549,40 +398,45 @@
 
     $('#exportCsvBtn').on('click', function () {
       if (_currentTab === 'summary') {
-        var list = getFilteredSummary();
-        var rows = ['Location,Type,Amount'];
-        list.forEach(function (dep) {
+        var rows = ['Location,Payment Type,Amount'];
+        var data = summaryTable ? summaryTable.rows({ search: 'applied' }).data().toArray() : _depositsData;
+        var total = 0;
+        data.forEach(function (dep) {
+          var amt = parseFloat(dep.amount) || 0;
+          total += amt;
           rows.push([
-            '"' + (dep.location || '') + '"',
-            '"' + (dep.type || '') + '"',
-            dep.amount
+            '"' + (dep.location || '').replace(/"/g, '""') + '"',
+            '"' + (dep.type || '').replace(/"/g, '""') + '"',
+            amt
           ].join(','));
         });
-        var total = list.reduce(function (sum, d) { return sum + (parseFloat(d.amount) || 0); }, 0);
         rows.push(['"Total"', '""', total].join(','));
         downloadCsv('deposit-summary.csv', rows);
       } else {
-        var list = getFilteredDetails();
-        var rows = ['Office,Patient Name,Patient ID,Provider,Provider ID,Date,Payment Type,Type,Insurance,Bank,Check Number,Unallocated,Amount'];
-        list.forEach(function (det) {
+        var headers = ['Office', 'Patient Name', 'Patient ID', 'Provider', 'Provider ID', 'Date', 'Payment Type', 'Type', 'Insurance', 'Bank', 'Check Number', 'Unallocated', 'Amount'];
+        var rows = [headers.join(',')];
+        var data = detailTable ? detailTable.rows({ search: 'applied' }).data().toArray() : _detailsData;
+        var total = 0;
+        data.forEach(function (det) {
+          var amt = parseFloat(det.amount) || 0;
+          total += amt;
           rows.push([
-            '"' + (det.office || '') + '"',
-            '"' + (det.patient_name || '') + '"',
-            '"' + (det.patient_id || '') + '"',
-            '"' + (det.provider || '') + '"',
-            '"' + (det.provider_id || '') + '"',
-            '"' + (det.date || '') + '"',
-            '"' + (det.payment_type || '') + '"',
-            '"' + (det.type || '') + '"',
-            '"' + (det.insurance || '') + '"',
-            '"' + (det.bank || '') + '"',
-            '"' + (det.check_number || '') + '"',
-            '"' + (det.unallocated || '') + '"',
-            det.amount
+            '"' + (det.office || '').replace(/"/g, '""') + '"',
+            '"' + (det.patient_name || '').replace(/"/g, '""') + '"',
+            '"' + (det.patient_id != null ? det.patient_id : '') + '"',
+            '"' + (det.provider || '').replace(/"/g, '""') + '"',
+            '"' + (det.provider_id != null ? det.provider_id : '') + '"',
+            '"' + (det.date || '').replace(/"/g, '""') + '"',
+            '"' + (det.payment_type || '').replace(/"/g, '""') + '"',
+            '"' + (det.type || '').replace(/"/g, '""') + '"',
+            '"' + (det.insurance || '').replace(/"/g, '""') + '"',
+            '"' + (det.bank || '').replace(/"/g, '""') + '"',
+            '"' + (det.check_number || '').replace(/"/g, '""') + '"',
+            '"' + (det.unallocated || '').replace(/"/g, '""') + '"',
+            amt
           ].join(','));
         });
-        var total = list.reduce(function (sum, d) { return sum + (parseFloat(d.amount) || 0); }, 0);
-        rows.push(['"Total"', '', '', '', '', '', '', '', '', '', '', '', total].join(','));
+        rows.push(['"Total"', '""', '""', '""', '""', '""', '""', '""', '""', '""', '""', '""', total].join(','));
         downloadCsv('deposit-details.csv', rows);
       }
     });
@@ -591,44 +445,53 @@
       _currentTab = 'summary';
       $(this).addClass('border-[#00c58e] text-gray-900').removeClass('border-transparent hover:text-gray-700');
       $('#detailTab').removeClass('border-[#00c58e] text-gray-900').addClass('border-transparent hover:text-gray-700');
-      $('#summaryContainer').show();
-      $('#detailContainer').hide();
-      var list = getFilteredSummary();
-      $('#paginationSummary').text(`1-${list.length} of ${list.length} items`);
+      $('#summaryTabContent').removeClass('hidden');
+      $('#detailTabContent').addClass('hidden');
+      if (summaryTable) {
+        var q = $('#searchInput').val() || '';
+        summaryTable.search(q).columns.adjust().draw();
+      }
     });
 
     $('#detailTab').on('click', function () {
       _currentTab = 'detail';
       $(this).addClass('border-[#00c58e] text-gray-900').removeClass('border-transparent hover:text-gray-700');
       $('#summaryTab').removeClass('border-[#00c58e] text-gray-900').addClass('border-transparent hover:text-gray-700');
-      $('#summaryContainer').hide();
-      $('#detailContainer').show();
-      var list = getFilteredDetails();
-      $('#paginationSummary').text(`1-${list.length} of ${list.length} items`);
-    });
-
-    $('#detailContainer').on('click', 'th[data-sort]', function (e) {
-      if ($(e.target).is('input[type="checkbox"]')) return;
-      var key = $(this).attr('data-sort');
-      sortDetailData(key);
-    });
-
-    $('#summaryContainer').on('click', 'th[data-sort]', function () {
-      var key = $(this).attr('data-sort');
-      sortSummaryData(key);
+      $('#summaryTabContent').addClass('hidden');
+      $('#detailTabContent').removeClass('hidden');
+      if (detailTable) {
+        var q = $('#searchInput').val() || '';
+        detailTable.search(q).columns.adjust().draw();
+      }
     });
 
     $('#searchInput').on('keyup input', function () {
-      applySummarySortAndRender();
-      applyDetailSortAndRender();
+      var val = this.value;
+      if (_currentTab === 'summary' && summaryTable) {
+        summaryTable.search(val).draw();
+      } else if (_currentTab === 'detail' && detailTable) {
+        detailTable.search(val).draw();
+      }
     });
 
     $(document).on('change', '#selectAllDetails', function () {
       var checked = $(this).is(':checked');
-      $('#detailTbody input[type="checkbox"]').prop('checked', checked);
+      $('.detail-row-chk').prop('checked', checked);
+    });
+
+    $(document).on('change', '.detail-row-chk', function () {
+      var total = $('.detail-row-chk').length;
+      var checked = $('.detail-row-chk:checked').length;
+      $('#selectAllDetails').prop('checked', total > 0 && total === checked);
     });
 
     window.onDrpApply = function (start, end) { fetchDeposits(start, end); };
+
+    document.addEventListener('daterange:changed', function (e) {
+      if (e.detail && e.detail.start && e.detail.end) {
+        fetchDeposits(e.detail.start, e.detail.end);
+      }
+    });
 
     $('#officeSelect').on('change', function () {
       fetchDeposits();

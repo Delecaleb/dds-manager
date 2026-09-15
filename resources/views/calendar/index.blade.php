@@ -401,171 +401,180 @@
                 </div>
 
                 {{-- Table --}}
-                <div class="flex-1 w-full relative">
-                    <x-table-skeleton />
-                    <x-data-table id="appointmentDetailsTable" min-width="1800px" max-height="100%">
-                        <x-slot:head>
-                            <tr class="bg-white">
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left"
-                                    style="min-width: 12rem;">Location</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left"
-                                    style="min-width: 12rem; left: 12rem;">Patient Name</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
-                                    style="min-width: 12rem; left: 24rem;">Appointment Date</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Appointment Time</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Appointment Duration</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Operatory Name</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Appointment Status</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Patient Age</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Patient Phone</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Email Address</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Patient Type</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Appointment Notes</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Confirmation Status</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Provider Name</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Procedure Codes</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Production</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Primary Insurance Carrier</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Secondary Insurance Carrier</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Referral Source</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Unscheduled Tx $</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Last Visit Date</th>
-                            </tr>
-                        </x-slot:head>
+                <div class="flex-1 w-full relative flex flex-col min-h-[480px]">
+                    <!-- Skeleton Loader Section (Replaces table while loading) -->
+                    <div id="detailsSkeleton" class="w-full bg-white overflow-hidden" style="max-height: calc(100vh - 280px); min-height: 480px;">
+                        <x-table-skeleton />
+                    </div>
 
-                        <x-slot:foot>
-                            <tr class="bg-gray-200">
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
-                                    style="min-width: 12rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
-                                    style="min-width: 12rem; width: 12rem; left: 12rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
-                                    style="min-width: 12rem; width: 12rem; left: 24rem;">Average:</td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class=""></span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">()--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class=""></span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class=""></span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">-</span></td>
-                            </tr>
-                            <tr class="bg-gray-200">
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
-                                    style="min-width: 12rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
-                                    style="min-width: 12rem; width: 12rem; left: 12rem;"><span
-                                        class="block flex justify-end"><span><strong class="block truncate">--</strong>
-                                            <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
-                                    style="min-width: 12rem; width: 12rem; left: 24rem;">Total:</td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class=""></span></strong>
-                                            <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class=""></span></strong>
-                                            <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class=""></span></strong>
-                                            <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                            </tr>
-                        </x-slot:foot>
-                    </x-data-table>
+                    <!-- Details Table Scroll Container (Hidden while loading) -->
+                    <div id="detailsTableContainer" class="hidden flex-1 w-full overflow-hidden flex flex-col">
+                        <x-data-table id="appointmentDetailsTable" min-width="1800px" max-height="calc(100vh - 340px)">
+                            <x-slot:head>
+                                <tr class="bg-white">
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left"
+                                        style="min-width: 12rem;">Location</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left"
+                                        style="min-width: 12rem; left: 12rem;">Patient Name</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
+                                        style="min-width: 12rem; left: 24rem;">Appointment Date</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Appointment Time</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Appointment Duration</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Operatory Name</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Appointment Status</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Patient Age</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Patient Phone</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Email Address</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Patient Type</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Appointment Notes</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Confirmation Status</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Provider Name</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Procedure Codes</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Production</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Primary Insurance Carrier</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Secondary Insurance Carrier</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Referral Source</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Unscheduled Tx $</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Last Visit Date</th>
+                                </tr>
+                            </x-slot:head>
+
+                            <x-slot:foot>
+                                <tr class="bg-gray-200">
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
+                                        style="min-width: 12rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
+                                        style="min-width: 12rem; width: 12rem; left: 12rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
+                                        style="min-width: 12rem; width: 12rem; left: 24rem;">Average:</td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class=""></span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">()--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class=""></span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class=""></span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">-</span></td>
+                                </tr>
+                                <tr class="bg-gray-200">
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
+                                        style="min-width: 12rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
+                                        style="min-width: 12rem; width: 12rem; left: 12rem;"><span
+                                            class="block flex justify-end"><span><strong class="block truncate">--</strong>
+                                                <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
+                                        style="min-width: 12rem; width: 12rem; left: 24rem;">Total:</td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate"><span class=""></span></strong>
+                                                <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate"><span class=""></span></strong>
+                                                <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate"><span class=""></span></strong>
+                                                <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                </tr>
+                            </x-slot:foot>
+                        </x-data-table>
+                    </div>
+
+                    <x-table-pagination id="details" :default-length="25" />
                 </div>
             </div>
         </div>
@@ -603,123 +612,132 @@
                 </div>
 
                 {{-- Table UI --}}
-                <div class="flex-1 w-full relative">
-                    <x-table-skeleton />
-                    <x-data-table id="appointmentCapacityTable" min-width="1200px" max-height="100%">
-                        <x-slot:head>
-                            <tr class="bg-slate-100 border-b border-t border-slate-200">
-                                <th class="text-xs font-bold text-slate-700 py-3 pl-4 pr-3 dt-col-sticky text-left border-r border-slate-200"
-                                    style="width: 14rem;">
-                                    Location
-                                </th>
-                                <th
-                                    class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-40">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span>Scheduled Appointments</span> <svg
-                                                class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                                <th
-                                    class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-32">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span># of Providers</span> <svg
-                                                class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                                <th
-                                    class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-32">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span>Booked Hours</span> <svg
-                                                class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                                <th
-                                    class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-48">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span>Avg. Lead Time - All<br>Appointments
-                                                (days)</span> <svg class="w-3.5 h-3.5 text-slate-400" fill="none"
-                                                stroke="currentColor" viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                                <th
-                                    class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-48">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span>Avg. Lead Time - New<br>Patient
-                                                Appointments (days)</span> <svg class="w-3.5 h-3.5 text-slate-400"
-                                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                                <th class="text-xs font-bold text-slate-700 py-3 px-3 text-center w-48">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span>Avg. Lead Time -<br>Emergency
-                                                Appointments (days)</span> <svg class="w-3.5 h-3.5 text-slate-400"
-                                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                            </tr>
-                        </x-slot:head>
+                <div class="flex-1 w-full relative flex flex-col min-h-[400px]">
+                    <!-- Skeleton Loader Section (Replaces table while loading) -->
+                    <div id="capacitySkeleton" class="w-full bg-white overflow-hidden" style="max-height: calc(100vh - 280px); min-height: 400px;">
+                        <x-table-skeleton />
+                    </div>
 
-                        <x-slot:foot>
-                            <tr class="bg-gray-50 border-t border-slate-200">
-                                <td class="text-left font-bold text-xs py-3 px-4 dt-col-sticky border-r border-slate-200 shadow-sm"
-                                    style="width:14rem">Total:</td>
-                                <td onclick="openCapacityBreakdown('scheduled_appointments')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-1 cursor-pointer hover:bg-slate-100 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('provider_count')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-2 cursor-pointer hover:bg-slate-100 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('booked_hours')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-3 cursor-pointer hover:bg-slate-100 transition">
-                                    -</td>
-                                <td class="border-r border-slate-200 bg-white"></td>
-                                <td class="border-r border-slate-200 bg-white"></td>
-                                <td class="bg-white"></td>
-                            </tr>
-                            <tr class="bg-white border-t border-slate-50">
-                                <td class="text-left font-bold text-xs py-3 px-4 dt-col-sticky border-r border-slate-200 shadow-sm"
-                                    style="width:14rem">Average:</td>
-                                <td onclick="openCapacityBreakdown('scheduled_appointments')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-1 cursor-pointer hover:bg-slate-50 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('provider_count')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-2 cursor-pointer hover:bg-slate-50 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('booked_hours')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-3 cursor-pointer hover:bg-slate-50 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('avg_lead_all')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-4 cursor-pointer hover:bg-slate-50 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('avg_lead_new')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-5 cursor-pointer hover:bg-slate-50 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('avg_lead_emerg')"
-                                    class="text-right font-bold text-xs py-3 px-6 capacity-avg-6 cursor-pointer hover:bg-slate-50 transition">-</td>
-                            </tr>
-                        </x-slot:foot>
-                    </x-data-table>
+                    <!-- Capacity Table Scroll Container (Hidden while loading) -->
+                    <div id="capacityTableContainer" class="hidden flex-1 w-full overflow-hidden flex flex-col">
+                        <x-data-table id="appointmentCapacityTable" min-width="1200px" max-height="100%">
+                            <x-slot:head>
+                                <tr class="bg-slate-100 border-b border-t border-slate-200">
+                                    <th class="text-xs font-bold text-slate-700 py-3 pl-4 pr-3 dt-col-sticky text-left border-r border-slate-200"
+                                        style="width: 14rem;">
+                                        Location
+                                    </th>
+                                    <th
+                                        class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-40">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span>Scheduled Appointments</span> <svg
+                                                    class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                    <th
+                                        class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-32">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span># of Providers</span> <svg
+                                                    class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                    <th
+                                        class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-32">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span>Booked Hours</span> <svg
+                                                    class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                    <th
+                                        class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-48">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span>Avg. Lead Time - All<br>Appointments
+                                                    (days)</span> <svg class="w-3.5 h-3.5 text-slate-400" fill="none"
+                                                    stroke="currentColor" viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                    <th
+                                        class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-48">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span>Avg. Lead Time - New<br>Patient
+                                                    Appointments (days)</span> <svg class="w-3.5 h-3.5 text-slate-400"
+                                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                    <th class="text-xs font-bold text-slate-700 py-3 px-3 text-center w-48">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span>Avg. Lead Time -<br>Emergency
+                                                    Appointments (days)</span> <svg class="w-3.5 h-3.5 text-slate-400"
+                                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                </tr>
+                            </x-slot:head>
+
+                            <x-slot:foot>
+                                <tr class="bg-gray-50 border-t border-slate-200">
+                                    <td class="text-left font-bold text-xs py-3 px-4 dt-col-sticky border-r border-slate-200 shadow-sm"
+                                        style="width:14rem">Total:</td>
+                                    <td onclick="openCapacityBreakdown('scheduled_appointments')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-1 cursor-pointer hover:bg-slate-100 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('provider_count')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-2 cursor-pointer hover:bg-slate-100 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('booked_hours')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-3 cursor-pointer hover:bg-slate-100 transition">
+                                        -</td>
+                                    <td class="border-r border-slate-200 bg-white"></td>
+                                    <td class="border-r border-slate-200 bg-white"></td>
+                                    <td class="bg-white"></td>
+                                </tr>
+                                <tr class="bg-white border-t border-slate-50">
+                                    <td class="text-left font-bold text-xs py-3 px-4 dt-col-sticky border-r border-slate-200 shadow-sm"
+                                        style="width:14rem">Average:</td>
+                                    <td onclick="openCapacityBreakdown('scheduled_appointments')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-1 cursor-pointer hover:bg-slate-50 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('provider_count')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-2 cursor-pointer hover:bg-slate-50 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('booked_hours')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-3 cursor-pointer hover:bg-slate-50 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('avg_lead_all')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-4 cursor-pointer hover:bg-slate-50 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('avg_lead_new')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-5 cursor-pointer hover:bg-slate-50 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('avg_lead_emerg')"
+                                        class="text-right font-bold text-xs py-3 px-6 capacity-avg-6 cursor-pointer hover:bg-slate-50 transition">-</td>
+                                </tr>
+                            </x-slot:foot>
+                        </x-data-table>
+                    </div>
+
+                    <x-table-pagination id="capacity" :default-length="10" />
                 </div>
             </div>
         </div>
@@ -1134,9 +1152,15 @@
             document.getElementById('refreshBtn').addEventListener('click', () => {
                 const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
                 if (activeTab === 'view-details') {
-                    if (aptDetailsTable) aptDetailsTable.ajax.reload();
+                    if (aptDetailsTable) {
+                        showDetailsLoading();
+                        aptDetailsTable.ajax.reload();
+                    }
                 } else if (activeTab === 'view-capacity') {
-                    if (aptCapacityTable) aptCapacityTable.ajax.reload();
+                    if (aptCapacityTable) {
+                        showCapacityLoading();
+                        aptCapacityTable.ajax.reload();
+                    }
                 } else {
                     const range = getViewDateRange(calendar?.view);
                     showCalSkeleton('Refreshing...', calendar?.view?.type);
@@ -1536,8 +1560,10 @@
         window.onCalendarRangeApply = function(start, end) {
             const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
             if (activeTab === 'view-details' && aptDetailsTable) {
+                showDetailsLoading();
                 aptDetailsTable.ajax.reload();
             } else if (activeTab === 'view-capacity' && aptCapacityTable) {
+                showCapacityLoading();
                 aptCapacityTable.ajax.reload();
             }
         };
@@ -1602,22 +1628,41 @@
 
                     if (target === 'view-details') {
                         if (aptDetailsTable) {
+                            showDetailsLoading();
                             aptDetailsTable.ajax.reload();
                         } else {
+                            showDetailsLoading();
                             initAptDetailsTable();
                         }
                     }
 
                     if (target === 'view-capacity') {
                         if (aptCapacityTable) {
+                            showCapacityLoading();
                             aptCapacityTable.ajax.reload();
                         } else {
+                            showCapacityLoading();
                             initAptCapacityTable();
                         }
                     }
                 }
             });
         });
+
+        function showDetailsLoading() {
+            $('#detailsSkeleton').removeClass('hidden');
+            $('#detailsTableContainer').addClass('hidden');
+            var scrollContainer = document.getElementById('detailsTableContainer');
+            if (scrollContainer) {
+                scrollContainer.scrollTop = 0;
+                scrollContainer.scrollLeft = 0;
+            }
+        }
+
+        function hideDetailsLoading() {
+            $('#detailsSkeleton').addClass('hidden');
+            $('#detailsTableContainer').removeClass('hidden');
+        }
 
         let aptDetailsTable = null;
         function initAptDetailsTable() {
@@ -1642,8 +1687,15 @@
             }
 
             aptDetailsTable = DDS.dataTable(document.getElementById('appointmentDetailsTable'), {
-                processing: true,
+                processing: false,
                 serverSide: true,
+                paging: true,
+                pageLength: 25,
+                lengthChange: false,
+                info: false,
+                searching: true,
+                ordering: true,
+                layout: { topStart: null, topEnd: null, bottomStart: null, bottomEnd: null },
                 ajax: {
                     url: "{{ route('calendar.appointments-details-data') }}",
                     data: function (d) {
@@ -1654,6 +1706,12 @@
                         if (provVal) d.provider_id = provVal;
                         const statusVal = $('#detailsFilterStatus').val();
                         if (statusVal) d.status = statusVal;
+                    },
+                    beforeSend: function () { showDetailsLoading(); },
+                    complete: function () { hideDetailsLoading(); },
+                    error: function (xhr, error, thrown) {
+                        console.error("Details DataTables error:", error, thrown, xhr.responseText);
+                        hideDetailsLoading();
                     }
                 },
                 columns: [
@@ -1679,16 +1737,7 @@
                     { data: 'unscheduled_tx', name: 'unscheduled_tx' },
                     { data: 'last_visit_date', name: 'last_visit_date' }
                 ],
-                dom: 'rt<"flex justify-between items-center px-4 py-3 border-t border-slate-200"ip>',
-                pagingType: 'simple_numbers',
-                pageLength: 25,
-                language: {
-                    paginate: {
-                        previous: "Prev",
-                        next: "Next"
-                    },
-                    processing: ""
-                },
+                dom: 'rt',
                 createdRow: function (row, data, dataIndex) {
                     $(row).addClass('hover:bg-slate-50 transition-colors');
                     $('td', row).addClass('px-4 py-2.5 border-r border-slate-200 text-xs bg-white text-right');
@@ -1704,6 +1753,9 @@
 
                     // Notes column truncation and hover attribute
                     $('td:eq(11)', row).addClass('notes-cell').attr('data-note', data.appointment_notes || '');
+                },
+                drawCallback: function () {
+                    hideDetailsLoading();
                 },
                 footerCallback: function (row, data, start, end, display) {
                     var api = this.api();
@@ -1727,26 +1779,28 @@
                 }
             });
 
-            // Toggle Skeleton
-            aptDetailsTable.on('processing.dt', function (e, settings, processing) {
-                if (processing) {
-                    $('#tableSkeleton').removeClass('hidden');
-                } else {
-                    $('#tableSkeleton').addClass('hidden');
-                }
-            });
+            DDS.bindPagination(aptDetailsTable, 'details', { onLoading: showDetailsLoading });
 
             $('#calDate').on('change', function () {
                 syncDateRangeFromSinglePicker();
-                if (aptDetailsTable) aptDetailsTable.ajax.reload();
+                if (aptDetailsTable) {
+                    showDetailsLoading();
+                    aptDetailsTable.ajax.reload();
+                }
             });
 
             $('#detailsFilterProvider, #detailsFilterStatus').on('change', function () {
-                if (aptDetailsTable) aptDetailsTable.ajax.reload();
+                if (aptDetailsTable) {
+                    showDetailsLoading();
+                    aptDetailsTable.ajax.reload();
+                }
             });
 
             $('#detailsSearch').on('keyup', function () {
-                if (aptDetailsTable) aptDetailsTable.search(this.value).draw();
+                if (aptDetailsTable) {
+                    showDetailsLoading();
+                    aptDetailsTable.search(this.value).draw();
+                }
             });
 
             // Notes hover cards
@@ -1782,19 +1836,47 @@
             });
         }
 
+        function showCapacityLoading() {
+            $('#capacitySkeleton').removeClass('hidden');
+            $('#capacityTableContainer').addClass('hidden');
+            var scrollContainer = document.getElementById('capacityTableContainer');
+            if (scrollContainer) {
+                scrollContainer.scrollTop = 0;
+                scrollContainer.scrollLeft = 0;
+            }
+        }
+
+        function hideCapacityLoading() {
+            $('#capacitySkeleton').addClass('hidden');
+            $('#capacityTableContainer').removeClass('hidden');
+        }
+
         let aptCapacityTable = null;
         function initAptCapacityTable() {
             if (aptCapacityTable) return;
 
             aptCapacityTable = DDS.dataTable(document.getElementById('appointmentCapacityTable'), {
-                processing: true,
+                processing: false,
                 serverSide: true,
+                paging: true,
+                pageLength: 10,
+                lengthChange: false,
+                info: false,
+                searching: true,
+                ordering: true,
+                layout: { topStart: null, topEnd: null, bottomStart: null, bottomEnd: null },
                 ajax: {
                     url: "{{ route('calendar.appointment-capacity-data') }}",
                     data: function (d) {
                         const range = getCalendarDateRange();
                         d.start = range.start;
                         d.end = range.end;
+                    },
+                    beforeSend: function () { showCapacityLoading(); },
+                    complete: function () { hideCapacityLoading(); },
+                    error: function (xhr, error, thrown) {
+                        console.error("Capacity DataTables error:", error, thrown, xhr.responseText);
+                        hideCapacityLoading();
                     }
                 },
                 columns: [
@@ -1806,10 +1888,7 @@
                     { data: 'avg_lead_new', name: 'avg_lead_new' },
                     { data: 'avg_lead_emerg', name: 'avg_lead_emerg' }
                 ],
-                dom: 'rt<"flex justify-between items-center px-5 py-4 border-t border-slate-200 bg-white"ip>',
-                pagingType: 'simple_numbers',
-                pageLength: 10,
-                language: { paginate: { previous: "Prev", next: "Next" }, processing: "" },
+                dom: 'rt',
                 createdRow: function (row, data, dataIndex) {
                     $(row).addClass('hover:bg-slate-50 transition-colors bg-white');
                     $('td', row).addClass('border-r border-slate-200 text-sm');
@@ -1839,6 +1918,9 @@
                         td.html('<div class="flex items-center justify-end gap-2 w-full"><span class="truncate">' + val + '</span> <div class="border border-black/10 rounded-sm p-0.5 bg-black/5 flex-shrink-0">' + arrow + '</div></div>');
                     });
                 },
+                drawCallback: function () {
+                    hideCapacityLoading();
+                },
                 footerCallback: function (row, data, start, end, display) {
                     if (data.length > 0) {
                         const first = data[0];
@@ -1850,11 +1932,19 @@
                 }
             });
 
+            DDS.bindPagination(aptCapacityTable, 'capacity', { onLoading: showCapacityLoading });
+
             $('#calDate').on('change', function () {
-                if (aptCapacityTable) aptCapacityTable.ajax.reload();
+                if (aptCapacityTable) {
+                    showCapacityLoading();
+                    aptCapacityTable.ajax.reload();
+                }
             });
             $('#capacitySearch').on('keyup', function () {
-                if (aptCapacityTable) aptCapacityTable.search(this.value).draw();
+                if (aptCapacityTable) {
+                    showCapacityLoading();
+                    aptCapacityTable.search(this.value).draw();
+                }
             });
         }
 
