@@ -66,6 +66,106 @@
         }
     };
 
+    /* ── Cross-page Date & Date Range Persistence (sessionStorage) ──────────── */
+    var DATE_TTL_MS = 120 * 60 * 1000; // 2 hours (matches Laravel session lifetime)
+    var RANGE_KEY = 'dds_active_date_range';
+    var DATE_KEY = 'dds_selected_date';
+
+    DDS.date = {
+        getRange: function (defaultStart, defaultEnd) {
+            try {
+                var raw = window.sessionStorage.getItem(RANGE_KEY);
+                if (raw) {
+                    var parsed = JSON.parse(raw);
+                    if (parsed && parsed.start && parsed.end) {
+                        if (!parsed.ts || (Date.now() - parsed.ts) < DATE_TTL_MS) {
+                            return { start: parsed.start, end: parsed.end, isDefault: false };
+                        } else {
+                            window.sessionStorage.removeItem(RANGE_KEY);
+                        }
+                    }
+                }
+            } catch (e) {}
+            var s = defaultStart || (window.moment ? window.moment().startOf('month').format('YYYY-MM-DD') : '');
+            var e = defaultEnd || (window.moment ? window.moment().format('YYYY-MM-DD') : '');
+            return { start: s, end: e, isDefault: true };
+        },
+
+        setRange: function (start, end) {
+            if (!start || !end) return;
+            try {
+                window.sessionStorage.setItem(RANGE_KEY, JSON.stringify({
+                    start: start,
+                    end: end,
+                    ts: Date.now()
+                }));
+                window.sessionStorage.setItem(DATE_KEY, JSON.stringify({
+                    date: start,
+                    ts: Date.now()
+                }));
+            } catch (e) {}
+        },
+
+        getDate: function (defaultDate) {
+            try {
+                var raw = window.sessionStorage.getItem(DATE_KEY);
+                if (raw) {
+                    var parsed = JSON.parse(raw);
+                    if (parsed && parsed.date) {
+                        if (!parsed.ts || (Date.now() - parsed.ts) < DATE_TTL_MS) {
+                            return parsed.date;
+                        } else {
+                            window.sessionStorage.removeItem(DATE_KEY);
+                        }
+                    }
+                }
+                var range = DDS.date.getRange();
+                if (range && !range.isDefault && range.start) {
+                    return range.start;
+                }
+            } catch (e) {}
+            return defaultDate || (window.moment ? window.moment().format('YYYY-MM-DD') : new Date().toISOString().split('T')[0]);
+        },
+
+        setDate: function (date) {
+            if (!date) return;
+            try {
+                window.sessionStorage.setItem(DATE_KEY, JSON.stringify({
+                    date: date,
+                    ts: Date.now()
+                }));
+                var rawRange = window.sessionStorage.getItem(RANGE_KEY);
+                var curRange = rawRange ? JSON.parse(rawRange) : null;
+                if (!curRange || curRange.start === curRange.end) {
+                    window.sessionStorage.setItem(RANGE_KEY, JSON.stringify({
+                        start: date,
+                        end: date,
+                        ts: Date.now()
+                    }));
+                }
+            } catch (e) {}
+        },
+
+        clear: function () {
+            try {
+                window.sessionStorage.removeItem(RANGE_KEY);
+                window.sessionStorage.removeItem(DATE_KEY);
+            } catch (e) {}
+        }
+    };
+
+    // Auto-clear date storage on logout or session expiration (401/419)
+    if (window.jQuery) {
+        $(document).ajaxError(function (event, jqXHR) {
+            if (jqXHR.status === 401 || jqXHR.status === 419) {
+                DDS.date.clear();
+            }
+        });
+        $(document).on('submit', 'form[action*="logout"]', function () {
+            DDS.date.clear();
+        });
+    }
+
     /* ── Date range picker: one read/wire helper (retires copy-pasted onDrpApply) */
     DDS.getRange = function (id) {
         var drp = window.jQuery && window.jQuery('#' + id).data('daterangepicker');
@@ -73,11 +173,11 @@
         return { start: drp.startDate.format('YYYY-MM-DD'), end: drp.endDate.format('YYYY-MM-DD') };
     };
     // Listen for a picker's apply (the x-daterange-picker dispatches 'daterange:changed').
-    // Syncs the range into the URL, then invokes cb({start,end}). Pass id=null for any picker.
+    // Persists the range into sessionStorage, then invokes cb({start,end}). Pass id=null for any picker.
     DDS.onDateRange = function (id, cb) {
         document.addEventListener('daterange:changed', function (e) {
             if (id && e.detail.id !== id) return;
-            history.replaceState(history.state, '', DDS.url.merge({ start_date: e.detail.start, end_date: e.detail.end }));
+            DDS.date.setRange(e.detail.start, e.detail.end);
             cb({ start: e.detail.start, end: e.detail.end });
         });
     };

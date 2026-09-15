@@ -226,6 +226,17 @@
         };
 
         document.addEventListener('DOMContentLoaded', function () {
+            if (window.DDS && window.DDS.date) {
+                var foRange = window.DDS.date.getRange();
+                if (foRange && !foRange.isDefault) {
+                    if (document.getElementById('frontOfficeStartDate')) document.getElementById('frontOfficeStartDate').value = foRange.start;
+                    if (document.getElementById('frontOfficeEndDate')) document.getElementById('frontOfficeEndDate').value = foRange.end;
+                    if (document.getElementById('frontOfficeMonth') && foRange.start.slice(0, 7) === foRange.end.slice(0, 7)) {
+                        document.getElementById('frontOfficeMonth').value = foRange.start.slice(0, 7);
+                    }
+                }
+            }
+
             $(document).on('change', '#foDateType', function () {
                 if ($(this).val() === 'range') {
                     $('#foMonthContainer').addClass('hidden');
@@ -237,7 +248,22 @@
                 window.reloadAllFoData();
             });
 
-            $(document).on('change', '#frontOfficeMonth, #frontOfficeStartDate, #frontOfficeEndDate', function () {
+            $(document).on('change', '#frontOfficeStartDate, #frontOfficeEndDate', function () {
+                var s = $('#frontOfficeStartDate').val();
+                var e = $('#frontOfficeEndDate').val();
+                if (s && e && window.DDS && window.DDS.date) {
+                    window.DDS.date.setRange(s, e);
+                }
+                window.reloadAllFoData();
+            });
+
+            $(document).on('change', '#frontOfficeMonth', function () {
+                var m = $(this).val();
+                if (m && window.DDS && window.DDS.date && typeof moment !== 'undefined') {
+                    var s = moment(m + '-01').startOf('month').format('YYYY-MM-DD');
+                    var e = moment(m + '-01').endOf('month').format('YYYY-MM-DD');
+                    window.DDS.date.setRange(s, e);
+                }
                 window.reloadAllFoData();
             });
 

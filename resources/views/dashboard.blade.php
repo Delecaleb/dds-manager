@@ -953,7 +953,12 @@
     }
 
     /* ── Daterangepicker callback (picker initialised by x-daterange-picker component) ── */
-    window.onDrpApply = function (start, end) { fetchAll(start, end); };
+    window.onDrpApply = function (start, end) {
+      if (window.DDS && window.DDS.date) {
+        window.DDS.date.setRange(start, end);
+      }
+      fetchAll(start, end);
+    };
 
     $(document).ready(function () {
 
@@ -995,10 +1000,11 @@
       });
 
       /* Initial load */
-      fetchAll(
-        moment().startOf('month').format('YYYY-MM-DD'),
-        moment().format('YYYY-MM-DD')
-      );
+      var _dashRange = (window.DDS && window.DDS.date) ? window.DDS.date.getRange() : {
+        start: moment().startOf('month').format('YYYY-MM-DD'),
+        end: moment().format('YYYY-MM-DD')
+      };
+      fetchAll(_dashRange.start, _dashRange.end);
     });
 
     /* ── Chart helpers ────────────────────────────────── */

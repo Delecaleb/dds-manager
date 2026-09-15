@@ -60,16 +60,16 @@
   var _id = '{{ $id }}';
   var _cb = @if($onApply) '{{ $onApply }}' @else null @endif;
 
-  // Restore the range from the URL (?start_date&end_date) so deep-links/reloads persist it.
-  var _params = new URLSearchParams(window.location.search);
-  var _startParam = _params.get('start_date');
-  var _endParam = _params.get('end_date');
-
   function _init() {
-    if (typeof $ === 'undefined' || !$.fn.daterangepicker) { setTimeout(_init, 30); return; }
+    if (typeof $ === 'undefined' || !$.fn.daterangepicker || typeof moment === 'undefined') { setTimeout(_init, 30); return; }
+
+    var savedRange = (window.DDS && window.DDS.date) ? window.DDS.date.getRange() : null;
+    var startM = (savedRange && savedRange.start) ? moment(savedRange.start, 'YYYY-MM-DD') : moment().startOf('month');
+    var endM = (savedRange && savedRange.end) ? moment(savedRange.end, 'YYYY-MM-DD') : moment();
+
     $('#' + _id).daterangepicker({
-      startDate: _startParam ? moment(_startParam, 'YYYY-MM-DD') : moment().startOf('month'),
-      endDate:   _endParam ? moment(_endParam, 'YYYY-MM-DD') : moment(),
+      startDate: startM,
+      endDate:   endM,
       ranges: {
         'Today':           [moment(),                                                       moment()],
         'Yesterday':       [moment().subtract(1, 'days'),                                   moment().subtract(1, 'days')],
@@ -95,6 +95,9 @@
       linkedCalendars: false,
     }, function(start, end) {
       var s = start.format('YYYY-MM-DD'), e = end.format('YYYY-MM-DD');
+      if (window.DDS && window.DDS.date) {
+        window.DDS.date.setRange(s, e);
+      }
       // Canonical: dispatch an event any consumer can listen to via DDS.onDateRange(id, cb).
       document.dispatchEvent(new CustomEvent('daterange:changed', { detail: { id: _id, start: s, end: e } }));
       // Back-compat: still call a named global if on-apply was provided.

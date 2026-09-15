@@ -981,10 +981,15 @@
             // Show skeleton immediately before the calendar even starts constructing
             showCalSkeleton('Initializing...', 'resourceTimeGridDay');
 
+            var initialCalDate = (window.DDS && window.DDS.date) ? window.DDS.date.getDate('{{ date("Y-m-d") }}') : '{{ date("Y-m-d") }}';
+            if (document.getElementById('calDate')) {
+                document.getElementById('calDate').value = initialCalDate;
+            }
+
             calendar = new FullCalendar.Calendar(calEl, {
                 schedulerLicenseKey: 'CC-Attribution-NonCommercialNoDerivatives',
                 initialView: 'resourceTimeGridDay',
-                initialDate: '{{ date("Y-m-d") }}',
+                initialDate: initialCalDate,
                 headerToolbar: false,
                 nowIndicator: true,
                 slotDuration: '00:30:00',
@@ -1109,6 +1114,10 @@
                     const dateChanged = currentCalDate !== null && currentCalDate !== dateStr;
                     currentCalDate = dateStr;
 
+                    if (window.DDS && window.DDS.date) {
+                        window.DDS.date.setDate(dateStr);
+                    }
+
                     document.getElementById('calDate').value = dateStr;
                     updateDateLabel(d, info.view?.type);
 
@@ -1129,7 +1138,7 @@
             calendar.render();
 
             // initialise date label & clock
-            updateDateLabel(new Date('{{ date("Y-m-d") }}T00:00:00'), calendar.view?.type);
+            updateDateLabel(new Date(initialCalDate + 'T00:00:00'), calendar.view?.type);
             startClock();
 
             // ── Active Columns Toggle ───────────────────────────────────────
@@ -1178,6 +1187,9 @@
             // ── Date picker ───────────────────────────────────────────────
             document.getElementById('calDate').addEventListener('change', function () {
                 showCalSkeleton('Loading date...', calendar?.view?.type);
+                if (window.DDS && window.DDS.date) {
+                    window.DDS.date.setDate(this.value);
+                }
                 calendar.gotoDate(this.value);
             });
 

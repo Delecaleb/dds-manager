@@ -1256,10 +1256,17 @@
 
 
 
-    var _currentStartDate = moment().startOf('month').format('YYYY-MM-DD');
-    var _currentEndDate = moment().format('YYYY-MM-DD');
+    var _finRange = (window.DDS && window.DDS.date) ? window.DDS.date.getRange() : {
+      start: moment().startOf('month').format('YYYY-MM-DD'),
+      end: moment().format('YYYY-MM-DD')
+    };
+    var _currentStartDate = _finRange.start;
+    var _currentEndDate = _finRange.end;
 
     window.onDrpApply = function (start, end) {
+      if (window.DDS && window.DDS.date) {
+        window.DDS.date.setRange(start, end);
+      }
       _currentStartDate = start;
       _currentEndDate = end;
       fetchAnalytics(start, end);

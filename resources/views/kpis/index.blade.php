@@ -990,7 +990,10 @@
       var _tryInit = setInterval(function () {
         if (typeof moment === 'undefined') return;
         clearInterval(_tryInit);
-        fetchKpis(moment().startOf('year').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'));
+        var _kpiRange = (window.DDS && window.DDS.date) ? window.DDS.date.getRange() : null;
+        var s = (_kpiRange && !_kpiRange.isDefault) ? _kpiRange.start : moment().startOf('year').format('YYYY-MM-DD');
+        var e = (_kpiRange && !_kpiRange.isDefault) ? _kpiRange.end : moment().format('YYYY-MM-DD');
+        fetchKpis(s, e);
       }, 30);
     });
   </script>
