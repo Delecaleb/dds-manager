@@ -104,7 +104,28 @@ class CalendarController extends Controller
 
         $produced = $this->production->netFrom($gross, $adjustments, $writeoffs);
 
-        $scheduled = $gross;
+        // Scheduled production: Total booked fee value of appointments in Scheduled status (AptStatus = 1) in the date range
+        $schedQuery = DB::table('od_appointments as a')
+            ->join('od_procedure_logs as pl', function ($join) use ($officeId) {
+                $join->on('a.AptNum', '=', 'pl.AptNum');
+                if ($officeId && Schema::hasColumn('od_procedure_logs', 'office_id')) {
+                    $join->where('pl.office_id', '=', $officeId);
+                }
+            })
+            ->whereIn('a.AptStatus', [1, '1'])
+            ->whereRaw("DATE(REPLACE(a.AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+
+        if ($officeId && Schema::hasColumn('od_appointments', 'office_id')) {
+            $schedQuery->where('a.office_id', $officeId);
+        }
+
+        if ($clinicNum !== null && Schema::hasColumn('od_appointments', 'ClinicNum')) {
+            $schedQuery->where('a.ClinicNum', $clinicNum);
+        }
+
+        $scheduled = (float) $schedQuery
+            ->selectRaw('COALESCE(SUM(CAST(pl.ProcFee AS DECIMAL(12,2))), 0) AS total')
+            ->value('total');
 
         // Fetch active providers in this date range
         $providerAptsQuery = OdAppointment::query()
