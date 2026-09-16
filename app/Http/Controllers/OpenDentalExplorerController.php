@@ -268,7 +268,7 @@ class OpenDentalExplorerController extends Controller
 
         $orderBy = (string) $request->input('order_by');
         $orderDir = strtolower((string) $request->input('order_direction', 'asc')) === 'desc' ? 'desc' : 'asc';
-        $limit = min(max((int) $request->input('limit', 50), 1), 2000);
+        $limit = min(max((int) $request->input('limit', 50), 1), 5000);
         $conditions = $request->input('conditions', []);
 
         // 1. Try OpenDental Realtime Query via API if source == opendental_live
@@ -834,7 +834,7 @@ class OpenDentalExplorerController extends Controller
         $table = (string) $request->input('table', 'appointment');
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
-        $limit = min(max((int) $request->input('limit', 500), 10), 2000);
+        $limit = min(max((int) $request->input('limit', 500), 10), 5000);
         $conditions = $request->input('conditions', []);
 
         $resolvedTable = $this->resolveTableName($table);
@@ -931,9 +931,9 @@ class OpenDentalExplorerController extends Controller
         // 3. Compute Diff Sets
         $intersectKeys = array_values(array_intersect($localKeys, $liveKeys));
         $potentialOrphanKeys = array_values(array_diff($localKeys, $liveKeys)); // in local, not in live range
-        $missingKeys = array_values(array_diff($liveKeys, $localKeys)); // in live OD, missing in local
+        $potentialMissingKeys = array_values(array_diff($liveKeys, $localKeys)); // in live OD, not in initial local slice
 
-        // Double check potential orphans against full OpenDental table to ensure they are true orphans (not false positives due to date mismatch)
+        // 3a. Double check potential orphans against full OpenDental table to ensure they are true orphans (not false positives due to date mismatch, limit truncation, or status change)
         $orphanKeys = [];
         if (! empty($potentialOrphanKeys) && empty($liveError)) {
             foreach (array_chunk($potentialOrphanKeys, 500) as $chunk) {
@@ -963,6 +963,40 @@ class OpenDentalExplorerController extends Controller
         } else {
             $orphanKeys = $potentialOrphanKeys;
         }
+
+        // 3b. Double check potential missing records against Local DB to ensure they are true missing records (not false positives due to limit boundary or sort ordering)
+        $missingKeys = [];
+        if (! empty($potentialMissingKeys)) {
+            foreach (array_chunk($potentialMissingKeys, 500) as $chunk) {
+                $localCheckQuery = DB::table($resolvedTable)->whereIn($primaryKey, $chunk);
+                if (in_array('office_id', $tableColumns, true)) {
+                    $localCheckQuery->where('office_id', $officeId);
+                }
+                $foundLocalRows = $localCheckQuery->get();
+                $foundLocalKeys = [];
+
+                foreach ($foundLocalRows as $flRow) {
+                    $fl = (array) $flRow;
+                    if (isset($fl[$primaryKey])) {
+                        $pkVal = (string) $fl[$primaryKey];
+                        $foundLocalKeys[] = $pkVal;
+                        $localKeys[] = $pkVal;
+                        $localRowsByPk[$pkVal] = $fl;
+                        $intersectKeys[] = $pkVal;
+                    }
+                }
+
+                $trueMissing = array_values(array_diff($chunk, $foundLocalKeys));
+                $missingKeys = array_merge($missingKeys, $trueMissing);
+            }
+        }
+
+        // De-duplicate all key collections
+        $intersectKeys = array_values(array_unique($intersectKeys));
+        $orphanKeys = array_values(array_unique($orphanKeys));
+        $missingKeys = array_values(array_unique($missingKeys));
+        $liveKeys = array_values(array_unique($liveKeys));
+        $localKeys = array_values(array_unique($localKeys));
 
         $criticalCols = $this->criticalColumnsMap[$resolvedTable]
             ?? $this->criticalColumnsMap[$odTableName]

@@ -121,6 +121,7 @@
             <option value="500" selected>500 rows</option>
             <option value="1000">1,000 rows</option>
             <option value="2000">2,000 rows</option>
+            <option value="5000">5,000 rows</option>
           </select>
         </div>
 
