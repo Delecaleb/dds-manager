@@ -2,1428 +2,297 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\HandlesSyncRequests;
+use App\Jobs\RepairOpenDentalRows;
 use App\Models\Office;
-use App\Models\SyncLog;
-use App\Models\SyncRequest;
-use App\Services\OpenDental\QueryService;
-use Exception;
+use App\Services\Sync\Explorer\ExplorerQueryService;
+use App\Services\Sync\Explorer\ReconciliationService;
+use App\Services\Sync\Explorer\RowRepairService;
+use App\Services\Sync\OpenDentalTable;
+use App\Services\Sync\OpenDentalTableCatalog;
+use App\Services\Sync\SyncCheckpointService;
+use App\Services\Sync\SyncRequestRunner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
+use InvalidArgumentException;
+use Throwable;
 
+/**
+ * OD Data Explorer: query, compare and repair OpenDental data for the active office.
+ *
+ * Coordination only. Every table goes through OpenDentalTableCatalog (OpenDental
+ * data only — never application tables), and all logic lives in the explorer
+ * services. Repairs send primary keys, never row data.
+ */
 class OpenDentalExplorerController extends Controller
 {
-    /**
-     * Map of native OpenDental table names to local synced tables.
-     */
-    protected array $openDentalNativeTables = [
-        'patient' => 'od_patients',
-        'procedurelog' => 'od_procedure_logs',
-        'procedurecode' => 'od_procedures',
-        'appointment' => 'od_appointments',
-        'provider' => 'od_providers',
-        'paysplit' => 'od_pay_splits',
-        'treatmentplan' => 'treatment_plans',
-        'treatplanattach' => 'od_treatment_plan_attachments',
-        'claimproc' => 'od_claim_procs',
-        'claimpayment' => 'od_claim_payments',
-        'adjustment' => 'od_adjustments',
-        'payplancharge' => 'od_pay_plan_charges',
-        'payment' => 'od_payments',
-        'deposit' => 'od_deposits',
-        'recall' => 'od_recalls',
-        'recalltype' => 'od_recall_types',
-        'schedule' => 'od_schedules',
-        'insplan' => 'od_insplans',
-        'carrier' => 'od_carriers',
-        'definition' => 'od_definitions',
-        'histappointment' => 'od_histappointments',
-        'statement' => 'od_statements',
-        'patientbalance' => 'od_patient_balances',
-    ];
+    use HandlesSyncRequests;
 
-    /**
-     * Critical columns to inspect for multi-column value drift and discrepancy detection.
-     */
-    protected array $criticalColumnsMap = [
-        'od_pay_splits' => ['PayNum', 'PatNum', 'ProvNum', 'ProcNum', 'ClinicNum', 'SplitAmt', 'DatePay', 'SecDateTEdit'],
-        'paysplit' => ['PayNum', 'PatNum', 'ProvNum', 'ProcNum', 'ClinicNum', 'SplitAmt', 'DatePay', 'SecDateTEdit'],
-        'od_payments' => ['PatNum', 'PayDate', 'PayAmt', 'PayType', 'ClinicNum', 'DepositNum', 'Receipt'],
-        'payment' => ['PatNum', 'PayDate', 'PayAmt', 'PayType', 'ClinicNum', 'DepositNum', 'Receipt'],
-        'od_claim_procs' => ['ClaimNum', 'ProcNum', 'PatNum', 'ProvNum', 'Status', 'InsPayAmt', 'FeeBilled', 'DedApplied', 'ProcDate'],
-        'claimproc' => ['ClaimNum', 'ProcNum', 'PatNum', 'ProvNum', 'Status', 'InsPayAmt', 'FeeBilled', 'DedApplied', 'ProcDate'],
-        'od_adjustments' => ['PatNum', 'AdjDate', 'AdjAmt', 'AdjType', 'ProvNum', 'ClinicNum', 'ProcNum'],
-        'adjustment' => ['PatNum', 'AdjDate', 'AdjAmt', 'AdjType', 'ProvNum', 'ClinicNum', 'ProcNum'],
-        'od_procedure_logs' => ['PatNum', 'ProcDate', 'CodeNum', 'ProcFee', 'ProvNum', 'ClinicNum', 'ProcStatus'],
-        'procedurelog' => ['PatNum', 'ProcDate', 'CodeNum', 'ProcFee', 'ProvNum', 'ClinicNum', 'ProcStatus'],
-        'od_appointments' => ['PatNum', 'AptDateTime', 'AptStatus', 'ProvNum', 'Op', 'ClinicNum', 'Pattern'],
-        'appointment' => ['PatNum', 'AptDateTime', 'AptStatus', 'ProvNum', 'Op', 'ClinicNum', 'Pattern'],
-        'od_histappointments' => ['HistApptNum', 'AptNum', 'PatNum', 'AptDateTime', 'AptStatus', 'HistDateTStamp'],
-        'histappointment' => ['HistApptNum', 'AptNum', 'PatNum', 'AptDateTime', 'AptStatus', 'HistDateTStamp'],
-        'od_claim_payments' => ['CheckDate', 'CheckAmt', 'CheckNum', 'DepositNum', 'ClinicNum'],
-        'claimpayment' => ['CheckDate', 'CheckAmt', 'CheckNum', 'DepositNum', 'ClinicNum'],
-        'od_deposits' => ['DateDeposit', 'Amount'],
-        'deposit' => ['DateDeposit', 'Amount'],
-        'od_patients' => ['PatNum', 'LName', 'FName', 'MiddleI', 'Birthdate', 'PatStatus', 'Gender', 'Position', 'SecDateEntry'],
-        'patient' => ['PatNum', 'LName', 'FName', 'MiddleI', 'Birthdate', 'PatStatus', 'Gender', 'Position', 'SecDateEntry'],
-        'od_treatment_plan_attachments' => ['TreatPlanAttachNum', 'TreatPlanNum', 'ProcNum', 'Priority', 'SecDateTEdit'],
-        'treatplanattach' => ['TreatPlanAttachNum', 'TreatPlanNum', 'ProcNum', 'Priority', 'SecDateTEdit'],
-        'od_insplans' => ['PlanNum', 'GroupName', 'GroupNum', 'PlanType', 'CarrierNum'],
-        'insplan' => ['PlanNum', 'GroupName', 'GroupNum', 'PlanType', 'CarrierNum'],
-        'od_statements' => ['StatementNum', 'PatNum', 'DateSent', 'IsSent', 'Mode_'],
-        'statement' => ['StatementNum', 'PatNum', 'DateSent', 'IsSent', 'Mode_'],
-    ];
-
-    /**
-     * Map of common table aliases to native OpenDental table names.
-     */
-    protected array $tableAliases = [
-        'od_claim_proc' => 'claimproc',
-        'od_claim_procs' => 'claimproc',
-        'claim_proc' => 'claimproc',
-        'claim_procs' => 'claimproc',
-        'claimprocs' => 'claimproc',
-        'od_claimproc' => 'claimproc',
-
-        'od_claim_payment' => 'claimpayment',
-        'od_claim_payments' => 'claimpayment',
-        'claim_payment' => 'claimpayment',
-        'claim_payments' => 'claimpayment',
-        'claimpayments' => 'claimpayment',
-
-        'od_patient' => 'patient',
-        'od_patients' => 'patient',
-        'patients' => 'patient',
-
-        'od_procedure_log' => 'procedurelog',
-        'od_procedure_logs' => 'procedurelog',
-        'procedurelogs' => 'procedurelog',
-        'procedure_log' => 'procedurelog',
-
-        'od_procedure' => 'procedurecode',
-        'od_procedures' => 'procedurecode',
-        'procedurecodes' => 'procedurecode',
-
-        'od_appointment' => 'appointment',
-        'od_appointments' => 'appointment',
-        'appointments' => 'appointment',
-
-        'od_provider' => 'provider',
-        'od_providers' => 'provider',
-        'providers' => 'provider',
-
-        'od_pay_split' => 'paysplit',
-        'od_pay_splits' => 'paysplit',
-        'pay_splits' => 'paysplit',
-
-        'od_treatment_plan' => 'treatmentplan',
-        'od_treatment_plans' => 'treatmentplan',
-        'treatment_plans' => 'treatmentplan',
-        'treatmentplans' => 'treatmentplan',
-
-        'od_treatment_plan_attachment' => 'treatplanattach',
-        'od_treatment_plan_attachments' => 'treatplanattach',
-        'treatment_plan_attachments' => 'treatplanattach',
-        'treatplanattach' => 'treatplanattach',
-        'treatplanattachment' => 'treatplanattach',
-        'treatplanattachments' => 'treatplanattach',
-        'od_treatplanattach' => 'treatplanattach',
-
-        'od_adjustment' => 'adjustment',
-        'od_adjustments' => 'adjustment',
-        'adjustments' => 'adjustment',
-
-        'od_pay_plan_charge' => 'payplancharge',
-        'od_pay_plan_charges' => 'payplancharge',
-        'payplancharges' => 'payplancharge',
-
-        'od_payment' => 'payment',
-        'od_payments' => 'payment',
-        'payments' => 'payment',
-
-        'od_deposit' => 'deposit',
-        'od_deposits' => 'deposit',
-        'deposits' => 'deposit',
-
-        'od_recall' => 'recall',
-        'od_recalls' => 'recall',
-        'recalls' => 'recall',
-
-        'od_recall_type' => 'recalltype',
-        'od_recall_types' => 'recalltype',
-        'recalltypes' => 'recalltype',
-
-        'od_schedule' => 'schedule',
-        'od_schedules' => 'schedule',
-        'schedules' => 'schedule',
-
-        'od_ins_plan' => 'insplan',
-        'od_ins_plans' => 'insplan',
-        'od_insplan' => 'insplan',
-        'od_insplans' => 'insplan',
-        'ins_plans' => 'insplan',
-        'insplans' => 'insplan',
-        'insplan' => 'insplan',
-
-        'od_carrier' => 'carrier',
-        'od_carriers' => 'carrier',
-        'carriers' => 'carrier',
-
-        'od_definition' => 'definition',
-        'od_definitions' => 'definition',
-        'definitions' => 'definition',
-
-        'od_histappointment' => 'histappointment',
-        'od_histappointments' => 'histappointment',
-        'histappointment' => 'histappointment',
-        'histappointments' => 'histappointment',
-        'historyappointment' => 'histappointment',
-        'historyappointments' => 'histappointment',
-        'od_historyappointment' => 'histappointment',
-        'od_historyappointments' => 'histappointment',
-        'hist_appointment' => 'histappointment',
-        'hist_appointments' => 'histappointment',
-
-        'od_statement' => 'statement',
-        'od_statements' => 'statement',
-        'statements' => 'statement',
-        'statement' => 'statement',
-
-        'od_patient_balance' => 'patientbalance',
-        'od_patient_balances' => 'patientbalance',
-        'patient_balances' => 'patientbalance',
-        'patientbalance' => 'patientbalance',
-        'patientbalances' => 'patientbalance',
-    ];
+    private const INVALID_TABLE = 'Invalid or unauthorized table selected.';
 
     public function __construct(
-        protected QueryService $queryService
+        private readonly OpenDentalTableCatalog $catalog,
+        private readonly ExplorerQueryService $explorer,
     ) {}
 
     public function index(): View
     {
-        $currentOffice = Office::getActiveOffice() ?? Office::first();
-
         return view('od-explorer.index', [
-            'currentOffice' => $currentOffice,
-            'openDentalTables' => array_keys($this->openDentalNativeTables),
-            'localTables' => $this->getLocalTables(),
+            'currentOffice' => Office::getActiveOffice() ?? Office::first(),
+            'tables' => $this->catalog->all(),
         ]);
     }
 
     public function tables(): JsonResponse
     {
+        $tables = $this->catalog->all();
+
         return response()->json([
-            'opendental_tables' => array_keys($this->openDentalNativeTables),
-            'local_tables' => $this->getLocalTables(),
+            'opendental_tables' => array_keys(array_filter($tables, fn (OpenDentalTable $t) => $t->existsInOpenDental)),
+            'local_tables' => array_values(array_map(fn (OpenDentalTable $t) => $t->localTable, $tables)),
         ]);
     }
 
     public function columns(Request $request): JsonResponse
     {
-        $table = (string) $request->input('table');
-        $resolvedTable = $this->resolveTableName($table);
+        $table = $this->catalog->resolve((string) $request->input('table'));
 
-        if (! $resolvedTable) {
-            return response()->json(['error' => 'Invalid or unauthorized table selected.'], 400);
+        if ($table === null) {
+            return response()->json(['error' => self::INVALID_TABLE], 400);
         }
 
-        $columns = DB::getSchemaBuilder()->getColumnListing($resolvedTable);
-
         return response()->json([
-            'table' => $table,
-            'resolved_table' => $resolvedTable,
-            'columns' => $columns,
+            'table' => (string) $request->input('table'),
+            'resolved_table' => $table->localTable,
+            'columns' => $this->explorer->columns($table),
         ]);
     }
 
     public function query(Request $request): JsonResponse
     {
-        $startTime = microtime(true);
-        $table = (string) $request->input('table');
-        $source = (string) $request->input('source', 'opendental_live');
-        $resolvedTable = $this->resolveTableName($table);
+        $startedAt = microtime(true);
+        $table = $this->catalog->resolve((string) $request->input('table'));
+        $office = $this->activeOffice();
 
-        if (! $resolvedTable) {
-            return response()->json(['error' => 'Invalid or unauthorized table selected.'], 400);
+        if ($table === null) {
+            return response()->json(['error' => self::INVALID_TABLE], 400);
         }
 
-        $activeOffice = Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
-        $activeOfficeId = (int) ($activeOffice->id ?? 1);
-
-        $tableColumns = DB::getSchemaBuilder()->getColumnListing($resolvedTable);
-
-        // Column Projection
-        $selectedColumns = $request->input('columns', []);
-        if (! is_array($selectedColumns) || empty($selectedColumns) || in_array('*', $selectedColumns, true)) {
-            $colsToSelect = ['*'];
-        } else {
-            $colsToSelect = array_values(array_intersect($selectedColumns, $tableColumns));
-            if (empty($colsToSelect)) {
-                $colsToSelect = ['*'];
-            }
+        if ($office === null) {
+            return response()->json(['error' => 'No office is configured.'], 422);
         }
 
-        $orderBy = (string) $request->input('order_by');
-        $orderDir = strtolower((string) $request->input('order_direction', 'asc')) === 'desc' ? 'desc' : 'asc';
-        $limit = min(max((int) $request->input('limit', 50), 1), 5000);
-        $conditions = $request->input('conditions', []);
+        $columns = $this->explorer->selectColumns($table, $request->input('columns'));
+        $conditions = $this->explorer->normalizeConditions($table, $request->input('conditions'), $request->input('start_date'), $request->input('end_date'));
+        $orderBy = $this->explorer->validOrderColumn($table, $request->input('order_by'));
+        $direction = strtolower((string) $request->input('order_direction')) === 'desc' ? 'desc' : 'asc';
+        $limit = $this->explorer->clampLimit((int) $request->input('limit', 50));
 
-        // 1. Try OpenDental Realtime Query via API if source == opendental_live
-        if ($source === 'opendental_live') {
+        if ($request->input('source', 'opendental_live') === 'opendental_live') {
             try {
-                $foundKey = array_search($table, $this->openDentalNativeTables, true);
-                $odTableName = $this->tableAliases[$table]
-                    ?? (isset($this->openDentalNativeTables[$table])
-                        ? $table
-                        : ($foundKey !== false ? $foundKey : $table));
-
-                $sql = $this->buildRawSqlString($odTableName, $colsToSelect, $conditions, $orderBy, $orderDir, $limit, $tableColumns);
-                $rows = $this->queryService->forOffice($activeOffice)->shortQuery($sql);
-
-                $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
-                $actualColumns = ($colsToSelect === ['*'])
-                    ? (! empty($rows) ? array_keys((array) $rows[0]) : $tableColumns)
-                    : $colsToSelect;
-
-                return response()->json([
-                    'source_type' => 'OpenDental Realtime API',
-                    'table' => $odTableName,
-                    'office_id' => $activeOfficeId,
-                    'count' => count($rows),
-                    'execution_time_ms' => $executionTimeMs,
-                    'columns' => $actualColumns,
-                    'sql' => $sql,
-                    'rows' => $rows,
-                ]);
-            } catch (Exception $e) {
-                // If live API is not configured or fails, fallback gracefully to Local DB with notice
-                $fallbackError = $e->getMessage();
+                $live = $this->explorer->live($table, $office, $columns, $conditions, $orderBy, $direction, $limit);
+            } catch (InvalidArgumentException $e) {
+                return response()->json(['error' => $e->getMessage()], 422);
+            } catch (Throwable $e) {
+                // No silent fallback to local data: the user asked for live OpenDental.
+                return response()->json(['error' => 'OpenDental live API unavailable: '.$e->getMessage()], 502);
             }
+
+            return response()->json([
+                'source_type' => 'OpenDental Realtime API',
+                'table' => $table->key,
+                'primary_key' => $table->primaryKey,
+                'office_id' => (int) $office->id,
+                'count' => count($live['rows']),
+                'execution_time_ms' => $this->elapsedMs($startedAt),
+                'columns' => $columns === ['*'] ? array_keys($live['rows'][0] ?? array_flip($this->explorer->columns($table))) : $columns,
+                'sql' => $live['sql'],
+                'rows' => $live['rows'],
+            ]);
         }
 
-        // 2. Query via Local DB QueryBuilder strictly scoped to active office
-        $builder = DB::table($resolvedTable)->select($colsToSelect);
+        $builder = $this->explorer->localBuilder($table, (int) $office->id, $conditions)->select($columns);
 
-        if (in_array('office_id', $tableColumns, true)) {
-            $builder->where("{$resolvedTable}.office_id", $activeOfficeId);
-        }
-
-        if (is_array($conditions) && ! empty($conditions)) {
-            $builder->where(function ($sub) use ($conditions, $tableColumns) {
-                foreach ($conditions as $cond) {
-                    if (! is_array($cond) || empty($cond['column']) || ! in_array($cond['column'], $tableColumns, true)) {
-                        continue;
-                    }
-
-                    $col = $cond['column'];
-                    $op = strtoupper((string) ($cond['operator'] ?? '='));
-                    $val = $cond['value'] ?? '';
-                    $logical = strtolower((string) ($cond['logical'] ?? 'and'));
-
-                    $whereMethod = ($logical === 'or') ? 'orWhere' : 'where';
-
-                    switch ($op) {
-                        case '=':
-                        case '!=':
-                        case '>':
-                        case '>=':
-                        case '<':
-                        case '<=':
-                            $sub->$whereMethod($col, $op, $val);
-                            break;
-                        case 'LIKE':
-                        case 'NOT LIKE':
-                            $valPattern = str_contains((string) $val, '%') ? $val : '%'.$val.'%';
-                            $sub->$whereMethod($col, $op, $valPattern);
-                            break;
-                        case 'IN':
-                            $vals = array_map('trim', explode(',', (string) $val));
-                            $inMethod = ($logical === 'or') ? 'orWhereIn' : 'whereIn';
-                            $sub->$inMethod($col, $vals);
-                            break;
-                        case 'NOT IN':
-                            $vals = array_map('trim', explode(',', (string) $val));
-                            $notInMethod = ($logical === 'or') ? 'orWhereNotIn' : 'whereNotIn';
-                            $sub->$notInMethod($col, $vals);
-                            break;
-                        case 'IS NULL':
-                            $nullMethod = ($logical === 'or') ? 'orWhereNull' : 'whereNull';
-                            $sub->$nullMethod($col);
-                            break;
-                        case 'IS NOT NULL':
-                            $notNullMethod = ($logical === 'or') ? 'orWhereNotNull' : 'whereNotNull';
-                            $sub->$notNullMethod($col);
-                            break;
-                        case 'BETWEEN':
-                            $range = array_map('trim', explode(',', (string) $val, 2));
-                            if (count($range) === 2) {
-                                $betweenMethod = ($logical === 'or') ? 'orWhereBetween' : 'whereBetween';
-                                $sub->$betweenMethod($col, $range);
-                            }
-                            break;
-                    }
-                }
-            });
-        }
-
-        if ($orderBy && in_array($orderBy, $tableColumns, true)) {
-            $builder->orderBy($orderBy, $orderDir);
+        if ($orderBy !== null) {
+            $builder->orderBy($orderBy, $direction);
         }
 
         $builder->limit($limit);
-
-        $sql = $builder->toSql();
-        $bindings = $builder->getBindings();
         $rows = $builder->get();
-        $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
-
-        $actualColumns = ($colsToSelect === ['*']) ? $tableColumns : $colsToSelect;
 
         return response()->json([
             'source_type' => 'Local Synced Database',
-            'table' => $resolvedTable,
-            'office_id' => $activeOfficeId,
-            'count' => count($rows),
-            'execution_time_ms' => $executionTimeMs,
-            'columns' => $actualColumns,
-            'sql' => $sql,
-            'bindings' => $bindings,
+            'table' => $table->localTable,
+            'primary_key' => $table->primaryKey,
+            'office_id' => (int) $office->id,
+            'count' => $rows->count(),
+            'execution_time_ms' => $this->elapsedMs($startedAt),
+            'columns' => $columns === ['*'] ? $this->explorer->columns($table) : $columns,
+            'sql' => $builder->toSql(),
+            'bindings' => $builder->getBindings(),
             'rows' => $rows,
-            'notice' => isset($fallbackError) ? 'OpenDental Live API unavailable: '.$fallbackError.' (Used Local DB Fallback)' : null,
         ]);
     }
 
-    private function resolveTableName(string $table): ?string
+    public function reconcileDiff(Request $request, ReconciliationService $reconciliation): JsonResponse
     {
-        if (isset($this->openDentalNativeTables[$table])) {
-            $mapped = $this->openDentalNativeTables[$table];
-            if (DB::getSchemaBuilder()->hasTable($mapped)) {
-                return $mapped;
-            }
+        $table = $this->catalog->resolve((string) $request->input('table', 'appointment'));
+        $office = $this->activeOffice();
+
+        if ($table === null) {
+            return response()->json(['error' => self::INVALID_TABLE], 400);
         }
 
-        $nativeKey = $this->tableAliases[$table] ?? null;
-        if ($nativeKey && isset($this->openDentalNativeTables[$nativeKey])) {
-            $mapped = $this->openDentalNativeTables[$nativeKey];
-            if (DB::getSchemaBuilder()->hasTable($mapped)) {
-                return $mapped;
-            }
+        if ($office === null) {
+            return response()->json(['error' => 'No office is configured.'], 422);
         }
 
-        $localTables = $this->getLocalTables();
-        if (in_array($table, $localTables, true)) {
-            return $table;
+        if (! $table->existsInOpenDental) {
+            return response()->json(['error' => "'{$table->key}' is a local rollup and cannot be compared with OpenDental."], 422);
         }
 
-        return null;
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        $conditions = $this->explorer->normalizeConditions($table, $request->input('conditions'), $startDate, $endDate);
+
+        return response()->json([
+            ...$reconciliation->compare($table, $office, $conditions, (int) $request->input('limit', 500)),
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
     }
 
-    private function getLocalTables(): array
-    {
-        $driver = DB::getDriverName();
-        if ($driver === 'sqlite') {
-            $tables = DB::select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'migrations'");
-
-            return array_values(array_filter(array_map(fn ($t) => $t->name, $tables)));
-        }
-
-        $dbName = DB::getDatabaseName();
-        $tables = DB::select('SHOW TABLES');
-        $key = 'Tables_in_'.$dbName;
-
-        $list = array_map(function ($t) use ($key) {
-            if (isset($t->$key)) {
-                return $t->$key;
-            }
-            $arr = (array) $t;
-
-            return reset($arr);
-        }, $tables);
-
-        return array_values(array_filter($list, fn ($t) => $t !== 'migrations'));
-    }
-
-    private function buildRawSqlString(string $table, array $columns, array $conditions, ?string $orderBy, string $orderDir, int $limit, array $validCols, ?string $primaryKey = null): string
-    {
-        $colStr = ($columns === ['*']) ? '*' : implode(', ', array_map(fn ($c) => "`{$c}`", $columns));
-        $sql = "SELECT {$colStr} FROM {$table}";
-
-        $whereClauses = [];
-        if (is_array($conditions)) {
-            foreach ($conditions as $idx => $cond) {
-                if (! is_array($cond) || empty($cond['column']) || ! in_array($cond['column'], $validCols, true)) {
-                    continue;
-                }
-
-                $col = "`{$cond['column']}`";
-                $op = strtoupper((string) ($cond['operator'] ?? '='));
-                $val = (string) ($cond['value'] ?? '');
-                $logical = ($idx > 0 && strtolower((string) ($cond['logical'] ?? 'and')) === 'or') ? 'OR' : 'AND';
-
-                $escapedVal = "'".addslashes($val)."'";
-
-                switch ($op) {
-                    case '=':
-                    case '!=':
-                    case '>':
-                    case '>=':
-                    case '<':
-                    case '<=':
-                        $clause = "{$col} {$op} {$escapedVal}";
-                        break;
-                    case 'LIKE':
-                    case 'NOT LIKE':
-                        $valPattern = str_contains($val, '%') ? $val : '%'.$val.'%';
-                        $clause = "{$col} {$op} '".addslashes($valPattern)."'";
-                        break;
-                    case 'IN':
-                    case 'NOT IN':
-                        $vals = array_map(fn ($v) => "'".addslashes(trim($v))."'", explode(',', $val));
-                        $clause = "{$col} {$op} (".implode(', ', $vals).')';
-                        break;
-                    case 'IS NULL':
-                    case 'IS NOT NULL':
-                        $clause = "{$col} {$op}";
-                        break;
-                    case 'BETWEEN':
-                        $range = array_map(fn ($r) => "'".addslashes(trim($r))."'", explode(',', $val, 2));
-                        if (count($range) === 2) {
-                            $clause = "{$col} BETWEEN {$range[0]} AND {$range[1]}";
-                        } else {
-                            $clause = '1=1';
-                        }
-                        break;
-                    default:
-                        $clause = "{$col} = {$escapedVal}";
-                }
-
-                $whereClauses[] = count($whereClauses) === 0 ? "WHERE {$clause}" : "{$logical} {$clause}";
-            }
-        }
-
-        if (! empty($whereClauses)) {
-            $sql .= ' '.implode(' ', $whereClauses);
-        }
-
-        if ($orderBy && in_array($orderBy, $validCols, true)) {
-            $upperDir = strtoupper($orderDir) === 'DESC' ? 'DESC' : 'ASC';
-            $sql .= " ORDER BY `{$orderBy}` {$upperDir}";
-            if ($primaryKey && $primaryKey !== $orderBy && in_array($primaryKey, $validCols, true)) {
-                $sql .= ", `{$primaryKey}` {$upperDir}";
-            }
-        }
-
-        $sql .= " LIMIT {$limit}";
-
-        return $sql;
-    }
-
+    /**
+     * Re-fetch rows from OpenDental by primary key and upsert them locally.
+     */
     public function syncToLocal(Request $request): JsonResponse
     {
-        $startTime = microtime(true);
-        $table = (string) $request->input('table');
-        $rows = $request->input('rows', []);
-
-        if (empty($rows) || ! is_array($rows)) {
-            return response()->json(['error' => 'No records provided to sync.'], 400);
-        }
-
-        $resolvedTable = $this->resolveTableName($table);
-        if (! $resolvedTable) {
-            return response()->json(['error' => 'Invalid or unauthorized target table.'], 400);
-        }
-
-        $tableColumns = DB::getSchemaBuilder()->getColumnListing($resolvedTable);
-        if (empty($tableColumns)) {
-            return response()->json(['error' => "Target local table '{$resolvedTable}' does not exist or has no columns."], 400);
-        }
-
-        $primaryKey = $this->getPrimaryKeyForTable($resolvedTable, $tableColumns);
-        $syncedCount = 0;
-        $activeOffice = Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
-        $activeOfficeId = (int) ($activeOffice->id ?? 1);
-        $hasOfficeCol = in_array('office_id', $tableColumns, true);
-
-        $validRecords = [];
-        foreach ($rows as $row) {
-            $rowArr = (array) $row;
-            $cleanRow = [];
-            foreach ($tableColumns as $col) {
-                if (array_key_exists($col, $rowArr)) {
-                    $val = $rowArr[$col];
-                    if (is_string($val) && (str_contains(strtolower($col), 'date') || str_contains(strtolower($col), 'time'))) {
-                        $val = str_replace('T', ' ', trim($val));
-                        if ($val === '' || $val < '1000-01-01' || $val > '9999-12-31') {
-                            $val = null;
-                        }
-                    }
-                    $cleanRow[$col] = $val;
-                }
-            }
-
-            if ($hasOfficeCol) {
-                $cleanRow['office_id'] = $activeOfficeId;
-            }
-
-            if (! empty($cleanRow)) {
-                $validRecords[] = $cleanRow;
-            }
-        }
-
-        if (empty($validRecords)) {
-            return response()->json(['error' => 'No matching valid columns to sync into local database.'], 400);
-        }
-
-        DB::transaction(function () use ($resolvedTable, $validRecords, $primaryKey, $hasOfficeCol, $activeOfficeId, &$syncedCount) {
-            if ($primaryKey && isset($validRecords[0][$primaryKey])) {
-                foreach ($validRecords as $rec) {
-                    $pkVal = $rec[$primaryKey];
-                    $matchCond = [$primaryKey => $pkVal];
-                    if ($hasOfficeCol) {
-                        $matchCond['office_id'] = $activeOfficeId;
-                    }
-                    $updateData = $rec;
-                    unset($updateData[$primaryKey]);
-                    DB::table($resolvedTable)->updateOrInsert($matchCond, $updateData);
-                    $syncedCount++;
-                }
-            } else {
-                foreach (array_chunk($validRecords, 500) as $chunk) {
-                    DB::table($resolvedTable)->insertOrIgnore($chunk);
-                    $syncedCount += count($chunk);
-                }
-            }
-        });
-
-        $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
-
-        return response()->json([
-            'success' => true,
-            'table' => $resolvedTable,
-            'synced_count' => $syncedCount,
-            'execution_time_ms' => $executionTimeMs,
-            'message' => "Successfully synced {$syncedCount} record(s) from OpenDental into local table '{$resolvedTable}'.",
-        ]);
+        return $this->repair($request, RepairOpenDentalRows::ACTION_SYNC);
     }
 
-    private function getPrimaryKeyForTable(string $table, array $columns): string
+    /**
+     * Delete local rows that OpenDental confirms are gone.
+     */
+    public function pruneOrphans(Request $request): JsonResponse
     {
-        $primaryKeyMap = [
-            'od_patients' => 'PatNum',
-            'patient' => 'PatNum',
-            'od_procedure_logs' => 'ProcNum',
-            'procedurelog' => 'ProcNum',
-            'od_procedures' => 'CodeNum',
-            'procedurecode' => 'CodeNum',
-            'od_appointments' => 'AptNum',
-            'appointment' => 'AptNum',
-            'od_providers' => 'ProvNum',
-            'provider' => 'ProvNum',
-            'od_pay_splits' => 'SplitNum',
-            'paysplit' => 'SplitNum',
-            'treatment_plans' => 'TreatPlanNum',
-            'treatmentplan' => 'TreatPlanNum',
-            'od_treatment_plan_attachments' => 'TreatPlanAttachNum',
-            'treatplanattach' => 'TreatPlanAttachNum',
-            'od_claim_procs' => 'ClaimProcNum',
-            'claimproc' => 'ClaimProcNum',
-            'od_adjustments' => 'AdjNum',
-            'adjustment' => 'AdjNum',
-            'od_pay_plan_charges' => 'PayPlanChargeNum',
-            'payplancharge' => 'PayPlanChargeNum',
-            'od_payments' => 'PayNum',
-            'payment' => 'PayNum',
-            'od_deposits' => 'DepositNum',
-            'deposit' => 'DepositNum',
-            'od_claim_payments' => 'ClaimPaymentNum',
-            'claimpayment' => 'ClaimPaymentNum',
-            'od_recalls' => 'RecallNum',
-            'recall' => 'RecallNum',
-            'od_recall_types' => 'RecallTypeNum',
-            'recalltype' => 'RecallTypeNum',
-            'od_schedules' => 'ScheduleNum',
-            'schedule' => 'ScheduleNum',
-            'od_insplans' => 'PlanNum',
-            'od_ins_plans' => 'PlanNum',
-            'insplan' => 'PlanNum',
-            'od_carriers' => 'CarrierNum',
-            'carrier' => 'CarrierNum',
-            'od_definitions' => 'DefNum',
-            'definition' => 'DefNum',
-            'od_histappointments' => 'HistApptNum',
-            'histappointment' => 'HistApptNum',
-            'od_statements' => 'StatementNum',
-            'statement' => 'StatementNum',
-            'od_patient_balances' => 'PatNum',
-            'patientbalance' => 'PatNum',
-        ];
-
-        if (isset($primaryKeyMap[$table])) {
-            return $primaryKeyMap[$table];
-        }
-
-        if (in_array('id', $columns, true)) {
-            return 'id';
-        }
-
-        foreach ($columns as $col) {
-            if (str_ends_with($col, 'Num') || str_ends_with($col, '_id')) {
-                return $col;
-            }
-        }
-
-        return $columns[0] ?? 'id';
+        return $this->repair($request, RepairOpenDentalRows::ACTION_PRUNE);
     }
 
-    public function syncCheckpoints(): JsonResponse
+    public function syncCheckpoints(SyncCheckpointService $checkpoints): JsonResponse
     {
-        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
-        $logs = SyncLog::where('office_id', $activeOfficeId)->orderBy('module')->get();
-
-        return response()->json([
-            'logs' => $logs,
-        ]);
+        return response()->json(['logs' => $checkpoints->forOffice($this->activeOfficeId())]);
     }
 
-    public function resetSyncCheckpoint(Request $request): JsonResponse
+    public function resetSyncCheckpoint(Request $request, SyncCheckpointService $checkpoints): JsonResponse
     {
-        $module = (string) $request->input('module');
-        $lastSyncedAt = $request->input('last_synced_at');
-        $lastPrimaryKey = (int) $request->input('last_primary_key', 0);
-
-        if (empty($module)) {
-            return response()->json(['error' => 'Module is required.'], 400);
-        }
-
-        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
-
-        $formattedDate = null;
-        if (! empty($lastSyncedAt)) {
-            $ts = strtotime((string) $lastSyncedAt);
-            if ($ts !== false) {
-                $formattedDate = date('Y-m-d H:i:s', $ts);
-            }
-        }
-
-        if ($module === 'all') {
-            SyncLog::where('office_id', $activeOfficeId)->update([
-                'last_synced_at' => $formattedDate,
-                'last_primary_key' => $lastPrimaryKey,
-                'status' => 'idle',
-                'last_error' => null,
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Successfully reset sync checkpoints for ALL modules.',
-            ]);
-        }
-
-        $log = SyncLog::firstOrCreate(
-            ['office_id' => $activeOfficeId, 'module' => $module],
-            ['status' => 'idle', 'total_processed' => 0]
-        );
-
-        $log->update([
-            'last_synced_at' => $formattedDate,
-            'last_primary_key' => $lastPrimaryKey,
-            'status' => 'idle',
-            'last_error' => null,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'module' => $module,
-            'message' => "Successfully reset sync checkpoint for module '{$module}'.",
-        ]);
+        return $this->resetSyncCheckpointFor($request, $checkpoints, $this->activeOfficeId());
     }
 
     public function getSyncRequests(): JsonResponse
     {
-        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
-
-        $requests = SyncRequest::with(['user:id,name', 'office:id,name'])
-            ->where('office_id', $activeOfficeId)
-            ->orderBy('id', 'desc')
-            ->take(50)
-            ->get();
-
-        return response()->json([
-            'requests' => $requests,
-        ]);
+        return $this->listSyncRequests($this->activeOfficeId());
     }
 
-    public function triggerDateSync(Request $request): JsonResponse
+    public function triggerDateSync(Request $request, SyncRequestRunner $runner): JsonResponse
     {
-        $request->validate([
-            'module' => 'required|string',
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date',
-            'prune_deleted' => 'nullable|boolean',
-        ]);
-
-        $module = strtolower(trim((string) $request->input('module')));
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
-        $pruneDeleted = (bool) $request->input('prune_deleted', false);
-
-        if ($startDate && $endDate && $startDate > $endDate) {
-            return response()->json(['error' => 'Start date cannot be after end date.'], 422);
-        }
-
-        $activeOffice = Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
-        $activeOfficeId = (int) ($activeOffice->id ?? 1);
-
-        $syncReq = SyncRequest::create([
-            'office_id' => $activeOfficeId,
-            'module' => $module,
-            'start_date' => $startDate,
-            'end_date' => $endDate,
-            'prune_deleted' => $pruneDeleted,
-            'status' => 'pending',
-            'created_by' => auth()->id(),
-        ]);
-
-        // Attempt background execution immediately so server-to-server sync starts instantly
-        try {
-            if (str_contains(PHP_OS_FAMILY, 'Windows')) {
-                pclose(popen('start /B php '.base_path('artisan')." sync:process-pending --id={$syncReq->id} > NUL 2>&1", 'r'));
-            } else {
-                exec('php '.base_path('artisan')." sync:process-pending --id={$syncReq->id} > /dev/null 2>&1 &");
-            }
-        } catch (Exception $e) {
-            // Log warning, background schedule cron will pick it up
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => "Server-to-server sync request created for '{$module}' module.",
-            'sync_request' => $syncReq,
-        ]);
+        return $this->createSyncRequest($request, $runner, $this->activeOfficeId());
     }
 
     public function cancelSyncRequest(Request $request): JsonResponse
     {
-        $id = (int) $request->input('id');
-        $activeOfficeId = Office::getActiveOfficeId() ?? 1;
-        $syncReq = SyncRequest::where('office_id', $activeOfficeId)->find($id);
-
-        if (! $syncReq) {
-            return response()->json(['error' => 'Sync request not found.'], 404);
-        }
-
-        if (in_array($syncReq->status, ['completed', 'failed', 'cancelled'])) {
-            return response()->json(['error' => "Cannot cancel a sync request with status '{$syncReq->status}'."], 422);
-        }
-
-        $syncReq->update([
-            'status' => 'cancelled',
-            'completed_at' => now(),
-            'error_message' => 'Cancelled by user.',
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => "Sync request #{$id} has been cancelled.",
-        ]);
+        return $this->cancelRequest((int) $request->input('id'), $this->activeOfficeId());
     }
 
-    public function reconcileDiff(Request $request): JsonResponse
+    private function repair(Request $request, string $action): JsonResponse
     {
-        $startTime = microtime(true);
-        $table = (string) $request->input('table', 'appointment');
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
-        $limit = min(max((int) $request->input('limit', 500), 10), 5000);
-        $conditions = $request->input('conditions', []);
+        $validated = $request->validate([
+            'table' => ['required', 'string'],
+            'keys' => ['required', 'array', 'min:1', 'max:'.RowRepairService::MAX_KEYS],
+            'keys.*' => ['integer', 'min:1'],
+        ]);
 
-        $resolvedTable = $this->resolveTableName($table);
-        if (! $resolvedTable) {
-            return response()->json(['error' => 'Invalid or unauthorized table selected.'], 400);
+        $table = $this->catalog->resolve($validated['table']);
+        $office = $this->activeOffice();
+
+        if ($table === null) {
+            return response()->json(['error' => self::INVALID_TABLE], 400);
         }
 
-        $odTableName = $this->tableAliases[$table]
-            ?? (isset($this->openDentalNativeTables[$table])
-                ? $table
-                : (array_search($table, $this->openDentalNativeTables, true) ?: $table));
-
-        $tableColumns = DB::getSchemaBuilder()->getColumnListing($resolvedTable);
-        $primaryKey = $this->getPrimaryKeyForTable($resolvedTable, $tableColumns);
-        $dateCol = $this->getDateColumnForTable($resolvedTable, $tableColumns);
-
-        $targetOffice = Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
-        $officeId = (int) ($targetOffice->id ?? 1);
-
-        // Build Conditions Array: add date range if provided
-        $allConditions = is_array($conditions) ? $conditions : [];
-        if ($startDate && $endDate && $dateCol) {
-            $allConditions[] = [
-                'column' => $dateCol,
-                'operator' => 'BETWEEN',
-                'value' => "{$startDate} 00:00:00, {$endDate} 23:59:59",
-                'logical' => 'and',
-            ];
+        if ($office === null) {
+            return response()->json(['error' => 'No office is configured.'], 422);
         }
 
-        // 1. Fetch from OpenDental Live API
-        $liveKeys = [];
-        $liveRowsByPk = [];
-        $liveError = null;
+        if (! $table->isRepairable()) {
+            return response()->json(['error' => "'{$table->key}' cannot be repaired from OpenDental."], 422);
+        }
+
+        $job = new RepairOpenDentalRows((int) $office->id, $table->key, $action, array_map('intval', $validated['keys']));
+
+        if (count($validated['keys']) > RowRepairService::INLINE_MAX_KEYS) {
+            dispatch($job);
+
+            return response()->json([
+                'success' => true,
+                'queued' => true,
+                'table' => $table->localTable,
+                'message' => count($validated['keys']).' record(s) queued. They are processed on the server — re-run the comparison in a minute.',
+            ]);
+        }
 
         try {
-            $odSql = $this->buildRawSqlString($odTableName, ['*'], $allConditions, $dateCol ?: $primaryKey, 'ASC', $limit, $tableColumns, $primaryKey);
-            $liveRowsRaw = $this->queryService->forOffice($targetOffice)->shortQuery($odSql);
-            foreach ($liveRowsRaw as $row) {
-                $r = (array) $row;
-                if (isset($r[$primaryKey])) {
-                    $pkVal = (string) $r[$primaryKey];
-                    $liveKeys[] = $pkVal;
-                    $liveRowsByPk[$pkVal] = $r;
-                }
-            }
-        } catch (Exception $e) {
-            $liveError = $e->getMessage();
-        }
-
-        // 2. Fetch from Local DB Snapshot strictly scoped to active office
-        $localQuery = DB::table($resolvedTable);
-        if (in_array('office_id', $tableColumns, true)) {
-            $localQuery->where('office_id', $officeId);
-        }
-
-        if ($startDate && $endDate && $dateCol) {
-            $localQuery->whereBetween($dateCol, ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
-        }
-
-        if (is_array($conditions) && ! empty($conditions)) {
-            $localQuery->where(function ($sub) use ($conditions, $tableColumns) {
-                foreach ($conditions as $cond) {
-                    if (! is_array($cond) || empty($cond['column']) || ! in_array($cond['column'], $tableColumns, true)) {
-                        continue;
-                    }
-                    $col = $cond['column'];
-                    $op = strtoupper((string) ($cond['operator'] ?? '='));
-                    $val = $cond['value'] ?? '';
-                    $logical = strtolower((string) ($cond['logical'] ?? 'and'));
-                    $whereMethod = ($logical === 'or') ? 'orWhere' : 'where';
-                    if ($op === '=') {
-                        $sub->$whereMethod($col, $op, $val);
-                    } elseif ($op === 'IN') {
-                        $inMethod = ($logical === 'or') ? 'orWhereIn' : 'whereIn';
-                        $sub->$inMethod($col, array_map('trim', explode(',', (string) $val)));
-                    }
-                }
-            });
-        }
-
-        $localQueryBuilder = $localQuery->orderBy($dateCol ?: $primaryKey, 'asc');
-        if ($dateCol && $primaryKey && $dateCol !== $primaryKey && in_array($primaryKey, $tableColumns, true)) {
-            $localQueryBuilder->orderBy($primaryKey, 'asc');
-        }
-
-        $localRowsRaw = $localQueryBuilder->limit($limit)->get();
-        $localKeys = [];
-        $localRowsByPk = [];
-        foreach ($localRowsRaw as $row) {
-            $r = (array) $row;
-            if (isset($r[$primaryKey])) {
-                $pkVal = (string) $r[$primaryKey];
-                $localKeys[] = $pkVal;
-                $localRowsByPk[$pkVal] = $r;
-            }
-        }
-
-        // 3. Compute Diff Sets
-        $intersectKeys = array_values(array_intersect($localKeys, $liveKeys));
-        $potentialOrphanKeys = array_values(array_diff($localKeys, $liveKeys)); // in local, not in live range
-        $potentialMissingKeys = array_values(array_diff($liveKeys, $localKeys)); // in live OD, not in initial local slice
-
-        // 3a. Double check potential orphans against full OpenDental table to ensure they are true orphans (not false positives due to date mismatch, limit truncation, or status change)
-        $orphanKeys = [];
-        if (! empty($potentialOrphanKeys) && empty($liveError)) {
-            foreach (array_chunk($potentialOrphanKeys, 500) as $chunk) {
-                try {
-                    $inClause = implode(',', array_map('intval', $chunk));
-                    $odCheckSql = "SELECT * FROM {$odTableName} WHERE {$primaryKey} IN ({$inClause})";
-                    $foundRows = $this->queryService->forOffice($targetOffice)->shortQuery($odCheckSql);
-                    $foundKeys = array_map('strval', array_column($foundRows, $primaryKey));
-
-                    $trueOrphans = array_values(array_diff($chunk, $foundKeys));
-                    $orphanKeys = array_merge($orphanKeys, $trueOrphans);
-
-                    $foundInOd = array_values(array_intersect($chunk, $foundKeys));
-                    if (! empty($foundInOd)) {
-                        foreach ($foundRows as $frow) {
-                            $fr = (array) $frow;
-                            $pkVal = (string) $fr[$primaryKey];
-                            $liveKeys[] = $pkVal;
-                            $liveRowsByPk[$pkVal] = $fr;
-                            $intersectKeys[] = $pkVal;
-                        }
-                    }
-                } catch (Exception) {
-                    $orphanKeys = array_merge($orphanKeys, $chunk);
-                }
-            }
-        } else {
-            $orphanKeys = $potentialOrphanKeys;
-        }
-
-        // 3b. Double check potential missing records against Local DB to ensure they are true missing records (not false positives due to limit boundary or sort ordering)
-        $missingKeys = [];
-        if (! empty($potentialMissingKeys)) {
-            foreach (array_chunk($potentialMissingKeys, 500) as $chunk) {
-                $localCheckQuery = DB::table($resolvedTable)->whereIn($primaryKey, $chunk);
-                if (in_array('office_id', $tableColumns, true)) {
-                    $localCheckQuery->where('office_id', $officeId);
-                }
-                $foundLocalRows = $localCheckQuery->get();
-                $foundLocalKeys = [];
-
-                foreach ($foundLocalRows as $flRow) {
-                    $fl = (array) $flRow;
-                    if (isset($fl[$primaryKey])) {
-                        $pkVal = (string) $fl[$primaryKey];
-                        $foundLocalKeys[] = $pkVal;
-                        $localKeys[] = $pkVal;
-                        $localRowsByPk[$pkVal] = $fl;
-                        $intersectKeys[] = $pkVal;
-                    }
-                }
-
-                $trueMissing = array_values(array_diff($chunk, $foundLocalKeys));
-                $missingKeys = array_merge($missingKeys, $trueMissing);
-            }
-        }
-
-        // De-duplicate all key collections
-        $intersectKeys = array_values(array_unique($intersectKeys));
-        $orphanKeys = array_values(array_unique($orphanKeys));
-        $missingKeys = array_values(array_unique($missingKeys));
-        $liveKeys = array_values(array_unique($liveKeys));
-        $localKeys = array_values(array_unique($localKeys));
-
-        $criticalCols = $this->criticalColumnsMap[$resolvedTable]
-            ?? $this->criticalColumnsMap[$odTableName]
-            ?? array_values(array_diff($tableColumns, ['id', 'created_at', 'updated_at', 'office_id']));
-
-        $pureMatchedKeys = [];
-        $discrepancyKeys = [];
-        $diffRows = [];
-
-        // Pre-fetch relational integrity data in 1-2 bulk queries to eliminate N+1 loop queries
-        $relationalContext = $this->buildRelationalContext($resolvedTable, $officeId, $localRowsByPk);
-
-        // Discrepancy & Matched (Present in Both)
-        foreach ($intersectKeys as $k) {
-            $localData = $localRowsByPk[$k] ?? [];
-            $liveData = $liveRowsByPk[$k] ?? [];
-            $fieldDiffs = $this->compareRowAttributes($localData, $liveData, $criticalCols);
-            $relationalWarning = $this->checkRelationalIntegrity($resolvedTable, $officeId, $localData, $relationalContext);
-
-            if (! empty($fieldDiffs)) {
-                $discrepancyKeys[] = $k;
-                $diffRows[] = [
-                    'status' => 'discrepancy',
-                    'status_label' => 'Modified in OpenDental (Data Discrepancy)',
-                    'status_badge' => 'blue',
-                    'pk' => $k,
-                    'office_id' => $localData['office_id'] ?? $officeId,
-                    'primary_key_name' => $primaryKey,
-                    'source' => 'both',
-                    'field_diffs' => $fieldDiffs,
-                    'relational_issue' => $relationalWarning,
-                    'data' => $liveData,
-                    'local_data' => $localData,
-                ];
-            } else {
-                $pureMatchedKeys[] = $k;
-                $diffRows[] = [
-                    'status' => 'matched',
-                    'status_label' => 'Synced & Matched',
-                    'status_badge' => 'emerald',
-                    'pk' => $k,
-                    'office_id' => $localData['office_id'] ?? $officeId,
-                    'primary_key_name' => $primaryKey,
-                    'source' => 'both',
-                    'field_diffs' => [],
-                    'relational_issue' => $relationalWarning,
-                    'data' => $liveData ?: $localData,
-                ];
-            }
-        }
-
-        // Orphans (Present in Local DB only - strictly confirmed deleted in OpenDental)
-        foreach ($orphanKeys as $k) {
-            $localData = $localRowsByPk[$k] ?? [];
-            $relationalWarning = $this->checkRelationalIntegrity($resolvedTable, $officeId, $localData, $relationalContext);
-            $diffRows[] = [
-                'status' => 'orphan',
-                'status_label' => 'Deleted in OpenDental (Orphan in Local DB)',
-                'status_badge' => 'red',
-                'pk' => $k,
-                'office_id' => $localData['office_id'] ?? $officeId,
-                'primary_key_name' => $primaryKey,
-                'source' => 'local_only',
-                'field_diffs' => [],
-                'relational_issue' => $relationalWarning,
-                'data' => $localData,
-            ];
-        }
-
-        // Missing (Present in Live OD only - not synced to Local DB)
-        foreach ($missingKeys as $k) {
-            $diffRows[] = [
-                'status' => 'missing',
-                'status_label' => 'Missing from Local DB (Sync Needed)',
-                'status_badge' => 'amber',
-                'pk' => $k,
-                'office_id' => $officeId,
-                'primary_key_name' => $primaryKey,
-                'source' => 'live_only',
-                'field_diffs' => [],
-                'relational_issue' => null,
-                'data' => $liveRowsByPk[$k] ?? null,
-            ];
-        }
-
-        $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
-        $totalCombined = count($diffRows);
-        $matchRate = $totalCombined > 0 ? round((count($pureMatchedKeys) / $totalCombined) * 100, 1) : 100;
-
-        return response()->json([
-            'success' => true,
-            'table' => $odTableName,
-            'local_table' => $resolvedTable,
-            'office_id' => $officeId,
-            'primary_key' => $primaryKey,
-            'date_column' => $dateCol,
-            'start_date' => $startDate,
-            'end_date' => $endDate,
-            'execution_time_ms' => $executionTimeMs,
-            'live_error' => $liveError,
-            'columns' => $tableColumns,
-            'summary' => [
-                'live_count' => count($liveKeys),
-                'local_count' => count($localKeys),
-                'matched_count' => count($pureMatchedKeys),
-                'discrepancy_count' => count($discrepancyKeys),
-                'orphan_count' => count($orphanKeys),
-                'missing_count' => count($missingKeys),
-                'match_rate_pct' => $matchRate,
-            ],
-            'orphan_keys' => $orphanKeys,
-            'missing_keys' => $missingKeys,
-            'discrepancy_keys' => $discrepancyKeys,
-            'diff_rows' => $diffRows,
-        ]);
-    }
-
-    public function pruneOrphans(Request $request): JsonResponse
-    {
-        $table = (string) $request->input('table');
-        $keys = $request->input('keys', []);
-
-        $resolvedTable = $this->resolveTableName($table);
-        if (! $resolvedTable) {
-            return response()->json(['error' => 'Invalid or unauthorized table selected.'], 400);
-        }
-
-        $tableColumns = DB::getSchemaBuilder()->getColumnListing($resolvedTable);
-        $primaryKey = $this->getPrimaryKeyForTable($resolvedTable, $tableColumns);
-        $targetOffice = Office::getActiveOffice() ?? Office::first() ?? new Office(['id' => 1]);
-        $officeId = (int) ($targetOffice->id ?? 1);
-
-        if (empty($keys) || ! is_array($keys)) {
-            return response()->json(['error' => 'No record keys provided to prune.'], 400);
-        }
-
-        $cleanKeys = array_map('intval', $keys);
-        $deletedCount = 0;
-
-        foreach (array_chunk($cleanKeys, 500) as $chunk) {
-            $query = DB::table($resolvedTable)->whereIn($primaryKey, $chunk);
-            if (in_array('office_id', $tableColumns, true)) {
-                $query->where('office_id', $officeId);
-            }
-            $deletedCount += $query->delete();
+            $result = app()->call([$job, 'handle']);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            return response()->json(['error' => 'OpenDental could not be reached; nothing was changed. '.$e->getMessage()], 502);
         }
 
         return response()->json([
             'success' => true,
-            'deleted_count' => $deletedCount,
-            'message' => "Successfully pruned {$deletedCount} orphan record(s) from local table '{$resolvedTable}'.",
+            'queued' => false,
+            'table' => $table->localTable,
+            ...$this->repairSummary($action, $result),
         ]);
     }
 
-    private function getDateColumnForTable(string $table, array $columns): ?string
+    /**
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function repairSummary(string $action, array $result): array
     {
-        $map = [
-            'od_appointments' => 'AptDateTime',
-            'appointment' => 'AptDateTime',
-            'od_procedure_logs' => 'ProcDate',
-            'procedurelog' => 'ProcDate',
-            'od_adjustments' => 'AdjDate',
-            'adjustment' => 'AdjDate',
-            'od_claim_procs' => 'ProcDate',
-            'claimproc' => 'ProcDate',
-            'od_pay_splits' => 'DatePay',
-            'paysplit' => 'DatePay',
-            'od_payments' => 'PayDate',
-            'payment' => 'PayDate',
-            'treatment_plans' => 'DateTP',
-            'treatmentplan' => 'DateTP',
-            'od_treatment_plan_attachments' => 'SecDateTEdit',
-            'treatplanattach' => 'SecDateTEdit',
-            'od_schedules' => 'SchedDate',
-            'schedule' => 'SchedDate',
-            'od_recalls' => 'DateDue',
-            'recall' => 'DateDue',
-            'od_patients' => 'SecDateEntry',
-            'patient' => 'SecDateEntry',
-            'od_claim_payments' => 'SecDateTEdit',
-            'claimpayment' => 'SecDateTEdit',
-            'od_pay_plan_charges' => 'ChargeDate',
-            'payplancharge' => 'ChargeDate',
-            'od_deposits' => 'DateDeposit',
-            'deposit' => 'DateDeposit',
-            'od_histappointments' => 'HistDate',
-            'histappointment' => 'HistDate',
-            'od_statements' => 'DateSent',
-            'statement' => 'DateSent',
-            'od_insplans' => 'SecDateTEdit',
-            'insplan' => 'SecDateTEdit',
-            'od_patient_balances' => 'DateTStamp',
-            'patientbalance' => 'DateTStamp',
+        if ($action === RepairOpenDentalRows::ACTION_SYNC) {
+            $notFound = count($result['not_found']);
+
+            return [
+                'synced_count' => $result['synced'],
+                'not_found_keys' => $result['not_found'],
+                'message' => "Synced {$result['synced']} record(s) from OpenDental.".($notFound > 0 ? " {$notFound} no longer exist in OpenDental." : ''),
+            ];
+        }
+
+        $kept = count($result['still_in_opendental']);
+
+        return [
+            'deleted_count' => $result['deleted'],
+            'still_in_opendental_keys' => $result['still_in_opendental'],
+            'message' => "Pruned {$result['deleted']} record(s) confirmed deleted in OpenDental.".($kept > 0 ? " {$kept} still exist in OpenDental and were kept." : ''),
         ];
-
-        if (isset($map[$table]) && in_array($map[$table], $columns, true)) {
-            return $map[$table];
-        }
-
-        foreach (['AptDateTime', 'ProcDate', 'AdjDate', 'DatePay', 'PayDate', 'DateTP', 'SchedDate', 'DateDue', 'SecDateEntry', 'SecDateTEdit', 'DateDeposit', 'DateSent', 'HistDate', 'ChargeDate', 'DateFirstVisit', 'DateTStamp', 'created_at'] as $candidate) {
-            if (in_array($candidate, $columns, true)) {
-                return $candidate;
-            }
-        }
-
-        return null;
     }
 
-    /**
-     * Compare key attributes between local DB row and live OpenDental row.
-     */
-    private function compareRowAttributes(array $localRow, array $liveRow, array $criticalCols): array
+    private function activeOffice(): ?Office
     {
-        $diffs = [];
-        foreach ($criticalCols as $col) {
-            if (! array_key_exists($col, $localRow) || ! array_key_exists($col, $liveRow)) {
-                continue;
-            }
-
-            $localVal = $localRow[$col];
-            $liveVal = $liveRow[$col];
-
-            // Normalize numeric amounts
-            if (is_numeric($localVal) && is_numeric($liveVal)) {
-                if (abs((float) $localVal - (float) $liveVal) > 0.005) {
-                    $diffs[$col] = ['local' => $localVal, 'live' => $liveVal];
-                }
-
-                continue;
-            }
-
-            // Normalize dates/datetimes
-            if (is_string($localVal) && is_string($liveVal) && (str_contains(strtolower($col), 'date') || str_contains(strtolower($col), 'time'))) {
-                $normLocal = str_replace('T', ' ', trim($localVal));
-                $normLive = str_replace('T', ' ', trim($liveVal));
-                if (substr($normLocal, 0, 10) !== substr($normLive, 0, 10)) {
-                    $diffs[$col] = ['local' => $localVal, 'live' => $liveVal];
-                }
-
-                continue;
-            }
-
-            // General scalar equality
-            if ((string) $localVal !== (string) $liveVal) {
-                $diffs[$col] = ['local' => $localVal, 'live' => $liveVal];
-            }
-        }
-
-        return $diffs;
+        return Office::getActiveOffice() ?? Office::first();
     }
 
-    /**
-     * Pre-fetch relational integrity data in bulk to eliminate N+1 queries during diff reconciliation.
-     */
-    private function buildRelationalContext(string $resolvedTable, int $officeId, array $localRowsByPk): array
+    private function activeOfficeId(): int
     {
-        $context = [];
-        if ($resolvedTable === 'od_pay_splits') {
-            $payNums = [];
-            foreach ($localRowsByPk as $r) {
-                $pn = (int) ($r['PayNum'] ?? 0);
-                if ($pn > 0) {
-                    $payNums[$pn] = $pn;
-                }
-            }
-            if (! empty($payNums) && Schema::hasTable('od_payments')) {
-                $context['parent_payments'] = DB::table('od_payments')
-                    ->where('office_id', $officeId)
-                    ->whereIn('PayNum', array_values($payNums))
-                    ->pluck('PayAmt', 'PayNum')
-                    ->toArray();
-
-                $context['split_sums'] = DB::table('od_pay_splits')
-                    ->where('office_id', $officeId)
-                    ->whereIn('PayNum', array_values($payNums))
-                    ->groupBy('PayNum')
-                    ->select('PayNum', DB::raw('SUM(SplitAmt) as split_sum'))
-                    ->pluck('split_sum', 'PayNum')
-                    ->toArray();
-            }
-        } elseif ($resolvedTable === 'od_payments') {
-            $payNums = [];
-            foreach ($localRowsByPk as $r) {
-                $pn = (int) ($r['PayNum'] ?? 0);
-                if ($pn > 0) {
-                    $payNums[$pn] = $pn;
-                }
-            }
-            if (! empty($payNums) && Schema::hasTable('od_pay_splits')) {
-                $stats = DB::table('od_pay_splits')
-                    ->where('office_id', $officeId)
-                    ->whereIn('PayNum', array_values($payNums))
-                    ->groupBy('PayNum')
-                    ->select('PayNum', DB::raw('COUNT(*) as split_cnt'), DB::raw('SUM(SplitAmt) as split_sum'))
-                    ->get();
-                $context['split_stats'] = [];
-                foreach ($stats as $st) {
-                    $context['split_stats'][$st->PayNum] = [
-                        'count' => (int) $st->split_cnt,
-                        'sum' => (float) $st->split_sum,
-                    ];
-                }
-            }
-        } elseif ($resolvedTable === 'od_claim_procs') {
-            $claimPaymentNums = [];
-            $claimNums = [];
-            foreach ($localRowsByPk as $r) {
-                $cpn = (int) ($r['ClaimPaymentNum'] ?? 0);
-                if ($cpn > 0) {
-                    $claimPaymentNums[$cpn] = $cpn;
-                }
-                $cn = (int) ($r['ClaimNum'] ?? 0);
-                if ($cn > 0) {
-                    $claimNums[$cn] = $cn;
-                }
-            }
-            if (! empty($claimPaymentNums) && Schema::hasTable('od_claim_payments')) {
-                $context['existing_claim_payments'] = DB::table('od_claim_payments')
-                    ->where('office_id', $officeId)
-                    ->whereIn('ClaimPaymentNum', array_values($claimPaymentNums))
-                    ->pluck('ClaimPaymentNum', 'ClaimPaymentNum')
-                    ->toArray();
-            }
-            if (! empty($claimNums) && Schema::hasTable('od_claims')) {
-                $context['existing_claims'] = DB::table('od_claims')
-                    ->where('office_id', $officeId)
-                    ->whereIn('ClaimNum', array_values($claimNums))
-                    ->pluck('ClaimNum', 'ClaimNum')
-                    ->toArray();
-            }
-        }
-
-        return $context;
+        return (int) ($this->activeOffice()?->id ?? 0);
     }
 
-    /**
-     * Inspect relational integrity (e.g. child paysplit without parent payment, or split sum mismatch).
-     */
-    private function checkRelationalIntegrity(string $resolvedTable, int $officeId, array $row, array $context = []): ?string
+    private function elapsedMs(float $startedAt): float
     {
-        if ($resolvedTable === 'od_pay_splits') {
-            $payNum = (int) ($row['PayNum'] ?? 0);
-            if ($payNum > 0) {
-                if (isset($context['parent_payments'])) {
-                    if (! array_key_exists($payNum, $context['parent_payments'])) {
-                        return "Parent Payment #{$payNum} is missing in local DB (Relational Orphan)";
-                    }
-                    $payAmt = (float) $context['parent_payments'][$payNum];
-                    $splitSum = (float) ($context['split_sums'][$payNum] ?? 0);
-                    if (abs($splitSum - $payAmt) > 0.01) {
-                        return "Split allocation mismatch: Local splits sum to \${$splitSum} vs Payment #{$payNum} amount \${$payAmt}";
-                    }
-                } elseif (Schema::hasTable('od_payments')) {
-                    $parentPay = DB::table('od_payments')->where('office_id', $officeId)->where('PayNum', $payNum)->first();
-                    if (! $parentPay) {
-                        return "Parent Payment #{$payNum} is missing in local DB (Relational Orphan)";
-                    }
-                    $splitSum = (float) DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->sum('SplitAmt');
-                    $payAmt = (float) ($parentPay->PayAmt ?? 0);
-                    if (abs($splitSum - $payAmt) > 0.01) {
-                        return "Split allocation mismatch: Local splits sum to \${$splitSum} vs Payment #{$payNum} amount \${$payAmt}";
-                    }
-                }
-            }
-        } elseif ($resolvedTable === 'od_payments') {
-            $payNum = (int) ($row['PayNum'] ?? 0);
-            if ($payNum > 0) {
-                if (isset($context['split_stats'])) {
-                    $stats = $context['split_stats'][$payNum] ?? null;
-                    $payAmt = (float) ($row['PayAmt'] ?? 0);
-                    if (! $stats || ($stats['count'] ?? 0) === 0) {
-                        return "No child pay splits found in local DB for Payment #{$payNum}";
-                    }
-                    $splitSum = (float) ($stats['sum'] ?? 0);
-                    if (abs($splitSum - $payAmt) > 0.01) {
-                        return "Child splits sum (\${$splitSum}) differs from PayAmt (\${$payAmt})";
-                    }
-                } elseif (Schema::hasTable('od_pay_splits')) {
-                    $splitSum = (float) DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->sum('SplitAmt');
-                    $payAmt = (float) ($row['PayAmt'] ?? 0);
-                    $splitCount = DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->count();
-                    if ($splitCount === 0) {
-                        return "No child pay splits found in local DB for Payment #{$payNum}";
-                    }
-                    if (abs($splitSum - $payAmt) > 0.01) {
-                        return "Child splits sum (\${$splitSum}) differs from PayAmt (\${$payAmt})";
-                    }
-                }
-            }
-        } elseif ($resolvedTable === 'od_claim_procs') {
-            $claimPaymentNum = (int) ($row['ClaimPaymentNum'] ?? 0);
-            if ($claimPaymentNum > 0) {
-                if (isset($context['existing_claim_payments'])) {
-                    if (! isset($context['existing_claim_payments'][$claimPaymentNum])) {
-                        return "Parent Claim Payment #{$claimPaymentNum} missing locally";
-                    }
-                } elseif (Schema::hasTable('od_claim_payments')) {
-                    $claimPaymentExists = DB::table('od_claim_payments')->where('office_id', $officeId)->where('ClaimPaymentNum', $claimPaymentNum)->exists();
-                    if (! $claimPaymentExists) {
-                        return "Parent Claim Payment #{$claimPaymentNum} missing locally";
-                    }
-                }
-            }
-
-            $claimNum = (int) ($row['ClaimNum'] ?? 0);
-            if ($claimNum > 0) {
-                if (isset($context['existing_claims'])) {
-                    if (! isset($context['existing_claims'][$claimNum])) {
-                        return "Parent Claim #{$claimNum} missing locally";
-                    }
-                } elseif (Schema::hasTable('od_claims')) {
-                    $claimExists = DB::table('od_claims')->where('office_id', $officeId)->where('ClaimNum', $claimNum)->exists();
-                    if (! $claimExists) {
-                        return "Parent Claim #{$claimNum} missing locally";
-                    }
-                }
-            }
-        }
-
-        return null;
+        return round((microtime(true) - $startedAt) * 1000, 2);
     }
 }

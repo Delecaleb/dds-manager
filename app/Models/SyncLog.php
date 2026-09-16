@@ -14,6 +14,8 @@ class SyncLog extends Model
         'module',
         'last_primary_key',
         'last_synced_at',
+        'cycle_started_at',
+        'run_token',
         'total_processed',
         'retry_count',
         'status',

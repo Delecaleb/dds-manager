@@ -58,38 +58,15 @@
         <!-- 1. Table Select -->
         <div class="lg:col-span-4">
           <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Table</label>
+          {{-- Options come from OpenDentalTableCatalog: OpenDental data only. --}}
           <select id="activeTableSelect" class="w-full bg-white border border-slate-300 text-slate-800 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-slate-400 focus:border-slate-400 shadow-2xs h-[38px]">
-            <optgroup label="📅 Appointments & Schedules">
-              <option value="appointment" selected>appointment (od_appointments)</option>
-              <option value="histappointment">histappointment (od_histappointments)</option>
-              <option value="schedule">schedule (od_schedules)</option>
-              <option value="recall">recall (od_recalls)</option>
-              <option value="recalltype">recalltype (od_recall_types)</option>
-            </optgroup>
-            <optgroup label="🩺 Clinical & Procedures">
-              <option value="procedurelog">procedurelog (od_procedure_logs)</option>
-              <option value="procedurecode">procedurecode (od_procedures)</option>
-              <option value="treatmentplan">treatmentplan (treatment_plans)</option>
-              <option value="treatplanattach">treatplanattach (od_treatment_plan_attachments)</option>
-            </optgroup>
-            <optgroup label="💳 Financials, Billing & Claims">
-              <option value="adjustment">adjustment (od_adjustments)</option>
-              <option value="payment">payment (od_payments)</option>
-              <option value="paysplit">paysplit (od_pay_splits)</option>
-              <option value="claimproc">claimproc (od_claim_procs)</option>
-              <option value="claimpayment">claimpayment (od_claim_payments)</option>
-              <option value="statement">statement (od_statements)</option>
-              <option value="payplancharge">payplancharge (od_pay_plan_charges)</option>
-              <option value="deposit">deposit (od_deposits)</option>
-              <option value="patientbalance">patientbalance (od_patient_balances)</option>
-            </optgroup>
-            <optgroup label="🏢 Practice & Patient Setup">
-              <option value="patient">patient (od_patients)</option>
-              <option value="provider">provider (od_providers)</option>
-              <option value="insplan">insplan (od_insplans)</option>
-              <option value="carrier">carrier (od_carriers)</option>
-              <option value="definition">definition (od_definitions)</option>
-            </optgroup>
+            @foreach ($tables as $table)
+              <option value="{{ $table->key }}"
+                      data-repairable="{{ $table->isRepairable() ? '1' : '0' }}"
+                      @selected($table->key === 'appointment')>
+                {{ $table->key }} ({{ $table->localTable }}){{ $table->existsInOpenDental ? '' : ' — local rollup' }}
+              </option>
+            @endforeach
           </select>
         </div>
 
@@ -97,8 +74,8 @@
         <div class="lg:col-span-4">
           <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Date Range</label>
           <x-daterange-picker id="odExplorerDateRange" on-apply="odExplorerDateApplied" class="w-full h-[38px] !bg-white shadow-2xs text-xs" />
-          <input type="hidden" id="filterStartDate" value="2026-08-01">
-          <input type="hidden" id="filterEndDate" value="2026-08-19">
+          <input type="hidden" id="filterStartDate" value="{{ now()->startOfMonth()->toDateString() }}">
+          <input type="hidden" id="filterEndDate" value="{{ now()->toDateString() }}">
         </div>
 
         <!-- 3. Status Filter (Visible for appointments) -->
@@ -130,7 +107,6 @@
       <!-- Quick Preset Dates -->
       <div id="quickDatePresetsWrapper" class="flex items-center gap-1.5 pt-1 border-t border-slate-100 text-xs flex-wrap">
         <span class="text-slate-400 font-medium text-[11px] mr-1">Quick Dates:</span>
-        <button type="button" onclick="setDatePreset('aug_2026')" class="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition cursor-pointer">Aug 1–19, 2026 (Live Data)</button>
         <button type="button" onclick="setDatePreset('this_month')" class="px-2.5 py-1 text-[11px] font-medium rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition cursor-pointer">This Month</button>
         <button type="button" onclick="setDatePreset('last_month')" class="px-2.5 py-1 text-[11px] font-medium rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition cursor-pointer">Last Month</button>
         <button type="button" onclick="setDatePreset('last_30_days')" class="px-2.5 py-1 text-[11px] font-medium rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition cursor-pointer">Last 30 Days</button>
@@ -141,7 +117,10 @@
 
     <!-- VIEW 1: SIDE-BY-SIDE RECONCILIATION CONTAINER -->
     <div id="viewCompareContainer" class="space-y-5">
-      
+
+      <!-- Verification notice: shown when OpenDental could not confirm the comparison -->
+      <div id="compareNotice" class="hidden p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 text-xs font-medium"></div>
+
       <!-- Metrics Grid -->
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
@@ -233,6 +212,9 @@
             </button>
             <button type="button" id="pillMatched" onclick="setDiffFilter('matched')" class="px-3 py-1 text-xs font-medium rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition cursor-pointer">
               Matched (<span id="countPillMatched">0</span>)
+            </button>
+            <button type="button" id="pillUnverified" onclick="setDiffFilter('unverified')" class="px-3 py-1 text-xs font-medium rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition cursor-pointer">
+              Unverified (<span id="countPillUnverified">0</span>)
             </button>
           </div>
 
@@ -413,6 +395,15 @@
         executeCurrentMode();
       });
 
+      // Start on the same range the date picker shows (saved range, else month to date).
+      if (window.DDS && DDS.date) {
+        var saved = DDS.date.getRange();
+        if (saved && !saved.isDefault) {
+          document.getElementById('filterStartDate').value = saved.start;
+          document.getElementById('filterEndDate').value = saved.end;
+        }
+      }
+
       // Initial run: compare side-by-side
       executeCurrentMode();
     });
@@ -488,10 +479,7 @@
       var startStr = '';
       var endStr = '';
 
-      if (preset === 'aug_2026') {
-        startStr = '2026-08-01';
-        endStr = '2026-08-19';
-      } else if (preset === 'this_month') {
+      if (preset === 'this_month') {
         startStr = y + '-' + m + '-01';
         endStr = y + '-' + m + '-' + d;
       } else if (preset === 'last_month') {
@@ -595,6 +583,20 @@
       document.getElementById('countPillOrphan').textContent = (sum.orphan_count || 0);
       document.getElementById('countPillMissing').textContent = (sum.missing_count || 0);
       document.getElementById('countPillMatched').textContent = (sum.matched_count || 0);
+      document.getElementById('countPillUnverified').textContent = (sum.unverified_count || 0);
+
+      // Nothing can be pruned or repaired unless OpenDental verified the comparison.
+      var notice = document.getElementById('compareNotice');
+      var noticeText = [];
+      if (_diffResult.live_error) noticeText.push('OpenDental could not be reached (' + _diffResult.live_error + '). ' + (sum.unverified_count || 0) + ' record(s) are unverified and cannot be pruned.');
+      if (_diffResult.warning) noticeText.push(_diffResult.warning);
+      if (_diffResult.repairable === false) noticeText.push('This table cannot be repaired from OpenDental.');
+      notice.textContent = noticeText.join(' ');
+      notice.classList.toggle('hidden', noticeText.length === 0);
+
+      if (_diffResult.repairable === false) {
+        sum = Object.assign({}, sum, { discrepancy_count: 0, orphan_count: 0, missing_count: 0 });
+      }
 
       var discBtn = document.getElementById('btnSyncDiscrepancies');
       var pruneBtn = document.getElementById('btnPruneAll');
@@ -643,8 +645,11 @@
         discrepancy: document.getElementById('pillDiscrepancy'),
         orphan: document.getElementById('pillOrphan'),
         missing: document.getElementById('pillMissing'),
-        matched: document.getElementById('pillMatched')
+        matched: document.getElementById('pillMatched'),
+        unverified: document.getElementById('pillUnverified')
       };
+      pills.unverified.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition cursor-pointer';
+      if (status === 'unverified') pills.unverified.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-slate-600 text-white shadow-2xs transition cursor-pointer';
 
       pills.all.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition cursor-pointer';
       pills.discrepancy.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 transition cursor-pointer';
@@ -686,20 +691,26 @@
         return;
       }
 
+      var canRepair = _diffResult.repairable !== false;
+
       var html = rows.map(function (item) {
         var d = item.data || {};
         var statusBadge = '';
         var actionBtn = '';
+        var pkNum = parseInt(item.pk, 10) || 0;
 
         if (item.status === 'orphan') {
           statusBadge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">🔴 Deleted in OD</span>';
-          actionBtn = '<button onclick="pruneSingleOrphan(' + item.pk + ')" class="px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition cursor-pointer" title="Delete from local database">Prune</button>';
+          actionBtn = canRepair ? '<button onclick="pruneSingleOrphan(' + pkNum + ')" class="px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition cursor-pointer" title="Delete from local database (re-checked against OpenDental first)">Prune</button>' : '';
         } else if (item.status === 'missing') {
           statusBadge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">🟡 Missing Locally</span>';
-          actionBtn = '<button onclick="syncSingleMissing(' + item.pk + ')" class="px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition cursor-pointer" title="Sync into local database">Sync</button>';
+          actionBtn = canRepair ? '<button onclick="syncKeysFromOpenDental([' + pkNum + '])" class="px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition cursor-pointer" title="Fetch from OpenDental into local database">Sync</button>' : '';
         } else if (item.status === 'discrepancy') {
           statusBadge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">🔵 Value Out of Sync</span>';
-          actionBtn = '<button onclick="syncSingleMissing(' + item.pk + ')" class="px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition cursor-pointer" title="Overwrite local values with Live OD">Update</button>';
+          actionBtn = canRepair ? '<button onclick="syncKeysFromOpenDental([' + pkNum + '])" class="px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition cursor-pointer" title="Re-fetch from OpenDental and overwrite local values">Update</button>' : '';
+        } else if (item.status === 'unverified') {
+          statusBadge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-300">⚪ Unverified</span>';
+          actionBtn = '<span class="text-slate-400 text-[11px]" title="OpenDental did not confirm this record; re-run the comparison">—</span>';
         } else {
           statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200">🟢 Matched</span>';
           actionBtn = '<span class="text-slate-400 text-[11px]">Synced</span>';
@@ -750,111 +761,68 @@
 
     document.getElementById('diffSearchInput').addEventListener('input', renderCompareTable);
 
+    var SPINNER = '<svg class="animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>';
+
+    // Repairs send only table + primary keys. The server re-reads OpenDental
+    // itself, so nothing shown in the browser is ever written to the database.
+    function postRepair(url, table, keys, btn, busyLabel) {
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = SPINNER + ' ' + busyLabel;
+      }
+
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ table: table, keys: keys })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          alert(res.error ? 'Error: ' + res.error : (res.message || 'Done.'));
+          executeCompare();
+        })
+        .catch(function (err) {
+          alert('Request failed: ' + err.message);
+          executeCompare();
+        });
+    }
+
+    function keysWithStatus(status) {
+      return (_diffResult.diff_rows || [])
+        .filter(function (r) { return r.status === status; })
+        .map(function (r) { return parseInt(r.pk, 10); })
+        .filter(function (pk) { return pk > 0; });
+    }
+
+    function syncKeysFromOpenDental(keys, btn, busyLabel) {
+      if (!_diffResult || !keys.length) return;
+      return postRepair('{{ route("od-explorer.sync") }}', _diffResult.table, keys, btn, busyLabel || 'Syncing...');
+    }
+
     function syncAllDiscrepancies() {
-      if (!_diffResult || !_diffResult.discrepancy_keys || !_diffResult.discrepancy_keys.length) return;
-      var discRows = _diffResult.diff_rows
-        .filter(function (r) { return r.status === 'discrepancy'; })
-        .map(function (r) { return r.data; });
-
-      if (!confirm('Update ' + discRows.length + ' out-of-sync records in local DB with live OpenDental values?')) return;
-      var btn = document.getElementById('btnSyncDiscrepancies');
-      btn.disabled = true;
-      btn.innerHTML = '<svg class="animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Updating...';
-
-      fetch('{{ url("/open-dental-explorer/sync-to-local") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-        body: JSON.stringify({ table: _diffResult.table, rows: discRows })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (res) {
-          if (res.error) alert('Error: ' + res.error);
-          else alert(res.message || 'Successfully updated out-of-sync records.');
-          executeCompare();
-        })
-        .catch(function (err) {
-          alert('Update failed: ' + err.message);
-          executeCompare();
-        });
-    }
-
-    function pruneAllOrphans() {
-      if (!_diffResult || !_diffResult.orphan_keys || !_diffResult.orphan_keys.length) return;
-      var count = _diffResult.orphan_keys.length;
-      if (!confirm('Delete all ' + count + ' orphan record(s) from your local table "' + _diffResult.local_table + '"?')) return;
-
-      var btn = document.getElementById('btnPruneAll');
-      btn.disabled = true;
-      btn.innerHTML = '<svg class="animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Pruning...';
-
-      fetch('{{ url("/open-dental-explorer/prune-orphans") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-        body: JSON.stringify({ table: _diffResult.table, keys: _diffResult.orphan_keys })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (res) {
-          if (res.error) alert('Error: ' + res.error);
-          else alert(res.message || 'Successfully pruned orphan records.');
-          executeCompare();
-        })
-        .catch(function (err) {
-          alert('Prune failed: ' + err.message);
-          executeCompare();
-        });
-    }
-
-    function pruneSingleOrphan(pk) {
-      if (!confirm('Delete orphan record #' + pk + ' from local DB?')) return;
-      fetch('{{ url("/open-dental-explorer/prune-orphans") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-        body: JSON.stringify({ table: _diffResult.table, keys: [pk] })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function () { executeCompare(); });
+      var keys = keysWithStatus('discrepancy');
+      if (!keys.length) return;
+      if (!confirm('Re-fetch ' + keys.length + ' out-of-sync record(s) from OpenDental and overwrite the local copies?')) return;
+      syncKeysFromOpenDental(keys, document.getElementById('btnSyncDiscrepancies'), 'Updating...');
     }
 
     function syncAllMissing() {
-      if (!_diffResult || !_diffResult.missing_keys || !_diffResult.missing_keys.length) return;
-      var missingRows = _diffResult.diff_rows
-        .filter(function (r) { return r.status === 'missing'; })
-        .map(function (r) { return r.data; });
-
-      if (!confirm('Sync ' + missingRows.length + ' missing records from OpenDental into local DB?')) return;
-      var btn = document.getElementById('btnSyncAll');
-      btn.disabled = true;
-      btn.innerHTML = '<svg class="animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Syncing...';
-
-      fetch('{{ url("/open-dental-explorer/sync-to-local") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-        body: JSON.stringify({ table: _diffResult.table, rows: missingRows })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (res) {
-          if (res.error) alert('Error: ' + res.error);
-          else alert(res.message || 'Successfully synced records.');
-          executeCompare();
-        })
-        .catch(function (err) {
-          alert('Sync failed: ' + err.message);
-          executeCompare();
-        });
+      var keys = keysWithStatus('missing');
+      if (!keys.length) return;
+      if (!confirm('Fetch ' + keys.length + ' missing record(s) from OpenDental into the local database?')) return;
+      syncKeysFromOpenDental(keys, document.getElementById('btnSyncAll'), 'Syncing...');
     }
 
-    function syncSingleMissing(pk) {
-      if (!_diffResult) return;
-      var match = _diffResult.diff_rows.find(function (r) { return r.pk == pk && r.status === 'missing'; });
-      if (!match || !match.data) return;
+    function pruneAllOrphans() {
+      var keys = keysWithStatus('orphan');
+      if (!keys.length) return;
+      if (!confirm('Delete ' + keys.length + ' record(s) from "' + _diffResult.local_table + '"?\n\nEach one is re-checked against OpenDental first; records that still exist there are kept.')) return;
+      postRepair('{{ route("od-explorer.prune-orphans") }}', _diffResult.table, keys, document.getElementById('btnPruneAll'), 'Pruning...');
+    }
 
-      fetch('{{ url("/open-dental-explorer/sync-to-local") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-        body: JSON.stringify({ table: _diffResult.table, rows: [match.data] })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function () { executeCompare(); });
+    function pruneSingleOrphan(pk) {
+      if (!pk || !confirm('Delete record #' + pk + ' from the local database? It is re-checked against OpenDental first.')) return;
+      postRepair('{{ route("od-explorer.prune-orphans") }}', _diffResult.table, [pk], null, '');
     }
 
     function exportDiffCsv() {
@@ -891,11 +859,8 @@
       btn.disabled = true;
       btn.innerHTML = '<svg class="animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Fetching...';
 
+      // The server applies the table's own business-date column to the range.
       var conditions = [];
-      if (startDate && endDate) {
-        var dateCol = (table.indexOf('appointment') !== -1) ? 'AptDateTime' : 'ProcDate';
-        conditions.push({ column: dateCol, operator: 'BETWEEN', value: startDate + ' 00:00:00, ' + endDate + ' 23:59:59' });
-      }
 
       if (table === 'appointment' || table === 'od_appointments') {
         if (statusVal === '1_2') conditions.push({ column: 'AptStatus', operator: 'IN', value: '1, 2' });
@@ -912,6 +877,8 @@
           table: table,
           columns: ['*'],
           conditions: conditions,
+          start_date: startDate || null,
+          end_date: endDate || null,
           limit: limit
         })
       })
@@ -970,28 +937,39 @@
     }
 
     function syncSingleQueryToLocal() {
-      if (!_singleQueryResult || !_singleQueryResult.rows || !_singleQueryResult.rows.length) return;
-      if (!confirm('Sync ' + _singleQueryResult.rows.length + ' live records into local database?')) return;
+      var res0 = _singleQueryResult;
+      if (!res0 || !res0.rows || !res0.rows.length || !res0.primary_key) return;
+
+      var keys = res0.rows
+        .map(function (r) { return parseInt(r[res0.primary_key], 10); })
+        .filter(function (pk) { return pk > 0; });
+
+      if (!keys.length) {
+        alert('Include the primary key column (' + res0.primary_key + ') in the query to sync these records.');
+        return;
+      }
+      if (!confirm('Re-fetch ' + keys.length + ' record(s) from OpenDental into the local database?')) return;
 
       var btn = document.getElementById('btnSyncSingleLive');
       btn.disabled = true;
       btn.textContent = 'Syncing...';
 
-      fetch('{{ url("/open-dental-explorer/sync-to-local") }}', {
+      fetch('{{ route("od-explorer.sync") }}', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-        body: JSON.stringify({
-          table: _singleQueryResult.table,
-          rows: _singleQueryResult.rows
-        })
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ table: res0.table, keys: keys })
       })
         .then(function (r) { return r.json(); })
         .then(function (res) {
           btn.disabled = false;
           btn.innerHTML = '<i data-lucide="cloud-download" class="w-3.5 h-3.5"></i> Sync Fetched to Local DB';
           if (window.lucide) lucide.createIcons();
-          if (res.error) alert('Error: ' + res.error);
-          else alert(res.message || 'Synced successfully.');
+          alert(res.error ? 'Error: ' + res.error : (res.message || 'Synced successfully.'));
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="cloud-download" class="w-3.5 h-3.5"></i> Sync Fetched to Local DB';
+          alert('Sync failed: ' + err.message);
         });
     }
 
@@ -1054,7 +1032,7 @@
               '<td class="px-4 py-2.5"><input type="datetime-local" class="cp-date bg-white border border-slate-300 rounded-md px-2 py-1 text-xs text-slate-800 focus:ring-slate-400 shadow-2xs" value="' + dateVal + '"></td>' +
               '<td class="px-4 py-2.5"><input type="number" class="cp-pk w-28 bg-white border border-slate-300 rounded-md px-2 py-1 text-xs text-slate-800 focus:ring-slate-400 shadow-2xs" value="' + (log.last_primary_key || 0) + '"></td>' +
               '<td class="px-4 py-2.5 font-mono font-semibold text-slate-700">' + Number(log.total_processed || 0).toLocaleString() + '</td>' +
-              '<td class="px-4 py-2.5 text-right"><button onclick="saveCheckpointRow(\'' + escMod + '\', this)" class="px-3 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-md transition shadow-2xs cursor-pointer">Reset Date</button></td>' +
+              '<td class="px-4 py-2.5 text-right"><button data-module="' + escMod + '" onclick="saveCheckpointRow(this.dataset.module, this)" class="px-3 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-md transition shadow-2xs cursor-pointer">Reset Date</button></td>' +
               '</tr>';
           }).join('');
           tbody.innerHTML = html;
@@ -1100,14 +1078,14 @@
         body: JSON.stringify({ module: 'all', last_synced_at: null, last_primary_key: 0 })
       })
         .then(function (r) { return r.json(); })
-        .then(function () {
-          alert('All checkpoints reset.');
+        .then(function (res) {
+          alert(res.error ? 'Error: ' + res.error : (res.message || 'Checkpoints reset.'));
           loadSyncCheckpoints();
         });
     }
 
     function escHtml(s) {
-      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return String(s === 0 ? '0' : (s || '')).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
   </script>
 </x-app-layout>

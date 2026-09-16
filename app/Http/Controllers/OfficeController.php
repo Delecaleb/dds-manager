@@ -4,15 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Domain\Support\ClinicRegistry;
 use App\Models\Office;
-use App\Services\Sync\AppointmentSyncService;
-use App\Services\Sync\PatientSyncService;
-use App\Services\Sync\ProcedureLogSyncService;
 use App\Services\Sync\SyncReportService;
-use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use InvalidArgumentException;
 
 class OfficeController extends Controller
 {
@@ -157,45 +154,22 @@ class OfficeController extends Controller
 
         $moduleKey = (string) $request->input('module');
 
-        ob_start();
-
         try {
-            $result = $syncReportService->syncModuleForOffice($office, $moduleKey);
-            ob_end_clean();
-
-            return response()->json($result);
-        } catch (Exception $e) {
-            ob_end_clean();
-
+            return response()->json($syncReportService->queueModuleForOffice($office, $moduleKey));
+        } catch (InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,
-                'error' => "Sync failed for {$moduleKey}: ".$e->getMessage(),
-            ], 500);
+                'error' => $e->getMessage(),
+            ], 422);
         }
     }
 
-    public function syncNow(Office $office): JsonResponse
+    /**
+     * Queue a full server-side sync for the office. Returns immediately; the
+     * queue worker does the work, so it never depends on the browser session.
+     */
+    public function syncNow(Office $office, SyncReportService $syncReportService): JsonResponse
     {
-        ob_start();
-
-        try {
-            app(PatientSyncService::class)->forOffice($office)->sync();
-            app(AppointmentSyncService::class)->forOffice($office)->sync();
-            app(ProcedureLogSyncService::class)->forOffice($office)->sync();
-
-            ob_end_clean();
-
-            return response()->json([
-                'success' => true,
-                'message' => "Successfully synced data for office '{$office->name}'.",
-            ]);
-        } catch (Exception $e) {
-            ob_end_clean();
-
-            return response()->json([
-                'success' => false,
-                'error' => "Sync failed for office '{$office->name}': ".$e->getMessage(),
-            ], 500);
-        }
+        return response()->json($syncReportService->queueAllModulesForOffice($office));
     }
 }

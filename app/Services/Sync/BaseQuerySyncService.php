@@ -6,16 +6,21 @@ use App\Models\Office;
 use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
 use Exception;
+use Illuminate\Database\DetectsConcurrencyErrors;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 abstract class BaseQuerySyncService
 {
+    use DetectsConcurrencyErrors;
+
     protected ?Office $office = null;
 
     protected int $batchSize = 1000;
-
-    protected int $maxRetries = 5;
 
     protected int $sleepSeconds = 1;
 
@@ -24,6 +29,16 @@ abstract class BaseQuerySyncService
     protected ?string $windowStart = null;
 
     protected ?string $windowEnd = null;
+
+    protected ?int $timeBudgetSeconds = null;
+
+    protected float $runStartedAt = 0.0;
+
+    protected bool $interrupted = false;
+
+    protected bool $skipped = false;
+
+    protected ?SyncLease $lease = null;
 
     public function __construct(
         protected QueryService $queryService
@@ -97,6 +112,73 @@ abstract class BaseQuerySyncService
         $officeId = $this->getOffice()->id ?? 1;
 
         return "office_{$officeId}:".$this->table().$this->windowSuffix();
+    }
+
+    /**
+     * Public description of the table this service syncs. This is the single
+     * source for OpenDental table metadata (see OpenDentalTableCatalog), so
+     * tools like the OD Data Explorer never keep their own copies.
+     *
+     * @return array{od_table: string, local_table: string, primary_key: string, date_column: ?string, sync_column: ?string}
+     */
+    public function describe(): array
+    {
+        $modelClass = $this->model();
+
+        return [
+            'od_table' => $this->table(),
+            'local_table' => (new $modelClass)->getTable(),
+            'primary_key' => $this->primaryKey(),
+            'date_column' => $this->dateColumn(),
+            'sync_column' => $this->syncColumn(),
+        ];
+    }
+
+    /**
+     * Re-fetch specific rows from OpenDental by primary key and upsert them
+     * through the normal persistence path (transformRow, truncation, upsert).
+     *
+     * The cursor is never touched, so this is safe alongside a running sync.
+     * Rows are always taken from OpenDental — never from caller-supplied data.
+     *
+     * @param  list<int|string>  $primaryKeys
+     * @return array{requested: int, synced: int, not_found: list<int>}
+     */
+    public function syncRowsByPrimaryKeys(array $primaryKeys): array
+    {
+        $keys = array_values(array_unique(array_filter(array_map('intval', $primaryKeys), fn (int $key) => $key > 0)));
+        $office = $this->getOffice();
+        $this->queryService->forOffice($office);
+
+        $log = SyncLog::withoutGlobalScopes()->firstOrCreate(
+            ['module' => $this->module()],
+            ['office_id' => (int) ($office->id ?? 1), 'status' => 'idle', 'total_processed' => 0]
+        );
+
+        $pk = $this->primaryKey();
+        $found = [];
+
+        foreach (array_chunk($keys, $this->batchSize) as $chunk) {
+            $rows = $this->executeWithRetry(
+                "SELECT * FROM {$this->table()} WHERE {$pk} IN (".implode(',', $chunk).')'
+            );
+
+            if ($rows === []) {
+                continue;
+            }
+
+            $this->persistBatch($rows, $log);
+
+            foreach ($rows as $row) {
+                $found[(int) ($row[$pk] ?? 0)] = true;
+            }
+        }
+
+        return [
+            'requested' => count($keys),
+            'synced' => count($found),
+            'not_found' => array_values(array_filter($keys, fn (int $key) => ! isset($found[$key]))),
+        ];
     }
 
     /**
@@ -202,44 +284,55 @@ abstract class BaseQuerySyncService
         return $timestamp !== false ? date('Y-m-d', $timestamp) : null;
     }
 
+    /**
+     * Stop cleanly after this many seconds (cursor saved, lease paused) so a
+     * queued job can re-queue itself instead of being killed by the host.
+     * Null — the default for CLI/web callers — means run to completion.
+     */
+    public function withTimeBudget(?int $seconds): static
+    {
+        $this->timeBudgetSeconds = $seconds !== null && $seconds > 0 ? $seconds : null;
+
+        return $this;
+    }
+
+    /**
+     * True when the last sync() stopped at the time budget with work remaining.
+     */
+    public function wasInterrupted(): bool
+    {
+        return $this->interrupted;
+    }
+
+    /**
+     * True when the last sync() did nothing because another live run holds the lease.
+     */
+    public function wasSkipped(): bool
+    {
+        return $this->skipped;
+    }
+
     public function sync(): void
     {
+        $this->interrupted = false;
+        $this->skipped = false;
+        $this->runStartedAt = microtime(true);
+
         $office = $this->getOffice();
         $this->queryService->forOffice($office);
 
-        $modelClass = $this->model();
-        if (class_exists($modelClass)) {
-            $model = new $modelClass;
-            $tableName = $model->getTable();
-            if (Schema::hasTable($tableName) && ! Schema::hasColumn($tableName, 'office_id')) {
-                Schema::table($tableName, function ($table) {
-                    $table->unsignedBigInteger('office_id')->default(1)->index();
-                });
-            }
-        }
+        // Atomic: two processes can never both hold the same office+module.
+        $lease = SyncLease::acquire($this->module(), (int) ($office->id ?? 1));
 
-        $log = SyncLog::withoutGlobalScopes()->firstOrCreate(
-            ['module' => $this->module()],
-            [
-                'office_id' => $office->id ?? 1,
-                'status' => 'idle',
-                'total_processed' => 0,
-            ]
-        );
-
-        // Prevent concurrent duplicate runs for the same module & office if an active process has an active heartbeat (< 10 min)
-        if ($log->status === 'running' && $log->updated_at && (now()->timestamp - strtotime((string) $log->updated_at)) < 600) {
-            $this->logOutput("Sync is already running for {$this->module()} (last heartbeat {$log->updated_at}). Skipping duplicate process.\n");
+        if ($lease === null) {
+            $this->skipped = true;
+            $this->logOutput("Sync is already running for {$this->module()}. Skipping duplicate process.\n");
 
             return;
         }
 
-        $log->update([
-            'office_id' => $office->id ?? 1,
-            'status' => 'running',
-            'started_at' => now(),
-            'last_error' => null,
-        ]);
+        $this->lease = $lease;
+        $log = $lease->log();
 
         try {
 
@@ -248,40 +341,76 @@ abstract class BaseQuerySyncService
             // always when the table has no incremental sync column.
             if ($this->syncColumn() === null || $log->last_synced_at === null) {
 
-                $runStartedAt = now()->format('Y-m-d H:i:s');
+                // A full pass may span several time-budgeted runs, so its
+                // start is persisted rather than taken from this run.
+                $cycleStartedAt = $log->cycle_started_at
+                    ? (string) $log->cycle_started_at
+                    : now()->format('Y-m-d H:i:s');
+
+                if ($log->cycle_started_at === null) {
+                    $lease->heartbeat(['cycle_started_at' => $cycleStartedAt]);
+                }
 
                 $this->runInitialSync($log);
+
+                if ($this->interrupted) {
+                    $lease->pause();
+
+                    return;
+                }
 
                 // Watermark for the first incremental run. Anything that
                 // changed remotely while the initial sync was running is
                 // covered by overlapSeconds + the hash-skip on re-scan.
+                $completion = ['cycle_started_at' => null];
+
                 if ($this->syncColumn() !== null) {
-                    $log->update(['last_synced_at' => $runStartedAt]);
+                    $completion['last_synced_at'] = $cycleStartedAt;
                 }
+
+                $lease->complete($completion);
 
             } else {
 
                 $this->runIncrementalSync($log);
 
+                $this->interrupted ? $lease->pause() : $lease->complete();
+
             }
 
-            $log->update([
-                'status' => 'completed',
-                'finished_at' => now(),
-                'retry_count' => 0,
-            ]);
+        } catch (SyncLeaseLostException $e) {
 
-        } catch (Exception $e) {
+            // Another run owns the row now; leave it untouched.
+            throw $e;
+        } catch (Throwable $e) {
 
-            $log->increment('retry_count');
-
-            $log->update([
-                'status' => 'failed',
-                'last_error' => $e->getMessage(),
-            ]);
+            $lease->fail($e);
 
             throw $e;
+        } finally {
+
+            $this->lease = null;
+
         }
+    }
+
+    /**
+     * Save cursor progress through the lease (aborts if the lease was lost).
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    protected function heartbeat(array $attributes = []): void
+    {
+        $this->lease?->heartbeat($attributes);
+    }
+
+    /**
+     * Whether the time budget is spent and the batch loop should stop.
+     */
+    protected function timeBudgetExhausted(): bool
+    {
+        return $this->timeBudgetSeconds !== null
+            && (microtime(true) - $this->runStartedAt) >= $this->timeBudgetSeconds;
     }
 
     /**
@@ -321,9 +450,8 @@ abstract class BaseQuerySyncService
 
             $persistTime = round(microtime(true) - $t1, 2);
 
-            $log->update([
+            $this->heartbeat([
                 'last_primary_key' => $lastId,
-                'updated_at' => now(),
             ]);
 
             $this->logOutput(sprintf(
@@ -334,6 +462,13 @@ abstract class BaseQuerySyncService
                 $fetchTime,
                 $persistTime
             ));
+
+            // A short page means the table is exhausted — no need to come back.
+            if (count($rows) >= $this->batchSize && $this->timeBudgetExhausted()) {
+                $this->interrupted = true;
+
+                return;
+            }
 
             if ($this->sleepSeconds > 0) {
                 usleep(50000); // 50ms light throttle
@@ -394,10 +529,9 @@ abstract class BaseQuerySyncService
 
             // Persist both halves of the cursor so a kill mid-run resumes
             // exactly where it left off (minus the overlap window).
-            $log->update([
+            $this->heartbeat([
                 'last_synced_at' => $lastSync,
                 'last_primary_key' => $lastId,
-                'updated_at' => now(),
             ]);
 
             $this->logOutput(sprintf(
@@ -409,6 +543,12 @@ abstract class BaseQuerySyncService
                 $fetchTime,
                 $persistTime
             ));
+
+            if (count($rows) >= $this->batchSize && $this->timeBudgetExhausted()) {
+                $this->interrupted = true;
+
+                return;
+            }
 
             if ($this->sleepSeconds > 0) {
                 usleep(50000); // 50ms light throttle
@@ -499,35 +639,80 @@ abstract class BaseQuerySyncService
 
             try {
                 // High-performance single multi-row UPSERT query
-                DB::table($tableName)->upsert($rowsToUpsert, ['office_id', $pk], $updateColumns);
-                $log->increment('total_processed', count($rowsToUpsert));
-            } catch (\Throwable $e) {
-                // Safe fallback to atomic updateOrInsert per record
-                DB::transaction(function () use ($tableName, $rowsToUpsert, $log, $pk, $officeId) {
+                $this->retryOnLockContention(
+                    fn () => DB::table($tableName)->upsert($rowsToUpsert, ['office_id', $pk], $updateColumns)
+                );
+            } catch (QueryException $e) {
+                // Lock contention that outlived its retries is a real failure;
+                // the queue backoff retries the whole batch later.
+                if ($this->causedByConcurrencyError($e)) {
+                    throw $e;
+                }
+
+                // Row-level fallback for data a multi-row upsert rejects.
+                // Logged so a recurring data problem is visible, not silent.
+                Log::warning("Bulk upsert failed for {$this->module()}; falling back to per-row writes.", [
+                    'table' => $tableName,
+                    'rows' => count($rowsToUpsert),
+                    'error' => $e->getMessage(),
+                ]);
+
+                $this->retryOnLockContention(fn () => DB::transaction(function () use ($tableName, $rowsToUpsert, $pk, $officeId) {
                     foreach ($rowsToUpsert as $cleanRow) {
-                        $pkVal = $cleanRow[$pk];
                         $matchCond = [
                             'office_id' => $officeId,
-                            $pk => $pkVal,
+                            $pk => $cleanRow[$pk],
                         ];
                         $updateData = $cleanRow;
                         unset($updateData['office_id'], $updateData[$pk]);
 
                         DB::table($tableName)->updateOrInsert($matchCond, $updateData);
                     }
-                    $log->increment('total_processed', count($rowsToUpsert));
-                });
+                }));
             }
+
+            $log->increment('total_processed', count($rowsToUpsert));
         }
 
         return [$lastSync, $lastId];
     }
 
+    /**
+     * Run a write, retrying MySQL deadlocks / lock wait timeouts with jitter.
+     * Offices share tables, so concurrent upserts can briefly contend.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    protected function retryOnLockContention(callable $callback): mixed
+    {
+        $maxAttempts = max(1, (int) config('sync.db_lock_attempts', 3));
+
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                return $callback();
+            } catch (QueryException $e) {
+                if ($attempt >= $maxAttempts || ! $this->causedByConcurrencyError($e)) {
+                    throw $e;
+                }
+
+                usleep(random_int(100, 400) * 1000 * $attempt);
+            }
+        }
+    }
+
+    /**
+     * Call the OpenDental API with a few quick retries for transient failures.
+     * Longer outages are left to the queue backoff so a worker is never held
+     * for minutes by one unreachable office.
+     */
     protected function executeWithRetry(string $sql): array
     {
-        $attempt = 1;
+        $maxAttempts = max(1, (int) config('sync.api_max_attempts', 3));
 
-        while (true) {
+        for ($attempt = 1; ; $attempt++) {
 
             try {
 
@@ -535,23 +720,37 @@ abstract class BaseQuerySyncService
 
             } catch (Exception $e) {
 
-                if ($attempt >= $this->maxRetries) {
-
+                if ($attempt >= $maxAttempts || ! $this->isRetryableApiError($e)) {
                     throw $e;
                 }
 
-                $wait = pow(2, $attempt);
+                $wait = 2 ** $attempt;
 
                 $this->logOutput("Retry {$attempt} after {$wait} seconds...\n");
 
-                sleep($wait);
+                // Keep the lease alive across a slow retry cycle.
+                $this->heartbeat();
 
-                $attempt++;
+                sleep($wait);
 
             }
 
         }
+    }
 
+    /**
+     * Client errors (bad SQL, bad credentials) will fail identically on retry;
+     * only timeouts, throttling and server errors are worth another attempt.
+     */
+    protected function isRetryableApiError(Exception $e): bool
+    {
+        if ($e instanceof RequestException && $e->response !== null) {
+            $status = $e->response->status();
+
+            return $status >= 500 || in_array($status, [408, 425, 429], true);
+        }
+
+        return true;
     }
 
     protected function logOutput(string $msg): void

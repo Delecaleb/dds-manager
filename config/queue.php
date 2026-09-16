@@ -44,6 +44,18 @@ return [
             'after_commit' => false,
         ],
 
+        // Dedicated connection for OpenDental sync jobs (see config/sync.php).
+        // retry_after must exceed sync.queue.job_timeout, otherwise a long
+        // batch is handed to a second worker while the first still runs.
+        'sync-database' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => env('SYNC_QUEUE', 'sync'),
+            'retry_after' => (int) env('SYNC_QUEUE_RETRY_AFTER', 900),
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

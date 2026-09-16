@@ -2,6 +2,7 @@
 
 namespace App\Services\Sync;
 
+use App\Jobs\SyncOfficeModule;
 use App\Models\Office;
 use App\Models\SyncLog;
 use Carbon\Carbon;
@@ -13,7 +14,11 @@ class SyncReportService
     /**
      * Define all trackable sync modules with their table names and display labels.
      *
-     * @return array<string, array{label: string, table: string, service_class?: string, icon?: string}>
+     * This is the single registry of sync modules: the report, the per-module
+     * "sync now" button and the queued SyncOfficeModule job all resolve here.
+     * log_module pins the sync_logs name when it can't be derived from the table.
+     *
+     * @return array<string, array{label: string, table: string, service_class?: class-string, log_module?: string, icon?: string}>
      */
     public function getModuleDefinitions(): array
     {
@@ -76,6 +81,7 @@ class SyncReportService
                 'label' => 'Patient Balances',
                 'table' => 'od_patient_balances',
                 'service_class' => PatientBalanceSyncService::class,
+                'log_module' => 'patient-balance',
                 'icon' => 'wallet',
             ],
             'treatment_plans' => [
@@ -83,6 +89,13 @@ class SyncReportService
                 'table' => 'treatment_plans',
                 'service_class' => TreatmentPlanSyncService::class,
                 'icon' => 'clipboard-list',
+            ],
+            'treatment_plan_attachments' => [
+                'label' => 'Treatment Plan Attachments',
+                'table' => 'od_treatment_plan_attachments',
+                'service_class' => TreatmentPlanAttachmentSyncService::class,
+                'log_module' => 'treatplanattach',
+                'icon' => 'paperclip',
             ],
             'payplancharges' => [
                 'label' => 'Pay Plan Charges',
@@ -108,6 +121,13 @@ class SyncReportService
                 'service_class' => StatementSyncService::class,
                 'icon' => 'file-spreadsheet',
             ],
+            'histappointments' => [
+                'label' => 'Appointment History',
+                'table' => 'od_histappointments',
+                'service_class' => HistAppointmentSyncService::class,
+                'log_module' => 'histappointment',
+                'icon' => 'history',
+            ],
             'providers' => [
                 'label' => 'Providers',
                 'table' => 'od_providers',
@@ -119,6 +139,13 @@ class SyncReportService
                 'table' => 'od_procedures',
                 'service_class' => ProcedureSyncService::class,
                 'icon' => 'activity',
+            ],
+            'recall_types' => [
+                'label' => 'Recall Types',
+                'table' => 'od_recall_types',
+                'service_class' => RecallTypeSyncService::class,
+                'log_module' => 'recalltype',
+                'icon' => 'list',
             ],
             'carriers' => [
                 'label' => 'Carriers',
@@ -138,12 +165,41 @@ class SyncReportService
                 'service_class' => ClinicSyncService::class,
                 'icon' => 'map-pin',
             ],
+            'definitions' => [
+                'label' => 'Definitions',
+                'table' => 'od_definitions',
+                'service_class' => SyncDefinitionsService::class,
+                'log_module' => 'definition',
+                'icon' => 'book-open',
+            ],
             'daily_schedule_snapshots' => [
                 'label' => 'Daily Snapshots',
                 'table' => 'od_daily_schedule_snapshots',
                 'icon' => 'camera',
             ],
         ];
+    }
+
+    /**
+     * Resolve the sync service class for a module key.
+     *
+     * @return class-string
+     *
+     * @throws \InvalidArgumentException for unknown or non-syncable modules
+     */
+    public function serviceClassFor(string $moduleKey): string
+    {
+        $modules = $this->getModuleDefinitions();
+
+        if (! isset($modules[$moduleKey])) {
+            throw new \InvalidArgumentException("Invalid sync module '{$moduleKey}'.");
+        }
+
+        if (empty($modules[$moduleKey]['service_class'])) {
+            throw new \InvalidArgumentException("Module '{$modules[$moduleKey]['label']}' does not support direct sync.");
+        }
+
+        return $modules[$moduleKey]['service_class'];
     }
 
     /**
@@ -200,7 +256,9 @@ class SyncReportService
             $icon = $def['icon'] ?? 'database';
 
             // Find matching sync log
-            $log = $this->findMatchingLog($syncLogs, $officeId, $key, $tableName);
+            $log = isset($def['log_module'])
+                ? $syncLogs->get("office_{$officeId}:{$def['log_module']}")
+                : $this->findMatchingLog($syncLogs, $officeId, $key, $tableName);
 
             // Calculate Records Count in local database
             $recordsCount = 0;
@@ -421,37 +479,50 @@ class SyncReportService
     }
 
     /**
-     * Trigger immediate synchronization for a specific module for an office.
+     * Queue a server-side sync of one module for an office.
+     *
+     * Runs on the queue worker, not in the web request, so it is unaffected by
+     * browser sessions, closed tabs or the host's web time limit.
      *
      * @return array{success: bool, message: string, module: string, office: string}
+     *
+     * @throws \InvalidArgumentException for unknown or non-syncable modules
      */
-    public function syncModuleForOffice(Office $office, string $moduleKey): array
+    public function queueModuleForOffice(Office $office, string $moduleKey): array
     {
-        $modules = $this->getModuleDefinitions();
+        $this->serviceClassFor($moduleKey);
+        $label = $this->getModuleDefinitions()[$moduleKey]['label'];
 
-        if (! isset($modules[$moduleKey])) {
-            throw new \InvalidArgumentException("Invalid sync module '{$moduleKey}'.");
-        }
-
-        $def = $modules[$moduleKey];
-
-        if (empty($def['service_class'])) {
-            throw new \InvalidArgumentException("Module '{$def['label']}' does not support direct sync.");
-        }
-
-        $serviceClass = $def['service_class'];
-        $service = app($serviceClass);
-
-        if (method_exists($service, 'forOffice')) {
-            $service->forOffice($office);
-        }
-
-        $service->sync();
+        SyncOfficeModule::dispatch((int) $office->id, $moduleKey);
 
         return [
             'success' => true,
-            'message' => "Successfully synced {$def['label']} for '{$office->name}'.",
+            'message' => "{$label} sync queued for '{$office->name}'. It runs on the server within a minute — progress shows in this report.",
             'module' => $moduleKey,
+            'office' => $office->name,
+        ];
+    }
+
+    /**
+     * Queue a server-side sync of every syncable module for an office.
+     *
+     * @return array{success: bool, message: string, modules: list<string>, office: string}
+     */
+    public function queueAllModulesForOffice(Office $office): array
+    {
+        $modules = array_keys(array_filter(
+            $this->getModuleDefinitions(),
+            fn (array $def) => ! empty($def['service_class'])
+        ));
+
+        foreach ($modules as $moduleKey) {
+            SyncOfficeModule::dispatch((int) $office->id, $moduleKey);
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Full sync queued for \''.$office->name.'\' ('.count($modules).' modules). It runs on the server — you can close this page.',
+            'modules' => $modules,
             'office' => $office->name,
         ];
     }

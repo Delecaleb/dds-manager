@@ -122,8 +122,11 @@
 
         <!-- Footer -->
         <div class="px-6 py-3.5 border-t border-slate-200 bg-white flex items-center justify-between shrink-0">
-            <div class="text-xs text-slate-500" id="gsr-last-updated">
-                Telemetry ready
+            <div class="flex flex-col">
+                <div class="text-xs text-slate-500" id="gsr-last-updated">
+                    Telemetry ready
+                </div>
+                <div class="text-xs text-emerald-600 hidden" id="gsr-sync-notice"></div>
             </div>
             <div class="flex items-center gap-3">
                 <button onclick="triggerGlobalOfficeFullSyncModal()" id="gsr-sync-all-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-sm transition-colors inline-flex items-center gap-1.5">
@@ -384,7 +387,7 @@
             if (btn) {
                 origContent = btn.innerHTML;
                 btn.disabled = true;
-                btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Syncing...`;
+                btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Queuing...`;
                 if (window.lucide) lucide.createIcons();
             }
 
@@ -406,6 +409,7 @@
                 }
 
                 if (data.success) {
+                    showGlobalSyncNotice(data.message);
                     loadGlobalSyncReport(currentOfficeId, true);
                 } else {
                     alert(data.error || `Sync failed for ${moduleLabel}.`);
@@ -427,7 +431,7 @@
             const btn = document.getElementById('gsr-sync-all-btn');
             const origHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Syncing All...`;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Queuing...`;
             if (window.lucide) lucide.createIcons();
 
             fetch(syncOfficeUrlPattern.replace(':id', currentOfficeId), {
@@ -445,6 +449,7 @@
                 if (window.lucide) lucide.createIcons();
 
                 if (data.success) {
+                    showGlobalSyncNotice(data.message);
                     loadGlobalSyncReport(currentOfficeId, true);
                 } else {
                     alert(data.error || 'Sync failed.');
@@ -457,6 +462,13 @@
                 alert(`Sync error: ${err.message}`);
             });
         };
+
+        function showGlobalSyncNotice(message) {
+            const notice = document.getElementById('gsr-sync-notice');
+            if (!notice) return;
+            notice.textContent = message;
+            notice.classList.remove('hidden');
+        }
 
         function escapeHtml(text) {
             if (!text) return '';

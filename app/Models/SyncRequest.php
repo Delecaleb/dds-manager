@@ -25,6 +25,8 @@ class SyncRequest extends Model
     ];
 
     protected $casts = [
+        'start_date' => 'date:Y-m-d',
+        'end_date' => 'date:Y-m-d',
         'prune_deleted' => 'boolean',
         'total_processed' => 'integer',
         'started_at' => 'datetime',

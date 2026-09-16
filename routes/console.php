@@ -10,53 +10,78 @@ Artisan::command('inspire', function () {
 
 /*
 |--------------------------------------------------------------------------
-| OpenDental sync schedule
+| OpenDental sync schedule (shared-hosting safe: database queue, no Redis)
 |--------------------------------------------------------------------------
-| Registered via the Schedule facade (Laravel 11/12). Activate on the live
-| server with a single cron entry that runs the scheduler every minute:
+| Activate on the live server with ONE cron entry that runs every minute:
 |
 |   * * * * * cd /path/to/app && php artisan schedule:run >> /dev/null 2>&1
 |
-| `withoutOverlapping(20)` enforces a 20-minute lock expiry to avoid deadlock
-| if a process terminates unexpectedly.
+| How it works:
+|  1. `sync:dispatch` only inserts one SyncOfficeModule job per (module,
+|     office) into the `jobs` table — it finishes in milliseconds.
+|  2. Every minute cron starts short-lived workers that drain the `sync`
+|     queue and exit. A job stops at its time budget with the cursor saved
+|     and re-queues itself, so the host never has to kill a long process.
+|  3. SyncLease (sync_logs.run_token) makes every office+module run
+|     exclusive, including manual `sync:*` CLI runs and "Sync now" buttons.
+|  Tuning lives in config/sync.php. Failures land in `failed_jobs`
+|  (`php artisan queue:failed`, `php artisan queue:retry all`).
+|
+| Module keys come from the registry in SyncReportService::getModuleDefinitions().
 */
+
+$syncQueue = config('sync.queue');
+
+foreach (range(1, max(1, (int) $syncQueue['workers'])) as $worker) {
+    Schedule::command(sprintf(
+        'queue:work %s --queue=%s --name=sync-worker-%d --stop-when-empty --max-time=%d --timeout=%d --sleep=3 --memory=256',
+        $syncQueue['connection'],
+        $syncQueue['name'],
+        $worker,
+        $syncQueue['worker_max_time'],
+        $syncQueue['job_timeout'],
+    ))
+        ->everyMinute()
+        // Lock expiry (minutes) outlives worker_max_time + one job_timeout, so
+        // a host-killed worker frees its slot without workers piling up.
+        ->withoutOverlapping((int) ceil(($syncQueue['worker_max_time'] + $syncQueue['job_timeout']) / 60))
+        ->runInBackground()
+        ->onOneServer();
+}
+
+/*
+| Date-range backfills requested from the Sync Manager UI.
+*/
+Schedule::command('sync:process-pending')->everyTenMinutes()->withoutOverlapping(20)->runInBackground()->onOneServer();
 
 /*
 | HIGH FREQUENCY (every 10 minutes) — operational data that changes constantly.
-| Run on every 10-minute interval so a 10-minute server cron triggers them cleanly.
 */
-Schedule::command('sync:process-pending')->everyTenMinutes()->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:appointments')->everyTenMinutes()->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:procedurelogs')->everyTenMinutes()->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:adjustments')->everyTenMinutes()->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:paysplits')->everyTenMinutes()->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:claimpayments')->everyTenMinutes()->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:claimprocs')->everyTenMinutes()->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:patient-balance')->everyTenMinutes()->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:payment')->everyTenMinutes()->withoutOverlapping(20)->runInBackground()->onOneServer();
+Schedule::command('sync:dispatch appointments procedurelogs adjustments paysplits claimpayments claimprocs payments patient_balance')
+    ->everyTenMinutes()
+    ->onOneServer();
 
 /*
 | MEDIUM FREQUENCY (every 30 minutes) — data that changes occasionally.
-| Staggered on 5-minute multiples (0, 5, 10, 15, 20, 25) so they align with the 5-minute cron.
+| Staggered so each tick only adds a handful of jobs.
 */
-Schedule::command('sync:patients')->cron('0,30 * * * *')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:treatment-plans')->cron('5,35 * * * *')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:treatment-plan-attachments')->cron('10,40 * * * *')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:payplancharges')->cron('15,45 * * * *')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:recalls')->cron('20,50 * * * *')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:schedules')->cron('25,55 * * * *')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:deposit')->cron('10,40 * * * *')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:statements')->cron('20,50 * * * *')->withoutOverlapping(20)->runInBackground()->onOneServer();
+Schedule::command('sync:dispatch patients')->cron('0,30 * * * *')->onOneServer();
+Schedule::command('sync:dispatch treatment_plans')->cron('5,35 * * * *')->onOneServer();
+Schedule::command('sync:dispatch treatment_plan_attachments deposits')->cron('10,40 * * * *')->onOneServer();
+Schedule::command('sync:dispatch payplancharges')->cron('15,45 * * * *')->onOneServer();
+Schedule::command('sync:dispatch recalls statements')->cron('20,50 * * * *')->onOneServer();
+Schedule::command('sync:dispatch schedules')->cron('25,55 * * * *')->onOneServer();
 
 /*
 | LOW FREQUENCY (daily) — reference tables and historical data (off-peak hours).
 */
-Schedule::command('sync:providers')->dailyAt('01:00')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:procedures')->dailyAt('01:05')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:recall-types')->dailyAt('01:10')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:carriers')->dailyAt('01:15')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:insplan')->dailyAt('01:20')->withoutOverlapping(20)->runInBackground()->onOneServer();
-Schedule::command('sync:histappointments')->dailyAt('02:00')->withoutOverlapping(20)->runInBackground()->onOneServer();
+Schedule::command('sync:dispatch providers procedures recall_types carriers insplan')->dailyAt('01:00')->onOneServer();
+Schedule::command('sync:dispatch histappointments')->dailyAt('02:00')->onOneServer();
+
+/*
+| Queue housekeeping: keep failed_jobs from growing forever.
+*/
+Schedule::command('queue:prune-failed --hours=168')->dailyAt('03:00')->onOneServer();
 
 /*
 | SCHEDULE SNAPSHOTS (8:00 AM EST lock & rolling future forecasts)

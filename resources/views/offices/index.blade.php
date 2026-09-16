@@ -490,12 +490,12 @@
         });
 
         function triggerSync(officeId, officeName) {
-            if (!confirm(`Trigger full data sync for '${officeName}'?`)) return;
+            if (!confirm(`Queue a full server-side sync for '${officeName}'?`)) return;
 
             const btn = event.currentTarget;
             const origText = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Syncing...`;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Queuing...`;
             lucide.createIcons();
 
             fetch(syncUrlPattern.replace(':id', officeId), {
@@ -748,7 +748,7 @@
             if (btn) {
                 origContent = btn.innerHTML;
                 btn.disabled = true;
-                btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Syncing...`;
+                btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Queuing...`;
                 lucide.createIcons();
             }
 
@@ -794,7 +794,7 @@
             const btn = document.getElementById('sr-sync-all-btn');
             const origHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Syncing All...`;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Queuing...`;
             lucide.createIcons();
 
             fetch(syncUrlPattern.replace(':id', currentSyncReportOfficeId), {
