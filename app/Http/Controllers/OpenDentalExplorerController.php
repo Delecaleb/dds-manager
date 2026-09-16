@@ -10,6 +10,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class OpenDentalExplorerController extends Controller
@@ -1217,7 +1218,7 @@ class OpenDentalExplorerController extends Controller
     {
         if ($resolvedTable === 'od_pay_splits') {
             $payNum = (int) ($row['PayNum'] ?? 0);
-            if ($payNum > 0) {
+            if ($payNum > 0 && Schema::hasTable('od_payments')) {
                 $parentPay = DB::table('od_payments')->where('office_id', $officeId)->where('PayNum', $payNum)->first();
                 if (! $parentPay) {
                     return "Parent Payment #{$payNum} is missing in local DB (Relational Orphan)";
@@ -1230,7 +1231,7 @@ class OpenDentalExplorerController extends Controller
             }
         } elseif ($resolvedTable === 'od_payments') {
             $payNum = (int) ($row['PayNum'] ?? 0);
-            if ($payNum > 0) {
+            if ($payNum > 0 && Schema::hasTable('od_pay_splits')) {
                 $splitSum = (float) DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->sum('SplitAmt');
                 $payAmt = (float) ($row['PayAmt'] ?? 0);
                 $splitCount = DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->count();
@@ -1242,8 +1243,16 @@ class OpenDentalExplorerController extends Controller
                 }
             }
         } elseif ($resolvedTable === 'od_claim_procs') {
+            $claimPaymentNum = (int) ($row['ClaimPaymentNum'] ?? 0);
+            if ($claimPaymentNum > 0 && Schema::hasTable('od_claim_payments')) {
+                $claimPaymentExists = DB::table('od_claim_payments')->where('office_id', $officeId)->where('ClaimPaymentNum', $claimPaymentNum)->exists();
+                if (! $claimPaymentExists) {
+                    return "Parent Claim Payment #{$claimPaymentNum} missing locally";
+                }
+            }
+
             $claimNum = (int) ($row['ClaimNum'] ?? 0);
-            if ($claimNum > 0) {
+            if ($claimNum > 0 && Schema::hasTable('od_claims')) {
                 $claimExists = DB::table('od_claims')->where('office_id', $officeId)->where('ClaimNum', $claimNum)->exists();
                 if (! $claimExists) {
                     return "Parent Claim #{$claimNum} missing locally";
