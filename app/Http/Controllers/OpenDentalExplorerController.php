@@ -446,7 +446,7 @@ class OpenDentalExplorerController extends Controller
         return array_values(array_filter($list, fn ($t) => $t !== 'migrations'));
     }
 
-    private function buildRawSqlString(string $table, array $columns, array $conditions, ?string $orderBy, string $orderDir, int $limit, array $validCols): string
+    private function buildRawSqlString(string $table, array $columns, array $conditions, ?string $orderBy, string $orderDir, int $limit, array $validCols, ?string $primaryKey = null): string
     {
         $colStr = ($columns === ['*']) ? '*' : implode(', ', array_map(fn ($c) => "`{$c}`", $columns));
         $sql = "SELECT {$colStr} FROM {$table}";
@@ -511,6 +511,9 @@ class OpenDentalExplorerController extends Controller
         if ($orderBy && in_array($orderBy, $validCols, true)) {
             $upperDir = strtoupper($orderDir) === 'DESC' ? 'DESC' : 'ASC';
             $sql .= " ORDER BY `{$orderBy}` {$upperDir}";
+            if ($primaryKey && $primaryKey !== $orderBy && in_array($primaryKey, $validCols, true)) {
+                $sql .= ", `{$primaryKey}` {$upperDir}";
+            }
         }
 
         $sql .= " LIMIT {$limit}";
@@ -871,7 +874,7 @@ class OpenDentalExplorerController extends Controller
         $liveError = null;
 
         try {
-            $odSql = $this->buildRawSqlString($odTableName, ['*'], $allConditions, $dateCol ?: $primaryKey, 'ASC', $limit, $tableColumns);
+            $odSql = $this->buildRawSqlString($odTableName, ['*'], $allConditions, $dateCol ?: $primaryKey, 'ASC', $limit, $tableColumns, $primaryKey);
             $liveRowsRaw = $this->queryService->forOffice($targetOffice)->shortQuery($odSql);
             foreach ($liveRowsRaw as $row) {
                 $r = (array) $row;
@@ -916,7 +919,12 @@ class OpenDentalExplorerController extends Controller
             });
         }
 
-        $localRowsRaw = $localQuery->orderBy($dateCol ?: $primaryKey, 'asc')->limit($limit)->get();
+        $localQueryBuilder = $localQuery->orderBy($dateCol ?: $primaryKey, 'asc');
+        if ($dateCol && $primaryKey && $dateCol !== $primaryKey && in_array($primaryKey, $tableColumns, true)) {
+            $localQueryBuilder->orderBy($primaryKey, 'asc');
+        }
+
+        $localRowsRaw = $localQueryBuilder->limit($limit)->get();
         $localKeys = [];
         $localRowsByPk = [];
         foreach ($localRowsRaw as $row) {
@@ -1006,12 +1014,15 @@ class OpenDentalExplorerController extends Controller
         $discrepancyKeys = [];
         $diffRows = [];
 
+        // Pre-fetch relational integrity data in 1-2 bulk queries to eliminate N+1 loop queries
+        $relationalContext = $this->buildRelationalContext($resolvedTable, $officeId, $localRowsByPk);
+
         // Discrepancy & Matched (Present in Both)
         foreach ($intersectKeys as $k) {
             $localData = $localRowsByPk[$k] ?? [];
             $liveData = $liveRowsByPk[$k] ?? [];
             $fieldDiffs = $this->compareRowAttributes($localData, $liveData, $criticalCols);
-            $relationalWarning = $this->checkRelationalIntegrity($resolvedTable, $officeId, $localData);
+            $relationalWarning = $this->checkRelationalIntegrity($resolvedTable, $officeId, $localData, $relationalContext);
 
             if (! empty($fieldDiffs)) {
                 $discrepancyKeys[] = $k;
@@ -1048,7 +1059,7 @@ class OpenDentalExplorerController extends Controller
         // Orphans (Present in Local DB only - strictly confirmed deleted in OpenDental)
         foreach ($orphanKeys as $k) {
             $localData = $localRowsByPk[$k] ?? [];
-            $relationalWarning = $this->checkRelationalIntegrity($resolvedTable, $officeId, $localData);
+            $relationalWarning = $this->checkRelationalIntegrity($resolvedTable, $officeId, $localData, $relationalContext);
             $diffRows[] = [
                 'status' => 'orphan',
                 'status_label' => 'Deleted in OpenDental (Orphan in Local DB)',
@@ -1246,50 +1257,169 @@ class OpenDentalExplorerController extends Controller
     }
 
     /**
+     * Pre-fetch relational integrity data in bulk to eliminate N+1 queries during diff reconciliation.
+     */
+    private function buildRelationalContext(string $resolvedTable, int $officeId, array $localRowsByPk): array
+    {
+        $context = [];
+        if ($resolvedTable === 'od_pay_splits') {
+            $payNums = [];
+            foreach ($localRowsByPk as $r) {
+                $pn = (int) ($r['PayNum'] ?? 0);
+                if ($pn > 0) {
+                    $payNums[$pn] = $pn;
+                }
+            }
+            if (! empty($payNums) && Schema::hasTable('od_payments')) {
+                $context['parent_payments'] = DB::table('od_payments')
+                    ->where('office_id', $officeId)
+                    ->whereIn('PayNum', array_values($payNums))
+                    ->pluck('PayAmt', 'PayNum')
+                    ->toArray();
+
+                $context['split_sums'] = DB::table('od_pay_splits')
+                    ->where('office_id', $officeId)
+                    ->whereIn('PayNum', array_values($payNums))
+                    ->groupBy('PayNum')
+                    ->select('PayNum', DB::raw('SUM(SplitAmt) as split_sum'))
+                    ->pluck('split_sum', 'PayNum')
+                    ->toArray();
+            }
+        } elseif ($resolvedTable === 'od_payments') {
+            $payNums = [];
+            foreach ($localRowsByPk as $r) {
+                $pn = (int) ($r['PayNum'] ?? 0);
+                if ($pn > 0) {
+                    $payNums[$pn] = $pn;
+                }
+            }
+            if (! empty($payNums) && Schema::hasTable('od_pay_splits')) {
+                $stats = DB::table('od_pay_splits')
+                    ->where('office_id', $officeId)
+                    ->whereIn('PayNum', array_values($payNums))
+                    ->groupBy('PayNum')
+                    ->select('PayNum', DB::raw('COUNT(*) as split_cnt'), DB::raw('SUM(SplitAmt) as split_sum'))
+                    ->get();
+                $context['split_stats'] = [];
+                foreach ($stats as $st) {
+                    $context['split_stats'][$st->PayNum] = [
+                        'count' => (int) $st->split_cnt,
+                        'sum' => (float) $st->split_sum,
+                    ];
+                }
+            }
+        } elseif ($resolvedTable === 'od_claim_procs') {
+            $claimPaymentNums = [];
+            $claimNums = [];
+            foreach ($localRowsByPk as $r) {
+                $cpn = (int) ($r['ClaimPaymentNum'] ?? 0);
+                if ($cpn > 0) {
+                    $claimPaymentNums[$cpn] = $cpn;
+                }
+                $cn = (int) ($r['ClaimNum'] ?? 0);
+                if ($cn > 0) {
+                    $claimNums[$cn] = $cn;
+                }
+            }
+            if (! empty($claimPaymentNums) && Schema::hasTable('od_claim_payments')) {
+                $context['existing_claim_payments'] = DB::table('od_claim_payments')
+                    ->where('office_id', $officeId)
+                    ->whereIn('ClaimPaymentNum', array_values($claimPaymentNums))
+                    ->pluck('ClaimPaymentNum', 'ClaimPaymentNum')
+                    ->toArray();
+            }
+            if (! empty($claimNums) && Schema::hasTable('od_claims')) {
+                $context['existing_claims'] = DB::table('od_claims')
+                    ->where('office_id', $officeId)
+                    ->whereIn('ClaimNum', array_values($claimNums))
+                    ->pluck('ClaimNum', 'ClaimNum')
+                    ->toArray();
+            }
+        }
+
+        return $context;
+    }
+
+    /**
      * Inspect relational integrity (e.g. child paysplit without parent payment, or split sum mismatch).
      */
-    private function checkRelationalIntegrity(string $resolvedTable, int $officeId, array $row): ?string
+    private function checkRelationalIntegrity(string $resolvedTable, int $officeId, array $row, array $context = []): ?string
     {
         if ($resolvedTable === 'od_pay_splits') {
             $payNum = (int) ($row['PayNum'] ?? 0);
-            if ($payNum > 0 && Schema::hasTable('od_payments')) {
-                $parentPay = DB::table('od_payments')->where('office_id', $officeId)->where('PayNum', $payNum)->first();
-                if (! $parentPay) {
-                    return "Parent Payment #{$payNum} is missing in local DB (Relational Orphan)";
-                }
-                $splitSum = (float) DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->sum('SplitAmt');
-                $payAmt = (float) ($parentPay->PayAmt ?? 0);
-                if (abs($splitSum - $payAmt) > 0.01) {
-                    return "Split allocation mismatch: Local splits sum to \${$splitSum} vs Payment #{$payNum} amount \${$payAmt}";
+            if ($payNum > 0) {
+                if (isset($context['parent_payments'])) {
+                    if (! array_key_exists($payNum, $context['parent_payments'])) {
+                        return "Parent Payment #{$payNum} is missing in local DB (Relational Orphan)";
+                    }
+                    $payAmt = (float) $context['parent_payments'][$payNum];
+                    $splitSum = (float) ($context['split_sums'][$payNum] ?? 0);
+                    if (abs($splitSum - $payAmt) > 0.01) {
+                        return "Split allocation mismatch: Local splits sum to \${$splitSum} vs Payment #{$payNum} amount \${$payAmt}";
+                    }
+                } elseif (Schema::hasTable('od_payments')) {
+                    $parentPay = DB::table('od_payments')->where('office_id', $officeId)->where('PayNum', $payNum)->first();
+                    if (! $parentPay) {
+                        return "Parent Payment #{$payNum} is missing in local DB (Relational Orphan)";
+                    }
+                    $splitSum = (float) DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->sum('SplitAmt');
+                    $payAmt = (float) ($parentPay->PayAmt ?? 0);
+                    if (abs($splitSum - $payAmt) > 0.01) {
+                        return "Split allocation mismatch: Local splits sum to \${$splitSum} vs Payment #{$payNum} amount \${$payAmt}";
+                    }
                 }
             }
         } elseif ($resolvedTable === 'od_payments') {
             $payNum = (int) ($row['PayNum'] ?? 0);
-            if ($payNum > 0 && Schema::hasTable('od_pay_splits')) {
-                $splitSum = (float) DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->sum('SplitAmt');
-                $payAmt = (float) ($row['PayAmt'] ?? 0);
-                $splitCount = DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->count();
-                if ($splitCount === 0) {
-                    return "No child pay splits found in local DB for Payment #{$payNum}";
-                }
-                if (abs($splitSum - $payAmt) > 0.01) {
-                    return "Child splits sum (\${$splitSum}) differs from PayAmt (\${$payAmt})";
+            if ($payNum > 0) {
+                if (isset($context['split_stats'])) {
+                    $stats = $context['split_stats'][$payNum] ?? null;
+                    $payAmt = (float) ($row['PayAmt'] ?? 0);
+                    if (! $stats || ($stats['count'] ?? 0) === 0) {
+                        return "No child pay splits found in local DB for Payment #{$payNum}";
+                    }
+                    $splitSum = (float) ($stats['sum'] ?? 0);
+                    if (abs($splitSum - $payAmt) > 0.01) {
+                        return "Child splits sum (\${$splitSum}) differs from PayAmt (\${$payAmt})";
+                    }
+                } elseif (Schema::hasTable('od_pay_splits')) {
+                    $splitSum = (float) DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->sum('SplitAmt');
+                    $payAmt = (float) ($row['PayAmt'] ?? 0);
+                    $splitCount = DB::table('od_pay_splits')->where('office_id', $officeId)->where('PayNum', $payNum)->count();
+                    if ($splitCount === 0) {
+                        return "No child pay splits found in local DB for Payment #{$payNum}";
+                    }
+                    if (abs($splitSum - $payAmt) > 0.01) {
+                        return "Child splits sum (\${$splitSum}) differs from PayAmt (\${$payAmt})";
+                    }
                 }
             }
         } elseif ($resolvedTable === 'od_claim_procs') {
             $claimPaymentNum = (int) ($row['ClaimPaymentNum'] ?? 0);
-            if ($claimPaymentNum > 0 && Schema::hasTable('od_claim_payments')) {
-                $claimPaymentExists = DB::table('od_claim_payments')->where('office_id', $officeId)->where('ClaimPaymentNum', $claimPaymentNum)->exists();
-                if (! $claimPaymentExists) {
-                    return "Parent Claim Payment #{$claimPaymentNum} missing locally";
+            if ($claimPaymentNum > 0) {
+                if (isset($context['existing_claim_payments'])) {
+                    if (! isset($context['existing_claim_payments'][$claimPaymentNum])) {
+                        return "Parent Claim Payment #{$claimPaymentNum} missing locally";
+                    }
+                } elseif (Schema::hasTable('od_claim_payments')) {
+                    $claimPaymentExists = DB::table('od_claim_payments')->where('office_id', $officeId)->where('ClaimPaymentNum', $claimPaymentNum)->exists();
+                    if (! $claimPaymentExists) {
+                        return "Parent Claim Payment #{$claimPaymentNum} missing locally";
+                    }
                 }
             }
 
             $claimNum = (int) ($row['ClaimNum'] ?? 0);
-            if ($claimNum > 0 && Schema::hasTable('od_claims')) {
-                $claimExists = DB::table('od_claims')->where('office_id', $officeId)->where('ClaimNum', $claimNum)->exists();
-                if (! $claimExists) {
-                    return "Parent Claim #{$claimNum} missing locally";
+            if ($claimNum > 0) {
+                if (isset($context['existing_claims'])) {
+                    if (! isset($context['existing_claims'][$claimNum])) {
+                        return "Parent Claim #{$claimNum} missing locally";
+                    }
+                } elseif (Schema::hasTable('od_claims')) {
+                    $claimExists = DB::table('od_claims')->where('office_id', $officeId)->where('ClaimNum', $claimNum)->exists();
+                    if (! $claimExists) {
+                        return "Parent Claim #{$claimNum} missing locally";
+                    }
                 }
             }
         }
