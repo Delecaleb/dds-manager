@@ -108,7 +108,7 @@ class ProductionService
         $excludedCodes = ProcCode::brokenAppointmentCodeNums($filter->officeId);
 
         return (int) $this->completedProcedures($filter)
-            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
+            ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('pl.CodeNum', $excludedCodes))
             ->distinct()
             ->count(DB::raw($this->visitKeyExpr()));
     }

@@ -35,96 +35,189 @@ class PatientVisitService
     public function newPatientVisits(string $start, string $end, array $clinics = [], array $providers = [], ?int $officeId = null): array
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
-        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
-        $groupConcat = $isSqlite
-            ? 'GROUP_CONCAT(DISTINCT pc.ProcCode)'
-            : "GROUP_CONCAT(DISTINCT pc.ProcCode ORDER BY pc.ProcCode SEPARATOR ', ')";
-        $nameExpr = $isSqlite
-            ? "COALESCE(p.LName || ', ' || p.FName, '')"
-            : "COALESCE(CONCAT(p.LName, ', ', p.FName), '')";
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
-        $clinicFilter = ! empty($clinics) ? 'AND pl_inner.ClinicNum IN ('.implode(',', array_map('intval', $clinics)).')' : '';
-        $provFilter = ! empty($providers) ? 'AND pl_inner.ProvNum IN ('.implode(',', array_map('intval', $providers)).')' : '';
+        // Step 1: Find candidate patients with completed procedures in range
+        $candidateQ = DB::table('od_procedure_logs')
+            ->where('office_id', $officeId)
+            ->whereIn('ProcStatus', ProcStatus::completed())
+            ->whereBetween('ProcDate', [$start, $end]);
 
-        $excludedIn = ProcCode::brokenAppointmentCodeNumsInList($officeId);
+        if (! empty($excludedCodes)) {
+            $candidateQ->whereNotIn('CodeNum', $excludedCodes);
+        }
+        if (! empty($clinics)) {
+            $candidateQ->whereIn('ClinicNum', $clinics);
+        }
+        if (! empty($providers)) {
+            $candidateQ->whereIn('ProvNum', $providers);
+        }
 
-        $rows = DB::select("
-            SELECT
-                fv.PatNum                                                              AS patient_id,
-                {$nameExpr}                                                            AS patient_name,
-                fv.first_date                                                           AS dates,
-                {$groupConcat}                                                         AS service_codes,
-                COALESCE(SUM(pl.ProcFee), 0)                                           AS amount,
-                MAX(pl.ClinicNum)                                                      AS clinic_num,
-                MAX(pl.ProvNum)                                                        AS prov_num
-            FROM (
-                -- Identify the patient's first-ever completed visit date across history
-                SELECT
-                    pl_inner.PatNum,
-                    MIN(pl_inner.ProcDate) AS first_date
-                FROM od_procedure_logs pl_inner
-                WHERE pl_inner.office_id = ?
-                  AND pl_inner.ProcStatus IN ({$this->completedIn})
-                  AND COALESCE(pl_inner.CodeNum, '') NOT IN ({$excludedIn})
-                  AND pl_inner.ProcDate BETWEEN ? AND ?
-                  {$clinicFilter}
-                  {$provFilter}
-                  AND NOT EXISTS (
-                      SELECT 1 FROM od_procedure_logs pl_prior
-                      WHERE pl_prior.office_id = ?
-                        AND pl_prior.PatNum = pl_inner.PatNum
-                        AND pl_prior.ProcStatus IN ({$this->completedIn})
-                        AND COALESCE(pl_prior.CodeNum, '') NOT IN ({$excludedIn})
-                        AND pl_prior.ProcDate < ?
-                  )
-                GROUP BY pl_inner.PatNum
-            ) fv
-            LEFT JOIN od_patients p ON fv.PatNum = p.PatNum AND p.office_id = ?
-            -- Join only procedures completed on that specific first visit date
-            JOIN od_procedure_logs pl ON fv.PatNum = pl.PatNum
-                AND pl.office_id = ?
-                AND pl.ProcDate = fv.first_date
-                AND pl.ProcStatus IN ({$this->completedIn})
-                AND COALESCE(pl.CodeNum, '') NOT IN ({$excludedIn})
-            LEFT JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = pl.office_id
-            -- Filter 1: Exclude patients who already had a completed appointment before this visit date
-            WHERE NOT EXISTS (
-                SELECT 1 FROM od_appointments a_prev
-                WHERE a_prev.office_id = ?
-                  AND a_prev.PatNum = fv.PatNum
-                  AND a_prev.AptStatus IN (2, 'Complete', 'Completed')
-                  AND a_prev.AptDateTime < ".($isSqlite ? 'fv.first_date' : "CONCAT(fv.first_date, ' 00:00:00')").'
-            )
-            -- Filter 2: Exclude returning patients whose visit was IsNewPatient = 0 AND who had appointments prior to this date range
-            AND NOT (
-                EXISTS (
-                    SELECT 1 FROM od_appointments a_curr
-                    WHERE a_curr.office_id = ?
-                      AND a_curr.PatNum = fv.PatNum
-                      AND a_curr.AptDateTime BETWEEN '.($isSqlite ? "fv.first_date AND fv.first_date || ' 23:59:59'" : "CONCAT(fv.first_date, ' 00:00:00') AND CONCAT(fv.first_date, ' 23:59:59')")."
-                      AND (a_curr.IsNewPatient = 0 OR a_curr.IsNewPatient = '0')
-                )
-                AND EXISTS (
-                    SELECT 1 FROM od_appointments a_old
-                    WHERE a_old.office_id = ?
-                      AND a_old.PatNum = fv.PatNum
-                      AND a_old.AptDateTime < ?
-                )
-            )
-            AND (pc.ProcCode NOT IN ('D9986', 'D9987') OR pc.ProcCode IS NULL)
-            GROUP BY fv.PatNum, p.LName, p.FName, fv.first_date
-            ORDER BY fv.first_date, p.LName
-        ", [$officeId, $start, $end, $officeId, $start, $officeId, $officeId, $officeId, $officeId, $officeId, $start.' 00:00:00']);
+        $candidates = $candidateQ->groupBy('PatNum')
+            ->selectRaw('PatNum, MIN(ProcDate) AS first_date')
+            ->get();
 
-        return array_map(fn ($r) => [
-            'patient_id' => $r->patient_id,
-            'patient_name' => $r->patient_name,
-            'dates' => $r->dates,
-            'service_codes' => $r->service_codes,
-            'amount' => round((float) $r->amount, 2),
-            'clinic_num' => (int) ($r->clinic_num ?? 0),
-            'prov_num' => $r->prov_num ?? null,
-        ], $rows);
+        if ($candidates->isEmpty()) {
+            return [];
+        }
+
+        $candidatePatNums = $candidates->pluck('PatNum')->all();
+        $patFirstDateMap = $candidates->pluck('first_date', 'PatNum')->all();
+
+        // Step 2: Eliminate patients who had ANY completed procedure prior to start
+        $priorPatQ = DB::table('od_procedure_logs')
+            ->where('office_id', $officeId)
+            ->whereIn('PatNum', $candidatePatNums)
+            ->whereIn('ProcStatus', ProcStatus::completed())
+            ->where('ProcDate', '<', $start);
+
+        if (! empty($excludedCodes)) {
+            $priorPatQ->whereNotIn('CodeNum', $excludedCodes);
+        }
+
+        $priorPatNums = $priorPatQ->distinct()->pluck('PatNum')->all();
+        $priorSet = array_fill_keys($priorPatNums, true);
+
+        $newPatNums = array_values(array_filter($candidatePatNums, fn ($pn) => ! isset($priorSet[$pn])));
+        if (empty($newPatNums)) {
+            return [];
+        }
+
+        // Step 3: Check Filter 1 & Filter 2 on appointments
+        $appts = DB::table('od_appointments')
+            ->where('office_id', $officeId)
+            ->whereIn('PatNum', $newPatNums)
+            ->get(['PatNum', 'AptStatus', 'AptDateTime', 'IsNewPatient']);
+
+        $apptsByPat = [];
+        foreach ($appts as $a) {
+            $apptsByPat[$a->PatNum][] = $a;
+        }
+
+        $disqualified = [];
+        foreach ($newPatNums as $pn) {
+            $firstDate = $patFirstDateMap[$pn];
+            $patAppts = $apptsByPat[$pn] ?? [];
+
+            $firstDateMidnight = substr($firstDate, 0, 10).' 00:00:00';
+            $firstDateEnd = substr($firstDate, 0, 10).' 23:59:59';
+
+            $hasPriorCompleted = false;
+            $hasCurrNonNew = false;
+            $hasOldAppt = false;
+
+            foreach ($patAppts as $a) {
+                $status = (string) $a->AptStatus;
+                $isCompleted = in_array($status, ['2', 'Complete', 'Completed'], true);
+                if ($isCompleted && $a->AptDateTime < $firstDateMidnight) {
+                    $hasPriorCompleted = true;
+                    break;
+                }
+
+                if ($a->AptDateTime >= $firstDateMidnight && $a->AptDateTime <= $firstDateEnd && ($a->IsNewPatient == 0 || $a->IsNewPatient === '0')) {
+                    $hasCurrNonNew = true;
+                }
+
+                if ($a->AptDateTime < ($start.' 00:00:00')) {
+                    $hasOldAppt = true;
+                }
+            }
+
+            if ($hasPriorCompleted || ($hasCurrNonNew && $hasOldAppt)) {
+                $disqualified[$pn] = true;
+            }
+        }
+
+        $finalPatNums = array_values(array_filter($newPatNums, fn ($pn) => ! isset($disqualified[$pn])));
+        if (empty($finalPatNums)) {
+            return [];
+        }
+
+        // Step 4: Fetch first-visit procedures, fees, and patient names
+        $procsQ = DB::table('od_procedure_logs as pl')
+            ->leftJoin('od_procedures as pc', function ($j) {
+                $j->on('pl.CodeNum', '=', 'pc.CodeNum')
+                    ->on('pl.office_id', '=', 'pc.office_id');
+            })
+            ->leftJoin('od_patients as p', function ($j) {
+                $j->on('pl.PatNum', '=', 'p.PatNum')
+                    ->on('pl.office_id', '=', 'p.office_id');
+            })
+            ->where('pl.office_id', $officeId)
+            ->whereIn('pl.PatNum', $finalPatNums)
+            ->whereIn('pl.ProcStatus', ProcStatus::completed());
+
+        if (! empty($excludedCodes)) {
+            $procsQ->whereNotIn('pl.CodeNum', $excludedCodes);
+        }
+
+        $procsQ->where(function ($q) {
+            $q->whereNotIn('pc.ProcCode', ['D9986', 'D9987'])
+                ->orWhereNull('pc.ProcCode');
+        });
+
+        $procRows = $procsQ->select([
+            'pl.PatNum',
+            'pl.ProcDate',
+            'pl.ProcFee',
+            'pl.ClinicNum',
+            'pl.ProvNum',
+            'pc.ProcCode',
+            'p.LName',
+            'p.FName',
+        ])->get();
+
+        $grouped = [];
+        foreach ($procRows as $r) {
+            $firstDate = $patFirstDateMap[$r->PatNum] ?? null;
+            if ($firstDate === null || substr($r->ProcDate, 0, 10) !== substr($firstDate, 0, 10)) {
+                continue;
+            }
+
+            $pn = $r->PatNum;
+            if (! isset($grouped[$pn])) {
+                $grouped[$pn] = [
+                    'patient_id' => $pn,
+                    'patient_name' => trim(($r->LName ?? '').', '.($r->FName ?? ''), ', '),
+                    'dates' => substr($firstDate, 0, 10),
+                    'service_codes_arr' => [],
+                    'amount' => 0.0,
+                    'clinic_num' => (int) ($r->ClinicNum ?? 0),
+                    'prov_num' => $r->ProvNum ?? null,
+                ];
+            }
+
+            if (! empty($r->ProcCode) && ! in_array($r->ProcCode, $grouped[$pn]['service_codes_arr'], true)) {
+                $grouped[$pn]['service_codes_arr'][] = $r->ProcCode;
+            }
+            $grouped[$pn]['amount'] += (float) $r->ProcFee;
+            if ($r->ClinicNum !== null) {
+                $grouped[$pn]['clinic_num'] = (int) $r->ClinicNum;
+            }
+            if ($r->ProvNum !== null) {
+                $grouped[$pn]['prov_num'] = $r->ProvNum;
+            }
+        }
+
+        $out = [];
+        foreach ($grouped as $g) {
+            sort($g['service_codes_arr']);
+            $out[] = [
+                'patient_id' => $g['patient_id'],
+                'patient_name' => $g['patient_name'],
+                'dates' => $g['dates'],
+                'service_codes' => implode(', ', $g['service_codes_arr']),
+                'amount' => round($g['amount'], 2),
+                'clinic_num' => $g['clinic_num'],
+                'prov_num' => $g['prov_num'],
+            ];
+        }
+
+        usort($out, function ($a, $b) {
+            return ($a['dates'] <=> $b['dates']) ?: ($a['patient_name'] <=> $b['patient_name']);
+        });
+
+        return $out;
     }
 
     /**
@@ -158,7 +251,7 @@ class PatientVisitService
         $q = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
+            ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('pl.CodeNum', $excludedCodes))
             ->whereBetween('pl.ProcDate', [$startDate, $endDate]);
 
         if (! empty($clinics)) {
@@ -192,7 +285,8 @@ class PatientVisitService
         $clinicFilter = ! empty($clinics) ? 'AND pl.ClinicNum IN ('.implode(',', array_map('intval', $clinics)).')' : '';
         $provFilter = ! empty($providers) ? 'AND pl.ProvNum IN ('.implode(',', array_map('intval', $providers)).')' : '';
 
-        $excludedIn = ProcCode::brokenAppointmentCodeNumsInList($officeId);
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
+        $codeFilter = ! empty($excludedCodes) ? 'AND pl.CodeNum NOT IN ('.implode(',', array_map('intval', $excludedCodes)).')' : '';
 
         $rows = DB::select("
             SELECT
@@ -204,7 +298,7 @@ class PatientVisitService
             JOIN od_patients p ON pl.PatNum = p.PatNum AND p.office_id = ?
             WHERE pl.office_id = ?
               AND pl.ProcStatus IN ({$this->completedIn})
-              AND COALESCE(pl.CodeNum, '') NOT IN ({$excludedIn})
+              {$codeFilter}
               AND pl.ProcDate BETWEEN ? AND ?
               {$clinicFilter}
               {$provFilter}
@@ -233,7 +327,7 @@ class PatientVisitService
         $q = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
+            ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('pl.CodeNum', $excludedCodes))
             ->whereBetween('pl.ProcDate', [$start, $end]);
 
         if (! empty($clinics)) {
@@ -271,7 +365,7 @@ class PatientVisitService
             $patientVisits = DB::table('od_procedure_logs')
                 ->where('office_id', $officeId)
                 ->whereIn('ProcStatus', ProcStatus::completed())
-                ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes)
+                ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('CodeNum', $excludedCodes))
                 ->whereBetween('ProcDate', [$s, $e])
                 ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::patientVisits('val'))
                 ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))

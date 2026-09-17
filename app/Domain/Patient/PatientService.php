@@ -41,7 +41,7 @@ class PatientService
             ->select('PatNum', DB::raw('MIN(ProcDate) AS first_date'))
             ->where('office_id', $officeId)
             ->whereIn('ProcStatus', ProcStatus::completed())
-            ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes);
+            ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('CodeNum', $excludedCodes));
 
         if ($clinicId !== null && $clinicId !== 'all' && $clinicId !== '') {
             if (is_array($clinicId)) {
@@ -116,7 +116,7 @@ class PatientService
         $q = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $filter->officeId)
             ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
+            ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('pl.CodeNum', $excludedCodes))
             ->whereBetween('pl.ProcDate', [$filter->start, $filter->end]);
 
         if ($filter->clinics) {

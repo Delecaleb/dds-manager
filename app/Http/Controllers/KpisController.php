@@ -484,7 +484,7 @@ class KpisController extends Controller
         $newPatientsCount = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->whereIn('pl.ProcStatus', [2, '2', 'C'])
-            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
+            ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('pl.CodeNum', $excludedCodes))
             ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
             ->groupBy('pl.PatNum')
             ->havingRaw('MIN(pl.ProcDate) >= ?', [$cutoff18m.' 00:00:00'])

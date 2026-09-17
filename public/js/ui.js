@@ -676,9 +676,113 @@
         };
     };
 
-    // Auto-init any declarative tab bars, and every sortable table, on load.
+    /* ── Location multi-select (canonical behavior for <x-location-picker>) ─────────
+       Checkbox changes are a draft; nothing is emitted until Apply. Closing the menu without
+       applying restores the last applied selection. At least one location must stay selected.
+         DDS.getLocations('opsLocations')            -> ['1', '3', '8:2']
+         DDS.onLocations('opsLocations', function (keys) { ...reload... });
+    */
+    DDS.locationPicker = (function () {
+        var pickers = {};
+
+        function init(root) {
+            if (root.__ddsLocationPicker) return root.__ddsLocationPicker;
+            var id = root.getAttribute('data-dds-location-picker');
+            var menu = root.querySelector('[data-lp-menu]');
+            var toggle = root.querySelector('[data-lp-toggle]');
+            var search = root.querySelector('[data-lp-search]');
+            var applyBtn = root.querySelector('[data-lp-apply]');
+            var label = root.querySelector('[data-lp-label]');
+            var boxes = Array.prototype.slice.call(root.querySelectorAll('[data-lp-option]'));
+            var applied = boxes.filter(function (b) { return b.checked; }).map(function (b) { return b.value; });
+
+            function checked() { return boxes.filter(function (b) { return b.checked; }); }
+            function setChecked(keys) { boxes.forEach(function (b) { b.checked = keys.indexOf(b.value) !== -1; }); }
+
+            function render() {
+                var n = checked().length;
+                applyBtn.disabled = n === 0;
+                applyBtn.classList.toggle('opacity-50', n === 0);
+                applyBtn.classList.toggle('cursor-not-allowed', n === 0);
+
+                var names = boxes.filter(function (b) { return applied.indexOf(b.value) !== -1; })
+                    .map(function (b) { return b.getAttribute('data-label'); });
+                label.textContent = applied.length === boxes.length ? 'All Locations'
+                    : (applied.length === 1 ? names[0] : applied.length + ' Locations');
+                label.title = names.join(', ');
+            }
+
+            function open() {
+                menu.classList.remove('hidden');
+                toggle.setAttribute('aria-expanded', 'true');
+                if (search) { search.value = ''; filter(''); search.focus(); }
+            }
+            function close() {
+                if (menu.classList.contains('hidden')) return;
+                menu.classList.add('hidden');
+                toggle.setAttribute('aria-expanded', 'false');
+                setChecked(applied); // discard an unapplied draft
+                render();
+            }
+            function filter(q) {
+                q = q.toLowerCase().trim();
+                boxes.forEach(function (b) {
+                    b.closest('label').style.display = b.getAttribute('data-label').toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+                });
+            }
+
+            toggle.addEventListener('click', function () {
+                if (menu.classList.contains('hidden')) open(); else close();
+            });
+            document.addEventListener('mousedown', function (e) { if (!root.contains(e.target)) close(); });
+            root.addEventListener('keydown', function (e) { if (e.key === 'Escape') { close(); toggle.focus(); } });
+            if (search) search.addEventListener('input', function () { filter(search.value); });
+            boxes.forEach(function (b) { b.addEventListener('change', render); });
+            root.querySelector('[data-lp-all]').addEventListener('click', function () { boxes.forEach(function (b) { b.checked = true; }); render(); });
+            root.querySelector('[data-lp-none]').addEventListener('click', function () { boxes.forEach(function (b) { b.checked = false; }); render(); });
+            applyBtn.addEventListener('click', function () {
+                if (!checked().length) return;
+                applied = checked().map(function (b) { return b.value; });
+                menu.classList.add('hidden');
+                toggle.setAttribute('aria-expanded', 'false');
+                render();
+                document.dispatchEvent(new CustomEvent('locations:changed', { detail: { id: id, keys: applied.slice() } }));
+            });
+
+            render();
+            var api = { keys: function () { return applied.slice(); } };
+            root.__ddsLocationPicker = pickers[id] = api;
+            return api;
+        }
+
+        return {
+            init: init,
+            initAll: function (scope) {
+                (scope || document).querySelectorAll('[data-dds-location-picker]').forEach(init);
+            },
+            // Lazily initialises, so inline page scripts can read a picker before DOMContentLoaded.
+            get: function (id) {
+                if (pickers[id]) return pickers[id];
+                var root = document.querySelector('[data-dds-location-picker="' + id + '"]');
+                return root ? init(root) : null;
+            }
+        };
+    })();
+    DDS.getLocations = function (id) {
+        var p = DDS.locationPicker.get(id);
+        return p ? p.keys() : [];
+    };
+    DDS.onLocations = function (id, cb) {
+        document.addEventListener('locations:changed', function (e) {
+            if (id && e.detail.id !== id) return;
+            cb(e.detail.keys);
+        });
+    };
+
+    // Auto-init any declarative tab bars, location pickers, and every sortable table, on load.
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('[data-dds-tabs]').forEach(function (n) { DDS.tabs.init(n); });
+        DDS.locationPicker.initAll(document);
         DDS.sortableAll(document);
     });
 

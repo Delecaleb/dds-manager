@@ -213,8 +213,12 @@
                                     $cellDate = $col['date'] ?? $row['date_raw'] ?? null;
                                     $startDate = $cellDate ?? request('start_date', now()->startOfMonth()->toDateString());
                                     $endDate = $cellDate ?? request('end_date', now()->toDateString());
+                                    // A location row drills into its own office; rows that span
+                                    // locations (e.g. Performance days) drill into the page selection.
                                     $ddUrl = route('operations.drilldown', array_filter([
                                         'metric' => $col['drilldown_type'],
+                                        'office_id' => $row['office_id'] ?? null,
+                                        'locations' => isset($row['office_id']) ? null : request('locations'),
                                         'clinic_num' => $row['clinic_num'] ?? request('clinic_num'),
                                         'prov_num' => $row['prov_num'] ?? request('prov_num'),
                                         'start_date' => $startDate,

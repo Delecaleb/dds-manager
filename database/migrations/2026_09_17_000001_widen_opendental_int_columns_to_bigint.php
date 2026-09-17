@@ -52,6 +52,8 @@ return new class extends Migration
             return; // SQLite (tests) has no fixed integer widths.
         }
 
+        DB::statement("SET SESSION sql_mode = ''");
+
         foreach ($this->tables as $table) {
             if (Schema::hasTable($table)) {
                 $this->widenTable($table);

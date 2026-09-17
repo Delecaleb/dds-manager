@@ -17,6 +17,8 @@
                         class="appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 font-bold text-slate-700 shadow-sm focus:outline-none focus:border-[#00bfa5] h-[34px] min-w-[150px]">
                 </div>
 
+                <x-location-picker id="opsLocations" :locations="$locations" :selected="$selectedLocations" />
+
                 {{-- Trends Metric Filter (shown only on Trends tab) --}}
                 <div id="opsTrendsMetricWrapper" class="{{ $activeTab === 'trends' ? '' : 'hidden' }} relative min-w-[260px]">
                     <div id="opsTrendsDropdown" class="relative">
@@ -131,27 +133,6 @@
                     </div>
                 </div>
 
-                <div class="relative min-w-[140px]">
-                    <select id="opsLocation"
-                        class="w-full appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 font-medium text-slate-700 pr-8 shadow-sm focus:outline-none">
-                        @if (isset($clinics) && count($clinics) > 1)
-                            <option value="" {{ ($activeClinicNum ?? null) === null ? 'selected' : '' }}>All Locations</option>
-                            @foreach ($clinics as $clinicId => $clinicName)
-                                <option value="{{ $clinicId }}" {{ ($activeClinicNum ?? null) !== null && (string)$clinicId === (string)$activeClinicNum ? 'selected' : '' }}>{{ $clinicName }}</option>
-                            @endforeach
-                        @elseif (isset($clinics) && count($clinics) === 1)
-                            @foreach ($clinics as $clinicId => $clinicName)
-                                <option value="{{ $clinicId }}" selected>{{ $clinicName }}</option>
-                            @endforeach
-                        @else
-                            <option value="0">Main Location</option>
-                        @endif
-                    </select>
-                    <div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-slate-400">
-                        <i data-lucide="chevron-down" class="w-4 h-4"></i>
-                    </div>
-                </div>
-
                 <div class="relative min-w-[170px]">
                     <select id="opsLineOfBusiness"
                         class="w-full appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 font-medium text-slate-700 pr-8 shadow-sm focus:outline-none">
@@ -163,7 +144,7 @@
                 </div>
 
                 <button id="opsUpdateBtn"
-                    class="bg-white border border-[#00bfa5] text-[#00bfa5] font-bold px-5 py-1.5 rounded shadow-sm text-xs hover:bg-[#00bfa5] hover:text-white transition-colors">
+                    class="bg-white border border-[#00bfa5] text-[#00bfa5] font-bold px-5 py-1.5 rounded shadow-sm text-xs hover:bg-[#00bfa5] hover:text-white transition-colors cursor-pointer">
                     Update
                 </button>
             </div>
@@ -205,7 +186,6 @@
             function dateParams() {
                 const isClaims = current.tab === 'claims';
                 const isTrends = current.tab === 'trends';
-                const clinic = document.getElementById('opsLocation')?.value ?? '';
                 const params = new URLSearchParams();
 
                 if (isClaims) {
@@ -226,7 +206,7 @@
                     }
                 }
 
-                if (clinic !== '') params.set('clinics', clinic);
+                params.set('locations', DDS.getLocations('opsLocations').join(','));
 
                 const lob = document.getElementById('opsLineOfBusiness')?.value ?? '';
                 if (lob) params.set('lob', lob);
@@ -573,8 +553,9 @@
             window.opsDateApplied = () => loadTab(current.tab, current.subtab, false, current.extra);
             document.getElementById('opsUpdateBtn').addEventListener('click',
                 () => loadTab(current.tab, current.subtab, false, current.extra));
-            document.getElementById('opsLocation').addEventListener('change',
-                () => loadTab(current.tab, current.subtab, false, current.extra));
+            DDS.onLocations('opsLocations', () => {
+                loadTab(current.tab, current.subtab, false, current.extra);
+            });
             document.getElementById('opsMonthPicker').addEventListener('change',
                 () => loadTab(current.tab, current.subtab, false, current.extra));
             document.getElementById('opsLineOfBusiness').addEventListener('change',
@@ -590,8 +571,6 @@
             (function boot() {
                 const ready = window.jQuery && jQuery('#opsDateRange').data('daterangepicker');
                 if (!ready) return setTimeout(boot, 30);
-                history.replaceState({ tab: current.tab, subtab: current.subtab }, '',
-                    pageUrl(current.tab, current.subtab));
                 loadTab(current.tab, current.subtab, false);
             })();
         })();

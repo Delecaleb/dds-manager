@@ -17,6 +17,9 @@ class ClinicRegistry
     /** @var array<int, array<int, string>> lazily-built officeId => (ClinicNum => name) */
     private array $maps = [];
 
+    /** @var array<string, Location>|null lazily-built reportable locations across active offices */
+    private ?array $locations = null;
+
     /** @return array<int,string> ClinicNum => display name for the given office */
     public function all(?int $officeId = null): array
     {
@@ -113,5 +116,142 @@ class ClinicRegistry
         if ($officeId) {
             session(["active_clinic_id_{$officeId}" => $clinicNum]);
         }
+    }
+
+    /**
+     * Every reportable location across active offices, keyed by Location::key().
+     * An office is one location; a multi-clinic office contributes one location per clinic.
+     *
+     * @return array<string, Location>
+     */
+    public function locations(): array
+    {
+        if ($this->locations !== null) {
+            return $this->locations;
+        }
+
+        $locations = [];
+        foreach (Office::where('is_active', true)->orderBy('name')->get(['id', 'name']) as $office) {
+            $clinics = $this->all($office->id);
+
+            if (count($clinics) > 1) {
+                foreach ($clinics as $clinicNum => $clinicName) {
+                    $displayName = $clinicName;
+                    if (! empty($office->name) && ! str_contains(strtolower($clinicName), strtolower($office->name))) {
+                        $displayName = "{$office->name} - {$clinicName}";
+                    }
+                    $location = new Location($office->id, $clinicNum, $displayName);
+                    $locations[$location->key()] = $location;
+                }
+            } else {
+                $location = new Location($office->id, null, $office->name);
+                $locations[$location->key()] = $location;
+            }
+        }
+
+        return $this->locations = $locations;
+    }
+
+    /**
+     * The location a synced row belongs to. A single-clinic office's registered clinic is
+     * the office itself; any other ClinicNum (e.g. unassigned 0 in a multi-clinic office)
+     * is reported as its own location so its numbers are never merged into a real clinic.
+     */
+    public function locationFor(int $officeId, int $clinicNum): Location
+    {
+        $clinics = $this->all($officeId);
+
+        if (count($clinics) <= 1 && array_key_exists($clinicNum, $clinics)) {
+            return $this->locations()[(string) $officeId]
+                ?? new Location($officeId, null, $clinics[$clinicNum]);
+        }
+
+        return $this->locations()[Location::keyFor($officeId, $clinicNum)]
+            ?? new Location($officeId, $clinicNum, $this->name($clinicNum, $officeId));
+    }
+
+    /**
+     * Resolve a comma-separated list of location keys (the `locations` request param).
+     * Unknown keys are dropped. "all" selects every location. Missing or fully invalid
+     * input falls back to the active office (and its active clinic, if one is set).
+     */
+    public function select(?string $param): LocationSelection
+    {
+        $all = $this->locations();
+        $tokens = array_values(array_filter(array_map('trim', explode(',', (string) $param)), 'strlen'));
+
+        $selected = [];
+        if (in_array('all', $tokens, true)) {
+            $selected = $all;
+        } else {
+            foreach ($tokens as $token) {
+                if (isset($all[$token])) {
+                    $selected[$token] = $all[$token];
+
+                    continue;
+                }
+                // A bare office id also selects every clinic of a multi-clinic office.
+                foreach ($all as $key => $location) {
+                    if (ctype_digit($token) && $location->officeId === (int) $token) {
+                        $selected[$key] = $location;
+                    }
+                }
+            }
+        }
+
+        if ($selected === []) {
+            $selected = $this->defaultLocations($all);
+        }
+
+        // Keep registry display order regardless of the order keys were passed in.
+        $ordered = array_values(array_intersect_key($all, $selected));
+
+        return new LocationSelection($ordered, $this->scopesFor($ordered));
+    }
+
+    /**
+     * @param  array<string, Location>  $all
+     * @return array<string, Location>
+     */
+    private function defaultLocations(array $all): array
+    {
+        $officeId = Office::getActiveOfficeId();
+        if ($officeId === null) {
+            return array_slice($all, 0, 1, true);
+        }
+
+        $activeClinic = $this->getActiveClinicNum($officeId);
+        $key = Location::keyFor($officeId, $activeClinic);
+        if ($activeClinic !== null && isset($all[$key])) {
+            return [$key => $all[$key]];
+        }
+
+        return array_filter($all, fn (Location $l) => $l->officeId === $officeId);
+    }
+
+    /**
+     * Collapse locations into per-office ClinicNum filters. When every clinic of an office is
+     * selected the filter is dropped (all clinics), which also keeps unassigned ClinicNum rows.
+     *
+     * @param  Location[]  $locations
+     * @return array<int, int[]>
+     */
+    private function scopesFor(array $locations): array
+    {
+        $scopes = [];
+        foreach ($locations as $location) {
+            $scopes[$location->officeId] ??= [];
+            if ($location->clinicNum !== null) {
+                $scopes[$location->officeId][] = $location->clinicNum;
+            }
+        }
+
+        foreach ($scopes as $officeId => $clinics) {
+            if ($clinics !== [] && count($clinics) === count($this->all($officeId))) {
+                $scopes[$officeId] = [];
+            }
+        }
+
+        return $scopes;
     }
 }

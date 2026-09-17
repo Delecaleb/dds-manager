@@ -112,23 +112,19 @@ class OperationsController extends Controller
      * Render the portal shell for any tab/subtab URL so that direct loads,
      * reloads and bookmarks all work. The active tab's fragment is fetched by JS.
      */
-    public function index(string $tab = 'offices', ?string $subtab = null)
+    public function index(Request $request, string $tab = 'offices', ?string $subtab = null)
     {
         if (! array_key_exists($tab, $this->tabs())) {
             abort(404);
         }
-
-        $officeId = Office::getActiveOfficeId() ?? 1;
-        $clinics = $this->clinics->all($officeId);
-        $activeClinicNum = $this->clinics->getActiveClinicNum($officeId);
 
         return view('operations.index', [
             'tabs' => $this->tabs(),
             'subtabsByTab' => $this->subtabsByTab(),
             'activeTab' => $tab,
             'activeSubtab' => $subtab ?: $this->defaultSubtab($tab),
-            'clinics' => $clinics,
-            'activeClinicNum' => $activeClinicNum,
+            'locations' => $this->clinics->locations(),
+            'selectedLocations' => $this->clinics->select($request->input('locations'))->keys(),
         ]);
     }
 
@@ -141,20 +137,10 @@ class OperationsController extends Controller
             abort(404);
         }
 
-        $officeId = Office::getActiveOfficeId() ?? 1;
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->endOfMonth()->toDateString());
         $subtab = $subtab ?: $this->defaultSubtab($tab);
-
-        $clinicsInput = $request->input('clinics') ?? $request->input('clinic_num') ?? $request->input('clinic_id');
-        if ($clinicsInput === 'all' || $clinicsInput === 'all_clinics') {
-            $clinics = [];
-        } elseif ($clinicsInput !== null && $clinicsInput !== '') {
-            $clinics = array_values(array_filter(explode(',', (string) $clinicsInput), 'strlen'));
-        } else {
-            $activeClinic = $this->clinics->getActiveClinicNum($officeId);
-            $clinics = $activeClinic !== null ? [(string) $activeClinic] : [];
-        }
+        $locations = $this->clinics->select($request->input('locations'));
 
         $chrome = [
             'tab' => $tab,
@@ -165,7 +151,7 @@ class OperationsController extends Controller
         switch ($tab) {
             case 'offices':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->offices($start, $end, $subtab, $clinics, $officeId),
+                    'spec' => $service->offices($start, $end, $subtab, $locations),
                 ]);
 
             case 'production-details':
@@ -173,32 +159,32 @@ class OperationsController extends Controller
 
                 return view('operations.tabs.production-details', $chrome + [
                     'group' => $group,
-                    'spec' => $service->productionDetails($start, $end, $group, $clinics, $officeId),
+                    'spec' => $service->productionDetails($start, $end, $group, $locations),
                 ]);
 
             case 'cancellations':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->cancellations($start, $end, $subtab, $clinics, $officeId),
+                    'spec' => $service->cancellations($start, $end, $subtab, $locations),
                 ]);
 
             case 'payors':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->payors($start, $end, $subtab, $clinics, $officeId),
+                    'spec' => $service->payors($start, $end, $subtab, $locations),
                 ]);
 
             case 'providers':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->providers($start, $end, $subtab, $clinics, $officeId),
+                    'spec' => $service->providers($start, $end, $subtab, $locations),
                 ]);
 
             case 'performance':
                 return view('operations.tabs.performance', $chrome + [
-                    'spec' => $service->performance($start, $end, $subtab, $clinics, $officeId),
+                    'spec' => $service->performance($start, $end, $subtab, $locations),
                 ]);
 
             case 'services':
                 return view('operations.tabs.services', $chrome + [
-                    'spec' => $service->services($start, $end, $subtab, $clinics, $officeId),
+                    'spec' => $service->services($start, $end, $subtab, $locations),
                 ]);
 
             case 'trends':
@@ -207,29 +193,30 @@ class OperationsController extends Controller
 
                 return view('operations.tabs.trends', $chrome + [
                     'metric' => $metric,
-                    'spec' => $service->trends($start, $end, $subtab, $clinics, $metric, $lob, $officeId),
+                    'locationNames' => array_map(fn ($l) => $l->name, $locations->locations()),
+                    'spec' => $service->trends($start, $end, $subtab, $locations, $metric, $lob),
                 ]);
 
             case 'claims':
                 return view('operations.tabs.claims', $chrome + [
-                    'spec' => $service->claims($start, $end, $subtab, $clinics, $officeId),
+                    'spec' => $service->claims($start, $end, $subtab, $locations),
                 ]);
 
             case 'compliance':
                 return view('operations.tabs.compliance', $chrome + [
-                    'spec' => $service->compliance($start, $end, $subtab, $clinics, $officeId),
+                    'spec' => $service->compliance($start, $end, $subtab, $locations),
                 ]);
 
             case 'marketing':
                 $zip = request('zip', 'ALL');
 
                 return view('operations.tabs.marketing', $chrome + [
-                    'spec' => $service->marketing($start, $end, $subtab, $clinics, $zip, $officeId),
+                    'spec' => $service->marketing($start, $end, $subtab, $locations, $zip),
                 ]);
 
             case 'monthly-practice-scorecards':
                 return view('operations.tabs.monthly-practice-scorecards', $chrome + [
-                    'spec' => $service->monthlyPracticeScorecards($start, $end, $subtab, $clinics, $officeId),
+                    'spec' => $service->monthlyPracticeScorecards($start, $end, $subtab, $locations),
                 ]);
 
             default:
@@ -247,19 +234,16 @@ class OperationsController extends Controller
     }
 
     /**
-     * AJAX endpoint for Operations -> Offices Drill-downs
+     * AJAX endpoint for Operations drill-downs.
+     *
+     * A cell in a location row passes that row's office_id (+ clinic_num), so it drills into
+     * exactly one location. Cells that span locations (e.g. a Performance day) pass the page's
+     * `locations`; each location is drilled separately and the results are stacked with a
+     * Location column.
      */
     public function drilldown(Request $request)
     {
-        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : (Office::getActiveOfficeId() ?? 1);
-        $metric = $request->input('metric');
-        $clinicNum = $request->input('clinic_num') ?? $request->input('clinic_id');
-        if ($clinicNum === null && $officeId !== null) {
-            $clinicNum = $this->clinics->getActiveClinicNum($officeId);
-        }
-        if ($clinicNum === 'all' || $clinicNum === '' || $clinicNum === 'all_clinics') {
-            $clinicNum = null;
-        }
+        $metric = (string) $request->input('metric');
         $provNum = $request->input('prov_num');
         $start = $request->input('start_date', $request->input('start', now()->startOfMonth()->toDateString()));
         $end = $request->input('end_date', $request->input('end', now()->toDateString()));
@@ -269,6 +253,100 @@ class OperationsController extends Controller
             $end = Carbon::parse($end)->subYear()->toDateString();
         }
 
+        $parts = [];
+        foreach ($this->drilldownScopes($request) as $scope) {
+            $parts[] = $scope + $this->buildDrilldown($metric, $scope['office_id'], $scope['clinic_num'], $provNum, $start, $end);
+        }
+
+        $data = count($parts) === 1 ? $parts[0] : $this->stackDrilldowns($parts);
+
+        return view('components.app-components.drilldown.table-content', [
+            'title' => $data['title'],
+            'columns' => $data['columns'],
+            'rows' => $data['rows'],
+            'totals' => $data['totals'],
+            'providerInfo' => $data['providerInfo'],
+        ]);
+    }
+
+    /**
+     * @return array<int, array{office_id: int, clinic_num: ?int, location: string}>
+     */
+    private function drilldownScopes(Request $request): array
+    {
+        $clinicParam = $request->input('clinic_num');
+        $clinicNum = $clinicParam !== null && $clinicParam !== '' && $clinicParam !== 'all' ? (int) $clinicParam : null;
+
+        if ($request->filled('office_id') || ($clinicNum !== null && ! $request->filled('locations'))) {
+            $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : (Office::getActiveOfficeId() ?? 1);
+            if ($clinicNum === null && ! $request->filled('office_id')) {
+                $clinicNum = $this->clinics->getActiveClinicNum($officeId);
+            }
+
+            return [[
+                'office_id' => $officeId,
+                'clinic_num' => $clinicNum,
+                'location' => $this->clinics->locationFor($officeId, $clinicNum ?? 0)->name,
+            ]];
+        }
+
+        $scopes = [];
+        foreach ($this->clinics->select($request->input('locations'))->scopes() as $officeId => $clinics) {
+            foreach ($clinics ?: [null] as $clinic) {
+                $scopes[] = [
+                    'office_id' => $officeId,
+                    'clinic_num' => $clinic,
+                    'location' => $this->clinics->locationFor($officeId, $clinic ?? 0)->name,
+                ];
+            }
+        }
+
+        return $scopes;
+    }
+
+    /**
+     * Stack per-location drill-downs into one table: a leading Location column, all rows, and
+     * totals summed where every part reports a number for that key.
+     *
+     * @param  array<int, array<string, mixed>>  $parts
+     */
+    private function stackDrilldowns(array $parts): array
+    {
+        $first = $parts[0];
+        $rows = [];
+        foreach ($parts as $part) {
+            foreach ($part['rows'] as $row) {
+                $rows[] = ['location' => $part['location']] + $row;
+            }
+        }
+
+        $totals = null;
+        if ($first['totals'] !== null) {
+            $totals = [];
+            foreach (array_keys($first['totals']) as $key) {
+                $values = array_column(array_column($parts, 'totals'), $key);
+                if (count($values) === count($parts) && count(array_filter($values, 'is_numeric')) === count($values)) {
+                    $totals[$key] = array_sum($values);
+                }
+            }
+        }
+
+        return [
+            'title' => $first['title'],
+            'columns' => array_merge([['key' => 'location', 'label' => 'Location', 'type' => 'text']], $first['columns']),
+            'rows' => $rows,
+            'totals' => $totals,
+            'providerInfo' => null,
+        ];
+    }
+
+    /**
+     * Drill-down rows for one office (optionally one clinic).
+     *
+     * @return array{title: string, columns: array, rows: array, totals: ?array, providerInfo: ?array}
+     */
+    private function buildDrilldown(string $metric, int $officeId, ?int $clinicNum, $provNum, string $start, string $end): array
+    {
         $title = 'Drilldown';
         $columns = [];
         $rows = [];
@@ -336,8 +414,6 @@ class OperationsController extends Controller
                 ],
             ];
         };
-
-        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : (Office::getActiveOfficeId() ?? 1);
 
         if ($metric === 'sched_production') {
             $title = 'Scheduled Production Breakdown';
@@ -1484,7 +1560,7 @@ class OperationsController extends Controller
             $logsQuery = DB::table('od_procedure_logs')
                 ->where('office_id', $officeId)
                 ->select('PatNum', 'ProcDate')
-                ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes)
+                ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('CodeNum', $excludedCodes))
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end]);
 
@@ -1777,7 +1853,7 @@ class OperationsController extends Controller
                 ->where('office_id', $officeId)
                 ->selectRaw('ProcDate, COUNT(DISTINCT PatNum) as pts_visits, COUNT(*) as procedures, SUM(ProcFee) as production')
                 ->whereIn('ProcStatus', ProcStatus::completed())
-                ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes)
+                ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('CodeNum', $excludedCodes))
                 ->whereBetween('ProcDate', [$start, $end]);
 
             if ($provNum) {
@@ -1831,7 +1907,7 @@ class OperationsController extends Controller
             $logs = DB::table('od_procedure_logs')
                 ->where('office_id', $officeId)
                 ->select('PatNum', 'ProcDate', 'ProvNum')
-                ->whereNotIn(DB::raw("COALESCE(CodeNum, '')"), $excludedCodes)
+                ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('CodeNum', $excludedCodes))
                 ->when($clinicNum !== null, fn ($q) => $q->where('ClinicNum', $clinicNum))
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$start, $end])
@@ -2125,24 +2201,27 @@ class OperationsController extends Controller
             $start36m = date('Y-m-d', strtotime('-36 months', strtotime($end)));
             $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
-            $firstProcs = DB::table('od_procedure_logs as pl')
-                ->where('pl.office_id', $officeId)
-                ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
-                ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
-                ->groupBy('pl.PatNum')
-                ->pluck('first_date', 'PatNum')
-                ->all();
-
             $patsAll = DB::table('od_procedure_logs as pl')
                 ->where('pl.office_id', $officeId)
                 ->selectRaw('pl.PatNum, MAX(pl.ProcDate) as last_date')
                 ->when($clinicNum !== null, fn ($q) => $q->where('pl.ClinicNum', $clinicNum))
                 ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
+                ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('pl.CodeNum', $excludedCodes))
                 ->whereBetween('pl.ProcDate', [$start36m.' 00:00:00', $end.' 23:59:59'])
                 ->groupBy('pl.PatNum')
                 ->get();
+
+            $patNums = $patsAll->pluck('PatNum')->all();
+
+            $firstProcs = ! empty($patNums) ? DB::table('od_procedure_logs as pl')
+                ->where('pl.office_id', $officeId)
+                ->whereIn('pl.PatNum', $patNums)
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('pl.CodeNum', $excludedCodes))
+                ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
+                ->groupBy('pl.PatNum')
+                ->pluck('first_date', 'PatNum')
+                ->all() : [];
 
             $patMap = $mapPatients($patsAll->pluck('PatNum')->unique());
 
@@ -2924,6 +3003,6 @@ class OperationsController extends Controller
             $totals = ['fee' => $totalFee];
         }
 
-        return view('components.app-components.drilldown.table-content', compact('title', 'columns', 'rows', 'totals', 'providerInfo'));
+        return compact('title', 'columns', 'rows', 'totals', 'providerInfo');
     }
 }

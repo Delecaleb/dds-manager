@@ -262,39 +262,41 @@
                     $activeClinicNum = $isMultiClinic ? $clinicRegistry->getActiveClinicNum($activeOfficeId) : null;
                 @endphp
                 @if($allOffices->count() > 0)
-                    <form method="POST" action="{{ route('offices.switch') }}" class="flex items-center gap-2">
-                        @csrf
-                        <div class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg text-xs font-semibold text-slate-700 border border-slate-200">
-                            <i data-lucide="building" class="w-3.5 h-3.5 text-blue-600"></i>
-                            <select name="office_id" onchange="this.form.submit()" class="bg-transparent font-medium text-slate-800 text-xs focus:outline-none cursor-pointer">
-                                @foreach($allOffices as $off)
-                                    <option value="{{ $off->id }}" {{ $off->id == $activeOfficeId ? 'selected' : '' }}>
-                                        Location: {{ $off->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </form>
-
-                    @if($isMultiClinic)
-                        <form method="POST" action="{{ route('clinics.switch') }}" class="flex items-center gap-2">
+                    @unless(request()->routeIs('operations.*'))
+                        <form method="POST" action="{{ route('offices.switch') }}" class="flex items-center gap-2">
                             @csrf
-                            <input type="hidden" name="office_id" value="{{ $activeOfficeId }}">
-                            <div class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/80 rounded-lg text-xs font-semibold text-indigo-900 border border-indigo-200 shadow-xs">
-                                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-indigo-600"></i>
-                                <select name="clinic_num" onchange="this.form.submit()" class="bg-transparent font-semibold text-indigo-900 text-xs focus:outline-none cursor-pointer">
-                                    <option value="all" {{ $activeClinicNum === null ? 'selected' : '' }}>
-                                        All Clinics
-                                    </option>
-                                    @foreach($officeClinics as $cNum => $cName)
-                                        <option value="{{ $cNum }}" {{ $activeClinicNum !== null && $cNum == $activeClinicNum ? 'selected' : '' }}>
-                                            Clinic: {{ $cName }}
+                            <div class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg text-xs font-semibold text-slate-700 border border-slate-200">
+                                <i data-lucide="building" class="w-3.5 h-3.5 text-blue-600"></i>
+                                <select name="office_id" onchange="this.form.submit()" class="bg-transparent font-medium text-slate-800 text-xs focus:outline-none cursor-pointer">
+                                    @foreach($allOffices as $off)
+                                        <option value="{{ $off->id }}" {{ $off->id == $activeOfficeId ? 'selected' : '' }}>
+                                            Location: {{ $off->name }}
                                         </option>
                                     @endforeach
                                 </select>
                             </div>
                         </form>
-                    @endif
+
+                        @if($isMultiClinic)
+                            <form method="POST" action="{{ route('clinics.switch') }}" class="flex items-center gap-2">
+                                @csrf
+                                <input type="hidden" name="office_id" value="{{ $activeOfficeId }}">
+                                <div class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/80 rounded-lg text-xs font-semibold text-indigo-900 border border-indigo-200 shadow-xs">
+                                    <i data-lucide="map-pin" class="w-3.5 h-3.5 text-indigo-600"></i>
+                                    <select name="clinic_num" onchange="this.form.submit()" class="bg-transparent font-semibold text-indigo-900 text-xs focus:outline-none cursor-pointer">
+                                        <option value="all" {{ $activeClinicNum === null ? 'selected' : '' }}>
+                                            All Clinics
+                                        </option>
+                                        @foreach($officeClinics as $cNum => $cName)
+                                            <option value="{{ $cNum }}" {{ $activeClinicNum !== null && $cNum == $activeClinicNum ? 'selected' : '' }}>
+                                                Clinic: {{ $cName }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </form>
+                        @endif
+                    @endunless
 
                     <!-- Header Live Sync Report Button -->
                     <button onclick="window.openGlobalSyncReport({{ $activeOfficeId ?? ($allOffices->first()->id ?? 1) }}, '{{ addslashes($currentOffice->name ?? 'Office') }}')" type="button"

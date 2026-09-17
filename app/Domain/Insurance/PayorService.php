@@ -49,6 +49,37 @@ class PayorService
             ->groupBy('PatNum');
     }
 
+    /**
+     * Map a list of PatNums to their latest PlanNum from claim_procs for the given office.
+     * Uses the composite index (office_id, PatNum, PlanNum, ClaimProcNum).
+     *
+     * @param  int[]  $patNums
+     * @return array<int, int> PatNum => PlanNum
+     */
+    public function planMapForPatients(array $patNums, ?int $officeId = null): array
+    {
+        if (empty($patNums)) {
+            return [];
+        }
+
+        $officeId = $officeId ?? Office::getActiveOfficeId();
+
+        $rows = DB::table('od_claim_procs')
+            ->where('office_id', $officeId)
+            ->whereIn('PatNum', array_values(array_unique(array_filter(array_map('intval', $patNums)))))
+            ->where('PlanNum', '>', 0)
+            ->select('PatNum', 'PlanNum', 'ClaimProcNum')
+            ->orderBy('ClaimProcNum', 'asc')
+            ->get();
+
+        $map = [];
+        foreach ($rows as $r) {
+            $map[(int) $r->PatNum] = (int) $r->PlanNum;
+        }
+
+        return $map;
+    }
+
     /** Display label for a plan (carrier name - carrier num), resolved via the database or OpenDental API. */
     public function payorLabel(int|string $planNum, ?int $officeId = null): string
     {
