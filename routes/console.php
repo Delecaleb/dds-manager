@@ -32,21 +32,29 @@ Artisan::command('inspire', function () {
 
 $syncQueue = config('sync.queue');
 
+// Every-minute cron: short workers that exit when the queue is empty.
+// Coarser cron (e.g. 5 min, common on shared hosting): workers keep polling
+// until ~20s before the next cron run, so new jobs never wait a full interval.
+$cronInterval = (int) $syncQueue['cron_interval_minutes'];
+$workerMaxTime = $cronInterval > 1 ? $cronInterval * 60 - 20 : (int) $syncQueue['worker_max_time'];
+$stopWhenEmpty = $cronInterval > 1 ? '' : ' --stop-when-empty';
+
 foreach (range(1, max(1, (int) $syncQueue['workers'])) as $worker) {
     Schedule::command(sprintf(
         // Priority queue listed first: the worker always drains it before regular syncs.
-        'queue:work %s --queue=%s,%s --name=sync-worker-%d --stop-when-empty --max-time=%d --timeout=%d --sleep=3 --memory=256',
+        'queue:work %s --queue=%s,%s --name=sync-worker-%d%s --max-time=%d --timeout=%d --sleep=3 --memory=256',
         $syncQueue['connection'],
         $syncQueue['priority_name'],
         $syncQueue['name'],
         $worker,
-        $syncQueue['worker_max_time'],
+        $stopWhenEmpty,
+        $workerMaxTime,
         $syncQueue['job_timeout'],
     ))
         ->everyMinute()
-        // Lock expiry (minutes) outlives worker_max_time + one job_timeout, so
+        // Lock expiry (minutes) outlives the worker's max time + one job_timeout, so
         // a host-killed worker frees its slot without workers piling up.
-        ->withoutOverlapping((int) ceil(($syncQueue['worker_max_time'] + $syncQueue['job_timeout']) / 60))
+        ->withoutOverlapping((int) ceil(($workerMaxTime + $syncQueue['job_timeout']) / 60))
         ->runInBackground()
         ->onOneServer();
 }

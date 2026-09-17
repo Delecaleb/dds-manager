@@ -69,8 +69,15 @@ return [
         // (process + MySQL connection limits). 1–2 is plenty for incrementals.
         'workers' => (int) env('SYNC_QUEUE_WORKERS', 1),
 
+        // How often the host runs `schedule:run`. Some shared hosts only allow
+        // every 5 minutes. Above 1, workers keep polling for new jobs until just
+        // before the next cron run instead of exiting when the queue is empty —
+        // otherwise freshly dispatched syncs would wait a full cron interval.
+        'cron_interval_minutes' => max(1, (int) env('SYNC_CRON_INTERVAL_MINUTES', 1)),
+
         // A worker stops taking new jobs after this many seconds and exits;
-        // cron starts a fresh one the next minute.
+        // cron starts a fresh one on its next run. Ignored when
+        // cron_interval_minutes > 1 (derived from the interval instead).
         'worker_max_time' => (int) env('SYNC_WORKER_MAX_TIME', 240),
 
         // A job stops cleanly after this many seconds (cursor saved) and
