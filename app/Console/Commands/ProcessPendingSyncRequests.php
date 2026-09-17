@@ -28,7 +28,7 @@ class ProcessPendingSyncRequests extends Command
      */
     public function handle(SyncRequestRunner $runner): int
     {
-        $this->failAbandonedRequests();
+        $this->recoverAbandonedRequests();
 
         if ($this->option('id')) {
             return $this->runOne($runner, (int) $this->option('id'));
@@ -69,16 +69,21 @@ class ProcessPendingSyncRequests extends Command
     }
 
     /**
-     * Mark 'running' requests failed only when their process is really gone.
+     * Recover 'running' requests whose worker process is really gone.
      *
      * A long backfill legitimately runs for more than 10 minutes, so age alone
-     * is not proof of death: the request is abandoned only when no sync for its
-     * office has sent a heartbeat within the stale window.
+     * is not proof of death: a request counts as abandoned only when no sync for
+     * its office has sent a heartbeat within the stale window.
+     *
+     * Hosts kill long-running processes, and every sync resumes from its saved
+     * cursor, so an abandoned request is re-queued to continue. Only a request
+     * that keeps dying for a day is given up on.
      */
-    protected function failAbandonedRequests(): void
+    protected function recoverAbandonedRequests(): void
     {
         $staleAfter = (int) config('sync.stale_after_seconds', 600);
         $cutoff = now()->subSeconds($staleAfter);
+        $giveUpBefore = now()->subDay();
 
         SyncRequest::where('status', 'running')
             ->where('started_at', '<', $cutoff)
@@ -88,10 +93,22 @@ class ProcessPendingSyncRequests extends Command
                 ->where('status', 'running')
                 ->where('updated_at', '>=', $cutoff)
                 ->exists())
-            ->each(fn (SyncRequest $req) => $req->update([
-                'status' => 'failed',
-                'error_message' => 'Sync process timed out or was terminated by server.',
-                'completed_at' => now(),
-            ]));
+            ->each(function (SyncRequest $req) use ($giveUpBefore) {
+                if ($req->created_at !== null && $req->created_at->lt($giveUpBefore)) {
+                    $req->update([
+                        'status' => 'failed',
+                        'error_message' => 'Sync process was repeatedly terminated by the server for over 24 hours. Check storage/logs/laravel.log and failed jobs.',
+                        'completed_at' => now(),
+                    ]);
+
+                    return;
+                }
+
+                $req->update([
+                    'status' => 'pending',
+                    'started_at' => null,
+                    'error_message' => 'Worker stopped mid-run (server terminated the process); resuming from the saved position.',
+                ]);
+            });
     }
 }

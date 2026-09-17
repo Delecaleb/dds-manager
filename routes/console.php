@@ -30,7 +30,17 @@ Artisan::command('inspire', function () {
 | Module keys come from the registry in SyncReportService::getModuleDefinitions().
 */
 
-$syncQueue = config('sync.queue');
+// Defaults are merged in so a stale config cache (deployed code newer than a
+// cached config) degrades to safe values instead of crashing every scheduled task.
+$syncQueue = array_merge([
+    'connection' => 'sync-database',
+    'name' => 'sync',
+    'priority_name' => 'sync-priority',
+    'workers' => 1,
+    'cron_interval_minutes' => 1,
+    'worker_max_time' => 240,
+    'job_timeout' => 600,
+], (array) config('sync.queue', []));
 
 // Every-minute cron: short workers that exit when the queue is empty.
 // Coarser cron (e.g. 5 min, common on shared hosting): workers keep polling
