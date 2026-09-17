@@ -70,14 +70,6 @@ class SyncManagerController extends Controller
         return response()->json(['logs' => $checkpoints->forOffice($this->activeOfficeId())]);
     }
 
-    /**
-     * Reset module sync checkpoint.
-     */
-    public function resetCheckpoint(Request $request, SyncCheckpointService $checkpoints): JsonResponse
-    {
-        return $this->resetSyncCheckpointFor($request, $checkpoints, $this->activeOfficeId());
-    }
-
     private function activeOfficeId(): int
     {
         return (int) ((Office::getActiveOffice() ?? Office::first())?->id ?? 0);

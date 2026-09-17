@@ -246,7 +246,6 @@ Route::middleware('auth')->group(function () {
         Route::post('open-dental-explorer/query', [OpenDentalExplorerController::class, 'query'])->name('od-explorer.query');
         Route::post('open-dental-explorer/sync-to-local', [OpenDentalExplorerController::class, 'syncToLocal'])->name('od-explorer.sync');
         Route::get('open-dental-explorer/sync-checkpoints', [OpenDentalExplorerController::class, 'syncCheckpoints'])->name('od-explorer.checkpoints');
-        Route::post('open-dental-explorer/reset-sync-checkpoint', [OpenDentalExplorerController::class, 'resetSyncCheckpoint'])->name('od-explorer.reset-checkpoint');
         Route::get('open-dental-explorer/sync-requests', [OpenDentalExplorerController::class, 'getSyncRequests'])->name('od-explorer.sync-requests');
         Route::post('open-dental-explorer/trigger-date-sync', [OpenDentalExplorerController::class, 'triggerDateSync'])->name('od-explorer.trigger-date-sync');
         Route::post('open-dental-explorer/reconcile-diff', [OpenDentalExplorerController::class, 'reconcileDiff'])->name('od-explorer.reconcile-diff');
@@ -261,7 +260,6 @@ Route::middleware('auth')->group(function () {
         Route::post('sync-manager/trigger', [SyncManagerController::class, 'triggerSync'])->name('sync-manager.trigger');
         Route::post('sync-manager/cancel', [SyncManagerController::class, 'cancelSync'])->name('sync-manager.cancel');
         Route::get('sync-manager/checkpoints', [SyncManagerController::class, 'checkpoints'])->name('sync-manager.checkpoints');
-        Route::post('sync-manager/reset-checkpoint', [SyncManagerController::class, 'resetCheckpoint'])->name('sync-manager.reset-checkpoint');
     });
 });
 

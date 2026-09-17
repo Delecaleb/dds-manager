@@ -321,15 +321,12 @@
               <i data-lucide="refresh-cw" class="w-4 h-4 text-slate-600"></i> OpenDental Sync Watermarks & Start Dates
             </h2>
             <p class="text-xs text-slate-500 mt-0.5">
-              Reset or update the sync checkpoint (`last_synced_at` and `last_primary_key`) for each module.
+              Read-only view of where each module's sync will continue from. To re-pull a period, use a date-range sync in the Sync Manager.
             </p>
           </div>
           <div class="flex items-center gap-2">
             <button onclick="loadSyncCheckpoints()" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer">
               Refresh
-            </button>
-            <button onclick="resetAllCheckpoints()" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition cursor-pointer">
-              Reset All to Start
             </button>
           </div>
         </div>
@@ -343,12 +340,11 @@
                 <th class="px-4 py-2.5">Last Synced Date (`last_synced_at`)</th>
                 <th class="px-4 py-2.5">Last Primary Key</th>
                 <th class="px-4 py-2.5">Records Synced</th>
-                <th class="px-4 py-2.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody id="checkpointsTbody">
               <tr>
-                <td colspan="6" class="p-8 text-center text-slate-400 text-xs">Loading sync checkpoints...</td>
+                <td colspan="5" class="p-8 text-center text-slate-400 text-xs">Loading sync checkpoints...</td>
               </tr>
             </tbody>
           </table>
@@ -1000,14 +996,14 @@
     function loadSyncCheckpoints() {
       var tbody = document.getElementById('checkpointsTbody');
       if (!tbody) return;
-      tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 text-xs">Loading sync checkpoints...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs">Loading sync checkpoints...</td></tr>';
 
       fetch('{{ url("/open-dental-explorer/sync-checkpoints") }}')
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var logs = data.logs || [];
           if (!logs.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 text-xs">No sync logs recorded yet.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs">No sync logs recorded yet.</td></tr>';
             return;
           }
           var html = logs.map(function (log) {
@@ -1024,63 +1020,16 @@
             }
 
             var escMod = escHtml(log.module);
-            var dateVal = log.last_synced_at ? String(log.last_synced_at).replace(' ', 'T').slice(0, 16) : '';
 
             return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">' +
               '<td class="px-4 py-2.5 font-bold text-slate-900">' + escMod + '</td>' +
               '<td class="px-4 py-2.5">' + statusBadge + errorHtml + '</td>' +
-              '<td class="px-4 py-2.5"><input type="datetime-local" class="cp-date bg-white border border-slate-300 rounded-md px-2 py-1 text-xs text-slate-800 focus:ring-slate-400 shadow-2xs" value="' + dateVal + '"></td>' +
-              '<td class="px-4 py-2.5"><input type="number" class="cp-pk w-28 bg-white border border-slate-300 rounded-md px-2 py-1 text-xs text-slate-800 focus:ring-slate-400 shadow-2xs" value="' + (log.last_primary_key || 0) + '"></td>' +
+              '<td class="px-4 py-2.5 font-mono text-slate-700">' + escHtml(log.last_synced_at || '—') + '</td>' +
+              '<td class="px-4 py-2.5 font-mono text-slate-700">' + escHtml(log.last_primary_key || 0) + '</td>' +
               '<td class="px-4 py-2.5 font-mono font-semibold text-slate-700">' + Number(log.total_processed || 0).toLocaleString() + '</td>' +
-              '<td class="px-4 py-2.5 text-right"><button data-module="' + escMod + '" onclick="saveCheckpointRow(this.dataset.module, this)" class="px-3 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-md transition shadow-2xs cursor-pointer">Reset Date</button></td>' +
               '</tr>';
           }).join('');
           tbody.innerHTML = html;
-        });
-    }
-
-    function saveCheckpointRow(module, btn) {
-      var tr = btn.closest('tr');
-      var dateVal = tr.querySelector('.cp-date').value;
-      var pkVal = tr.querySelector('.cp-pk').value;
-      btn.disabled = true;
-      btn.textContent = 'Saving...';
-
-      fetch('{{ url("/open-dental-explorer/reset-sync-checkpoint") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-        body: JSON.stringify({
-          module: module,
-          last_synced_at: dateVal ? dateVal.replace('T', ' ') : null,
-          last_primary_key: parseInt(pkVal, 10) || 0
-        })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (res) {
-          btn.disabled = false;
-          btn.textContent = 'Reset Date';
-          if (res.error) alert('Error: ' + res.error);
-          else alert(res.message || 'Saved.');
-          loadSyncCheckpoints();
-        })
-        .catch(function (err) {
-          btn.disabled = false;
-          btn.textContent = 'Reset Date';
-          alert('Failed: ' + err.message);
-        });
-    }
-
-    function resetAllCheckpoints() {
-      if (!confirm('Reset ALL sync checkpoints?')) return;
-      fetch('{{ url("/open-dental-explorer/reset-sync-checkpoint") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-        body: JSON.stringify({ module: 'all', last_synced_at: null, last_primary_key: 0 })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (res) {
-          alert(res.error ? 'Error: ' + res.error : (res.message || 'Checkpoints reset.'));
-          loadSyncCheckpoints();
         });
     }
 

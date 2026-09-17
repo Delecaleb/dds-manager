@@ -114,17 +114,16 @@
     <details class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden group">
       <summary class="p-4 bg-slate-50 hover:bg-slate-100/80 transition cursor-pointer font-bold text-xs text-slate-700 uppercase tracking-wider flex items-center justify-between select-none">
         <span class="flex items-center gap-2">
-          <i data-lucide="sliders" class="w-4 h-4 text-slate-500"></i> Advanced Watermarks & Checkpoints
+          <i data-lucide="sliders" class="w-4 h-4 text-slate-500"></i> Sync Checkpoints (read-only)
         </span>
         <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 group-open:rotate-180 transition"></i>
       </summary>
 
       <div class="p-6 space-y-4 border-t border-slate-200">
         <div class="flex items-center justify-between pb-2">
-          <p class="text-xs text-slate-500">View or adjust low-level timestamp watermarks per module.</p>
+          <p class="text-xs text-slate-500">Where each module's sync will continue from. To re-pull a period, create a date-range sync above.</p>
           <div class="flex items-center gap-2">
             <button onclick="loadSyncCheckpoints()" class="px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition">Refresh List</button>
-            <button onclick="resetAllCheckpoints()" class="px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition">Reset All Checkpoints</button>
           </div>
         </div>
 
@@ -137,12 +136,11 @@
                 <th class="px-4 py-3">Last Synced Timestamp</th>
                 <th class="px-4 py-3">Last Primary Key</th>
                 <th class="px-4 py-3">Total Synced</th>
-                <th class="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody id="smCheckpointsTbody" class="divide-y divide-slate-100 font-medium text-slate-800">
               <tr>
-                <td colspan="6" class="p-6 text-center text-slate-400 text-sm">Expand to inspect watermarks.</td>
+                <td colspan="5" class="p-6 text-center text-slate-400 text-sm">Expand to inspect watermarks.</td>
               </tr>
             </tbody>
           </table>
@@ -295,14 +293,14 @@
     function loadSyncCheckpoints() {
       var tbody = document.getElementById('smCheckpointsTbody');
       if (!tbody) return;
-      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400 text-sm">Loading watermarks...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400 text-sm">Loading watermarks...</td></tr>';
 
       fetch('{{ url("/sync-manager/checkpoints") }}')
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var logs = data.logs || [];
           if (!logs.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400 text-sm">No watermark logs recorded yet.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400 text-sm">No watermark logs recorded yet.</td></tr>';
             return;
           }
           var html = '';
@@ -312,74 +310,20 @@
             if (log.status === 'running') statusBadge = '<span class="px-2 py-0.5 text-[11px] font-bold rounded-full uppercase bg-blue-100 text-blue-800 border border-blue-200 animate-pulse">Running</span>';
             if (log.status === 'failed') statusBadge = '<span class="px-2 py-0.5 text-[11px] font-bold rounded-full uppercase bg-rose-100 text-rose-800 border border-rose-200">Failed</span>';
 
-            var dtVal = log.last_synced_at ? escHtml(log.last_synced_at).replace(' ', 'T') : '';
             var pkVal = log.last_primary_key || 0;
             var label = friendlyModuleNames[log.module] || log.module;
 
             html += '<tr class="hover:bg-slate-50 transition">';
             html += '<td class="px-4 py-3 font-bold text-slate-900">' + escHtml(label) + '</td>';
             html += '<td class="px-4 py-3">' + statusBadge + '</td>';
-            html += '<td class="px-4 py-3"><input type="datetime-local" id="dt_' + escHtml(log.module) + '" value="' + dtVal + '" class="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-mono text-slate-800 focus:ring-indigo-500"></td>';
-            html += '<td class="px-4 py-3"><input type="number" id="pk_' + escHtml(log.module) + '" value="' + pkVal + '" class="w-28 bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-mono text-slate-800 focus:ring-indigo-500"></td>';
+            html += '<td class="px-4 py-3 font-mono text-slate-700">' + escHtml(log.last_synced_at || '—') + '</td>';
+            html += '<td class="px-4 py-3 font-mono text-slate-700">' + escHtml(String(pkVal)) + '</td>';
             html += '<td class="px-4 py-3 font-semibold text-slate-700">' + (log.total_processed || 0).toLocaleString() + '</td>';
-            html += '<td class="px-4 py-3 text-right"><button onclick="saveCheckpoint(\'' + escHtml(log.module) + '\')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition cursor-pointer">Save</button></td>';
             html += '</tr>';
           });
           tbody.innerHTML = html;
         });
     }
 
-    function saveCheckpoint(mod) {
-      var dateVal = document.getElementById('dt_' + mod).value;
-      var pkVal = document.getElementById('pk_' + mod).value;
-
-      fetch('{{ url("/sync-manager/reset-checkpoint") }}', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({
-          module: mod,
-          last_synced_at: dateVal ? dateVal.replace('T', ' ') : null,
-          last_primary_key: parseInt(pkVal, 10) || 0
-        })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (res) {
-          if (res.error) {
-            alert('Error: ' + res.error);
-            return;
-          }
-          alert(res.message || 'Updated checkpoint.');
-          loadSyncCheckpoints();
-        });
-    }
-
-    function resetAllCheckpoints() {
-      if (!confirm('Are you sure you want to reset all sync checkpoints?')) return;
-
-      fetch('{{ url("/sync-manager/reset-checkpoint") }}', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({
-          module: 'all',
-          last_synced_at: null,
-          last_primary_key: 0
-        })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (res) {
-          if (res.error) {
-            alert('Error: ' + res.error);
-            return;
-          }
-          alert(res.message || 'Reset all sync checkpoints.');
-          loadSyncCheckpoints();
-        });
-    }
   </script>
 </x-app-layout>
