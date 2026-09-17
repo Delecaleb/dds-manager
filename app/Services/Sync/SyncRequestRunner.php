@@ -3,6 +3,7 @@
 namespace App\Services\Sync;
 
 use App\Jobs\ProcessSyncRequest;
+use App\Jobs\PruneOfficeTable;
 use App\Models\Office;
 use App\Models\SyncRequest;
 use Exception;
@@ -241,10 +242,11 @@ class SyncRequestRunner
                 continue;
             }
 
+            // Queued like scheduled prunes: chunked, resumable, mass-delete guarded.
             if ($startDate && $endDate) {
-                $this->deleter->pruneTable($table, $startDate, $endDate, $office, false);
+                PruneOfficeTable::dispatch((int) $office->id, $table, HardDeleteSyncService::MODE_RANGE, $startDate, $endDate);
             } else {
-                $this->deleter->pruneAllRecords($table, $office, false);
+                PruneOfficeTable::dispatch((int) $office->id, $table, HardDeleteSyncService::MODE_FULL);
             }
         }
     }

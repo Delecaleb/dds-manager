@@ -33,9 +33,37 @@ return [
     */
     'db_lock_attempts' => (int) env('SYNC_DB_LOCK_ATTEMPTS', 3),
 
+    /*
+    | Hard-delete pruning: removes local rows OpenDental no longer has.
+    | OpenDental hard-deletes rows (appointments, procedures, splits…), so the
+    | incremental sync alone never notices them.
+    */
+    'prune' => [
+        // Rolling window checked twice daily: recent past + upcoming schedule.
+        'rolling_past_days' => (int) env('SYNC_PRUNE_PAST_DAYS', 7),
+        'rolling_future_days' => (int) env('SYNC_PRUNE_FUTURE_DAYS', 90),
+
+        // Local keys checked per OpenDental lookup (one API call per chunk).
+        'chunk_size' => (int) env('SYNC_PRUNE_CHUNK_SIZE', 500),
+
+        // Mass-delete guard: refuse to delete when OpenDental reports more than
+        // this share of a chunk missing (wrong API key/database looks exactly
+        // like "everything was deleted"). Override per run with --force.
+        'max_missing_ratio' => (float) env('SYNC_PRUNE_MAX_MISSING_RATIO', 0.5),
+        'max_missing_min_rows' => (int) env('SYNC_PRUNE_MAX_MISSING_MIN_ROWS', 20),
+
+        // Weekly full scan of every local row. Costs one API call per chunk_size
+        // rows per table per office — disable if OpenDental API usage is a concern.
+        'weekly_full_scan' => (bool) env('SYNC_PRUNE_WEEKLY_FULL_SCAN', true),
+    ],
+
     'queue' => [
         'connection' => env('SYNC_QUEUE_CONNECTION', 'sync-database'),
         'name' => env('SYNC_QUEUE', 'sync'),
+
+        // Drained before the regular queue. Used for work with a deadline, e.g. the
+        // morning prune that must finish before the 08:00 schedule snapshot.
+        'priority_name' => env('SYNC_PRIORITY_QUEUE', 'sync-priority'),
 
         // Concurrent workers started by cron. Keep low on shared hosting
         // (process + MySQL connection limits). 1–2 is plenty for incrementals.

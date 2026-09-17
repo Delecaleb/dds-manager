@@ -34,8 +34,10 @@ $syncQueue = config('sync.queue');
 
 foreach (range(1, max(1, (int) $syncQueue['workers'])) as $worker) {
     Schedule::command(sprintf(
-        'queue:work %s --queue=%s --name=sync-worker-%d --stop-when-empty --max-time=%d --timeout=%d --sleep=3 --memory=256',
+        // Priority queue listed first: the worker always drains it before regular syncs.
+        'queue:work %s --queue=%s,%s --name=sync-worker-%d --stop-when-empty --max-time=%d --timeout=%d --sleep=3 --memory=256',
         $syncQueue['connection'],
+        $syncQueue['priority_name'],
         $syncQueue['name'],
         $worker,
         $syncQueue['worker_max_time'],
@@ -101,23 +103,21 @@ Schedule::command('snapshot:daily-schedule --future-days=60')
     ->onOneServer();
 
 /*
-| ORPHAN DATA PRUNING (runs twice daily: 07:30 AM EST before morning snapshot & 19:30 PM EST)
-| Incremental pruning automatically removes records added today that were deleted in Open Dental across all active offices,
-| logging each run to sync_log_prune.
+| HARD-DELETE PRUNING — OpenDental hard-deletes rows, which incremental syncs never see.
+| Each entry only queues one PruneOfficeTable job per office × table (see config sync.prune).
+|  - Rolling (last 7 days + next 90): 07:00 on the priority queue so it finishes before the 08:00
+|    schedule snapshot (~1 OpenDental call per office × table), and again at 19:30.
+|  - Current month: nightly, catches deletions of anything dated this month.
+|  - Full scan: weekly, catches older deletions. Disable with SYNC_PRUNE_WEEKLY_FULL_SCAN=false.
+| Every run logs to sync_log_prune; a mass-delete refusal lands in failed_jobs with instructions.
 */
-Schedule::command('sync:prune-deleted --today')
-    ->dailyAt('07:30')
-    ->timezone('America/New_York')
-    ->withoutOverlapping(20)
-    ->runInBackground()
-    ->onOneServer();
+Schedule::command('sync:prune-deleted --rolling --queue --priority')->dailyAt('07:00')->timezone('America/New_York')->onOneServer();
+Schedule::command('sync:prune-deleted --rolling --queue')->dailyAt('19:30')->timezone('America/New_York')->onOneServer();
+Schedule::command('sync:prune-deleted --current-month --queue')->dailyAt('02:30')->timezone('America/New_York')->onOneServer();
 
-Schedule::command('sync:prune-deleted --today')
-    ->dailyAt('19:30')
-    ->timezone('America/New_York')
-    ->withoutOverlapping(20)
-    ->runInBackground()
-    ->onOneServer();
+if (config('sync.prune.weekly_full_scan')) {
+    Schedule::command('sync:prune-deleted --full --queue')->weeklyOn(0, '03:30')->timezone('America/New_York')->onOneServer();
+}
 
 /*
 | NOTE: Heavy range-backfill commands (`sync:*-range`) are kept on-demand
