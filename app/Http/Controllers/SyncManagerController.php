@@ -17,9 +17,13 @@ class SyncManagerController extends Controller
     /**
      * Display the standalone Sync Manager page.
      */
-    public function index(): View
+    public function index(SyncCheckpointService $checkpoints): View
     {
         $currentOffice = Office::getActiveOffice() ?? Office::first();
+        $offices = Office::where('is_active', true)->orderBy('id')->get();
+        if ($offices->isEmpty()) {
+            $offices = Office::orderBy('id')->get();
+        }
 
         $modules = [
             'appointments' => 'Appointments',
@@ -34,7 +38,9 @@ class SyncManagerController extends Controller
 
         return view('sync_manager.index', [
             'currentOffice' => $currentOffice,
+            'offices' => $offices,
             'modules' => $modules,
+            'resetModules' => $checkpoints->resettableModules(),
         ]);
     }
 
@@ -68,6 +74,14 @@ class SyncManagerController extends Controller
     public function checkpoints(SyncCheckpointService $checkpoints): JsonResponse
     {
         return response()->json(['logs' => $checkpoints->forOffice($this->activeOfficeId())]);
+    }
+
+    /**
+     * Reset sync checkpoint (start date / primary key) for an office.
+     */
+    public function resetCheckpoint(Request $request, SyncCheckpointService $checkpoints): JsonResponse
+    {
+        return $this->resetSyncCheckpointFor($request, $checkpoints, $this->activeOfficeId(), officeFromRequest: true);
     }
 
     private function activeOfficeId(): int

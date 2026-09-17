@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Support\ClinicRegistry;
+use App\Http\Controllers\Concerns\HandlesSyncRequests;
 use App\Models\Office;
+use App\Services\Sync\SyncCheckpointService;
 use App\Services\Sync\SyncReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -13,6 +15,8 @@ use InvalidArgumentException;
 
 class OfficeController extends Controller
 {
+    use HandlesSyncRequests;
+
     public function index(): View
     {
         $offices = Office::orderBy('id')->get();
@@ -171,5 +175,13 @@ class OfficeController extends Controller
     public function syncNow(Office $office, SyncReportService $syncReportService): JsonResponse
     {
         return response()->json($syncReportService->queueAllModulesForOffice($office));
+    }
+
+    /**
+     * Reset sync checkpoint / start date for the office.
+     */
+    public function resetSyncCheckpoint(Request $request, Office $office, SyncCheckpointService $checkpoints): JsonResponse
+    {
+        return $this->resetSyncCheckpointFor($request, $checkpoints, (int) $office->id);
     }
 }

@@ -354,17 +354,77 @@
                 <div class="text-xs text-slate-500" id="sr-last-updated">
                     Telemetry ready
                 </div>
-                <div class="flex items-center gap-3">
-                    <button onclick="triggerOfficeFullSyncModal()" id="sr-sync-all-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-sm transition-colors inline-flex items-center gap-1.5">
+                <div class="flex items-center gap-2">
+                    <button onclick="openOfficeResetStartDateModal()" class="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-medium text-xs rounded-lg border border-amber-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset Start Date
+                    </button>
+                    <button onclick="triggerOfficeFullSyncModal()" id="sr-sync-all-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-sm transition-colors inline-flex items-center gap-1.5 cursor-pointer">
                         <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync All Modules
                     </button>
-                    <button onclick="closeSyncReportModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg transition-colors">
+                    <button onclick="closeSyncReportModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg transition-colors cursor-pointer">
                         Close
                     </button>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Office Reset Start Date Modal -->
+    <div id="office-reset-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="p-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4 text-amber-600"></i>
+                    Reset Sync Start Date (<span id="office-reset-name"></span>)
+                </h3>
+                <button onclick="closeOfficeResetStartDateModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="office-reset-form" onsubmit="submitOfficeResetForm(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Target Module</label>
+                    <select id="office-reset-module" required class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-amber-500 p-2.5 font-semibold shadow-xs">
+                        <option value="all">⚡ All Modules (Complete Location Reset)</option>
+                        <option value="appointments">Appointments</option>
+                        <option value="procedurelogs">Procedures</option>
+                        <option value="patients">Patients</option>
+                        <option value="payments">Payments</option>
+                        <option value="paysplits">Pay Splits</option>
+                        <option value="adjustments">Adjustments</option>
+                        <option value="claimprocs">Insurance Claims</option>
+                        <option value="treatmentplans">Treatment Plans</option>
+                        <option value="schedules">Schedules</option>
+                        <option value="recalls">Recalls</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">New Sync Start Date</label>
+                    <input type="date" id="office-reset-date" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-amber-500 p-2.5 font-medium shadow-xs">
+                    <p class="text-[11px] text-slate-500 mt-1">Incremental sync will re-scan and update all records modified since this date.</p>
+                </div>
+
+                <div class="pt-2">
+                    <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700">
+                        <input type="checkbox" id="office-reset-beginning" onchange="document.getElementById('office-reset-date').disabled = this.checked; if(this.checked) document.getElementById('office-reset-date').value = '';" class="w-4 h-4 text-amber-600 border-slate-300 rounded focus:ring-amber-500">
+                        <span>Reset completely from the beginning (Full Initial Scan from ID 0)</span>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeOfficeResetStartDateModal()" class="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="office-reset-btn" class="px-5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-sm transition inline-flex items-center gap-1.5">
+                        <i data-lucide="check" class="w-4 h-4"></i> Apply Reset
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 
     <script>
         function openOfficeModal() {
@@ -833,7 +893,74 @@
             });
         }
 
+        function openOfficeResetStartDateModal() {
+            if (!currentSyncReportOfficeId) return;
+            const officeSelect = document.getElementById('sr-office-switcher');
+            const officeName = officeSelect.options[officeSelect.selectedIndex]?.text || 'Office';
+            document.getElementById('office-reset-name').innerText = officeName;
+            document.getElementById('office-reset-date').value = '';
+            document.getElementById('office-reset-date').disabled = false;
+            document.getElementById('office-reset-beginning').checked = false;
+            document.getElementById('office-reset-module').value = 'all';
+            document.getElementById('office-reset-modal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeOfficeResetStartDateModal() {
+            document.getElementById('office-reset-modal').classList.add('hidden');
+        }
+
+        function submitOfficeResetForm(e) {
+            e.preventDefault();
+            if (!currentSyncReportOfficeId) return;
+
+            const btn = document.getElementById('office-reset-btn');
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Applying...`;
+            lucide.createIcons();
+
+            const module = document.getElementById('office-reset-module').value;
+            const isBeginning = document.getElementById('office-reset-beginning').checked;
+            const startDate = isBeginning ? null : (document.getElementById('office-reset-date').value || null);
+
+            fetch("{{ route('offices.reset-sync-checkpoint', ['office' => ':id']) }}".replace(':id', currentSyncReportOfficeId), {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    module: module,
+                    start_date: startDate,
+                    last_primary_key: 0
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+                lucide.createIcons();
+
+                if (data.success) {
+                    showAlert(data.message);
+                    closeOfficeResetStartDateModal();
+                    loadSyncReport(currentSyncReportOfficeId, true);
+                } else {
+                    showAlert(data.error || 'Failed to reset sync start date.', true);
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+                lucide.createIcons();
+                showAlert(`Error: ${err.message}`, true);
+            });
+        }
+
         // Global helper for opening sync report modal from anywhere
         window.openOfficeSyncReport = openSyncReportModal;
     </script>
 </x-app-layout>
+

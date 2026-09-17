@@ -184,6 +184,11 @@ class OpenDentalExplorerController extends Controller
         return response()->json(['logs' => $checkpoints->forOffice($this->activeOfficeId())]);
     }
 
+    public function resetSyncCheckpoint(Request $request, SyncCheckpointService $checkpoints): JsonResponse
+    {
+        return $this->resetSyncCheckpointFor($request, $checkpoints, $this->activeOfficeId());
+    }
+
     public function getSyncRequests(): JsonResponse
     {
         return $this->listSyncRequests($this->activeOfficeId());

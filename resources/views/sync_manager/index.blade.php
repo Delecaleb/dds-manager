@@ -15,12 +15,15 @@
             </span>
           </h1>
           <p class="text-sm text-slate-500 mt-0.5">
-            Sync your OpenDental records by selecting a data type and date range.
+            Sync your OpenDental records by selecting a data type and date range, or manage sync start dates per location.
           </p>
         </div>
       </div>
 
       <div class="flex items-center gap-2.5">
+        <button onclick="openResetModal()" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition focus:outline-none cursor-pointer">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset Sync Start Date
+        </button>
         <button onclick="loadSyncRequests()" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition focus:outline-none cursor-pointer">
           <i data-lucide="rotate-cw" class="w-4 h-4"></i> Refresh
         </button>
@@ -110,20 +113,27 @@
       </div>
     </div>
 
-    <!-- Advanced Settings (Collapsible) -->
-    <details class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden group">
+    <!-- Sync Checkpoints & Watermarks Section (Collapsible) -->
+    <details class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden group" open>
       <summary class="p-4 bg-slate-50 hover:bg-slate-100/80 transition cursor-pointer font-bold text-xs text-slate-700 uppercase tracking-wider flex items-center justify-between select-none">
         <span class="flex items-center gap-2">
-          <i data-lucide="sliders" class="w-4 h-4 text-slate-500"></i> Sync Checkpoints (read-only)
+          <i data-lucide="sliders" class="w-4 h-4 text-slate-500"></i> Location Sync Checkpoints & Watermarks
         </span>
         <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 group-open:rotate-180 transition"></i>
       </summary>
 
       <div class="p-6 space-y-4 border-t border-slate-200">
-        <div class="flex items-center justify-between pb-2">
-          <p class="text-xs text-slate-500">Where each module's sync will continue from. To re-pull a period, create a date-range sync above.</p>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2">
+          <p class="text-xs text-slate-500">
+            Where each module's background sync will continue from. You can reset the sync start date for any location or module below.
+          </p>
           <div class="flex items-center gap-2">
-            <button onclick="loadSyncCheckpoints()" class="px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition">Refresh List</button>
+            <button onclick="openResetModal()" class="px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition inline-flex items-center gap-1.5">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset Start Date
+            </button>
+            <button onclick="loadSyncCheckpoints()" class="px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition">
+              Refresh List
+            </button>
           </div>
         </div>
 
@@ -133,14 +143,15 @@
               <tr class="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 uppercase tracking-wider">
                 <th class="px-4 py-3">Module</th>
                 <th class="px-4 py-3">Status</th>
-                <th class="px-4 py-3">Last Synced Timestamp</th>
+                <th class="px-4 py-3">Sync Start / Watermark Date</th>
                 <th class="px-4 py-3">Last Primary Key</th>
                 <th class="px-4 py-3">Total Synced</th>
+                <th class="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody id="smCheckpointsTbody" class="divide-y divide-slate-100 font-medium text-slate-800">
               <tr>
-                <td colspan="5" class="p-6 text-center text-slate-400 text-sm">Expand to inspect watermarks.</td>
+                <td colspan="6" class="p-6 text-center text-slate-400 text-sm">Loading watermarks...</td>
               </tr>
             </tbody>
           </table>
@@ -150,8 +161,75 @@
 
   </div>
 
+  <!-- Reset Sync Start Date Modal -->
+  <div id="resetSyncModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="rotate-ccw" class="w-4 h-4 text-amber-600"></i>
+          Reset Sync Start Date
+        </h3>
+        <button onclick="closeResetModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="resetSyncForm" onsubmit="submitResetSyncForm(event)" class="p-6 space-y-4">
+        <!-- Office Location -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Office Location</label>
+          <select id="resetOfficeSelect" required class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-amber-500 p-2.5 font-semibold shadow-xs">
+            @foreach($offices as $office)
+              <option value="{{ $office->id }}" @if($office->id == ($currentOffice->id ?? 1)) selected @endif>{{ $office->name }} (#{{ $office->id }})</option>
+            @endforeach
+          </select>
+        </div>
+
+        <!-- Target Module -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Target Module</label>
+          <select id="resetModuleSelect" required class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-amber-500 p-2.5 font-semibold shadow-xs">
+            <option value="all">⚡ All Modules (Complete Location Reset)</option>
+            {{-- Keys are OpenDental table names, matching the checkpoint rows below. --}}
+            @foreach($resetModules as $val => $label)
+              <option value="{{ $val }}">{{ $label }}</option>
+            @endforeach
+          </select>
+        </div>
+
+        <!-- Sync Start Date -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">New Sync Start Date</label>
+          <input type="date" id="resetStartDateInput" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-amber-500 p-2.5 font-medium shadow-xs">
+          <p class="text-[11px] text-slate-500 mt-1">Incremental sync will re-scan and update all records modified since this date.</p>
+        </div>
+
+        <!-- Full Initial Resync Toggle -->
+        <div class="pt-2">
+          <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700">
+            <input type="checkbox" id="resetBeginningToggle" onchange="toggleResetBeginning(this.checked)" class="w-4 h-4 text-amber-600 border-slate-300 rounded focus:ring-amber-500">
+            <span>Reset completely from the beginning (Full Initial Scan from ID 0)</span>
+          </label>
+        </div>
+
+        <div id="resetModalNotice" class="hidden p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800"></div>
+
+        <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+          <button type="button" onclick="closeResetModal()" class="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+            Cancel
+          </button>
+          <button type="submit" id="resetSubmitBtn" class="px-5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-sm transition inline-flex items-center gap-1.5">
+            <i data-lucide="check" class="w-4 h-4"></i> Apply Reset
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- JavaScript Engine -->
   <script>
+    var resetModuleKeys = @json(array_keys($resetModules));
+
     var friendlyModuleNames = {
       'appointments': 'Appointments',
       'procedurelogs': 'Procedures',
@@ -165,6 +243,7 @@
 
     document.addEventListener('DOMContentLoaded', function () {
       loadSyncRequests();
+      loadSyncCheckpoints();
     });
 
     function escHtml(s) {
@@ -183,15 +262,11 @@
             return;
           }
 
-          var hasActiveJobs = false;
-
           var html = res.requests.map(function (req) {
             var statusBadge = '';
             if (req.status === 'pending') {
-              hasActiveJobs = true;
               statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200"><span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span> Queued</span>';
             } else if (req.status === 'running') {
-              hasActiveJobs = true;
               statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200"><svg class="animate-spin w-3 h-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> In Progress</span>';
             } else if (req.status === 'completed') {
               statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">✓ Completed</span>';
@@ -293,14 +368,14 @@
     function loadSyncCheckpoints() {
       var tbody = document.getElementById('smCheckpointsTbody');
       if (!tbody) return;
-      tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400 text-sm">Loading watermarks...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400 text-sm">Loading watermarks...</td></tr>';
 
       fetch('{{ url("/sync-manager/checkpoints") }}')
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var logs = data.logs || [];
           if (!logs.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400 text-sm">No watermark logs recorded yet.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400 text-sm">No watermark logs recorded yet.</td></tr>';
             return;
           }
           var html = '';
@@ -311,17 +386,106 @@
             if (log.status === 'failed') statusBadge = '<span class="px-2 py-0.5 text-[11px] font-bold rounded-full uppercase bg-rose-100 text-rose-800 border border-rose-200">Failed</span>';
 
             var pkVal = log.last_primary_key || 0;
-            var label = friendlyModuleNames[log.module] || log.module;
+            var cleanModule = log.module.replace(/^office_\d+:/, '');
+            var label = friendlyModuleNames[cleanModule] || cleanModule;
+            var dateVal = log.last_synced_at ? log.last_synced_at.substring(0, 10) : '';
 
             html += '<tr class="hover:bg-slate-50 transition">';
-            html += '<td class="px-4 py-3 font-bold text-slate-900">' + escHtml(label) + '</td>';
+            html += '<td class="px-4 py-3 font-bold text-slate-900">' + escHtml(label) + ' <span class="text-[10px] text-slate-400 font-mono font-normal">(' + escHtml(log.module) + ')</span></td>';
             html += '<td class="px-4 py-3">' + statusBadge + '</td>';
             html += '<td class="px-4 py-3 font-mono text-slate-700">' + escHtml(log.last_synced_at || '—') + '</td>';
             html += '<td class="px-4 py-3 font-mono text-slate-700">' + escHtml(String(pkVal)) + '</td>';
             html += '<td class="px-4 py-3 font-semibold text-slate-700">' + (log.total_processed || 0).toLocaleString() + '</td>';
+            // Only scheduled-sync rows can be reset (not prune or date-range backfill rows).
+            var canReset = resetModuleKeys.indexOf(cleanModule) !== -1;
+            html += '<td class="px-4 py-3 text-right">' + (canReset
+              ? '<button data-module="' + escHtml(cleanModule) + '" data-date="' + escHtml(dateVal) + '" data-office="' + Number(log.office_id || 0) + '" onclick="openResetModal(this.dataset.module, this.dataset.date, this.dataset.office)" class="px-2.5 py-1 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition cursor-pointer">Reset Date</button>'
+              : '<span class="text-slate-300 text-xs">—</span>') + '</td>';
             html += '</tr>';
           });
           tbody.innerHTML = html;
+        });
+    }
+
+    function openResetModal(moduleKey, currentDate, officeId) {
+      if (moduleKey) {
+        document.getElementById('resetModuleSelect').value = moduleKey;
+      }
+      if (currentDate) {
+        document.getElementById('resetStartDateInput').value = currentDate;
+      }
+      if (officeId) {
+        document.getElementById('resetOfficeSelect').value = officeId;
+      }
+      document.getElementById('resetBeginningToggle').checked = false;
+      document.getElementById('resetStartDateInput').disabled = false;
+      document.getElementById('resetModalNotice').classList.add('hidden');
+      document.getElementById('resetSyncModal').classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeResetModal() {
+      document.getElementById('resetSyncModal').classList.add('hidden');
+    }
+
+    function toggleResetBeginning(checked) {
+      var dateInput = document.getElementById('resetStartDateInput');
+      dateInput.disabled = checked;
+      if (checked) {
+        dateInput.value = '';
+      }
+    }
+
+    function submitResetSyncForm(e) {
+      e.preventDefault();
+      var btn = document.getElementById('resetSubmitBtn');
+      var notice = document.getElementById('resetModalNotice');
+      notice.classList.add('hidden');
+
+      var officeId = document.getElementById('resetOfficeSelect').value;
+      var module = document.getElementById('resetModuleSelect').value;
+      var isBeginning = document.getElementById('resetBeginningToggle').checked;
+      var startDate = isBeginning ? null : (document.getElementById('resetStartDateInput').value || null);
+
+      btn.disabled = true;
+      btn.innerHTML = '<svg class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Applying...';
+
+      fetch('{{ url("/sync-manager/reset-checkpoint") }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+          office_id: officeId,
+          module: module,
+          start_date: startDate,
+          last_primary_key: 0
+        })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> Apply Reset';
+          if (window.lucide) lucide.createIcons();
+
+          if (res.error || res.errors) {
+            notice.innerText = 'Error: ' + (res.error || res.message);
+            notice.classList.remove('hidden');
+            return;
+          }
+
+          alert(res.message || 'Sync start date reset successfully.');
+          closeResetModal();
+          loadSyncCheckpoints();
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> Apply Reset';
+          if (window.lucide) lucide.createIcons();
+          notice.innerText = 'Network error: ' + err.message;
+          notice.classList.remove('hidden');
         });
     }
 

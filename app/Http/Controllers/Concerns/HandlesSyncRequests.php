@@ -3,15 +3,17 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Models\SyncRequest;
+use App\Services\Sync\SyncCheckpointService;
 use App\Services\Sync\SyncRequestRunner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
+use RuntimeException;
 
 /**
- * Date-range sync requests, shared by the Sync Manager
- * and the OD Data Explorer so both screens behave identically.
+ * Date-range sync requests and checkpoint resets, shared by the Sync Manager,
+ * Office locations and the OD Data Explorer.
  */
 trait HandlesSyncRequests
 {
@@ -77,5 +79,34 @@ trait HandlesSyncRequests
             'success' => true,
             'message' => "Sync request #{$id} has been cancelled.",
         ]);
+    }
+
+    /**
+     * @param  bool  $officeFromRequest  let the request pick the office (Sync Manager selector);
+     *                                   otherwise the caller's office (route or active office) is authoritative
+     */
+    protected function resetSyncCheckpointFor(Request $request, SyncCheckpointService $checkpoints, int $officeId, bool $officeFromRequest = false): JsonResponse
+    {
+        $validated = $request->validate([
+            'office_id' => ['nullable', 'integer', 'exists:offices,id'],
+            'module' => ['required', 'string'],
+            'start_date' => ['nullable', 'date'],
+            'last_synced_at' => ['nullable', 'date'],
+            'last_primary_key' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $targetOfficeId = $officeFromRequest && ! empty($validated['office_id']) ? (int) $validated['office_id'] : $officeId;
+        $startDate = $validated['start_date'] ?? $validated['last_synced_at'] ?? null;
+        $lastPrimaryKey = (int) ($validated['last_primary_key'] ?? 0);
+
+        try {
+            $result = $checkpoints->resetForOffice($targetOfficeId, $validated['module'], $startDate, $lastPrimaryKey);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 409);
+        }
+
+        return response()->json($result);
     }
 }
