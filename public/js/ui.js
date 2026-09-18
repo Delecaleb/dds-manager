@@ -713,12 +713,14 @@
             }
 
             function open() {
+                root.classList.add('is-open');
                 menu.classList.remove('hidden');
                 toggle.setAttribute('aria-expanded', 'true');
                 if (search) { search.value = ''; filter(''); search.focus(); }
             }
             function close() {
                 if (menu.classList.contains('hidden')) return;
+                root.classList.remove('is-open');
                 menu.classList.add('hidden');
                 toggle.setAttribute('aria-expanded', 'false');
                 setChecked(applied); // discard an unapplied draft
@@ -743,6 +745,7 @@
             applyBtn.addEventListener('click', function () {
                 if (!checked().length) return;
                 applied = checked().map(function (b) { return b.value; });
+                root.classList.remove('is-open');
                 menu.classList.add('hidden');
                 toggle.setAttribute('aria-expanded', 'false');
                 render();

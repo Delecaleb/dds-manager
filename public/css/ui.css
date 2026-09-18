@@ -21,6 +21,30 @@
     /* stacking modals increment from here */
 }
 
+/* ── Dropdowns & Pickers Stacking ───────────────────────────────────────────
+   Location pickers, date pickers, and custom dropdowns must ALWAYS render above
+   all tables, sticky headers (z:20-35), sticky columns (z:15-35), and tab bars (z:10).
+   Modals remain above them at var(--dds-modal-base-z: 120).
+────────────────────────────────────────────────────────────────────────────── */
+[data-dds-location-picker] {
+    position: relative;
+    z-index: 40;
+}
+
+[data-dds-location-picker].is-open,
+[data-dds-location-picker]:focus-within {
+    z-index: 60 !important;
+}
+
+[data-dds-location-picker] [data-lp-menu] {
+    z-index: 100 !important;
+}
+
+.daterangepicker {
+    z-index: 100 !important;
+}
+
+
 /* ── Canonical table shell ────────────────────────────────────────────────── */
 .dds-table {
     width: 100%;
@@ -533,7 +557,6 @@ nav[role="tablist"],
 .portal-tabs-nav,
 nav.flex.gap-6,
 nav.flex.gap-8,
-section.border-b > div.flex,
 section.border-b > nav.flex,
 div.border-b > nav.flex,
 ul.border-b.flex {
@@ -559,7 +582,6 @@ nav[role="tablist"]::-webkit-scrollbar,
 #rcmTierPills::-webkit-scrollbar,
 .tier-pills::-webkit-scrollbar,
 #foTabNav::-webkit-scrollbar,
-section.border-b > div.flex::-webkit-scrollbar,
 section.border-b > nav.flex::-webkit-scrollbar,
 div.border-b > nav.flex::-webkit-scrollbar,
 ul.border-b.flex::-webkit-scrollbar {

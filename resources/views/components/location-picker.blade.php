@@ -15,12 +15,23 @@
 --}}
 @props([
     'id' => 'locations',
-    'locations' => [],
-    'selected' => [],
+    'locations' => null,
+    'selected' => null,
     'class' => '',
 ])
 
-<div data-dds-location-picker="{{ $id }}" class="relative {{ $class }}">
+@php
+    if ($locations === null || empty($locations)) {
+        $clinicRegistry = app(\App\Domain\Support\ClinicRegistry::class);
+        $locations = $clinicRegistry->locations();
+    }
+    if ($selected === null || empty($selected)) {
+        $clinicRegistry = app(\App\Domain\Support\ClinicRegistry::class);
+        $selected = $clinicRegistry->select(request('locations'))->keys();
+    }
+@endphp
+
+<div data-dds-location-picker="{{ $id }}" class="relative z-40 {{ $class }}">
     <button type="button" data-lp-toggle aria-haspopup="true" aria-expanded="false"
         class="flex items-center gap-2 border border-slate-200 rounded-lg bg-slate-50 px-3 py-1.5 min-w-[190px] max-w-[260px] hover:border-emerald-400 hover:bg-white transition-colors cursor-pointer text-sm font-medium text-slate-700 focus:outline-none focus:border-emerald-400">
         <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
@@ -28,7 +39,7 @@
         <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
     </button>
 
-    <div data-lp-menu class="hidden absolute left-0 top-full mt-1.5 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2.5 flex flex-col gap-2">
+    <div data-lp-menu class="hidden absolute left-0 top-full mt-1.5 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-[100] p-2.5 flex flex-col gap-2">
         @if (count($locations) > 6)
             <input type="text" data-lp-search placeholder="Search locations…" aria-label="Search locations"
                 class="w-full px-2.5 py-1 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-400 bg-slate-50 focus:bg-white">

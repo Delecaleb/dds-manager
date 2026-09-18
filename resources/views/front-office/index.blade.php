@@ -23,15 +23,7 @@
                         class="appearance-none bg-gray-100 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-700">
                 </div>
 
-                <div class="relative">
-                    <select
-                        class="appearance-none bg-gray-100 border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-700">
-                        <option>8 Mile</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                        <i class="fa-solid fa-chevron-down text-xs"></i>
-                    </div>
-                </div>
+                <x-location-picker id="foLocations" />
                 <button id="updateStatsBtn"
                     class="bg-white hover:bg-gray-50 text-emerald-600 border border-emerald-500 font-medium text-sm px-4 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5">
                     <i class="fa-solid fa-arrows-rotate text-xs"></i> Update
@@ -270,6 +262,12 @@
             $(document).on('click', '#updateStatsBtn', function () {
                 window.reloadAllFoData();
             });
+
+            if (window.DDS && typeof DDS.onLocations === 'function') {
+                DDS.onLocations('foLocations', function () {
+                    window.reloadAllFoData();
+                });
+            }
 
             // SPA Tab Switching Engine
             $('.fo-nav-link').on('click', function (e) {

@@ -27,5 +27,8 @@ Thumbs.db
 /front-office-shedule-tables
 /scratch
 /tests
-tests
+/tests/*
+tests/
+/test
 /test/*
+test/

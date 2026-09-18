@@ -37,7 +37,7 @@
     <div class="min-h-screen flex flex-col relative bg-slate-50">
 
         <!-- Top Header Banner -->
-        <div class="bg-white border-b border-slate-200 px-8 pt-6 pb-0 shadow-sm">
+        <div class="relative z-30 bg-white border-b border-slate-200 px-8 pt-6 pb-0 shadow-sm">
             <div class="flex items-center justify-between mb-4">
                 <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Patient Portal</h1>
                 <button
@@ -47,22 +47,7 @@
             </div>
 
             <div class="flex items-center gap-3 mb-6">
-                <div class="relative w-48">
-                    <select id="globalClinicSelect"
-                        class="w-full appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer">
-                        <option value="all" {{ ($activeClinicNum ?? null) === null ? 'selected' : '' }}>All Clinics</option>
-                        @if(isset($clinics) && count($clinics))
-                            @foreach($clinics as $cNum => $cName)
-                                <option value="{{ $cNum }}" {{ ($activeClinicNum ?? null) !== null && (string)$cNum === (string)$activeClinicNum ? 'selected' : '' }}>{{ $cName }}</option>
-                            @endforeach
-                        @else
-                            <option value="0" selected>{{ \App\Models\Office::getActiveOffice()?->name ?? 'Main Office' }}</option>
-                        @endif
-                    </select>
-                    <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-500">
-                        <i data-lucide="chevron-down" class="w-4 h-4"></i>
-                    </div>
-                </div>
+                <x-location-picker id="patientLocations" />
                 <button id="refreshPatients"
                     class="border border-emerald-500 text-slate-800 text-sm font-semibold px-5 py-1.5 rounded bg-white hover:bg-slate-50 transition-colors cursor-pointer">
                     Refresh
@@ -694,7 +679,11 @@
                     url: "{{ route('patients.data') }}",
                     type: "GET",
                     data: function (d) {
-                        d.clinic_id = $('#globalClinicSelect').val();
+                        var locs = window.DDS && typeof window.DDS.getLocations === 'function' ? window.DDS.getLocations('patientLocations') : [];
+                        d.locations = locs;
+                        if (locs && locs.length) {
+                            d.clinic_id = locs[0];
+                        }
                     },
                     beforeSend: function () { showPatientsLoading(); },
                     complete: function () { hidePatientsLoading(); },
@@ -824,22 +813,12 @@
                 table.search("").draw();
             });
 
-            $("#globalClinicSelect").on('change', function () {
-                let cVal = $(this).val();
-                if ($('#expClinic').length) {
-                    $('#expClinic').val(cVal);
-                }
-                showPatientsLoading();
-                table.ajax.reload();
-            });
-
-            $("#expClinic").on('change', function () {
-                let cVal = $(this).val();
-                if ($('#globalClinicSelect').length) {
-                    $('#globalClinicSelect').val(cVal);
-                }
-                fetchExportPreview(1);
-            });
+            if (window.DDS && typeof window.DDS.onLocations === 'function') {
+                window.DDS.onLocations('patientLocations', function () {
+                    showPatientsLoading();
+                    table.ajax.reload();
+                });
+            }
 
             $("#refreshPatients").on('click', function () {
                 showPatientsLoading();
@@ -860,10 +839,12 @@
             $("#confirmExportBtn").click(function () {
                 let currentSearchValue = $("#searchInput").val();
                 let customName = $("#exportFileName").val() || "patient_export";
-                let currentClinic = $("#globalClinicSelect").val();
+                let locs = window.DDS && typeof window.DDS.getLocations === 'function' ? window.DDS.getLocations('patientLocations') : [];
+                let currentClinic = locs && locs.length ? locs[0] : 'all';
                 $("#exportModal").addClass('hidden');
 
                 let params = $.param({
+                    locations: locs,
                     clinic_id: currentClinic,
                     search: currentSearchValue,
                     date_mode: 'all',

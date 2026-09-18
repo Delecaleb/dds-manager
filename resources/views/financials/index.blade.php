@@ -264,24 +264,10 @@
     </div>
   </header>
 
-  <section class="bg-white border-b border-gray-200 px-8 py-4">
+  <section class="relative z-40 bg-white border-b border-gray-200 px-8 py-4">
     <div class="flex flex-wrap items-center gap-3">
       <x-daterange-picker on-apply="onDrpApply" />
-
-      @if(isset($clinics) && count($clinics) > 1)
-      <div class="relative min-w-[180px]" id="clinicSelectWrapper">
-        <select id="clinicSelect"
-          class="w-full appearance-none bg-white border border-gray-300 rounded px-3 py-1.5 text-sm font-medium text-gray-700 focus:outline-none focus:border-[#00c58e] shadow-xs cursor-pointer pr-8">
-          <option value="all" {{ ($activeClinicNum ?? null) === null ? 'selected' : '' }}>All Clinics</option>
-          @foreach($clinics as $cNum => $cName)
-            <option value="{{ $cNum }}" {{ ($activeClinicNum ?? null) !== null && (string)$cNum === (string)$activeClinicNum ? 'selected' : '' }}>{{ $cName }}</option>
-          @endforeach
-        </select>
-        <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-400">
-          <i data-lucide="chevron-down" class="w-4 h-4"></i>
-        </div>
-      </div>
-      @endif
+      <x-location-picker id="finLocations" :locations="$locations ?? null" :selected="$selectedLocations ?? null" />
 
       <span id="fetchError" class="hidden text-xs text-red-600 font-medium">
         <i class="fa-solid fa-triangle-exclamation mr-1"></i>Failed to load data.
@@ -289,13 +275,13 @@
     </div>
   </section>
 
-  <section class="px-8 bg-white border-b border-gray-200 flex gap-6 text-sm font-medium text-gray-500 dds-tab-nav flex-nowrap overflow-x-auto">
+  <section class="relative z-10 px-8 bg-white border-b border-gray-200 flex gap-6 text-sm font-medium text-gray-500 dds-tab-nav flex-nowrap overflow-x-auto">
     <button class="main-tab active" id="tabSummary" onclick="switchMainTab('summary')">Summary</button>
     <button class="main-tab" id="tabScoreCards" onclick="switchMainTab('score-cards')">Score Cards</button>
   </section>
 
   {{-- ── Summary Panel ──────────────────────────────────────────────────────── --}}
-  <main id="summaryPanel" class="p-6 space-y-6 max-w-[1600px] mx-auto">
+  <main id="summaryPanel" class="relative z-10 isolate p-6 space-y-6 max-w-[1600px] mx-auto">
 
     <div class="font-bold border-b p-3 text-sm text-gray-700">Revenue</div>
     <section class="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -601,7 +587,7 @@
   </main>
 
   {{-- ── Score Cards Panel ───────────────────────────────────────────────────── --}}
-  <div id="scoreCardsPanel" class="hidden p-6 space-y-5 max-w-[1600px] mx-auto">
+  <div id="scoreCardsPanel" class="hidden relative z-10 isolate p-6 space-y-5 max-w-[1600px] mx-auto">
 
     {{-- Header row: sub-tabs + filters --}}
     <div class="flex items-center justify-between flex-wrap gap-3">
@@ -839,6 +825,10 @@
       if (data.top_services !== undefined) renderTopServicesChart(data.top_services);
     }
 
+    function getFinLocations() {
+      return (window.DDS && typeof DDS.getLocations === 'function') ? DDS.getLocations('finLocations').join(',') : '';
+    }
+
     function getSelectedClinicNum() {
       var el = document.getElementById('clinicSelect');
       return el ? el.value : '';
@@ -846,8 +836,10 @@
 
     function fetchAnalytics(start, end) {
       showSkeletons();
-      var clinicNum = getSelectedClinicNum();
+      var locs = getFinLocations();
       var baseParams = { start_date: start, end_date: end };
+      if (locs) baseParams.locations = locs;
+      var clinicNum = getSelectedClinicNum();
       if (clinicNum) baseParams.clinic_num = clinicNum;
 
       // Fetch gross production, net production, adjustments & collections from revenue route
@@ -1285,6 +1277,16 @@
         }
       });
 
+      if (window.DDS && typeof DDS.onLocations === 'function') {
+        DDS.onLocations('finLocations', function () {
+          fetchAnalytics(_currentStartDate, _currentEndDate);
+          if (_sc.data || !document.getElementById('scoreCardsPanel').classList.contains('hidden')) {
+            _sc.data = null;
+            loadScoreCards();
+          }
+        });
+      }
+
       fetchAnalytics(_currentStartDate, _currentEndDate);
       // Deep-link: honor ?tab= on load (Summary by default).
       activateMainTab(finTabs.initial || 'summary');
@@ -1377,8 +1379,9 @@
       var start = _currentStartDate;
       var end = _currentEndDate;
       var prov = document.getElementById('scProvider').value;
+      var locs = getFinLocations();
       var clinicNum = getSelectedClinicNum();
-      var params = '?tab=' + _sc.tab + '&start_date=' + start + '&end_date=' + end + (prov ? '&provider_num=' + encodeURIComponent(prov) : '') + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : '');
+      var params = '?tab=' + _sc.tab + '&start_date=' + start + '&end_date=' + end + (locs ? '&locations=' + encodeURIComponent(locs) : '') + (prov ? '&provider_num=' + encodeURIComponent(prov) : '') + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : '');
 
       if (window.jQuery && jQuery.fn.DataTable) {
         jQuery.fn.DataTable.ext.errMode = 'none';
@@ -1927,9 +1930,10 @@
 
       var start = _currentStartDate;
       var end = _currentEndDate;
+      var locs = getFinLocations();
       var clinicNum = getSelectedClinicNum();
 
-      fetch(baseUrl + '/financials/breakdown?type=' + type + '&start_date=' + start + '&end_date=' + end + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
+      fetch(baseUrl + '/financials/breakdown?type=' + type + '&start_date=' + start + '&end_date=' + end + (locs ? '&locations=' + encodeURIComponent(locs) : '') + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
         .then(function (r) { return r.json(); })
         .then(function (data) {
           _bk.allData = data;
@@ -1978,9 +1982,10 @@
 
       var start = _currentStartDate;
       var end = _currentEndDate;
+      var locs = getFinLocations();
       var clinicNum = getSelectedClinicNum();
 
-      fetch(baseUrl + '/financials/breakdown?type=patient_visits&start_date=' + start + '&end_date=' + end + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
+      fetch(baseUrl + '/financials/breakdown?type=patient_visits&start_date=' + start + '&end_date=' + end + (locs ? '&locations=' + encodeURIComponent(locs) : '') + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var columns = [
@@ -2003,9 +2008,10 @@
 
       var start = _currentStartDate;
       var end = _currentEndDate;
+      var locs = getFinLocations();
       var clinicNum = getSelectedClinicNum();
 
-      fetch(baseUrl + '/financials/breakdown?type=new_patient_visits&start_date=' + start + '&end_date=' + end + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
+      fetch(baseUrl + '/financials/breakdown?type=new_patient_visits&start_date=' + start + '&end_date=' + end + (locs ? '&locations=' + encodeURIComponent(locs) : '') + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var columns = [
@@ -2034,9 +2040,10 @@
 
       var start = _currentStartDate;
       var end = _currentEndDate;
+      var locs = getFinLocations();
       var clinicNum = getSelectedClinicNum();
 
-      fetch(baseUrl + '/financials/breakdown?type=broken_cancelled&start_date=' + start + '&end_date=' + end + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
+      fetch(baseUrl + '/financials/breakdown?type=broken_cancelled&start_date=' + start + '&end_date=' + end + (locs ? '&locations=' + encodeURIComponent(locs) : '') + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var columns = [
@@ -2059,9 +2066,10 @@
 
       var start = _currentStartDate;
       var end = _currentEndDate;
+      var locs = getFinLocations();
       var clinicNum = getSelectedClinicNum();
 
-      fetch(baseUrl + '/financials/breakdown?type=patients_scheduled&start_date=' + start + '&end_date=' + end + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
+      fetch(baseUrl + '/financials/breakdown?type=patients_scheduled&start_date=' + start + '&end_date=' + end + (locs ? '&locations=' + encodeURIComponent(locs) : '') + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var columns = [
@@ -2084,9 +2092,10 @@
 
       var start = _currentStartDate;
       var end = _currentEndDate;
+      var locs = getFinLocations();
       var clinicNum = getSelectedClinicNum();
 
-      fetch(baseUrl + '/financials/breakdown?type=new_patients_scheduled&start_date=' + start + '&end_date=' + end + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
+      fetch(baseUrl + '/financials/breakdown?type=new_patients_scheduled&start_date=' + start + '&end_date=' + end + (locs ? '&locations=' + encodeURIComponent(locs) : '') + (clinicNum ? '&clinic_num=' + encodeURIComponent(clinicNum) : ''))
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var columns = [

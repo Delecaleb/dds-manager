@@ -2,22 +2,9 @@
 
     <!-- ── HEADER ─────────────────────────────────────────── -->
     <header
-        class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-20">
+        class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-30">
         <div class="flex items-center gap-4">
             <h1 class="text-lg font-bold text-slate-800 tracking-tight">Treatment Miner</h1>
-
-            <!-- Location Filter -->
-            <div class="border-l border-slate-200 pl-4">
-                <select id="txMinerLocation"
-                    class="appearance-none bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-9 py-1.5 text-sm font-semibold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white cursor-pointer transition-colors">
-                    <option value="all">All Locations</option>
-                    @if(isset($clinics))
-                        @foreach($clinics as $clinicId => $clinicName)
-                            <option value="{{ $clinicId }}">{{ $clinicName }}</option>
-                        @endforeach
-                    @endif
-                </select>
-            </div>
 
             <!-- Month & Year Selector (for By Month tab) -->
             <div id="txMinerMonthPickerWrap" class="relative flex items-center border border-slate-200 rounded-lg bg-slate-50 px-3 py-1.5 gap-2 hover:border-emerald-400 hover:bg-white transition-colors cursor-pointer">
@@ -37,6 +24,9 @@
             <div id="txMinerDateRangeWrap" class="hidden">
                 <x-daterange-picker id="txMinerDateRange" />
             </div>
+
+            <!-- Location Filter -->
+            <x-location-picker id="txMinerLocations" />
         </div>
     </header>
 
@@ -749,10 +739,12 @@
             let activeTabMode = 'month';
 
             function getFilters(tab) {
-                const clinic = $('#txMinerLocation').val();
+                const clinic = $('#txMinerLocation').val() || 'all';
+                const locs = (window.DDS && typeof DDS.getLocations === 'function') ? DDS.getLocations('txMinerLocations').join(',') : '';
 
                 let params = {
-                    clinic: clinic
+                    clinic: clinic,
+                    locations: locs
                 };
 
                 if (tab === 'month') {
@@ -1102,6 +1094,9 @@
 
             // Location Change & Date Range change
             $('#txMinerLocation').on('change', reloadActiveTable);
+            if (window.DDS && typeof DDS.onLocations === 'function') {
+                DDS.onLocations('txMinerLocations', reloadActiveTable);
+            }
 
             // Month Picker change handler
             $('#txMinerMonth').on('change', function () {

@@ -49,7 +49,15 @@ final class MetricFilter
             : Office::getActiveOfficeId();
 
         $clinics = [];
-        if ($request->has('clinics')) {
+        if ($request->filled('locations')) {
+            $selection = app(ClinicRegistry::class)->select($request->input('locations'));
+            $scopes = $selection->scopes();
+            if (! empty($scopes)) {
+                $officeIds = array_keys($scopes);
+                $officeId = $officeIds[0];
+                $clinics = $scopes[$officeId] ?? [];
+            }
+        } elseif ($request->has('clinics')) {
             $raw = (array) $request->input('clinics', []);
             if (! in_array('all', $raw, true)) {
                 $clinics = array_values(array_map('intval', array_filter($raw, fn ($v) => $v !== '' && $v !== null && $v !== 'all')));

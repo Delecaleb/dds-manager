@@ -19,7 +19,7 @@
     <div class="flex-1 overflow-y-auto p-6 space-y-5">
 
         {{-- ── Filter bar ───────────────────────────────────────────────────── --}}
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <div class="relative z-30 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div class="flex flex-wrap items-center gap-3">
 
                 {{-- Provider type --}}
@@ -64,6 +64,12 @@
                 <div class="flex flex-col gap-0.5">
                     <label class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Date Range</label>
                     <x-daterange-picker id="portalDateRange" />
+                </div>
+
+                {{-- Location picker --}}
+                <div class="flex flex-col gap-0.5">
+                    <label class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Locations</label>
+                    <x-location-picker id="portalLocations" />
                 </div>
 
                 {{-- Refresh --}}
@@ -189,6 +195,12 @@
             provider_type: document.getElementById('provTypeSelect').value,
         });
         _selected.forEach(function (id) { p.append('providers[]', id); });
+        if (window.DDS && typeof window.DDS.getLocations === 'function') {
+            var locs = window.DDS.getLocations('portalLocations');
+            if (locs && locs.length) {
+                locs.forEach(function (l) { p.append('locations[]', l); });
+            }
+        }
         return p.toString();
     }
 
@@ -514,6 +526,10 @@
     }
 
     document.getElementById('refreshBtn').addEventListener('click', refresh);
+
+    if (window.DDS && typeof window.DDS.onLocations === 'function') {
+        window.DDS.onLocations('portalLocations', refresh);
+    }
 
     /* ── Bootstrap ──────────────────────────────────────────────────────────── */
     loadProviders();

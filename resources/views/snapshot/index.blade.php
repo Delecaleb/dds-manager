@@ -8,17 +8,14 @@
     </a>
   </header>
 
-  <section class="bg-white border-b border-gray-200 px-8 py-4 flex flex-wrap items-center justify-between gap-4">
+  <section class="relative z-30 bg-white border-b border-gray-200 px-8 py-4 flex flex-wrap items-center justify-between gap-4">
     <div class="flex flex-wrap items-center gap-3">
       <div class="relative flex items-center border border-gray-300 rounded px-3 py-1.5 bg-white shadow-sm">
         <i class="fa-regular fa-calendar text-gray-400 mr-2 text-sm"></i>
         <span class="text-sm font-medium text-gray-700">Jun 01, 2026 - Jun 24, 2026</span>
       </div>
 
-      <select class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
-        <option selected>8 Mile</option>
-        <option>Detroit Main</option>
-      </select>
+      <x-location-picker id="snapLocations" />
 
       <select class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
         <option selected>Detroit Dental Specialist</option>

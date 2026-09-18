@@ -14,31 +14,21 @@
         </div>
 
         <!-- Top Filter Bar -->
-        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div class="relative z-30 bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap items-center gap-3">
-                <!-- Location Dropdown -->
-                <div class="relative">
-                    <select id="rcmOfficeSelect"
-                        class="bg-white border border-slate-300 rounded-lg px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none focus:border-emerald-500 cursor-pointer pr-8">
-                        <option value="all">All Locations</option>
-                        @foreach ($offices as $office)
-                            <option value="{{ $office->id }}" {{ $office->id == $activeOfficeId ? 'selected' : '' }}>
-                                {{ $office->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                <!-- Date Range Selector (Hidden on Payor Overview) -->
+                <div id="rcmDateRangeContainer">
+                    <x-daterange-picker id="rcmDateRange" on-apply="onRcmDateRangeApply" />
                 </div>
+
+                <!-- Location Dropdown -->
+                <x-location-picker id="rcmLocations" />
 
                 <!-- Refresh Button -->
                 <button id="rcmRefreshBtn" type="button"
                     class="bg-white border border-emerald-500 text-emerald-600 hover:bg-emerald-50 px-5 py-1.5 rounded-lg text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5">
                     <span>Refresh</span>
                 </button>
-
-                <!-- Date Range Selector (Hidden on Payor Overview) -->
-                <div id="rcmDateRangeContainer" class="ml-2">
-                    <x-daterange-picker id="rcmDateRange" on-apply="onRcmDateRangeApply" />
-                </div>
             </div>
 
             <!-- Download PDF Button (visible on Payor Overview) -->
@@ -317,12 +307,12 @@
                 }, 400);
             });
 
-            const officeSelect = document.getElementById('rcmOfficeSelect');
-            officeSelect.addEventListener('change', (e) => {
-                RCM_STATE.officeId = e.target.value;
-                RCM_STATE.page = 1;
-                loadTabData();
-            });
+            if (window.DDS && typeof DDS.onLocations === 'function') {
+                DDS.onLocations('rcmLocations', () => {
+                    RCM_STATE.page = 1;
+                    loadTabData();
+                });
+            }
 
             const refreshBtn = document.getElementById('rcmRefreshBtn');
             refreshBtn.addEventListener('click', () => {
@@ -331,7 +321,8 @@
 
             const exportBtn = document.getElementById('rcmExportBtn');
             exportBtn.addEventListener('click', () => {
-                const url = `{{ route('rcm.export') }}?tab=${RCM_STATE.currentTab}&start_date=${RCM_STATE.startDate}&end_date=${RCM_STATE.endDate}&office_id=${RCM_STATE.officeId}&tier=${RCM_STATE.tier}&search=${encodeURIComponent(RCM_STATE.search)}`;
+                const locs = (window.DDS && typeof DDS.getLocations === 'function') ? DDS.getLocations('rcmLocations').join(',') : '';
+                const url = `{{ route('rcm.export') }}?tab=${RCM_STATE.currentTab}&start_date=${RCM_STATE.startDate}&end_date=${RCM_STATE.endDate}&locations=${encodeURIComponent(locs)}&office_id=${RCM_STATE.officeId}&tier=${RCM_STATE.tier}&search=${encodeURIComponent(RCM_STATE.search)}`;
                 window.location.href = url;
             });
         }
@@ -388,10 +379,12 @@
             const loading = document.getElementById('rcmLoading');
             loading.classList.remove('hidden');
 
+            const locs = (window.DDS && typeof DDS.getLocations === 'function') ? DDS.getLocations('rcmLocations').join(',') : '';
             const params = new URLSearchParams({
                 tab: RCM_STATE.currentTab,
                 start_date: RCM_STATE.startDate,
                 end_date: RCM_STATE.endDate,
+                locations: locs,
                 office_id: RCM_STATE.officeId,
                 tier: RCM_STATE.tier,
                 search: RCM_STATE.search,

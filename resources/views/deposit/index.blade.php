@@ -9,42 +9,9 @@
   </header>
 
   <!-- ── FILTERS ────────────────────────────────────────── -->
-  <section class="bg-white border-b border-gray-200 px-8 py-3 flex flex-wrap items-center gap-3">
+  <section class="relative z-40 bg-white border-b border-gray-200 px-8 py-3 flex flex-wrap items-center gap-3">
     <x-daterange-picker on-apply="onDrpApply" />
-
-    <div class="relative min-w-[200px]">
-      <select id="officeSelect"
-        class="w-full appearance-none bg-white border border-gray-300 rounded px-3 py-1.5 text-sm font-medium text-gray-700 focus:outline-none focus:border-[#00c58e] shadow-xs cursor-pointer pr-8">
-        <option value="all">All Locations</option>
-        @if(isset($offices) && $offices->count())
-          @foreach($offices as $off)
-            <option value="{{ $off->id }}" {{ (isset($activeOfficeId) && $off->id == $activeOfficeId) ? 'selected' : '' }}>
-              {{ $off->name }}
-            </option>
-          @endforeach
-        @else
-          <option value="{{ $activeOfficeId ?? 1 }}" selected>{{ \App\Models\Office::getActiveOffice()?->name ?? 'Main Office' }}</option>
-        @endif
-      </select>
-      <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-400">
-        <i data-lucide="chevron-down" class="w-4 h-4"></i>
-      </div>
-    </div>
-
-    @if(isset($clinics) && count($clinics) > 1)
-    <div class="relative min-w-[180px]" id="clinicSelectWrapper">
-      <select id="clinicSelect"
-        class="w-full appearance-none bg-white border border-gray-300 rounded px-3 py-1.5 text-sm font-medium text-gray-700 focus:outline-none focus:border-[#00c58e] shadow-xs cursor-pointer pr-8">
-        <option value="all" {{ ($activeClinicNum ?? null) === null ? 'selected' : '' }}>All Clinics</option>
-        @foreach($clinics as $cNum => $cName)
-          <option value="{{ $cNum }}" {{ ($activeClinicNum ?? null) !== null && (string)$cNum === (string)$activeClinicNum ? 'selected' : '' }}>{{ $cName }}</option>
-        @endforeach
-      </select>
-      <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-400">
-        <i data-lucide="chevron-down" class="w-4 h-4"></i>
-      </div>
-    </div>
-    @endif
+    <x-location-picker id="depositLocations" :locations="$locations ?? null" :selected="$selectedLocations ?? null" />
 
     <button id="refreshBtn"
       class="bg-white border border-[#00c58e] text-[#00c58e] px-5 py-1.5 rounded text-sm font-bold hover:bg-emerald-50 transition shadow-xs cursor-pointer">
@@ -53,14 +20,14 @@
   </section>
 
   <!-- ── TABS ───────────────────────────────────────────── -->
-  <section class="px-8 bg-white border-b border-gray-200 flex flex-nowrap overflow-x-auto gap-6 text-sm font-bold text-gray-400 dds-tab-nav">
+  <section class="relative z-10 px-8 bg-white border-b border-gray-200 flex flex-nowrap overflow-x-auto gap-6 text-sm font-bold text-gray-400 dds-tab-nav">
     <button id="summaryTab" class="border-b-4 border-[#00c58e] text-gray-900 pb-2 pt-4 transition">Summary</button>
     <button id="detailTab"
       class="border-b-4 border-transparent hover:text-gray-700 pb-2 pt-4 transition">Detail</button>
   </section>
 
   <!-- ── MAIN CONTENT ───────────────────────────────────── -->
-  <main class="p-6 max-w-[1600px] mx-auto bg-gray-50/50 min-h-screen">
+  <main class="relative z-10 isolate p-6 max-w-[1600px] mx-auto bg-gray-50/50 min-h-screen">
     <div class="bg-white shadow-sm border border-gray-200 p-6 rounded">
 
       <!-- Search & Export -->
@@ -345,15 +312,16 @@
       showSummaryLoading();
       showDetailLoading();
 
-      var officeId = $('#officeSelect').val();
-      var clinicNum = $('#clinicSelect').length ? $('#clinicSelect').val() : null;
-      var params = { start_date: start, end_date: end };
-      if (officeId && officeId !== '') {
-        params.office_id = officeId;
-      }
-      if (clinicNum && clinicNum !== '') {
-        params.clinic_num = clinicNum;
-      }
+      var s = start || _currentStartDate;
+      var e = end || _currentEndDate;
+      _currentStartDate = s;
+      var locs = (window.DDS && typeof DDS.getLocations === 'function') ? DDS.getLocations('depositLocations').join(',') : '';
+
+      var params = {
+        start_date: s,
+        end_date: e,
+        locations: locs
+      };
 
       $.get('{{ route("deposits.data") }}', params)
         .done(function (res) {
@@ -493,13 +461,11 @@
       }
     });
 
-    $('#officeSelect').on('change', function () {
-      fetchDeposits();
-    });
-
-    $('#clinicSelect').on('change', function () {
-      fetchDeposits();
-    });
+    if (window.DDS && typeof DDS.onLocations === 'function') {
+      DDS.onLocations('depositLocations', function () {
+        fetchDeposits();
+      });
+    }
 
     $('#refreshBtn').on('click', function () {
       fetchDeposits();

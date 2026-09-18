@@ -180,7 +180,7 @@
     <div class="flex flex-col bg-slate-50" style="min-height: calc(100vh - 64px);">
 
         {{-- ══════════════════ TOP TOOLBAR ══════════════════ --}}
-        <div class="bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+        <div class="relative z-30 bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
             <div class="flex flex-wrap items-center gap-2 md:gap-3">
                 <div id="singleDateWrapper"
                     class="relative flex items-center border border-slate-300 rounded px-3 py-1.5 gap-2 bg-white shadow-sm">
@@ -196,8 +196,27 @@
                         value="{{ date('Y-m-d') }}">
                 </div>
 
+                {{-- Single location selector for Appointments Calendar tab (only 1 location at a time, no multiple selection) --}}
+                <div id="singleLocationWrapper" class="relative">
+                    <select id="calSingleLocation"
+                        class="appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 text-sm font-medium text-slate-700 pr-8 focus:outline-none focus:border-emerald-500 shadow-sm cursor-pointer min-w-[160px]">
+                        @foreach($locations as $key => $loc)
+                            <option value="{{ $key }}" @selected(in_array((string)$key, (array)$selectedLocations, true))>{{ $loc->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </div>
+
                 <div id="rangeDateWrapper" class="hidden">
                     <x-daterange-picker id="calDateRange" on-apply="onCalendarRangeApply" />
+                </div>
+
+                <div id="calLocationWrapper" class="hidden">
+                    <x-location-picker id="calLocations" :locations="$locations" :selected="$selectedLocations" />
                 </div>
 
                 <button id="refreshBtn"
@@ -1005,7 +1024,8 @@
                     setProgress(20, 'Loading providers...');
                     const date = (info.startStr || info.start?.toISOString() || document.getElementById('calDate').value || '{{ date("Y-m-d") }}').substring(0, 10);
                     const activeOnly = document.getElementById('activeColumnsToggle').checked ? '1' : '0';
-                    fetch(baseUrl + '/calendar/resources?date=' + date + '&active_only=' + activeOnly)
+                    const loc = document.getElementById('calSingleLocation')?.value || '';
+                    fetch(baseUrl + '/calendar/resources?date=' + date + '&active_only=' + activeOnly + (loc ? '&location=' + encodeURIComponent(loc) : ''))
                         .then(r => r.json())
                         .then(data => {
                             console.log('[FC Resources]', data);
@@ -1027,7 +1047,8 @@
                     const end = info.end
                         ? new Date(info.end - 1).toISOString().substring(0, 10)
                         : start;
-                    fetch(baseUrl + '/calendar/data?start=' + start + '&end=' + end)
+                    const loc = document.getElementById('calSingleLocation')?.value || '';
+                    fetch(baseUrl + '/calendar/data?start=' + start + '&end=' + end + (loc ? '&location=' + encodeURIComponent(loc) : ''))
                         .then(r => r.json())
                         .then(data => {
                             console.log('[FC Events] count:', data.length);
@@ -1288,7 +1309,8 @@
                 endStr = startStr;
             }
 
-            fetch(baseUrl + '/calendar/monthly-summary?start=' + startStr + '&end=' + endStr)
+            const loc = document.getElementById('calSingleLocation')?.value || '';
+            fetch(baseUrl + '/calendar/monthly-summary?start=' + startStr + '&end=' + endStr + (loc ? '&location=' + encodeURIComponent(loc) : ''))
                 .then(r => r.json())
                 .then(data => {
                     renderMonthlySummary(data);
@@ -1424,7 +1446,8 @@
                     : (vType === 'week' ? 'Scheduled Production <span class="text-[10px] text-slate-400 font-normal">(Week)</span>' : 'Scheduled Production');
             }
 
-            fetch(baseUrl + '/calendar/stats?start=' + encodeURIComponent(sDate) + '&end=' + encodeURIComponent(eDate) + '&date=' + encodeURIComponent(sDate))
+            const loc = document.getElementById('calSingleLocation')?.value || '';
+            fetch(baseUrl + '/calendar/stats?start=' + encodeURIComponent(sDate) + '&end=' + encodeURIComponent(eDate) + '&date=' + encodeURIComponent(sDate) + (loc ? '&location=' + encodeURIComponent(loc) : ''))
                 .then(r => r.json())
                 .then(s => {
                     if (prodEl) prodEl.textContent = usd.format(parseFloat(s.production) || 0);
@@ -1613,17 +1636,23 @@
 
                 // Toggle date selection input vs range picker & calendar view buttons based on tab
                 const singleDateWrapper = document.getElementById('singleDateWrapper');
+                const singleLocationWrapper = document.getElementById('singleLocationWrapper');
                 const rangeDateWrapper = document.getElementById('rangeDateWrapper');
+                const calLocationWrapper = document.getElementById('calLocationWrapper');
                 const viewToggleWrapper = document.getElementById('viewToggleWrapper');
 
                 if (target === 'view-calendar') {
                     singleDateWrapper?.classList.remove('hidden');
+                    singleLocationWrapper?.classList.remove('hidden');
                     rangeDateWrapper?.classList.add('hidden');
+                    calLocationWrapper?.classList.add('hidden');
                     viewToggleWrapper?.classList.remove('hidden');
                 } else {
                     syncDateRangeFromSinglePicker();
                     singleDateWrapper?.classList.add('hidden');
+                    singleLocationWrapper?.classList.add('hidden');
                     rangeDateWrapper?.classList.remove('hidden');
+                    calLocationWrapper?.classList.remove('hidden');
                     viewToggleWrapper?.classList.add('hidden');
                 }
 
@@ -1715,6 +1744,10 @@
                         const range = getCalendarDateRange();
                         d.start = range.start;
                         d.end = range.end;
+                        const locs = window.DDS && DDS.getLocations ? DDS.getLocations('calLocations') : [];
+                        if (locs && locs.length > 0) {
+                            d.locations = locs.join(',');
+                        }
                         const provVal = $('#detailsFilterProvider').val();
                         if (provVal) d.provider_id = provVal;
                         const statusVal = $('#detailsFilterStatus').val();
@@ -1888,6 +1921,10 @@
                         const range = getCalendarDateRange();
                         d.start = range.start;
                         d.end = range.end;
+                        const locs = window.DDS && DDS.getLocations ? DDS.getLocations('calLocations') : [];
+                        if (locs && locs.length > 0) {
+                            d.locations = locs.join(',');
+                        }
                     },
                     beforeSend: function () { showCapacityLoading(); },
                     complete: function () { hideCapacityLoading(); },
@@ -1943,11 +1980,37 @@
                 },
                 footerCallback: function (row, data, start, end, display) {
                     if (data.length > 0) {
-                        const first = data[0];
-                        ['scheduled_appointments', 'provider_count', 'booked_hours', 'avg_lead_all', 'avg_lead_new', 'avg_lead_emerg'].forEach((col, idx) => {
-                            $('.capacity-total-' + (idx + 1)).text(first[col]);
-                            $('.capacity-avg-' + (idx + 1)).text(first[col]);
-                        });
+                        const numRows = data.length;
+                        const parseNum = (val) => {
+                            if (val === null || val === undefined) return 0;
+                            const num = parseFloat(String(val).replace(/[^0-9.-]+/g, ''));
+                            return isNaN(num) ? 0 : num;
+                        };
+
+                        const sum = (col) => data.reduce((acc, r) => acc + parseNum(r[col]), 0);
+
+                        const totalSched = sum('scheduled_appointments');
+                        const totalProv = sum('provider_count');
+                        const totalHours = sum('booked_hours');
+
+                        const avgSched = (totalSched / numRows).toFixed(2);
+                        const avgProv = (totalProv / numRows).toFixed(2);
+                        const avgHours = (totalHours / numRows).toFixed(2);
+
+                        const avgLeadAll = (sum('avg_lead_all') / numRows).toFixed(2);
+                        const avgLeadNew = (sum('avg_lead_new') / numRows).toFixed(2);
+                        const avgLeadEmerg = (sum('avg_lead_emerg') / numRows).toFixed(2);
+
+                        $('.capacity-total-1').text(totalSched);
+                        $('.capacity-total-2').text(totalProv);
+                        $('.capacity-total-3').text(totalHours.toFixed(2));
+
+                        $('.capacity-avg-1').text(avgSched);
+                        $('.capacity-avg-2').text(avgProv);
+                        $('.capacity-avg-3').text(avgHours);
+                        $('.capacity-avg-4').text(avgLeadAll);
+                        $('.capacity-avg-5').text(avgLeadNew);
+                        $('.capacity-avg-6').text(avgLeadEmerg);
                     }
                 }
             });
@@ -1967,6 +2030,54 @@
                 }
             });
         }
+
+        // ── Location Change Listener ─────────────────────────────────────
+        if (window.DDS && typeof DDS.onLocations === 'function') {
+            DDS.onLocations('calLocations', function () {
+                const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
+                if (activeTab === 'view-details' && aptDetailsTable) {
+                    showDetailsLoading();
+                    aptDetailsTable.ajax.reload();
+                } else if (activeTab === 'view-capacity' && aptCapacityTable) {
+                    showCapacityLoading();
+                    aptCapacityTable.ajax.reload();
+                }
+            });
+        }
+
+        // ── Single Location Change Listener (Appointments Calendar tab) ──
+        document.getElementById('calSingleLocation')?.addEventListener('change', function () {
+            if (calendar) {
+                showCalSkeleton('Loading location...', calendar.view?.type);
+                calendar.refetchResources();
+                calendar.refetchEvents();
+                const range = getViewDateRange(calendar.view);
+                if (calendar.view?.type === 'dayGridMonth') {
+                    fetchMonthlySummary({ view: calendar.view });
+                }
+                fetchCalendarStats(range.start, range.end, range.type);
+            }
+        });
+
+        document.getElementById('refreshBtn')?.addEventListener('click', function () {
+            const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
+            if (activeTab === 'view-calendar' && calendar) {
+                showCalSkeleton('Refreshing...', calendar.view?.type);
+                calendar.refetchEvents();
+                calendar.refetchResources();
+                const range = getViewDateRange(calendar.view);
+                if (calendar.view?.type === 'dayGridMonth') {
+                    fetchMonthlySummary({ view: calendar.view });
+                }
+                fetchCalendarStats(range.start, range.end, range.type);
+            } else if (activeTab === 'view-details' && aptDetailsTable) {
+                showDetailsLoading();
+                aptDetailsTable.ajax.reload();
+            } else if (activeTab === 'view-capacity' && aptCapacityTable) {
+                showCapacityLoading();
+                aptCapacityTable.ajax.reload();
+            }
+        });
 
         // ── CSV Export Helpers ───────────────────────────────────────────
         function downloadCsv(filename, rows) {
@@ -1995,7 +2106,11 @@
             }
 
             const range = getCalendarDateRange();
-            const url = `${baseUrl}/calendar/appointments-details-data?start=${range.start}&end=${range.end}&length=-1`;
+            const locs = window.DDS && DDS.getLocations ? DDS.getLocations('calLocations') : [];
+            let url = `${baseUrl}/calendar/appointments-details-data?start=${range.start}&end=${range.end}&length=-1`;
+            if (locs && locs.length > 0) {
+                url += `&locations=${encodeURIComponent(locs.join(','))}`;
+            }
 
             fetch(url)
                 .then(r => r.json())
@@ -2116,7 +2231,11 @@
             }
 
             const range = getCalendarDateRange();
-            const url = `${baseUrl}/calendar/appointment-capacity-data?start=${range.start}&end=${range.end}&length=-1`;
+            const locs = window.DDS && DDS.getLocations ? DDS.getLocations('calLocations') : [];
+            let url = `${baseUrl}/calendar/appointment-capacity-data?start=${range.start}&end=${range.end}&length=-1`;
+            if (locs && locs.length > 0) {
+                url += `&locations=${encodeURIComponent(locs.join(','))}`;
+            }
 
             fetch(url)
                 .then(r => r.json())
@@ -2163,6 +2282,7 @@
         function openCapacityBreakdown(type) {
             const range = getCalendarDateRange();
             const date = range.start || "{{ date('Y-m-d') }}";
+            const locs = window.DDS && DDS.getLocations ? DDS.getLocations('calLocations') : [];
 
             let title = 'Capacity Breakdown';
             let columns = [];
@@ -2229,7 +2349,12 @@
 
             setDataTableModalLoading('capacity-breakdown-modal', title);
 
-            fetch(`${baseUrl}/calendar/capacity-breakdown?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}&date=${encodeURIComponent(date)}&type=${encodeURIComponent(type)}`)
+            let breakdownUrl = `${baseUrl}/calendar/capacity-breakdown?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}&date=${encodeURIComponent(date)}&type=${encodeURIComponent(type)}`;
+            if (locs && locs.length > 0) {
+                breakdownUrl += `&locations=${encodeURIComponent(locs.join(','))}`;
+            }
+
+            fetch(breakdownUrl)
                 .then(r => r.json())
                 .then(data => {
                     openDataTableModal('capacity-breakdown-modal', title, columns, data);
@@ -2255,7 +2380,8 @@
             document.getElementById('sched-modal-prov-count').textContent = '…';
             document.getElementById('sched-view-provider').innerHTML = '<div class="p-8 text-center text-xs text-slate-400">Loading breakdown data...</div>';
 
-            fetch(baseUrl + '/calendar/scheduled-production-breakdown?start=' + encodeURIComponent(range.start) + '&end=' + encodeURIComponent(range.end) + '&date=' + encodeURIComponent(range.start))
+            const loc = document.getElementById('calSingleLocation')?.value || '';
+            fetch(baseUrl + '/calendar/scheduled-production-breakdown?start=' + encodeURIComponent(range.start) + '&end=' + encodeURIComponent(range.end) + '&date=' + encodeURIComponent(range.start) + (loc ? '&location=' + encodeURIComponent(loc) : ''))
                 .then(r => r.json())
                 .then(data => {
                     rawSchedData = data;

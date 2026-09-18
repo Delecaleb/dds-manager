@@ -12,17 +12,14 @@
   </header>
 
   <!-- Filter Controls Section -->
-  <section class="bg-white border-b border-gray-200 px-8 py-4 flex flex-wrap items-center justify-between gap-4">
+  <section class="relative z-40 bg-white border-b border-gray-200 px-8 py-4 flex flex-wrap items-center justify-between gap-4">
     <div class="flex flex-wrap items-center gap-3">
       <div class="relative flex items-center border border-gray-300 rounded px-3 py-1.5 bg-white shadow-sm">
         <i class="fa-regular fa-calendar text-gray-400 mr-2 text-sm"></i>
         <input type="text" id="asOfDate" value="{{ date('M d, Y') }}"
           class="text-sm font-medium text-gray-700 outline-none w-28">
       </div>
-      <select
-        class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
-        <option selected>8 Mile</option>
-      </select>
+      <x-location-picker id="agingLocations" />
       <button id="refreshBtn"
         class="bg-white border border-emerald-500 text-emerald-600 px-5 py-1.5 rounded text-sm font-semibold hover:bg-emerald-50 transition shadow-sm">
         Refresh
@@ -31,7 +28,7 @@
   </section>
 
   <!-- Tab Bar -->
-  <section class="px-8 bg-white border-b border-gray-200 flex flex-nowrap overflow-x-auto gap-6 text-sm font-medium text-gray-500 dds-tab-nav">
+  <section class="relative z-10 px-8 bg-white border-b border-gray-200 flex flex-nowrap overflow-x-auto gap-6 text-sm font-medium text-gray-500 dds-tab-nav">
     <button class="tab-btn border-b-2 border-emerald-500 text-emerald-600 font-bold pb-3 pt-4"
       data-tab="responsible_party">Responsible Party</button>
     <button class="tab-btn border-b-2 border-transparent hover:text-gray-700 pb-3 pt-4" data-tab="by_office">By
@@ -43,7 +40,7 @@
   </section>
 
   <!-- Main Content -->
-  <main class="p-6">
+  <main class="relative z-10 isolate p-6">
 
     <!-- Info Banner -->
     <div
@@ -670,6 +667,7 @@
             d.mode = mode;
             d.as_of_date = $('#asOfDate').val();
             d.credits = $('#creditsFilter').val();
+            d.locations = (window.DDS && typeof DDS.getLocations === 'function') ? DDS.getLocations('agingLocations').join(',') : '';
           },
           dataSrc: function (json) {
             updateFooter(mode, json.totals);
@@ -702,6 +700,10 @@
 
       $('#refreshBtn').on('click', () => tables[activeMode] && tables[activeMode].ajax.reload());
       $('#creditsFilter').on('change', () => tables[activeMode] && tables[activeMode].ajax.reload());
+
+      if (window.DDS && typeof DDS.onLocations === 'function') {
+        DDS.onLocations('agingLocations', () => tables[activeMode] && tables[activeMode].ajax.reload());
+      }
 
       // ── Tab switching: URL-driven + deep-linkable (DDS.tabs.deeplink) ──
       //    Panels are pre-rendered; we show/hide + lazily init the tab's DataTable,

@@ -12,9 +12,9 @@ class CalendarResourceTransformer
     /**
      * Map the required 10 operatories in order, optionally filtering only active ones.
      */
-    public static function transform(Collection $appointments, bool $activeOnly = false, int|string|null $clinicId = null): array
+    public static function transform(Collection $appointments, bool $activeOnly = false, int|string|null $clinicId = null, ?int $officeId = null): array
     {
-        $officeId = Office::getActiveOfficeId();
+        $officeId = $officeId ?? Office::getActiveOfficeId();
 
         $dbOps = collect();
         if (Schema::hasTable('od_operatories')) {

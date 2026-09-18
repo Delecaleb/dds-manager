@@ -20,6 +20,12 @@ class ClinicRegistry
     /** @var array<string, Location>|null lazily-built reportable locations across active offices */
     private ?array $locations = null;
 
+    public function flush(): void
+    {
+        $this->maps = [];
+        $this->locations = null;
+    }
+
     /** @return array<int,string> ClinicNum => display name for the given office */
     public function all(?int $officeId = null): array
     {

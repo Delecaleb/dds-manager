@@ -120,14 +120,9 @@
   </header>
 
   <!-- ── Filter bar ─────────────────────────────────────────────────────────── -->
-  <section class="bg-white border-b border-gray-200 px-8 py-3 flex flex-wrap items-center gap-3">
+  <section class="relative z-30 bg-white border-b border-gray-200 px-8 py-3 flex flex-wrap items-center gap-3">
     <x-daterange-picker id="kpiDateRange" />
-
-    <select id="kpiLocation"
-      class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
-      <option value="all">All Locations</option>
-      <option value="0" selected>8 Mile</option>
-    </select>
+    <x-location-picker id="kpiLocations" />
 
     <button id="kpiUpdateBtn"
       class="bg-white border border-emerald-500 text-emerald-600 px-5 py-1.5 rounded text-sm font-semibold hover:bg-emerald-50 transition shadow-sm">
@@ -565,8 +560,21 @@
     /* ── Data fetch — 3 parallel independent requests ──────────────────────── */
     var _kpiPending = 0;
 
+    function getKpiQueryString(start, end) {
+      var qs = '?start_date=' + encodeURIComponent(start) + '&end_date=' + encodeURIComponent(end);
+      if (window.DDS && typeof window.DDS.getLocations === 'function') {
+        var locs = window.DDS.getLocations('kpiLocations');
+        if (locs && locs.length) {
+          locs.forEach(function (l) {
+            qs += '&locations[]=' + encodeURIComponent(l);
+          });
+        }
+      }
+      return qs;
+    }
+
     function fetchSection(path, gridId, cards, start, end) {
-      var qs = '?start_date=' + start + '&end_date=' + end;
+      var qs = getKpiQueryString(start, end);
       _kpiPending++;
       fetch(_kpiBase + path + qs)
         .then(function (r) { return r.json(); })
@@ -621,7 +629,7 @@
 
     // Function to fetch specialty providers
     function fetchSpecialtyProvidersSection(path, type, start, end) {
-      var qs = '?start_date=' + start + '&end_date=' + end;
+      var qs = getKpiQueryString(start, end);
       _kpiPending++;
       fetch(_kpiBase + path + qs)
         .then(function (r) { return r.json(); })
@@ -640,7 +648,7 @@
     }
 
     function fetchProvidersSection(path, type, start, end) {
-      var qs = '?start_date=' + start + '&end_date=' + end;
+      var qs = getKpiQueryString(start, end);
       _kpiPending++;
       fetch(_kpiBase + path + qs)
         .then(function (r) { return r.json(); })
@@ -985,6 +993,17 @@
           renderProvidersTable();
         }
       });
+
+      if (window.DDS && typeof window.DDS.onLocations === 'function') {
+        window.DDS.onLocations('kpiLocations', function () {
+          var drp = $('#kpiDateRange').data('daterangepicker');
+          if (!drp) return;
+          fetchKpis(drp.startDate.format('YYYY-MM-DD'), drp.endDate.format('YYYY-MM-DD'));
+          if (!document.getElementById('tab-providers').classList.contains('hidden')) {
+            renderProvidersTable();
+          }
+        });
+      }
 
       // Initial load — wait for moment to be available
       var _tryInit = setInterval(function () {

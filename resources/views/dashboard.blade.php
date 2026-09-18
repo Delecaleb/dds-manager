@@ -33,9 +33,7 @@
       border-radius: 2px;
     }
   </style>
-  <header class="bg-white border-b border-gray-100 px-8 py-4 flex justify-between items-center">
 
-  </header>
   <!-- ── HEADER ─────────────────────────────────────────── -->
   <header
     class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-20">
@@ -43,7 +41,7 @@
       <h2 class="text-3xl font-semibold text-slate-700 tracking-wide">Dashboard</h2>
       <!-- Date range picker -->
       <x-daterange-picker id="dashDateRange" on-apply="onDrpApply" />
-
+      <x-location-picker id="dashLocations" :locations="$locations ?? null" :selected="$selectedLocations ?? null" />
     </div>
 
     <!-- Right: status + user -->
@@ -639,7 +637,7 @@
         /* Name + meta */
         html += '<div class="flex-1 min-w-0">';
         html += '<p class="text-[10px] text-slate-400 font-medium">' + escHtml(row.specialty || row.Abbr || '') + '</p>';
-        html += '<p class="text-[10px] text-slate-400">' + escHtml(row.location || '8 Mile') + '</p>';
+        html += '<p class="text-[10px] text-slate-400">' + escHtml(row.location || '') + '</p>';
         html += '<p class="text-sm font-bold text-slate-900 truncate">' + name + ' <span class="text-slate-400 font-normal">(' + escHtml(row.appointment_count ?? 0) + ')</span></p>';
         html += '</div>';
 
@@ -722,13 +720,16 @@
 
       showSkeletons();
 
+      var locs = (window.DDS && typeof DDS.getLocations === 'function') ? DDS.getLocations('dashLocations').join(',') : '';
+      var queryParams = { start_date: start, end_date: end, locations: locs };
+
       /* KPIs */
-      $.get("{{ route('dashboard.data') }}", { start_date: start, end_date: end })
+      $.get("{{ route('dashboard.data') }}", queryParams)
         .done(populateKpis)
         .fail(showKpiError);
 
       /* Financials Per Location */
-      $.get("{{ route('dashboard.financials-per-location') }}", { start_date: start, end_date: end })
+      $.get("{{ route('dashboard.financials-per-location') }}", queryParams)
         .done(function (data) {
           _finPerLocData = data;
           renderFinPerLocChart(data);
@@ -738,7 +739,7 @@
         });
 
       /* Patient Visits Per Location */
-      $.get("{{ route('dashboard.patient-visits-per-location') }}", { start_date: start, end_date: end })
+      $.get("{{ route('dashboard.patient-visits-per-location') }}", queryParams)
         .done(function (data) {
           _patVisitsPerLocData = data;
           renderPatVisitsCharts(data);
@@ -748,7 +749,7 @@
         });
 
       /* Location stats */
-      $.get("{{ route('dashboard.location-stats') }}", { start_date: start, end_date: end })
+      $.get("{{ route('dashboard.location-stats') }}", queryParams)
         .done(function (data) {
           _locationData = data;
           renderLocationTable(data);
@@ -759,7 +760,7 @@
 
       /* Providers */
       $('#tot-gross,#tot-net,#tot-coll,#tot-adj').html('<span class="skel h-4 w-20 rounded"></span>');
-      $.get("{{ route('dashboard.providers') }}", { start_date: start, end_date: end })
+      $.get("{{ route('dashboard.providers') }}", queryParams)
         .done(function (data) {
           _providerData = data;
           renderProviders();
@@ -1005,6 +1006,12 @@
         end: moment().format('YYYY-MM-DD')
       };
       fetchAll(_dashRange.start, _dashRange.end);
+
+      if (window.DDS && typeof DDS.onLocations === 'function') {
+        DDS.onLocations('dashLocations', function () {
+          fetchAll(_currentStart, _currentEnd);
+        });
+      }
     });
 
     /* ── Chart helpers ────────────────────────────────── */
