@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\LocationSelection;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use App\Models\OdPatient;
@@ -44,7 +45,7 @@ class TxMinerController extends Controller
     /**
      * By Month aggregated dataset.
      */
-    public function data(Request $request, TreatmentAcceptanceService $txAcceptance): JsonResponse
+    public function data(Request $request, TreatmentAcceptanceService $txAcceptance, ClinicRegistry $clinicRegistry): JsonResponse
     {
         $draw = (int) $request->get('draw', 1);
         $start = (int) $request->get('start', 0);
@@ -53,9 +54,13 @@ class TxMinerController extends Controller
         $completed = ProcStatus::inList(ProcStatus::completed());
         $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
 
+        $effectiveDateSql = DB::getDriverName() === 'sqlite'
+            ? "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END"
+            : "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END";
+
         $monthGroupSql = DB::getDriverName() === 'sqlite'
-            ? "strftime('%Y-%m', pl.ProcDate)"
-            : "DATE_FORMAT(pl.ProcDate, '%Y-%m')";
+            ? "strftime('%Y-%m', {$effectiveDateSql})"
+            : "DATE_FORMAT({$effectiveDateSql}, '%Y-%m')";
 
         $hasMonth = $request->filled('month');
         $hasCustomRange = ! $hasMonth && $request->filled('start_date') && $request->filled('end_date');
@@ -85,7 +90,7 @@ class TxMinerController extends Controller
                 ];
             }
 
-            $query = $this->baseQuery($request, $startDate, $endDate)
+            $query = $this->baseQuery($request, $clinicRegistry, $startDate, $endDate)
                 ->selectRaw("{$monthGroupSql} as month_group")
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
@@ -106,7 +111,7 @@ class TxMinerController extends Controller
             $records = array_values($monthList);
             $totalRecords = count($records);
         } else {
-            $query = $this->baseQuery($request)
+            $query = $this->baseQuery($request, $clinicRegistry)
                 ->selectRaw("{$monthGroupSql} as month_group")
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
@@ -187,7 +192,7 @@ class TxMinerController extends Controller
     /**
      * By Provider aggregated dataset.
      */
-    public function dataProvider(Request $request, TreatmentAcceptanceService $txAcceptance): JsonResponse
+    public function dataProvider(Request $request, TreatmentAcceptanceService $txAcceptance, ClinicRegistry $clinicRegistry): JsonResponse
     {
         $draw = (int) $request->get('draw', 1);
         $start = (int) $request->get('start', 0);
@@ -196,7 +201,7 @@ class TxMinerController extends Controller
         $completed = ProcStatus::inList(ProcStatus::completed());
         $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
 
-        $query = $this->baseQuery($request)
+        $query = $this->baseQuery($request, $clinicRegistry)
             ->selectRaw('pl.ProvNum')
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
@@ -297,29 +302,30 @@ class TxMinerController extends Controller
         $completed = ProcStatus::inList(ProcStatus::completed());
         $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
 
-        $query = $this->baseQuery($request)
-            ->selectRaw('pl.ClinicNum')
+        $query = $this->baseQuery($request, $clinicRegistry)
+            ->selectRaw('pl.office_id, pl.ClinicNum')
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
             ->selectRaw("COUNT(CASE WHEN pl.ProcStatus IN ({$tp}) THEN 1 END) as tx_presented_count")
             ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.PatNum END) as patients_seen")
             ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.PatNum END) as patients_with_tp")
-            ->groupBy('pl.ClinicNum');
+            ->groupBy('pl.office_id', 'pl.ClinicNum');
 
         $totalRecords = DB::query()->fromSub($query, 'sub')->count();
 
         $records = $query->get();
 
-        $officeId = Office::getActiveOfficeId();
         $stagedRows = [];
         foreach ($records as $r) {
+            $officeId = (int) $r->office_id;
             $clinicNum = (int) $r->ClinicNum;
-            $locationName = $clinicRegistry->name($clinicNum, $officeId);
+            $location = $clinicRegistry->locationFor($officeId, $clinicNum);
 
             $stagedRows[] = $this->mapRowMetrics($r, $txAcceptance) + [
+                'office_id' => $officeId,
                 'clinic_num' => $clinicNum,
-                'location_name' => $locationName,
+                'location_name' => $location->name,
             ];
         }
 
@@ -408,11 +414,11 @@ class TxMinerController extends Controller
             ]);
 
             if ($tab === 'provider') {
-                $response = $this->dataProvider($request, $txAcceptance);
+                $response = $this->dataProvider($request, $txAcceptance, $clinicRegistry);
             } elseif ($tab === 'location') {
                 $response = $this->dataLocation($request, $txAcceptance, $clinicRegistry);
             } else {
-                $response = $this->data($request, $txAcceptance);
+                $response = $this->data($request, $txAcceptance, $clinicRegistry);
             }
 
             $jsonData = $response->getData(true);
@@ -478,22 +484,28 @@ class TxMinerController extends Controller
         $metric = $request->input('metric', 'total_tx_plan');
         $provNum = $request->input('prov_num');
         $clinicNum = $request->input('clinic_num');
+        $officeId = $request->input('office_id');
         $month = $request->input('month');
 
-        $query = $this->baseQuery($request);
+        $query = $this->baseQuery($request, $clinicRegistry);
+
+        $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
+        $effectiveDateSql = DB::getDriverName() === 'sqlite'
+            ? "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END"
+            : "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END";
 
         // Scope to specific month if requested (e.g. '2026-07' or formatted 'Jul 26')
         if ($month) {
             try {
                 $monthDate = Carbon::createFromFormat('Y-m', $month);
-                $query->whereBetween('pl.ProcDate', [
+                $query->whereRaw("{$effectiveDateSql} BETWEEN ? AND ?", [
                     $monthDate->copy()->startOfMonth()->toDateString(),
                     $monthDate->copy()->endOfMonth()->toDateString(),
                 ]);
             } catch (\Exception $e) {
                 try {
                     $monthDate = Carbon::parse($month);
-                    $query->whereBetween('pl.ProcDate', [
+                    $query->whereRaw("{$effectiveDateSql} BETWEEN ? AND ?", [
                         $monthDate->copy()->startOfMonth()->toDateString(),
                         $monthDate->copy()->endOfMonth()->toDateString(),
                     ]);
@@ -509,6 +521,10 @@ class TxMinerController extends Controller
 
         if ($clinicNum !== null && $clinicNum !== '' && $clinicNum !== 'all') {
             $query->where('pl.ClinicNum', (int) $clinicNum);
+        }
+
+        if ($officeId) {
+            $query->where('pl.office_id', (int) $officeId);
         }
 
         // Apply metric filter
@@ -560,18 +576,18 @@ class TxMinerController extends Controller
             }
         }
 
-        $officeId = Office::getActiveOfficeId();
-
-        // Select required columns and join procedure codes
-        $query->leftJoin('od_procedures as pc_drill', function ($join) use ($officeId) {
+        // Select required columns and join procedure codes matching office_id
+        $query->leftJoin('od_procedures as pc_drill', function ($join) {
             $join->on('pl.CodeNum', '=', 'pc_drill.CodeNum')
-                ->where('pc_drill.office_id', '=', $officeId);
+                ->on('pl.office_id', '=', 'pc_drill.office_id');
         })
             ->select([
+                'pl.office_id',
                 'pl.PatNum',
                 'pl.ProvNum',
                 'pl.ClinicNum',
                 'pl.ProcDate',
+                'pl.DateTP',
                 'pl.ProcFee',
                 'pl.Surf',
                 'pl.ToothNum',
@@ -580,7 +596,7 @@ class TxMinerController extends Controller
                 'pc_drill.ProcCode',
                 'pc_drill.Descript as proc_descript',
             ])
-            ->orderBy('pl.ProcDate', 'desc')
+            ->orderByRaw("{$effectiveDateSql} DESC")
             ->limit(500);
 
         $logs = $query->get();
@@ -636,13 +652,18 @@ class TxMinerController extends Controller
 
             $toothSurf = trim(($log->ToothNum ?? '').($log->Surf ? ' / '.$log->Surf : ''));
 
+            $isTp = in_array((string) $log->ProcStatus, ProcStatus::treatmentPlanned(), true);
+            $displayDate = ($isTp && ! empty($log->DateTP) && $log->DateTP !== '0001-01-01' && $log->DateTP !== '0000-00-00')
+                ? Carbon::parse($log->DateTP)->format('M d, Y')
+                : ($log->ProcDate ? Carbon::parse($log->ProcDate)->format('M d, Y') : '—');
+
             $r = [
                 'pat_id' => $log->PatNum,
                 'patient' => [
                     'label' => $patName,
                     'link' => true,
                 ],
-                'date' => $log->ProcDate ? Carbon::parse($log->ProcDate)->format('M d, Y') : '—',
+                'date' => $displayDate,
                 'code' => $log->ProcCode ?? '—',
                 'descript' => $log->proc_descript ?? '—',
                 'tooth_surf' => $toothSurf ?: '—',
@@ -659,7 +680,7 @@ class TxMinerController extends Controller
             }
 
             if (! $clinicNum || $clinicNum === 'all') {
-                $r['location'] = $clinicRegistry->name((int) $log->ClinicNum, Office::getActiveOfficeId());
+                $r['location'] = $clinicRegistry->name((int) $log->ClinicNum, (int) $log->office_id);
             }
 
             $rows[] = $r;
@@ -673,33 +694,57 @@ class TxMinerController extends Controller
     /**
      * Shared Base Query with comprehensive multi-parameter filtering.
      */
-    protected function baseQuery(Request $request, ?string $overrideStartDate = null, ?string $overrideEndDate = null): Builder
+    protected function baseQuery(Request $request, ClinicRegistry $clinicRegistry, ?string $overrideStartDate = null, ?string $overrideEndDate = null): Builder
     {
-        $officeId = Office::getActiveOfficeId();
+        $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
+        $effectiveDateSql = DB::getDriverName() === 'sqlite'
+            ? "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END"
+            : "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END";
+
+        $yearSql = DB::getDriverName() === 'sqlite'
+            ? "CAST(strftime('%Y', {$effectiveDateSql}) AS INT)"
+            : "YEAR({$effectiveDateSql})";
+
         $query = DB::table('od_procedure_logs as pl')
-            ->where('pl.office_id', $officeId)
-            ->whereNotNull('pl.ProcDate')
-            ->whereYear('pl.ProcDate', '>=', 2000);
+            ->where(function ($q) {
+                $q->whereNotNull('pl.ProcDate')
+                    ->orWhereNotNull('pl.DateTP');
+            })
+            ->whereRaw("{$yearSql} >= 2000");
+
+        // Scopes via LocationSelection
+        $locationSelection = $this->resolveLocations($request, $clinicRegistry);
+        $scopes = $locationSelection->scopes();
+
+        // Support legacy clinic / clinics query params when locations param is not provided
+        $clinic = $request->input('clinic') ?? $request->input('clinic_num');
+        $clinics = $request->input('clinics');
+        if ($clinic !== null && $clinic !== '' && $clinic !== 'all' && ! $request->filled('locations')) {
+            $scopes = [Office::getActiveOfficeId() => [(int) $clinic]];
+        } elseif ($clinics && ! $request->filled('locations')) {
+            $clinicsArray = is_array($clinics) ? $clinics : explode(',', (string) $clinics);
+            $clinicsArray = array_filter(array_map('trim', $clinicsArray));
+            if (! empty($clinicsArray)) {
+                $scopes = [Office::getActiveOfficeId() => array_map('intval', $clinicsArray)];
+            }
+        }
+
+        $query->where(function ($q) use ($scopes) {
+            foreach ($scopes as $officeId => $clinicNums) {
+                $q->orWhere(function ($sub) use ($officeId, $clinicNums) {
+                    $sub->where('pl.office_id', $officeId);
+                    if (! empty($clinicNums)) {
+                        $sub->whereIn('pl.ClinicNum', $clinicNums);
+                    }
+                });
+            }
+        });
 
         // Date Range filter
         $start = $overrideStartDate ?? $request->input('start_date');
         $end = $overrideEndDate ?? $request->input('end_date');
         if ($start && $end) {
-            $query->whereBetween('pl.ProcDate', [$start, $end]);
-        }
-
-        // Clinic/Location filter
-        $clinic = $request->input('clinic') ?? $request->input('clinic_num');
-        if ($clinic !== null && $clinic !== '' && $clinic !== 'all') {
-            $query->where('pl.ClinicNum', (int) $clinic);
-        }
-        $clinics = $request->input('clinics');
-        if ($clinics) {
-            $clinicsArray = is_array($clinics) ? $clinics : explode(',', (string) $clinics);
-            $clinicsArray = array_filter(array_map('trim', $clinicsArray));
-            if (! empty($clinicsArray)) {
-                $query->whereIn('pl.ClinicNum', array_map('intval', $clinicsArray));
-            }
+            $query->whereRaw("{$effectiveDateSql} BETWEEN ? AND ?", [$start, $end]);
         }
 
         // Provider filter
@@ -738,9 +783,9 @@ class TxMinerController extends Controller
             $lobArray = is_array($lobs) ? $lobs : explode(',', (string) $lobs);
             $lobArray = array_filter(array_map('trim', $lobArray));
             if (! empty($lobArray)) {
-                $query->join('od_procedures as pc_lob', function ($join) use ($officeId) {
+                $query->join('od_procedures as pc_lob', function ($join) {
                     $join->on('pl.CodeNum', '=', 'pc_lob.CodeNum')
-                        ->where('pc_lob.office_id', '=', $officeId);
+                        ->on('pl.office_id', '=', 'pc_lob.office_id');
                 });
                 $query->where(function ($q) use ($lobArray) {
                     foreach ($lobArray as $lob) {
@@ -808,6 +853,33 @@ class TxMinerController extends Controller
         return $query;
     }
 
+    private function resolveLocations(Request $request, ClinicRegistry $clinicRegistry): LocationSelection
+    {
+        if ($request->filled('locations')) {
+            return $clinicRegistry->select($request->input('locations'));
+        }
+
+        if ($request->filled('office_id') || $request->filled('clinic_num') || $request->filled('clinic_id')) {
+            $officeInput = $request->input('office_id');
+            if ($officeInput === 'all') {
+                return $clinicRegistry->select('all');
+            }
+            $officeId = ($officeInput !== null && $officeInput !== '') ? (int) $officeInput : Office::getActiveOfficeId();
+            $clinicInput = $request->input('clinic_id') ?? $request->input('clinic_num');
+            if ($clinicInput === null && $officeId !== null) {
+                $clinicInput = $clinicRegistry->getActiveClinicNum($officeId);
+            }
+            if ($clinicInput !== null && $clinicInput !== '' && $clinicInput !== 'all') {
+                return $clinicRegistry->select("{$officeId}:{$clinicInput}");
+            }
+            if ($officeId !== null) {
+                return $clinicRegistry->select((string) $officeId);
+            }
+        }
+
+        return $clinicRegistry->select(null);
+    }
+
     /**
      * Map raw row query to standard metrics.
      */
@@ -833,6 +905,7 @@ class TxMinerController extends Controller
             'total_tx_plan_raw' => $totalTx,
             'tx_scheduled_raw' => $txScheduled,
             'tx_unscheduled_raw' => $unscheduled,
+            'completed_tx' => $completed,
             'completed_tx_raw' => $completed,
             'case_acceptance_raw' => $caseAcceptance,
             'tx_presented_raw' => $txPresentedCount,

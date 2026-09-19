@@ -2,7 +2,7 @@
 
     <!-- ── HEADER ─────────────────────────────────────────── -->
     <header
-        class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-30">
+        class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-50">
         <div class="flex items-center gap-4">
             <h1 class="text-lg font-bold text-slate-800 tracking-tight">Treatment Miner</h1>
 
