@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\LocationSelection;
 use App\Domain\Support\ProcStatus;
 use App\Models\OdAppointment;
 use App\Models\OdPatient;
@@ -27,27 +28,32 @@ class PatientController extends Controller
     public function index(ClinicRegistry $clinicRegistry)
     {
         $exportColumns = self::getExportableColumns();
+        $locations = $clinicRegistry->locations();
+        $selectedLocations = $clinicRegistry->select(request('locations'))->keys();
         $officeId = Office::getActiveOfficeId();
         $clinics = $clinicRegistry->all($officeId);
         $activeClinicNum = $clinicRegistry->getActiveClinicNum($officeId);
 
-        return view('patients.index', compact('exportColumns', 'clinics', 'activeClinicNum'));
+        return view('patients.index', compact('exportColumns', 'clinics', 'activeClinicNum', 'locations', 'selectedLocations'));
     }
 
     public function data(Request $request, ClinicRegistry $clinicRegistry)
     {
-        $officeId = Office::getActiveOfficeId();
-        $query = OdPatient::query()->where('od_patients.office_id', $officeId);
+        $selection = $this->resolveLocations($request, $clinicRegistry);
+        $scopes = $selection->scopes();
 
-        // Resolve Clinic Scoping
-        $clinicNum = $request->input('clinic_id') ?? $request->input('clinic_num');
-        if ($clinicNum === null) {
-            $clinicNum = $clinicRegistry->getActiveClinicNum($officeId);
+        $query = OdPatient::withoutGlobalScopes();
+
+        if (empty($scopes)) {
+            return response()->json([
+                'draw' => (int) $request->input('draw', 1),
+                'recordsTotal' => 0,
+                'recordsFiltered' => 0,
+                'data' => [],
+            ]);
         }
 
-        if ($clinicNum !== null && $clinicNum !== '' && $clinicNum !== 'all') {
-            $query->where('od_patients.ClinicNum', (int) $clinicNum);
-        }
+        $this->applyLocationScopes($query, $selection, 'od_patients');
 
         $recordsTotal = (clone $query)->count();
 
@@ -132,13 +138,14 @@ class PatientController extends Controller
         ]);
 
         $patNums = $patients->pluck('PatNum')->all();
+        $patientOfficeIds = $patients->pluck('office_id')->unique()->all();
         $guarantorIds = $patients->pluck('Guarantor')->filter()->unique()->all();
 
         // Batch 1: Guarantor Names
         $guarantorMap = [];
-        if (! empty($guarantorIds)) {
+        if (! empty($guarantorIds) && ! empty($patientOfficeIds)) {
             $guarantors = DB::table('od_patients')
-                ->where('office_id', $officeId)
+                ->whereIn('office_id', $patientOfficeIds)
                 ->whereIn('PatNum', $guarantorIds)
                 ->select('PatNum', 'LName', 'FName')
                 ->get();
@@ -149,9 +156,9 @@ class PatientController extends Controller
 
         // Batch 2: First Visit Date
         $firstVisitMap = [];
-        if (! empty($patNums)) {
+        if (! empty($patNums) && ! empty($patientOfficeIds)) {
             $firstVisitMap = DB::table('od_appointments')
-                ->where('office_id', $officeId)
+                ->whereIn('office_id', $patientOfficeIds)
                 ->whereIn('PatNum', $patNums)
                 ->groupBy('PatNum')
                 ->selectRaw('PatNum, MIN(AptDateTime) as first_visit')
@@ -161,9 +168,9 @@ class PatientController extends Controller
 
         // Batch 3: Lifetime Production
         $prodMap = [];
-        if (! empty($patNums)) {
+        if (! empty($patNums) && ! empty($patientOfficeIds)) {
             $prodMap = DB::table('od_procedure_logs')
-                ->where('office_id', $officeId)
+                ->whereIn('office_id', $patientOfficeIds)
                 ->whereIn('PatNum', $patNums)
                 ->groupBy('PatNum')
                 ->selectRaw('PatNum, COALESCE(SUM(ProcFee), 0) as total_prod')
@@ -173,9 +180,9 @@ class PatientController extends Controller
 
         // Batch 4: Lifetime Collection
         $colMap = [];
-        if (! empty($patNums)) {
+        if (! empty($patNums) && ! empty($patientOfficeIds)) {
             $colMap = DB::table('od_pay_splits')
-                ->where('office_id', $officeId)
+                ->whereIn('office_id', $patientOfficeIds)
                 ->whereIn('PatNum', $patNums)
                 ->groupBy('PatNum')
                 ->selectRaw('PatNum, COALESCE(SUM(SplitAmt), 0) as total_col')
@@ -246,7 +253,7 @@ class PatientController extends Controller
 
     public function show($id, Request $request)
     {
-        $patient = OdPatient::where('PatNum', $id)->first();
+        $patient = OdPatient::withoutGlobalScopes()->where('PatNum', $id)->first();
 
         if (! $patient) {
             if ($request->expectsJson() || $request->ajax()) {
@@ -561,7 +568,7 @@ class PatientController extends Controller
 
     public function showFamily($patientId)
     {
-        $patient = OdPatient::where('PatNum', $patientId)->first();
+        $patient = OdPatient::withoutGlobalScopes()->where('PatNum', $patientId)->first();
 
         if (! $patient) {
             return response()->json([], 404);
@@ -577,7 +584,10 @@ class PatientController extends Controller
         $statusMap = [0 => 'Active', 1 => 'NonPatient', 2 => 'Inactive', 3 => 'Archived', 4 => 'Deceased', 5 => 'Prospective'];
         $nowStr = now()->format('Y-m-d H:i:s');
 
-        $familyMembers = OdPatient::where('Guarantor', $guarantorId)->get();
+        $familyMembers = OdPatient::withoutGlobalScopes()
+            ->where('office_id', $patient->office_id)
+            ->where('Guarantor', $guarantorId)
+            ->get();
 
         return response()->json($familyMembers->map(function ($m) use ($genderMap, $statusMap, $nowStr) {
             $mApts = OdAppointment::where('PatNum', $m->PatNum)->get();
@@ -602,7 +612,7 @@ class PatientController extends Controller
 
     public function showEmployer($patientId)
     {
-        $patient = OdPatient::where('PatNum', $patientId)->first();
+        $patient = OdPatient::withoutGlobalScopes()->where('PatNum', $patientId)->first();
 
         if (! $patient) {
             return response()->json(['name' => null], 404);
@@ -738,15 +748,18 @@ class PatientController extends Controller
     protected function buildExportQuery(Request $request, ?ClinicRegistry $clinicRegistry = null)
     {
         $clinicRegistry = $clinicRegistry ?? app(ClinicRegistry::class);
-        $officeId = Office::getActiveOfficeId();
-        $query = OdPatient::query()->where('od_patients.office_id', $officeId);
+        $selection = $this->resolveLocations($request, $clinicRegistry);
+        $scopes = $selection->scopes();
 
-        // Location / Clinic filter
-        $clinicNum = $request->input('clinic_id') ?? $request->input('clinic_num');
+        $query = OdPatient::withoutGlobalScopes();
 
-        if ($clinicNum !== null && $clinicNum !== '' && $clinicNum !== 'all') {
-            $query->where('od_patients.ClinicNum', (int) $clinicNum);
+        if (empty($scopes)) {
+            $query->whereRaw('1 = 0');
+
+            return $query;
         }
+
+        $this->applyLocationScopes($query, $selection, 'od_patients');
 
         // Status filter
         if ($request->filled('status') && $request->get('status') !== 'all') {
@@ -1007,5 +1020,87 @@ class PatientController extends Controller
         }
 
         return $result;
+    }
+
+    private function resolveLocations(Request $request, ClinicRegistry $clinicRegistry): LocationSelection
+    {
+        // 1. Explicit locations parameter (from x-location-picker, array or string)
+        if ($request->filled('locations')) {
+            $locs = $request->input('locations');
+            if (is_array($locs)) {
+                $locs = implode(',', array_filter($locs));
+            }
+            $selection = $clinicRegistry->select($locs);
+
+            // If an additional specific clinic filter was passed (and not 'all')
+            $clinicInput = $request->input('clinic_id') ?? $request->input('clinic_num') ?? $request->input('clinic');
+            if ($clinicInput !== null && $clinicInput !== '' && $clinicInput !== 'all') {
+                $scopes = $selection->scopes();
+                $newScopes = [];
+                foreach ($scopes as $officeId => $clinics) {
+                    $newScopes[$officeId] = [(int) $clinicInput];
+                }
+
+                return new LocationSelection($selection->locations(), $newScopes);
+            }
+
+            return $selection;
+        }
+
+        // 2. Specific clinic parameter without locations
+        if ($request->filled('clinic_id') || $request->filled('clinic_num') || $request->filled('clinic')) {
+            $clinicVal = $request->input('clinic_id') ?? $request->input('clinic_num') ?? $request->input('clinic');
+
+            if ($clinicVal === 'all') {
+                return $clinicRegistry->select('all');
+            }
+
+            if (str_contains((string) $clinicVal, ':')) {
+                return $clinicRegistry->select((string) $clinicVal);
+            }
+
+            if (is_numeric($clinicVal)) {
+                $officeId = $request->filled('office_id') && $request->input('office_id') !== 'all'
+                    ? (int) $request->input('office_id')
+                    : (Office::getActiveOfficeId() ?? 1);
+
+                return LocationSelection::forOffice($officeId, [(int) $clinicVal]);
+            }
+
+            return $clinicRegistry->select((string) $clinicVal);
+        }
+
+        if ($request->filled('office_id')) {
+            $officeInput = $request->input('office_id');
+            if ($officeInput === 'all') {
+                return $clinicRegistry->select('all');
+            }
+
+            return $clinicRegistry->select((string) $officeInput);
+        }
+
+        return $clinicRegistry->select(null);
+    }
+
+    private function applyLocationScopes($query, LocationSelection $selection, string $table = 'od_patients'): void
+    {
+        $scopes = $selection->scopes();
+        if (empty($scopes)) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $prefix = $table !== '' ? "{$table}." : '';
+        $query->where(function ($q) use ($scopes, $prefix) {
+            foreach ($scopes as $officeId => $scopedClinics) {
+                $q->orWhere(function ($sub) use ($officeId, $scopedClinics, $prefix) {
+                    $sub->where("{$prefix}office_id", $officeId);
+                    if (! empty($scopedClinics)) {
+                        $sub->whereIn("{$prefix}ClinicNum", $scopedClinics);
+                    }
+                });
+            }
+        });
     }
 }

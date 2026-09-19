@@ -37,7 +37,7 @@
     <div class="min-h-screen flex flex-col relative bg-slate-50">
 
         <!-- Top Header Banner -->
-        <div class="relative z-30 bg-white border-b border-slate-200 px-8 pt-6 pb-0 shadow-sm">
+        <div class="relative z-50 bg-white border-b border-slate-200 px-8 pt-6 pb-0 shadow-sm">
             <div class="flex items-center justify-between mb-4">
                 <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Patient Portal</h1>
                 <button
@@ -47,7 +47,20 @@
             </div>
 
             <div class="flex items-center gap-3 mb-6">
-                <x-location-picker id="patientLocations" />
+                {{-- Single location selector for Patients Portal (only 1 location at a time, matching Appointments Calendar) --}}
+                <div id="singleLocationWrapper" class="relative">
+                    <select id="patientSingleLocation"
+                        class="appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 text-sm font-medium text-slate-700 pr-8 focus:outline-none focus:border-emerald-500 shadow-sm cursor-pointer min-w-[180px]">
+                        @foreach($locations as $key => $loc)
+                            <option value="{{ $key }}" @selected(in_array((string)$key, (array)$selectedLocations, true))>{{ $loc->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </div>
                 <button id="refreshPatients"
                     class="border border-emerald-500 text-slate-800 text-sm font-semibold px-5 py-1.5 rounded bg-white hover:bg-slate-50 transition-colors cursor-pointer">
                     Refresh
@@ -553,7 +566,7 @@
         <!-- POPUP & MODALS                             -->
         <!-- ========================================== -->
         <div id="exportModal"
-            class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center transition-opacity">
+            class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[250] flex items-center justify-center transition-opacity">
             <div
                 class="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-md overflow-hidden transform transition-transform scale-100 p-6">
                 <div class="flex items-center gap-3 mb-4 text-slate-900">
@@ -679,11 +692,8 @@
                     url: "{{ route('patients.data') }}",
                     type: "GET",
                     data: function (d) {
-                        var locs = window.DDS && typeof window.DDS.getLocations === 'function' ? window.DDS.getLocations('patientLocations') : [];
-                        d.locations = locs;
-                        if (locs && locs.length) {
-                            d.clinic_id = locs[0];
-                        }
+                        var loc = document.getElementById('patientSingleLocation')?.value || '';
+                        d.locations = loc ? [loc] : [];
                     },
                     beforeSend: function () { showPatientsLoading(); },
                     complete: function () { hidePatientsLoading(); },
@@ -813,12 +823,13 @@
                 table.search("").draw();
             });
 
-            if (window.DDS && typeof window.DDS.onLocations === 'function') {
-                window.DDS.onLocations('patientLocations', function () {
-                    showPatientsLoading();
-                    table.ajax.reload();
-                });
-            }
+            $('#patientSingleLocation').on('change', function () {
+                showPatientsLoading();
+                table.ajax.reload();
+                if (!$('#exportDataTabContent').hasClass('hidden')) {
+                    fetchExportPreview(1);
+                }
+            });
 
             $("#refreshPatients").on('click', function () {
                 showPatientsLoading();
@@ -839,13 +850,11 @@
             $("#confirmExportBtn").click(function () {
                 let currentSearchValue = $("#searchInput").val();
                 let customName = $("#exportFileName").val() || "patient_export";
-                let locs = window.DDS && typeof window.DDS.getLocations === 'function' ? window.DDS.getLocations('patientLocations') : [];
-                let currentClinic = locs && locs.length ? locs[0] : 'all';
+                let loc = document.getElementById('patientSingleLocation')?.value || '';
                 $("#exportModal").addClass('hidden');
 
                 let params = $.param({
-                    locations: locs,
-                    clinic_id: currentClinic,
+                    locations: loc ? [loc] : [],
                     search: currentSearchValue,
                     date_mode: 'all',
                     status: 'all',
@@ -990,7 +999,10 @@
                     cols = ['patient_id', 'first_name', 'last_name', 'date_added'];
                 }
 
+                let loc = document.getElementById('patientSingleLocation')?.value || '';
+
                 let params = {
+                    locations: loc ? [loc] : [],
                     date_mode: $('#expDateMode').val(),
                     date_from: $('#expDateFrom').val(),
                     date_to: $('#expDateTo').val(),
@@ -1057,7 +1069,9 @@
                 }
 
                 let filename = $('#expFilenameInput').val() || 'patients_export';
+                let loc = document.getElementById('patientSingleLocation')?.value || '';
                 let params = $.param({
+                    locations: loc ? [loc] : [],
                     date_mode: $('#expDateMode').val(),
                     date_from: $('#expDateFrom').val(),
                     date_to: $('#expDateTo').val(),
