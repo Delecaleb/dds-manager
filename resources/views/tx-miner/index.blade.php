@@ -27,6 +27,17 @@
 
             <!-- Location Filter -->
             <x-location-picker id="txMinerLocations" />
+
+            <!-- Refresh Button -->
+            <button id="txMinerRefreshBtn" type="button"
+                class="h-9 inline-flex items-center gap-1.5 border border-emerald-500 text-emerald-600 font-bold px-3.5 rounded-lg shadow-sm hover:bg-emerald-50 active:scale-95 transition-all text-xs cursor-pointer"
+                title="Refresh table data">
+                <svg class="w-3.5 h-3.5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Refresh</span>
+            </button>
         </div>
     </header>
 
@@ -1186,6 +1197,17 @@
             if (window.DDS && typeof DDS.onLocations === 'function') {
                 DDS.onLocations('txMinerLocations', reloadActiveTable);
             }
+
+            // Refresh Button click handler
+            $('#txMinerRefreshBtn').on('click', function () {
+                const $btn = $(this);
+                const $icon = $btn.find('svg');
+                $icon.addClass('animate-spin');
+                reloadActiveTable();
+                setTimeout(() => {
+                    $icon.removeClass('animate-spin');
+                }, 600);
+            });
 
             // Month Picker change handler
             $('#txMinerMonth').on('change', function () {
