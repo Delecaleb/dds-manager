@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\Sync\QueueHealthService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -29,6 +30,12 @@ Artisan::command('inspire', function () {
 |
 | Module keys come from the registry in SyncReportService::getModuleDefinitions().
 */
+
+// Heartbeat: proves cron really runs schedule:run (and with which PHP), for the
+// Sync Manager's queue health check and `php artisan sync:health`.
+Schedule::call(fn () => app(QueueHealthService::class)->recordSchedulerTick())
+    ->name('sync-health-heartbeat')
+    ->everyMinute();
 
 // Defaults are merged in so a stale config cache (deployed code newer than a
 // cached config) degrades to safe values instead of crashing every scheduled task.

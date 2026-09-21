@@ -24,10 +24,24 @@
         <button onclick="openResetModal()" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition focus:outline-none cursor-pointer">
           <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset Sync Start Date
         </button>
-        <button onclick="loadSyncRequests()" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition focus:outline-none cursor-pointer">
+        <button onclick="loadQueueHealth(); loadSyncRequests()" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition focus:outline-none cursor-pointer">
           <i data-lucide="rotate-cw" class="w-4 h-4"></i> Refresh
         </button>
       </div>
+    </div>
+
+    <!-- Queue Health -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">
+      <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+        <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="activity" class="w-5 h-5 text-amber-500"></i>
+          Queue Health
+        </h2>
+        <button type="button" onclick="loadQueueHealth()" class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition cursor-pointer">
+          <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> Check again
+        </button>
+      </div>
+      <div id="smQueueHealth" class="text-sm text-slate-400">Checking cron and the queue worker...</div>
     </div>
 
     <!-- On-Demand Sync Form Card -->
@@ -280,9 +294,47 @@
     }, @json($modules));
 
     document.addEventListener('DOMContentLoaded', function () {
+      loadQueueHealth();
       loadSyncRequests();
       loadSyncCheckpoints();
     });
+
+    function loadQueueHealth() {
+      var box = document.getElementById('smQueueHealth');
+      if (!box) return;
+
+      fetch('{{ route("sync-manager.health") }}', { headers: { 'Accept': 'text/html' } })
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.text();
+        })
+        .then(function (html) {
+          box.innerHTML = html;
+          if (window.lucide) lucide.createIcons();
+        })
+        .catch(function (err) {
+          box.innerHTML = '<p class="text-rose-600 text-sm">Could not run the queue health check: ' + escHtml(err.message) + '</p>';
+        });
+    }
+
+    function requeueMissingRequests(btn) {
+      btn.disabled = true;
+
+      fetch('{{ route("sync-manager.health.requeue") }}', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          alert(res.message || res.error || 'Done.');
+          loadQueueHealth();
+          loadSyncRequests();
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          alert('Re-queue failed: ' + err.message);
+        });
+    }
 
     function escHtml(s) {
       return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

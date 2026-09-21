@@ -264,6 +264,8 @@ Route::middleware('auth')->group(function () {
         Route::post('sync-manager/cancel', [SyncManagerController::class, 'cancelSync'])->name('sync-manager.cancel');
         Route::get('sync-manager/checkpoints', [SyncManagerController::class, 'checkpoints'])->name('sync-manager.checkpoints');
         Route::post('sync-manager/reset-checkpoint', [SyncManagerController::class, 'resetCheckpoint'])->name('sync-manager.reset-checkpoint');
+        Route::get('sync-manager/health', [SyncManagerController::class, 'health'])->name('sync-manager.health');
+        Route::post('sync-manager/health/requeue', [SyncManagerController::class, 'requeueMissing'])->name('sync-manager.health.requeue');
     });
 
 });

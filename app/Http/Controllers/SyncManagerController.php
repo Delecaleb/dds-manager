@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\HandlesSyncRequests;
 use App\Models\Office;
+use App\Services\Sync\QueueHealthService;
 use App\Services\Sync\SyncCheckpointService;
 use App\Services\Sync\SyncRequestRunner;
 use Illuminate\Http\JsonResponse;
@@ -72,6 +73,28 @@ class SyncManagerController extends Controller
     public function resetCheckpoint(Request $request, SyncCheckpointService $checkpoints): JsonResponse
     {
         return $this->resetSyncCheckpointFor($request, $checkpoints, $this->activeOfficeId(), officeFromRequest: true);
+    }
+
+    /**
+     * Queue health panel (rendered HTML, refreshed in place).
+     */
+    public function health(QueueHealthService $health): View
+    {
+        return view('sync_manager.partials.queue-health', ['health' => $health->snapshot()]);
+    }
+
+    /**
+     * Put pending requests that have no job in the queue back on it.
+     */
+    public function requeueMissing(QueueHealthService $health): JsonResponse
+    {
+        $count = $health->requeueMissingRequests();
+
+        return response()->json([
+            'success' => true,
+            'message' => $count > 0 ? "Re-queued {$count} sync request(s)." : 'Every pending request is already in the queue.',
+            'requeued' => $count,
+        ]);
     }
 
     private function activeOfficeId(): int
