@@ -303,7 +303,7 @@
       var box = document.getElementById('smQueueHealth');
       if (!box) return;
 
-      fetch('{{ route("sync-manager.health") }}', { headers: { 'Accept': 'text/html' } })
+      fetch('{{ url("/sync-manager/health") }}', { headers: { 'Accept': 'text/html' } })
         .then(function (r) {
           if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.text();
@@ -320,7 +320,7 @@
     function requeueMissingRequests(btn) {
       btn.disabled = true;
 
-      fetch('{{ route("sync-manager.health.requeue") }}', {
+      fetch('{{ url("/sync-manager/health/requeue") }}', {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
       })

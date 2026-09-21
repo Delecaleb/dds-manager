@@ -69,6 +69,17 @@ return [
         // (process + MySQL connection limits). 1–2 is plenty for incrementals.
         'workers' => (int) env('SYNC_QUEUE_WORKERS', 1),
 
+        // Whether `schedule:run` starts the workers (as background processes).
+        // Hosts that kill a cron job's child processes when the job ends
+        // (e.g. CloudLinux) must set this false and run the worker from its own
+        // cron line instead: php artisan queue:work … --stop-when-empty --max-time=280
+        'scheduler_starts_workers' => (bool) env('SYNC_SCHEDULER_STARTS_WORKERS', true),
+
+        // Whether slow scheduled tasks (pending-request recovery, schedule
+        // snapshots) run as background processes. False on the same hosts:
+        // they then run inside schedule:run, one after another.
+        'background_tasks' => (bool) env('SYNC_SCHEDULE_BACKGROUND_TASKS', true),
+
         // How often the host runs `schedule:run`. Some shared hosts only allow
         // every 5 minutes. Above 1, workers keep polling for new jobs until just
         // before the next cron run instead of exiting when the queue is empty —

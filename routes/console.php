@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\Sync\QueueHealthService;
+use Illuminate\Console\Scheduling\Event;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -47,7 +48,13 @@ $syncQueue = array_merge([
     'cron_interval_minutes' => 1,
     'worker_max_time' => 240,
     'job_timeout' => 600,
+    'scheduler_starts_workers' => true,
+    'background_tasks' => true,
 ], (array) config('sync.queue', []));
+
+// Background processes are killed on hosts that end a cron job's children with
+// the job (see sync.queue.background_tasks); there the task runs in schedule:run.
+$inBackground = fn (Event $event): Event => $syncQueue['background_tasks'] ? $event->runInBackground() : $event;
 
 // Every-minute cron: short workers that exit when the queue is empty.
 // Coarser cron (e.g. 5 min, common on shared hosting): workers keep polling
@@ -56,7 +63,10 @@ $cronInterval = (int) $syncQueue['cron_interval_minutes'];
 $workerMaxTime = $cronInterval > 1 ? $cronInterval * 60 - 20 : (int) $syncQueue['worker_max_time'];
 $stopWhenEmpty = $cronInterval > 1 ? '' : ' --stop-when-empty';
 
-foreach (range(1, max(1, (int) $syncQueue['workers'])) as $worker) {
+// When false, the worker comes from its own cron line (see sync.queue.scheduler_starts_workers).
+$schedulerWorkers = $syncQueue['scheduler_starts_workers'] ? max(1, (int) $syncQueue['workers']) : 0;
+
+foreach ($schedulerWorkers > 0 ? range(1, $schedulerWorkers) : [] as $worker) {
     Schedule::command(sprintf(
         // Priority queue listed first: the worker always drains it before regular syncs.
         'queue:work %s --queue=%s,%s --name=sync-worker-%d%s --max-time=%d --timeout=%d --sleep=3 --memory=256',
@@ -79,7 +89,7 @@ foreach (range(1, max(1, (int) $syncQueue['workers'])) as $worker) {
 /*
 | Date-range backfills requested from the Sync Manager UI.
 */
-Schedule::command('sync:process-pending')->everyTenMinutes()->withoutOverlapping(20)->runInBackground()->onOneServer();
+$inBackground(Schedule::command('sync:process-pending')->everyTenMinutes()->withoutOverlapping(20)->onOneServer());
 
 /*
 | HIGH FREQUENCY (every 10 minutes) — operational data that changes constantly.
@@ -113,19 +123,17 @@ Schedule::command('queue:prune-failed --hours=168')->dailyAt('03:00')->onOneServ
 /*
 | SCHEDULE SNAPSHOTS (8:00 AM EST lock & rolling future forecasts)
 */
-Schedule::command('snapshot:daily-schedule --lock-today')
+$inBackground(Schedule::command('snapshot:daily-schedule --lock-today')
     ->dailyAt('08:00')
     ->timezone('America/New_York')
     ->withoutOverlapping(20)
-    ->runInBackground()
-    ->onOneServer();
+    ->onOneServer());
 
-Schedule::command('snapshot:daily-schedule --future-days=60')
+$inBackground(Schedule::command('snapshot:daily-schedule --future-days=60')
     ->hourly()
     ->timezone('America/New_York')
     ->withoutOverlapping(20)
-    ->runInBackground()
-    ->onOneServer();
+    ->onOneServer());
 
 /*
 | HARD-DELETE PRUNING — OpenDental hard-deletes rows, which incremental syncs never see.

@@ -44,6 +44,7 @@ class QueueHealthService
             'at' => now()->toIso8601String(),
             'previous_at' => $previous['at'] ?? null,
             'php' => PHP_VERSION,
+            'php_binary' => PHP_BINARY,
         ]);
     }
 
@@ -85,6 +86,7 @@ class QueueHealthService
             'checked_at' => $now->toIso8601String(),
             'scheduler' => $this->beat($scheduler, $now),
             'scheduler_php' => $scheduler['php'] ?? null,
+            'scheduler_php_binary' => $scheduler['php_binary'] ?? null,
             'observed_cron_minutes' => $this->observedInterval($scheduler),
             'worker' => $this->beat($worker, $now),
             'worker_last_job' => $worker['job'] ?? null,
@@ -340,7 +342,10 @@ class QueueHealthService
     private function diagnose(array $health, array $rows, array $workerQueues, Carbon $now): array
     {
         $findings = [];
-        $cronLine = 'cd '.base_path().' && php artisan schedule:run >> '.storage_path('logs/cron.log').' 2>&1';
+        // The PHP that cron really uses (recorded by the scheduler heartbeat); plain
+        // "php" on shared hosting is often a different version.
+        $php = $health['scheduler_php_binary'] ?: 'php';
+        $cronLine = 'cd '.base_path().' && '.$php.' artisan schedule:run >> '.storage_path('logs/cron.log').' 2>&1';
         $schedulerAge = $health['scheduler']['minutes_ago'];
         $schedulerLate = max(10, $health['cron_interval_minutes'] * 2 + 2);
         $waiting = count(array_filter($rows, fn ($row) => ! $row['reserved']
@@ -372,7 +377,7 @@ class QueueHealthService
                 'level' => 'error',
                 'title' => 'Cron runs, but no queue worker is processing jobs',
                 'detail' => "{$waiting} job(s) are waiting and no worker has been seen ".($workerAge === null ? 'since this check was installed' : "for {$workerAge} minutes").'. The scheduler starts the worker as a background process; on shared hosting that fails when PHP\'s proc_open/exec are disabled, or the worker crashes on start.',
-                'fix' => 'Read storage/logs/cron.log and storage/logs/laravel.log for the error. If background processes are blocked, ask the host to enable proc_open, or add a second cron line that runs the worker directly: cd '.base_path().' && php artisan queue:work '.config('sync.queue.connection').' --queue='.implode(',', $workerQueues).' --stop-when-empty --max-time=280 --timeout=600 >> '.storage_path('logs/worker.log').' 2>&1',
+                'fix' => 'Read storage/logs/cron.log and storage/logs/laravel.log for the error. If background processes are blocked, ask the host to enable proc_open, or add a second cron line that runs the worker directly: cd '.base_path().' && '.$php.' artisan queue:work '.config('sync.queue.connection').' --queue='.implode(',', $workerQueues).' --stop-when-empty --max-time=280 --timeout=600 >> '.storage_path('logs/worker.log').' 2>&1',
             ];
         }
 
