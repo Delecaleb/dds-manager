@@ -40,31 +40,43 @@
       </div>
 
       <form id="syncManagerForm" onsubmit="submitSyncManagerForm(event)" class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-          
-          <!-- Module / Data Type -->
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Data Type</label>
-            <select id="smModuleSelect" required class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-amber-500 p-3 font-semibold shadow-xs transition">
-              @foreach($modules as $val => $label)
-                <option value="{{ $val }}" @if($val === 'appointments') selected @endif>{{ $label }}</option>
-              @endforeach
-            </select>
+        <!-- Modules / Data Types -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Data Types</label>
+            <span class="flex items-center gap-2 text-[11px] font-semibold">
+              <button type="button" onclick="setAllSyncModules(true)" class="text-amber-700 hover:underline">Select all</button>
+              <span class="text-slate-300">|</span>
+              <button type="button" onclick="setAllSyncModules(false)" class="text-slate-500 hover:underline">Clear</button>
+            </span>
           </div>
+          <div id="smModuleList" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-2 bg-slate-50 border border-slate-300 rounded-xl p-3.5">
+            @foreach($modules as $val => $label)
+              <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700">
+                <input type="checkbox" name="sync_modules[]" value="{{ $val }}" class="w-4 h-4 text-amber-600 border-slate-300 rounded focus:ring-amber-500">
+                <span>{{ $label }}</span>
+              </label>
+            @endforeach
+          </div>
+        </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
           <!-- Start Date -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Start Date</label>
-            <input type="date" id="smStartDate" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-amber-500 p-3 font-medium shadow-xs transition">
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Resync From</label>
+            <input type="date" id="smStartDate" required class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-amber-500 p-3 font-medium shadow-xs transition">
+            <p class="text-[11px] text-slate-500 mt-1">Every record dated on or after this day is re-downloaded from OpenDental and overwrites the local copy.</p>
           </div>
 
           <!-- End Date -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">End Date</label>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Until <span class="normal-case font-medium text-slate-400">(optional)</span></label>
             <input type="date" id="smEndDate" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-amber-500 p-3 font-medium shadow-xs transition">
+            <p class="text-[11px] text-slate-500 mt-1">Leave empty for no end date (future appointments are included).</p>
           </div>
-
         </div>
+
+        <div id="smFormNotice" class="hidden p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800"></div>
 
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-slate-100">
           <label class="inline-flex items-center gap-2.5 cursor-pointer select-none text-xs font-semibold text-slate-700">
@@ -185,16 +197,26 @@
           </select>
         </div>
 
-        <!-- Target Module -->
+        <!-- Target Modules -->
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Target Module</label>
-          <select id="resetModuleSelect" required class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-amber-500 p-2.5 font-semibold shadow-xs">
-            <option value="all">⚡ All Modules (Complete Location Reset)</option>
-            {{-- Keys are OpenDental table names, matching the checkpoint rows below. --}}
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Target Modules</label>
+            <span class="flex items-center gap-2 text-[11px] font-semibold">
+              <button type="button" onclick="setAllResetModules(true)" class="text-amber-700 hover:underline">Select all</button>
+              <span class="text-slate-300">|</span>
+              <button type="button" onclick="setAllResetModules(false)" class="text-slate-500 hover:underline">Clear</button>
+            </span>
+          </div>
+          {{-- Keys are OpenDental table names, matching the checkpoint rows below. --}}
+          <div id="resetModuleList" class="grid grid-cols-2 gap-x-3 gap-y-1.5 max-h-56 overflow-y-auto bg-slate-50 border border-slate-300 rounded-xl p-3">
             @foreach($resetModules as $val => $label)
-              <option value="{{ $val }}">{{ $label }}</option>
+              <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700">
+                <input type="checkbox" name="reset_modules[]" value="{{ $val }}" class="w-4 h-4 text-amber-600 border-slate-300 rounded focus:ring-amber-500">
+                <span>{{ $label }}</span>
+              </label>
             @endforeach
-          </select>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">Only the checked modules are reset. Leave stable modules (e.g. Patients, Providers) unchecked.</p>
         </div>
 
         <!-- Sync Start Date -->
@@ -230,16 +252,11 @@
   <script>
     var resetModuleKeys = @json(array_keys($resetModules));
 
-    var friendlyModuleNames = {
-      'appointments': 'Appointments',
-      'procedurelogs': 'Procedures',
-      'patients': 'Patients',
-      'adjustments': 'Adjustments',
-      'payments': 'Payments',
-      'claimprocs': 'Insurance Claims',
+    // Current module labels, plus names older sync requests were stored under.
+    var friendlyModuleNames = Object.assign({
       'treatmentplans': 'Treatment Plans',
       'all': 'All Modules'
-    };
+    }, @json($modules));
 
     document.addEventListener('DOMContentLoaded', function () {
       loadSyncRequests();
@@ -304,9 +321,26 @@
         });
     }
 
+    function setAllSyncModules(checked) {
+      document.querySelectorAll('#smModuleList input[name="sync_modules[]"]').forEach(function (box) { box.checked = checked; });
+    }
+
     function submitSyncManagerForm(e) {
       e.preventDefault();
       var btn = document.getElementById('smSubmitBtn');
+      var notice = document.getElementById('smFormNotice');
+      var modules = Array.prototype.map.call(
+        document.querySelectorAll('#smModuleList input[name="sync_modules[]"]:checked'),
+        function (box) { return box.value; }
+      );
+
+      notice.classList.add('hidden');
+      if (!modules.length) {
+        notice.innerText = 'Tick at least one data type to resync.';
+        notice.classList.remove('hidden');
+        return;
+      }
+
       btn.disabled = true;
       btn.innerHTML = '<svg class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Starting...';
 
@@ -314,10 +348,11 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'X-CSRF-TOKEN': '{{ csrf_token() }}'
         },
         body: JSON.stringify({
-          module: document.getElementById('smModuleSelect').value,
+          modules: modules,
           start_date: document.getElementById('smStartDate').value || null,
           end_date: document.getElementById('smEndDate').value || null,
           prune_deleted: document.getElementById('smPruneDeleted').checked
@@ -329,8 +364,9 @@
           btn.innerHTML = '<i data-lucide="zap" class="w-4 h-4 fill-current"></i> Start Sync';
           if (window.lucide) lucide.createIcons();
 
-          if (res.error) {
-            alert('Error: ' + res.error);
+          if (res.error || res.errors) {
+            notice.innerText = 'Error: ' + (res.error || res.message);
+            notice.classList.remove('hidden');
             return;
           }
           alert(res.message || 'Sync job started successfully.');
@@ -407,10 +443,17 @@
         });
     }
 
+    function resetModuleCheckboxes() {
+      return document.querySelectorAll('#resetModuleList input[name="reset_modules[]"]');
+    }
+
+    function setAllResetModules(checked) {
+      resetModuleCheckboxes().forEach(function (box) { box.checked = checked; });
+    }
+
     function openResetModal(moduleKey, currentDate, officeId) {
-      if (moduleKey) {
-        document.getElementById('resetModuleSelect').value = moduleKey;
-      }
+      // A row's "Reset Date" pre-selects just that module; the header button starts empty.
+      resetModuleCheckboxes().forEach(function (box) { box.checked = !!moduleKey && box.value === moduleKey; });
       if (currentDate) {
         document.getElementById('resetStartDateInput').value = currentDate;
       }
@@ -443,9 +486,23 @@
       notice.classList.add('hidden');
 
       var officeId = document.getElementById('resetOfficeSelect').value;
-      var module = document.getElementById('resetModuleSelect').value;
+      var modules = Array.prototype.map.call(
+        document.querySelectorAll('#resetModuleList input[name="reset_modules[]"]:checked'),
+        function (box) { return box.value; }
+      );
       var isBeginning = document.getElementById('resetBeginningToggle').checked;
       var startDate = isBeginning ? null : (document.getElementById('resetStartDateInput').value || null);
+
+      if (!modules.length) {
+        notice.innerText = 'Select at least one module to reset.';
+        notice.classList.remove('hidden');
+        return;
+      }
+      if (!isBeginning && !startDate) {
+        notice.innerText = 'Pick a new sync start date, or tick "Reset completely from the beginning".';
+        notice.classList.remove('hidden');
+        return;
+      }
 
       btn.disabled = true;
       btn.innerHTML = '<svg class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Applying...';
@@ -459,7 +516,7 @@
         },
         body: JSON.stringify({
           office_id: officeId,
-          module: module,
+          modules: modules,
           start_date: startDate,
           last_primary_key: 0
         })

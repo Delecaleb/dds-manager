@@ -107,6 +107,36 @@ abstract class BaseQuerySyncService
         return $this;
     }
 
+    /**
+     * Make the next run of this date window re-pull the whole window.
+     *
+     * A windowed row keeps its cursor so an interrupted backfill resumes, but a
+     * completed one would otherwise run incrementally and fetch only rows edited
+     * since that pass. A new backfill request calls this so it re-reads every row
+     * in the window. A live run of the window is left untouched.
+     */
+    public function restartWindow(): void
+    {
+        if ($this->windowSuffix() === '') {
+            throw new Exception(static::class.'::restartWindow() needs a date window (see withDateWindow()).');
+        }
+
+        $staleBefore = now()->subSeconds((int) config('sync.stale_after_seconds', 600));
+
+        SyncLog::withoutGlobalScopes()
+            ->where('module', $this->module())
+            ->where(fn ($query) => $query->whereNull('status')
+                ->orWhere('status', '!=', 'running')
+                ->orWhere('updated_at', '<', $staleBefore))
+            ->update([
+                'last_synced_at' => null,
+                'last_primary_key' => 0,
+                'cycle_started_at' => null,
+                'status' => 'idle',
+                'run_token' => null,
+            ]);
+    }
+
     protected function module(): string
     {
         $officeId = $this->getOffice()->id ?? 1;
@@ -214,8 +244,11 @@ abstract class BaseQuerySyncService
             $clause .= " AND {$col} >= '".addslashes($this->windowStart)."'";
         }
 
+        // Exclusive next-day bound: the end date is a whole day, so datetime
+        // columns (AptDateTime, DateSent) keep rows later than midnight on it.
         if ($this->windowEnd !== null) {
-            $clause .= " AND {$col} <= '".addslashes($this->windowEnd)."'";
+            $dayAfterEnd = date('Y-m-d', strtotime($this->windowEnd.' +1 day'));
+            $clause .= " AND {$col} < '".addslashes($dayAfterEnd)."'";
         }
 
         return $clause;

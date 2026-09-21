@@ -25,4 +25,9 @@ class PayPlanChargeSyncService extends BaseQuerySyncService
     {
         return 'SecDateTEdit';
     }
+
+    protected function dateColumn(): ?string
+    {
+        return 'ChargeDate';
+    }
 }

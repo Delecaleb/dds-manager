@@ -21,8 +21,17 @@ class PaymentSyncService extends BaseQuerySyncService
         return 'PayNum';
     }
 
+    /**
+     * SecDateTEdit, not DateEntry: DateEntry is the creation date, so edits to an
+     * existing payment (amount, PayDate, splits re-balanced) would never re-sync.
+     */
     protected function syncColumn(): ?string
     {
-        return 'DateEntry';
+        return 'SecDateTEdit';
+    }
+
+    protected function dateColumn(): ?string
+    {
+        return 'PayDate';
     }
 }

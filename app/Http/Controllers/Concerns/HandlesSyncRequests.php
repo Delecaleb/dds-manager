@@ -31,16 +31,18 @@ trait HandlesSyncRequests
     protected function createSyncRequest(Request $request, SyncRequestRunner $runner, int $officeId): JsonResponse
     {
         $validated = $request->validate([
-            'module' => ['required', 'string', Rule::in($runner->acceptedModules())],
+            'module' => ['required_without:modules', 'string', Rule::in($runner->acceptedModules())],
+            'modules' => ['required_without:module', 'array', 'min:1'],
+            'modules.*' => ['string', Rule::in($runner->acceptedModules())],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'prune_deleted' => ['nullable', 'boolean'],
         ]);
 
         try {
-            $syncRequest = $runner->createAndQueue(
+            $syncRequests = $runner->createAndQueueMany(
                 $officeId,
-                $validated['module'],
+                $validated['modules'] ?? [$validated['module']],
                 $validated['start_date'] ?? null,
                 $validated['end_date'] ?? null,
                 (bool) ($validated['prune_deleted'] ?? false),
@@ -50,10 +52,15 @@ trait HandlesSyncRequests
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
+        $modules = implode(', ', array_map(fn (SyncRequest $syncRequest) => $syncRequest->module, $syncRequests));
+
         return response()->json([
             'success' => true,
-            'message' => "Server-to-server sync request queued for '{$syncRequest->module}'. It runs on the server — you can close this page.",
-            'sync_request' => $syncRequest,
+            'message' => count($syncRequests) === 1
+                ? "Server-to-server sync request queued for '{$modules}'. It runs on the server — you can close this page."
+                : count($syncRequests)." sync requests queued ({$modules}). They run on the server — you can close this page.",
+            'sync_request' => $syncRequests[0],
+            'sync_requests' => $syncRequests,
         ]);
     }
 
@@ -89,7 +96,9 @@ trait HandlesSyncRequests
     {
         $validated = $request->validate([
             'office_id' => ['nullable', 'integer', 'exists:offices,id'],
-            'module' => ['required', 'string'],
+            'module' => ['required_without:modules', 'string'],
+            'modules' => ['required_without:module', 'array', 'min:1'],
+            'modules.*' => ['string'],
             'start_date' => ['nullable', 'date'],
             'last_synced_at' => ['nullable', 'date'],
             'last_primary_key' => ['nullable', 'integer', 'min:0'],
@@ -100,7 +109,7 @@ trait HandlesSyncRequests
         $lastPrimaryKey = (int) ($validated['last_primary_key'] ?? 0);
 
         try {
-            $result = $checkpoints->resetForOffice($targetOfficeId, $validated['module'], $startDate, $lastPrimaryKey);
+            $result = $checkpoints->resetForOffice($targetOfficeId, $validated['modules'] ?? $validated['module'], $startDate, $lastPrimaryKey);
         } catch (InvalidArgumentException $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         } catch (RuntimeException $e) {

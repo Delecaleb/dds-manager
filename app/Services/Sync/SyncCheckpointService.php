@@ -64,21 +64,31 @@ class SyncCheckpointService
     /**
      * Reset sync checkpoint (start date / primary key) for an office.
      *
+     * $modules is one module, "all", or a list of modules. A single module that is
+     * running is an error; with several, running ones are skipped and reported.
+     *
+     * @param  string|list<string>  $modules
      * @return array{success: bool, message: string, reset_count: int, skipped_running: int, module: string, start_date: ?string}
      *
      * @throws InvalidArgumentException for an unknown office, date or module
-     * @throws RuntimeException when that module is running
+     * @throws RuntimeException when a single requested module is running
      */
-    public function resetForOffice(int $officeId, string $module, ?string $startDate, int $lastPrimaryKey = 0): array
+    public function resetForOffice(int $officeId, string|array $modules, ?string $startDate, int $lastPrimaryKey = 0): array
     {
         $office = Office::find($officeId) ?? throw new InvalidArgumentException("Office #{$officeId} does not exist.");
         $formattedDate = $this->formatDate($startDate);
-        $module = strtolower(trim($module));
-        $isAll = $module === 'all';
+        $modules = array_values(array_unique(array_map(fn (string $m) => strtolower(trim($m)), (array) $modules)));
+        $isAll = in_array('all', $modules, true);
+
+        if ($modules === []) {
+            throw new InvalidArgumentException('Select at least one module to reset.');
+        }
 
         $logModules = $isAll
             ? array_map(fn (string $key) => "office_{$officeId}:{$key}", array_keys($this->resettableModules()))
-            : [$this->resolveLogModule($officeId, $module)];
+            : array_values(array_unique(array_map(fn (string $m) => $this->resolveLogModule($officeId, $m), $modules)));
+        $isSingle = ! $isAll && count($logModules) === 1;
+        $module = $isAll ? 'all' : implode(', ', $modules);
 
         // Modules that never synced get a row so the chosen start date applies to their first run.
         foreach ($logModules as $logModule) {
@@ -107,7 +117,7 @@ class SyncCheckpointService
 
         $skippedRunning = count($logModules) - $resetCount;
 
-        if (! $isAll && $resetCount === 0) {
+        if ($isSingle && $resetCount === 0) {
             throw new RuntimeException("Cannot reset '{$module}' while its sync is running. Try again after it finishes.");
         }
 
@@ -115,10 +125,10 @@ class SyncCheckpointService
             ? 'records created or changed since '.substr($formattedDate, 0, 10)
             : 'a full scan from the first record';
 
-        $message = $isAll
-            ? "Reset {$resetCount} module(s) for '{$office->name}' to {$dateLabel}."
-                .($skippedRunning > 0 ? " {$skippedRunning} running module(s) were left unchanged; reset them after they finish." : '')
-            : "Reset '{$module}' for '{$office->name}' to {$dateLabel}.";
+        $message = $isSingle
+            ? "Reset '{$module}' for '{$office->name}' to {$dateLabel}."
+            : "Reset {$resetCount} module(s) for '{$office->name}' to {$dateLabel}."
+                .($skippedRunning > 0 ? " {$skippedRunning} running module(s) were left unchanged; reset them after they finish." : '');
 
         return [
             'success' => true,

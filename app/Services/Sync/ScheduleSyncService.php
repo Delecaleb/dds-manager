@@ -25,4 +25,9 @@ class ScheduleSyncService extends BaseQuerySyncService
     {
         return 'DateTStamp';
     }
+
+    protected function dateColumn(): ?string
+    {
+        return 'SchedDate';
+    }
 }

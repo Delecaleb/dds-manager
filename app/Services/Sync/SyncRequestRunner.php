@@ -30,29 +30,25 @@ class SyncRequestRunner
     public const OUTCOME_NOT_CLAIMED = 'not_claimed';
 
     /**
-     * Modules a date-range request may target → registry module key.
+     * Singular and legacy names still accepted for a registry module key.
      *
      * @var array<string, string>
      */
-    private const MODULES = [
-        'appointments' => 'appointments',
+    private const ALIASES = [
         'appointment' => 'appointments',
-        'procedurelogs' => 'procedurelogs',
         'procedurelog' => 'procedurelogs',
-        'patients' => 'patients',
         'patient' => 'patients',
-        'adjustments' => 'adjustments',
         'adjustment' => 'adjustments',
-        'payments' => 'payments',
         'payment' => 'payments',
-        'claimprocs' => 'claimprocs',
         'claimproc' => 'claimprocs',
         'treatmentplans' => 'treatment_plans',
         'treatmentplan' => 'treatment_plans',
-        'treatment_plans' => 'treatment_plans',
     ];
 
     public const ALL = 'all';
+
+    /** @var array<string, string>|null */
+    private ?array $rangeModules = null;
 
     public function __construct(
         private readonly SyncReportService $registry,
@@ -60,28 +56,73 @@ class SyncRequestRunner
     ) {}
 
     /**
+     * Registry modules that can be re-synced by date range (key => label).
+     *
+     * Derived from each sync service's dateColumn(), so a table gains range
+     * support by defining its business date there, not by editing a list here.
+     *
+     * @return array<string, string>
+     */
+    public function rangeModules(): array
+    {
+        if ($this->rangeModules !== null) {
+            return $this->rangeModules;
+        }
+
+        $modules = [];
+
+        foreach ($this->registry->getModuleDefinitions() as $key => $definition) {
+            $class = $definition['service_class'] ?? null;
+
+            if ($class && is_subclass_of($class, BaseQuerySyncService::class) && app($class)->describe()['date_column'] !== null) {
+                $modules[$key] = $definition['label'] ?? $key;
+            }
+        }
+
+        asort($modules);
+
+        return $this->rangeModules = $modules;
+    }
+
+    /**
      * @return list<string> accepted module values, for request validation
      */
     public function acceptedModules(): array
     {
-        return [...array_keys(self::MODULES), self::ALL];
+        return [...array_keys($this->rangeModules()), ...array_keys(self::ALIASES), self::ALL];
     }
 
     /**
-     * Create a date-range request and queue it. Used by every UI entry point.
+     * Create one queued request per module. Every module is validated first,
+     * so an unknown module creates nothing.
+     *
+     * @param  list<string>  $modules
+     * @return list<SyncRequest>
+     */
+    public function createAndQueueMany(int $officeId, array $modules, ?string $startDate, ?string $endDate, bool $pruneDeleted, ?int $userId): array
+    {
+        $moduleKeys = array_values(array_unique(array_merge(
+            ...array_map(fn (string $module) => $this->moduleKeysFor($module), $modules)
+        )));
+
+        return array_map(
+            fn (string $moduleKey) => $this->createAndQueue($officeId, $moduleKey, $startDate, $endDate, $pruneDeleted, $userId),
+            $moduleKeys
+        );
+    }
+
+    /**
+     * Create a date-range request and queue it.
      */
     public function createAndQueue(int $officeId, string $module, ?string $startDate, ?string $endDate, bool $pruneDeleted, ?int $userId): SyncRequest
     {
         $moduleKeys = $this->moduleKeysFor($module);
 
-        // Fail at creation, not minutes later in the worker: a single module
-        // without a business date cannot honour a date range.
-        if (($startDate || $endDate) && count($moduleKeys) === 1) {
-            $meta = app($this->registry->serviceClassFor($moduleKeys[0]))->describe();
+        $startDate = $startDate ? date('Y-m-d', strtotime($startDate)) : null;
+        $endDate = $endDate ? date('Y-m-d', strtotime($endDate)) : null;
 
-            if ($meta['date_column'] === null) {
-                throw new InvalidArgumentException("'{$module}' cannot be synced by date range. Leave the dates empty to sync it in full.");
-            }
+        if ($startDate || $endDate) {
+            $this->restartWindows($officeId, $moduleKeys, $startDate, $endDate);
         }
 
         $request = SyncRequest::create([
@@ -97,6 +138,32 @@ class SyncRequestRunner
         $this->queue($request);
 
         return $request;
+    }
+
+    /**
+     * A new request re-reads its whole window, even if an earlier request for the
+     * same range completed (otherwise it would only fetch rows edited since then).
+     * Modules without a business date sync unwindowed, so they have nothing to restart.
+     *
+     * @param  list<string>  $moduleKeys
+     */
+    private function restartWindows(int $officeId, array $moduleKeys, ?string $startDate, ?string $endDate): void
+    {
+        $office = Office::find($officeId);
+
+        // A missing office is reported when the request runs.
+        if ($office === null) {
+            return;
+        }
+
+        foreach ($moduleKeys as $moduleKey) {
+            /** @var BaseQuerySyncService $service */
+            $service = app($this->registry->serviceClassFor($moduleKey))->forOffice($office);
+
+            if ($service->describe()['date_column'] !== null) {
+                $service->withDateWindow($startDate, $endDate)->restartWindow();
+            }
+        }
     }
 
     /**
@@ -216,11 +283,13 @@ class SyncRequestRunner
         $module = strtolower(trim($module));
 
         if ($module === self::ALL) {
-            return array_values(array_unique(self::MODULES));
+            return array_keys($this->rangeModules());
         }
 
-        return isset(self::MODULES[$module])
-            ? [self::MODULES[$module]]
+        $moduleKey = self::ALIASES[$module] ?? $module;
+
+        return isset($this->rangeModules()[$moduleKey])
+            ? [$moduleKey]
             : throw new InvalidArgumentException("Unknown sync module '{$module}'.");
     }
 

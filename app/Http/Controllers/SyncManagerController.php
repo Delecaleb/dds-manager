@@ -17,7 +17,7 @@ class SyncManagerController extends Controller
     /**
      * Display the standalone Sync Manager page.
      */
-    public function index(SyncCheckpointService $checkpoints): View
+    public function index(SyncCheckpointService $checkpoints, SyncRequestRunner $runner): View
     {
         $currentOffice = Office::getActiveOffice() ?? Office::first();
         $offices = Office::where('is_active', true)->orderBy('id')->get();
@@ -25,21 +25,10 @@ class SyncManagerController extends Controller
             $offices = Office::orderBy('id')->get();
         }
 
-        $modules = [
-            'appointments' => 'Appointments',
-            'procedurelogs' => 'Procedures',
-            'patients' => 'Patients',
-            'adjustments' => 'Adjustments',
-            'payments' => 'Payments',
-            'claimprocs' => 'Insurance Claims',
-            'treatmentplans' => 'Treatment Plans',
-            'all' => 'All Modules',
-        ];
-
         return view('sync_manager.index', [
             'currentOffice' => $currentOffice,
             'offices' => $offices,
-            'modules' => $modules,
+            'modules' => $runner->rangeModules(),
             'resetModules' => $checkpoints->resettableModules(),
         ]);
     }

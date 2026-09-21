@@ -25,4 +25,9 @@ class RecallSyncService extends BaseQuerySyncService
     {
         return 'DateTStamp';
     }
+
+    protected function dateColumn(): ?string
+    {
+        return 'DateDue';
+    }
 }
