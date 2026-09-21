@@ -312,7 +312,11 @@ class SyncRequestRunner
             }
 
             // Queued like scheduled prunes: chunked, resumable, mass-delete guarded.
-            if ($startDate && $endDate) {
+            // "From a date, no end" checks from that date through the upcoming
+            // schedule — not every record ever synced (one API call per 500 rows).
+            if ($startDate) {
+                $endDate ??= now()->addDays((int) config('sync.prune.rolling_future_days', 90))->toDateString();
+
                 PruneOfficeTable::dispatch((int) $office->id, $table, HardDeleteSyncService::MODE_RANGE, $startDate, $endDate);
             } else {
                 PruneOfficeTable::dispatch((int) $office->id, $table, HardDeleteSyncService::MODE_FULL);
