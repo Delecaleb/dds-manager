@@ -703,6 +703,7 @@ class FinancialController extends Controller
         $rows = DB::select("
             SELECT
                 p.PatNum                                      AS patient_id,
+                pl.office_id                                  AS office_id,
                 {$patNameExpr}                                AS patient_name,
                 {$provIdExpr}                                 AS provider_ids,
                 {$provNameExpr}                               AS providers,
@@ -714,7 +715,7 @@ class FinancialController extends Controller
             WHERE {$scopeSql}
               AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
-            GROUP BY p.PatNum, p.LName, p.FName,
+            GROUP BY p.PatNum, pl.office_id, p.LName, p.FName,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
                      pl.ProcDate
             HAVING SUM(pl.ProcFee) != 0
@@ -725,6 +726,7 @@ class FinancialController extends Controller
 
         return array_values(array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
+            'office_id' => (int) $r->office_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
             'providers' => $r->providers,
@@ -748,10 +750,11 @@ class FinancialController extends Controller
         [$cpSql, $cpBindings] = $this->buildScopeSql($scopes, 'cp');
 
         $rows = DB::select("
-            SELECT patient_id, patient_name, provider_ids, providers, dates, amount
+            SELECT patient_id, office_id, patient_name, provider_ids, providers, dates, amount
             FROM (
                 SELECT
                     p.PatNum                                          AS patient_id,
+                    pl.office_id                                      AS office_id,
                     {$patNameExpr}                                    AS patient_name,
                     {$provIdExpr}                                     AS provider_ids,
                     {$provNameExpr}                                   AS providers,
@@ -763,13 +766,14 @@ class FinancialController extends Controller
                 WHERE {$plSql}
                   AND pl.ProcStatus IN ({$this->completedIn})
                   AND pl.ProcDate BETWEEN ? AND ?
-                GROUP BY p.PatNum, p.LName, p.FName,
+                GROUP BY p.PatNum, pl.office_id, p.LName, p.FName,
                          pr.ProvNum, pr.Abbr, pr.LName, pr.PName, pl.ProcDate
 
                 UNION ALL
 
                 SELECT
                     p.PatNum                                          AS patient_id,
+                    a.office_id                                       AS office_id,
                     {$patNameExpr}                                    AS patient_name,
                     COALESCE({$provIdExpr}, '')                       AS provider_ids,
                     COALESCE({$provNameExpr}, '')                     AS providers,
@@ -780,13 +784,14 @@ class FinancialController extends Controller
                 LEFT JOIN od_providers pr ON a.ProvNum = pr.ProvNum AND pr.office_id = a.office_id
                 WHERE {$aSql}
                   AND a.AdjDate BETWEEN ? AND ?
-                GROUP BY p.PatNum, p.LName, p.FName,
+                GROUP BY p.PatNum, a.office_id, p.LName, p.FName,
                          pr.ProvNum, pr.Abbr, pr.LName, pr.PName, a.AdjDate
 
                 UNION ALL
 
                 SELECT
                     p.PatNum                                          AS patient_id,
+                    cp.office_id                                      AS office_id,
                     {$patNameExpr}                                    AS patient_name,
                     COALESCE({$provIdExpr}, '')                       AS provider_ids,
                     COALESCE({$provNameExpr}, '')                     AS providers,
@@ -798,7 +803,7 @@ class FinancialController extends Controller
                 WHERE {$cpSql}
                   AND cp.ProcDate BETWEEN ? AND ?
                   AND cp.WriteOff <> 0
-                GROUP BY p.PatNum, p.LName, p.FName,
+                GROUP BY p.PatNum, cp.office_id, p.LName, p.FName,
                          pr.ProvNum, pr.Abbr, pr.LName, pr.PName, cp.ProcDate
             ) combined
             ORDER BY dates, patient_name
@@ -806,6 +811,7 @@ class FinancialController extends Controller
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
+            'office_id' => (int) $r->office_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
             'providers' => $r->providers,
@@ -836,6 +842,7 @@ class FinancialController extends Controller
         $rows = DB::select("
             SELECT
                 p.PatNum                                          AS patient_id,
+                a.office_id                                       AS office_id,
                 {$patNameExpr}                                    AS patient_name,
                 COALESCE({$provIdExpr}, '')                       AS provider_ids,
                 COALESCE({$provNameExpr}, '')                     AS providers,
@@ -848,7 +855,7 @@ class FinancialController extends Controller
             LEFT JOIN od_providers pr ON a.ProvNum = pr.ProvNum AND pr.office_id = a.office_id
             WHERE {$aSql}
               AND a.AdjDate BETWEEN ? AND ?
-            GROUP BY p.PatNum, p.LName, p.FName,
+            GROUP BY p.PatNum, a.office_id, p.LName, p.FName,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
                      a.AdjDate, a.AdjType
 
@@ -856,6 +863,7 @@ class FinancialController extends Controller
 
             SELECT
                 p.PatNum                                          AS patient_id,
+                cp.office_id                                      AS office_id,
                 COALESCE({$patNameExpr}, 'Insurance Payment')     AS patient_name,
                 COALESCE({$provIdExpr}, '')                       AS provider_ids,
                 COALESCE({$provNameExpr}, '')                     AS providers,
@@ -869,7 +877,7 @@ class FinancialController extends Controller
             WHERE {$cpSql}
               AND cp.ProcDate BETWEEN ? AND ?
               AND cp.WriteOff <> 0
-            GROUP BY p.PatNum, p.LName, p.FName,
+            GROUP BY p.PatNum, cp.office_id, p.LName, p.FName,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName, cp.ProcDate
 
             ORDER BY dates, patient_name
@@ -877,6 +885,7 @@ class FinancialController extends Controller
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
+            'office_id' => (int) $r->office_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
             'providers' => $r->providers,
@@ -904,6 +913,7 @@ class FinancialController extends Controller
         $rows = DB::select("
             SELECT
                 COALESCE(p.PatNum, ps.PatNum, 0)                  AS patient_id,
+                ps.office_id                                      AS office_id,
                 COALESCE({$patNameExpr}, 'Patient Payment')       AS patient_name,
                 COALESCE({$provIdExpr}, '')                       AS provider_ids,
                 COALESCE({$provNameExpr}, '')                     AS providers,
@@ -914,7 +924,7 @@ class FinancialController extends Controller
             LEFT JOIN od_providers pr ON ps.ProvNum = pr.ProvNum AND pr.office_id = ps.office_id
             WHERE {$psSql}
               AND ps.DatePay BETWEEN ? AND ?
-            GROUP BY p.PatNum, ps.PatNum, p.LName, p.FName,
+            GROUP BY p.PatNum, ps.PatNum, ps.office_id, p.LName, p.FName,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
                      ps.DatePay
 
@@ -922,6 +932,7 @@ class FinancialController extends Controller
 
             SELECT
                 COALESCE(p.PatNum, cp.PatNum, 0)                 AS patient_id,
+                cp_pay.office_id                                  AS office_id,
                 COALESCE({$patNameExpr}, 'Insurance Payment')     AS patient_name,
                 COALESCE({$provIdExpr}, '')                       AS provider_ids,
                 COALESCE({$provNameExpr}, '')                     AS providers,
@@ -934,7 +945,7 @@ class FinancialController extends Controller
             WHERE {$cpPaySql}
               AND cp_pay.CheckDate BETWEEN ? AND ?
               AND cp.InsPayAmt != 0
-            GROUP BY p.PatNum, p.LName, p.FName,
+            GROUP BY p.PatNum, cp_pay.office_id, p.LName, p.FName,
                      cp.PatNum,
                      pr.ProvNum, pr.Abbr, pr.LName, pr.PName,
                      cp_pay.CheckDate
@@ -944,6 +955,7 @@ class FinancialController extends Controller
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
+            'office_id' => (int) $r->office_id,
             'patient_name' => $r->patient_name,
             'provider_ids' => $r->provider_ids,
             'providers' => $r->providers,
@@ -994,6 +1006,7 @@ class FinancialController extends Controller
         $rows = DB::select("
             SELECT
                 a.PatNum                                                              AS patient_id,
+                a.office_id                                                           AS office_id,
                 {$nameExpr}                                                          AS patient_name,
                 {$dateConcat}                                                         AS dates,
                 COUNT(DISTINCT DATE(a.AptDateTime))                                   AS count
@@ -1002,12 +1015,13 @@ class FinancialController extends Controller
             WHERE {$scopeSql}
               AND a.AptDateTime BETWEEN ? AND ?
               AND a.AptStatus IN (1, 2)
-            GROUP BY a.PatNum, p.LName, p.FName
+            GROUP BY a.PatNum, a.office_id, p.LName, p.FName
             ORDER BY count DESC, p.LName
         ", array_merge($scopeBindings, [$startDate, $endDate]));
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
+            'office_id' => (int) $r->office_id,
             'patient_name' => $r->patient_name,
             'dates' => $r->dates,
             'count' => (int) $r->count,
@@ -1030,6 +1044,7 @@ class FinancialController extends Controller
         $rows = DB::select("
             SELECT
                 a.PatNum                                             AS patient_id,
+                a.office_id                                          AS office_id,
                 {$nameExpr}                                          AS patient_name,
                 {$dateExpr}                                          AS dates,
                 1                                                   AS count
@@ -1055,12 +1070,13 @@ class FinancialController extends Controller
                     AND pl_old.ProcDate < ?
                     AND pl_old.ProcStatus IN ('C', '2', 'D')
               )
-            GROUP BY a.PatNum, p.LName, p.FName
+            GROUP BY a.PatNum, a.office_id, p.LName, p.FName
             ORDER BY p.LName
         ", array_merge($scopeBindings, [$start.' 00:00:00', $end.' 23:59:59', $start.' 00:00:00', $start]));
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
+            'office_id' => (int) $r->office_id,
             'patient_name' => $r->patient_name,
             'dates' => $r->dates,
             'count' => (int) $r->count,
@@ -1080,6 +1096,7 @@ class FinancialController extends Controller
         $rows = DB::select("
             SELECT
                 p.PatNum                         AS patient_id,
+                pl.office_id                     AS office_id,
                 {$nameExpr}                      AS patient_name,
                 COUNT(DISTINCT pl.ProcDate)       AS count,
                 SUM(pl.ProcFee)                  AS amount
@@ -1088,12 +1105,13 @@ class FinancialController extends Controller
             WHERE {$scopeSql}
               AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
-            GROUP BY p.PatNum, p.LName, p.FName
+            GROUP BY p.PatNum, pl.office_id, p.LName, p.FName
             ORDER BY p.LName
         ", array_merge($scopeBindings, [$start, $end]));
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
+            'office_id' => (int) $r->office_id,
             'patient_name' => $r->patient_name,
             'count' => (int) $r->count,
             'amount' => round((float) $r->amount, 2),
@@ -1113,6 +1131,7 @@ class FinancialController extends Controller
         $rows = DB::select("
             SELECT
                 p.PatNum                         AS patient_id,
+                pl.office_id                     AS office_id,
                 {$nameExpr}                      AS patient_name,
                 pl.ProcDate                      AS dates,
                 pc.ProcCode                      AS service_codes
@@ -1128,6 +1147,7 @@ class FinancialController extends Controller
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
+            'office_id' => (int) $r->office_id,
             'patient_name' => $r->patient_name,
             'dates' => $r->dates,
             'type' => $r->service_codes === 'D9986' ? 'No-Show' : 'Cancelled',

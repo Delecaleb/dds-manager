@@ -204,6 +204,7 @@ class PatientVisitService
             sort($g['service_codes_arr']);
             $out[] = [
                 'patient_id' => $g['patient_id'],
+                'office_id' => (int) $officeId,
                 'patient_name' => $g['patient_name'],
                 'dates' => $g['dates'],
                 'service_codes' => implode(', ', $g['service_codes_arr']),
@@ -291,6 +292,7 @@ class PatientVisitService
         $rows = DB::select("
             SELECT
                 p.PatNum                         AS patient_id,
+                pl.office_id                     AS office_id,
                 {$nameExpr}                      AS patient_name,
                 {$dateConcat}                    AS dates,
                 COUNT(DISTINCT DATE(pl.ProcDate)) AS count
@@ -302,12 +304,13 @@ class PatientVisitService
               AND pl.ProcDate BETWEEN ? AND ?
               {$clinicFilter}
               {$provFilter}
-            GROUP BY p.PatNum, p.LName, p.FName
+            GROUP BY p.PatNum, pl.office_id, p.LName, p.FName
             ORDER BY count DESC, p.LName
         ", [$officeId, $officeId, $start, $end]);
 
         return array_map(fn ($r) => [
             'patient_id' => $r->patient_id,
+            'office_id' => (int) ($r->office_id ?? $officeId),
             'patient_name' => $r->patient_name,
             'dates' => $r->dates,
             'count' => (int) $r->count,

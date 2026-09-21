@@ -253,7 +253,17 @@ class PatientController extends Controller
 
     public function show($id, Request $request)
     {
-        $patient = OdPatient::withoutGlobalScopes()->where('PatNum', $id)->first();
+        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : Office::getActiveOfficeId();
+
+        $patientQuery = OdPatient::withoutGlobalScopes()->where('PatNum', $id);
+        if ($officeId) {
+            $patientQuery->where('office_id', $officeId);
+        }
+        $patient = $patientQuery->first();
+
+        if (! $patient && $officeId) {
+            $patient = OdPatient::withoutGlobalScopes()->where('PatNum', $id)->first();
+        }
 
         if (! $patient) {
             if ($request->expectsJson() || $request->ajax()) {
@@ -264,8 +274,9 @@ class PatientController extends Controller
 
         if (! $request->expectsJson() && ! $request->ajax()) {
             return redirect()->route('patients.index', ['open_patient_id' => $id]);
-
         }
+
+        $patientOfficeId = (int) $patient->office_id;
 
         $dobStr = $patient->Birthdate ?? null;
         $age = 'N/A';
@@ -285,9 +296,18 @@ class PatientController extends Controller
         $statusRaw = $patient->PatStatus ?? '';
         $status = is_numeric($statusRaw) ? ($statusMap[intval($statusRaw)] ?? 'Active') : ($statusRaw ?: 'Active');
 
-        $patientAppointments = OdAppointment::where('PatNum', $id)->get();
-        $patientProcedures = OdProcedureLog::where('PatNum', $id)->get();
-        $provMap = OdProvider::all()->pluck('LName', 'ProvNum')->toArray();
+        $patientAppointments = OdAppointment::withoutGlobalScopes()
+            ->where('office_id', $patientOfficeId)
+            ->where('PatNum', $id)
+            ->get();
+        $patientProcedures = OdProcedureLog::withoutGlobalScopes()
+            ->where('office_id', $patientOfficeId)
+            ->where('PatNum', $id)
+            ->get();
+        $provMap = OdProvider::withoutGlobalScopes()
+            ->where('office_id', $patientOfficeId)
+            ->pluck('LName', 'ProvNum')
+            ->toArray();
 
         $nowStr = now()->format('Y-m-d H:i:s');
 
@@ -317,7 +337,10 @@ class PatientController extends Controller
         $scheduledTPFee = floatval($scheduledTP->sum('ProcFee'));
         $unscheduledTPFee = floatval($unscheduledTP->sum('ProcFee'));
 
-        $codeMap = OdProcedure::all()->keyBy('CodeNum');
+        $codeMap = OdProcedure::withoutGlobalScopes()
+            ->where('office_id', $patientOfficeId)
+            ->get()
+            ->keyBy('CodeNum');
 
         $ledgerItems = [];
         foreach ($patientProcedures->whereIn('ProcStatus', ProcStatus::completed()) as $proc) {
@@ -343,20 +366,22 @@ class PatientController extends Controller
 
         usort($ledgerItems, fn ($a, $b) => $b['timestamp'] <=> $a['timestamp']);
 
-        $provMap = OdProvider::all()->mapWithKeys(function ($p) {
-            $name = trim(($p->LName ?? '').($p->FName ? ', '.$p->FName : ''));
+        $provMapFormatted = OdProvider::withoutGlobalScopes()
+            ->where('office_id', $patientOfficeId)
+            ->get()
+            ->mapWithKeys(function ($p) {
+                $name = trim(($p->LName ?? '').($p->FName ? ', '.$p->FName : ''));
 
-            return [$p->ProvNum => $name ?: ($p->Abbr ?? '—')];
-        })->toArray();
+                return [$p->ProvNum => $name ?: ($p->Abbr ?? '—')];
+            })->toArray();
 
-        $codeMap = OdProcedure::all()->keyBy('CodeNum');
-
-        $txplansItems = $this->getPatientTxPlans($id, $patientProcedures, $patientAppointments, $provMap, $codeMap);
+        $txplansItems = $this->getPatientTxPlans($id, $patientProcedures, $patientAppointments, $provMapFormatted, $codeMap, $patientOfficeId);
 
         $notes = $patient->AddrNote ?? 'No activities or notes available.';
 
         return response()->json([
             'id' => $patient->PatNum,
+            'office_id' => $patientOfficeId,
             'name' => ($patient->LName ?? '').', '.($patient->FName ?? ''),
             'age' => $age,
             'gender' => $gender,
@@ -409,23 +434,38 @@ class PatientController extends Controller
         ]);
     }
 
-    public function showTreatment($patientId)
+    public function showTreatment($patientId, Request $request)
     {
-        $items = $this->getPatientTxPlans($patientId);
+        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : Office::getActiveOfficeId();
+        $items = $this->getPatientTxPlans($patientId, null, null, null, null, $officeId);
 
         return response()->json($items);
     }
 
-    private function getPatientTxPlans($patientId, $procedures = null, $appointments = null, $provMap = null, $codeMap = null): array
+    private function getPatientTxPlans($patientId, $procedures = null, $appointments = null, $provMap = null, $codeMap = null, ?int $officeId = null): array
     {
-        $planNums = TreatmentPlan::where('PatNum', $patientId)->pluck('TreatPlanNum');
-        $attachedProcNums = OdTreatmentPlanAttachments::whereIn('TreatPlanNum', $planNums)
-            ->pluck('ProcNum')
+        $officeId = $officeId ?? Office::getActiveOfficeId();
+
+        $planQuery = TreatmentPlan::withoutGlobalScopes()->where('PatNum', $patientId);
+        if ($officeId) {
+            $planQuery->where('office_id', $officeId);
+        }
+        $planNums = $planQuery->pluck('TreatPlanNum');
+
+        $attQuery = OdTreatmentPlanAttachments::withoutGlobalScopes()->whereIn('TreatPlanNum', $planNums);
+        if ($officeId) {
+            $attQuery->where('office_id', $officeId);
+        }
+        $attachedProcNums = $attQuery->pluck('ProcNum')
             ->filter()
             ->unique();
 
         if ($procedures === null) {
-            $procedures = OdProcedureLog::where('PatNum', $patientId)
+            $procQuery = OdProcedureLog::withoutGlobalScopes()->where('PatNum', $patientId);
+            if ($officeId) {
+                $procQuery->where('office_id', $officeId);
+            }
+            $procedures = $procQuery
                 ->where(function ($query) use ($attachedProcNums) {
                     $query->whereIn('ProcStatus', ProcStatus::TREATMENT_PLANNED)
                         ->orWhere(function ($q) {
@@ -446,7 +486,11 @@ class PatientController extends Controller
         }
 
         if ($provMap === null) {
-            $provMap = OdProvider::all()->mapWithKeys(function ($p) {
+            $provQuery = OdProvider::withoutGlobalScopes();
+            if ($officeId) {
+                $provQuery->where('office_id', $officeId);
+            }
+            $provMap = $provQuery->get()->mapWithKeys(function ($p) {
                 $name = trim(($p->LName ?? '').($p->FName ? ', '.$p->FName : ''));
 
                 return [$p->ProvNum => $name ?: ($p->Abbr ?? '—')];
@@ -454,15 +498,27 @@ class PatientController extends Controller
         }
 
         if ($codeMap === null) {
-            $codeMap = OdProcedure::all()->keyBy('CodeNum');
+            $codeQuery = OdProcedure::withoutGlobalScopes();
+            if ($officeId) {
+                $codeQuery->where('office_id', $officeId);
+            }
+            $codeMap = $codeQuery->get()->keyBy('CodeNum');
         }
 
         if ($appointments === null) {
             $aptNums = $procedures->pluck('AptNum')->filter(fn ($aptNum) => ($aptNum ?? 0) > 0)->unique();
-            $appointments = OdAppointment::whereIn('AptNum', $aptNums)->get()->keyBy('AptNum');
+            $aptQuery = OdAppointment::withoutGlobalScopes()->whereIn('AptNum', $aptNums);
+            if ($officeId) {
+                $aptQuery->where('office_id', $officeId);
+            }
+            $appointments = $aptQuery->get()->keyBy('AptNum');
         }
 
-        $firstTp = TreatmentPlan::where('PatNum', $patientId)->orderBy('DateTP')->first();
+        $firstTpQuery = TreatmentPlan::withoutGlobalScopes()->where('PatNum', $patientId)->orderBy('DateTP');
+        if ($officeId) {
+            $firstTpQuery->where('office_id', $officeId);
+        }
+        $firstTp = $firstTpQuery->first();
         $masterTpDate = ($firstTp && ! empty($firstTp->DateTP) && $firstTp->DateTP !== '0001-01-01')
             ? date('M d, Y', strtotime($firstTp->DateTP))
             : null;
@@ -566,9 +622,18 @@ class PatientController extends Controller
         return $items;
     }
 
-    public function showFamily($patientId)
+    public function showFamily($patientId, Request $request)
     {
-        $patient = OdPatient::withoutGlobalScopes()->where('PatNum', $patientId)->first();
+        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : Office::getActiveOfficeId();
+        $patientQuery = OdPatient::withoutGlobalScopes()->where('PatNum', $patientId);
+        if ($officeId) {
+            $patientQuery->where('office_id', $officeId);
+        }
+        $patient = $patientQuery->first();
+
+        if (! $patient && $officeId) {
+            $patient = OdPatient::withoutGlobalScopes()->where('PatNum', $patientId)->first();
+        }
 
         if (! $patient) {
             return response()->json([], 404);
@@ -589,8 +654,11 @@ class PatientController extends Controller
             ->where('Guarantor', $guarantorId)
             ->get();
 
-        return response()->json($familyMembers->map(function ($m) use ($genderMap, $statusMap, $nowStr) {
-            $mApts = OdAppointment::where('PatNum', $m->PatNum)->get();
+        return response()->json($familyMembers->map(function ($m) use ($genderMap, $statusMap, $nowStr, $patient) {
+            $mApts = OdAppointment::withoutGlobalScopes()
+                ->where('office_id', $patient->office_id)
+                ->where('PatNum', $m->PatNum)
+                ->get();
             $mNext = $mApts->filter(fn ($apt) => ($apt->AptDateTime ?? '') >= $nowStr)->sortBy('AptDateTime')->first();
             $mLast = $mApts->filter(fn ($apt) => ($apt->AptDateTime ?? '') < $nowStr)->sortByDesc('AptDateTime')->first();
 
@@ -610,9 +678,18 @@ class PatientController extends Controller
         })->values());
     }
 
-    public function showEmployer($patientId)
+    public function showEmployer($patientId, Request $request)
     {
-        $patient = OdPatient::withoutGlobalScopes()->where('PatNum', $patientId)->first();
+        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : Office::getActiveOfficeId();
+        $patientQuery = OdPatient::withoutGlobalScopes()->where('PatNum', $patientId);
+        if ($officeId) {
+            $patientQuery->where('office_id', $officeId);
+        }
+        $patient = $patientQuery->first();
+
+        if (! $patient && $officeId) {
+            $patient = OdPatient::withoutGlobalScopes()->where('PatNum', $patientId)->first();
+        }
 
         if (! $patient) {
             return response()->json(['name' => null], 404);
@@ -628,9 +705,18 @@ class PatientController extends Controller
         ]);
     }
 
-    public function showAR($patientId)
+    public function showAR($patientId, Request $request)
     {
-        $ar = OdPatientBalance::where('PatNum', $patientId)->first();
+        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : Office::getActiveOfficeId();
+        $arQuery = OdPatientBalance::withoutGlobalScopes()->where('PatNum', $patientId);
+        if ($officeId) {
+            $arQuery->where('office_id', $officeId);
+        }
+        $ar = $arQuery->first();
+
+        if (! $ar && $officeId) {
+            $ar = OdPatientBalance::withoutGlobalScopes()->where('PatNum', $patientId)->first();
+        }
 
         if (! $ar) {
             return response()->json([
@@ -659,15 +745,29 @@ class PatientController extends Controller
         ]);
     }
 
-    public function showArLive($patientId)
+    public function showArLive($patientId, Request $request)
     {
+        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : Office::getActiveOfficeId();
+
         // Fetch Live Aging Array from Service
         $ar = $this->ar->aging($patientId);
 
         // Fetch Live completed transactions for the sub-log
-        $patientProcedures = OdProcedureLog::where('PatNum', $patientId)->whereIn('ProcStatus', ProcStatus::completed())->get();
-        $provMap = OdProvider::all()->pluck('LName', 'ProvNum')->toArray();
-        $codeMap = OdProcedure::all()->keyBy('CodeNum');
+        $procQuery = OdProcedureLog::withoutGlobalScopes()
+            ->where('PatNum', $patientId)
+            ->whereIn('ProcStatus', ProcStatus::completed());
+        $provQuery = OdProvider::withoutGlobalScopes();
+        $codeQuery = OdProcedure::withoutGlobalScopes();
+
+        if ($officeId) {
+            $procQuery->where('office_id', $officeId);
+            $provQuery->where('office_id', $officeId);
+            $codeQuery->where('office_id', $officeId);
+        }
+
+        $patientProcedures = $procQuery->get();
+        $provMap = $provQuery->pluck('LName', 'ProvNum')->toArray();
+        $codeMap = $codeQuery->keyBy('CodeNum');
 
         $arTransactions = [];
         foreach ($patientProcedures as $proc) {
