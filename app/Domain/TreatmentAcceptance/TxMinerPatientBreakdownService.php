@@ -19,7 +19,9 @@ use Illuminate\Support\Facades\DB;
  *  - Population: every TP or completed procedure whose DateTP (the date it was
  *    treatment-planned) falls in the period, grouped by patient. ProcDate is NOT
  *    used — a procedure planned in July and completed in August belongs to July.
- *  - Tx Scheduled / Unscheduled: fee of those procedures still TP, split on AptNum.
+ *  - Tx Scheduled / Unscheduled: fee of those procedures still TP, split on whether
+ *    their appointment is still Scheduled (see TxScheduling — broken appointments
+ *    keep AptNum, so AptNum alone is not enough).
  *  - Completed TX $: fee of those procedures now completed.
  *  - Type: "New" when the patient's DateFirstVisit falls in the period.
  *  - Preferred Provider: the distinct ProvNums on those procedures.
@@ -41,10 +43,10 @@ class TxMinerPatientBreakdownService
      */
     public function patients(Builder $procedureScope, string $start, string $end, CarbonInterface $asOf): array
     {
-        $procs = (clone $procedureScope)
+        $procs = TxScheduling::joinScheduledAppointment(clone $procedureScope)
             ->whereBetween('pl.DateTP', [$start, $end])
             ->whereIn('pl.ProcStatus', [...ProcStatus::treatmentPlanned(), ...ProcStatus::completed()])
-            ->select(['pl.office_id', 'pl.ProcNum', 'pl.PatNum', 'pl.ProvNum', 'pl.ProcFee', 'pl.ProcStatus', 'pl.AptNum', 'pl.DateTP'])
+            ->select(['pl.office_id', 'pl.ProcNum', 'pl.PatNum', 'pl.ProvNum', 'pl.ProcFee', 'pl.ProcStatus', 'pl.DateTP', TxScheduling::scheduledAptColumn()])
             ->get();
 
         $rows = [];
@@ -92,7 +94,7 @@ class TxMinerPatientBreakdownService
 
                 if (in_array((string) $proc->ProcStatus, ProcStatus::completed(), true)) {
                     $completed += $fee;
-                } elseif ((int) $proc->AptNum !== 0) {
+                } elseif (TxScheduling::isScheduled($proc)) {
                     $scheduled += $fee;
                 } else {
                     $unscheduled += $fee;

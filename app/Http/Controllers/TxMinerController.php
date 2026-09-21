@@ -7,6 +7,7 @@ use App\Domain\Support\LocationSelection;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use App\Domain\TreatmentAcceptance\TxMinerPatientBreakdownService;
+use App\Domain\TreatmentAcceptance\TxScheduling;
 use App\Models\OdPatient;
 use App\Models\OdProvider;
 use App\Models\Office;
@@ -94,8 +95,7 @@ class TxMinerController extends Controller
 
             $query = $this->baseQuery($request, $clinicRegistry, $startDate, $endDate)
                 ->selectRaw("{$monthGroupSql} as month_group")
-                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
-                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND (pl.AptNum IS NULL OR pl.AptNum = 0 OR pl.AptNum = '0') THEN pl.ProcFee ELSE 0 END) as tx_unscheduled")
+                ->tap(fn (Builder $q) => $this->selectScheduleSplit($q, $tp))
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tpOrCompleted}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
                 ->selectRaw('COUNT(DISTINCT pl.PatNum) as tx_presented_count')
@@ -136,8 +136,7 @@ class TxMinerController extends Controller
 
             $query = $this->baseQuery($request, $clinicRegistry)
                 ->selectRaw("{$monthGroupSql} as month_group")
-                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
-                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND (pl.AptNum IS NULL OR pl.AptNum = 0 OR pl.AptNum = '0') THEN pl.ProcFee ELSE 0 END) as tx_unscheduled")
+                ->tap(fn (Builder $q) => $this->selectScheduleSplit($q, $tp))
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tpOrCompleted}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
                 ->selectRaw('COUNT(DISTINCT pl.PatNum) as tx_presented_count')
@@ -243,8 +242,7 @@ class TxMinerController extends Controller
 
         $query = $this->baseQuery($request, $clinicRegistry)
             ->selectRaw('pl.ProvNum')
-            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
-            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND (pl.AptNum IS NULL OR pl.AptNum = 0 OR pl.AptNum = '0') THEN pl.ProcFee ELSE 0 END) as tx_unscheduled")
+            ->tap(fn (Builder $q) => $this->selectScheduleSplit($q, $tp))
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tpOrCompleted}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
             ->selectRaw('COUNT(DISTINCT pl.PatNum) as tx_presented_count')
@@ -359,8 +357,7 @@ class TxMinerController extends Controller
 
         $query = $this->baseQuery($request, $clinicRegistry)
             ->selectRaw('pl.office_id, pl.ClinicNum')
-            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
-            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND (pl.AptNum IS NULL OR pl.AptNum = 0 OR pl.AptNum = '0') THEN pl.ProcFee ELSE 0 END) as tx_unscheduled")
+            ->tap(fn (Builder $q) => $this->selectScheduleSplit($q, $tp))
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tpOrCompleted}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
             ->selectRaw('COUNT(DISTINCT pl.PatNum) as tx_presented_count')
@@ -563,7 +560,7 @@ class TxMinerController extends Controller
         $officeId = $request->input('office_id');
         $month = $request->input('month');
 
-        $query = $this->baseQuery($request, $clinicRegistry);
+        $query = TxScheduling::joinScheduledAppointment($this->baseQuery($request, $clinicRegistry));
 
         // Scope to specific month if requested (e.g. '2026-07' or formatted 'July 2026')
         if ($month) {
@@ -598,16 +595,12 @@ class TxMinerController extends Controller
             case 'tx_scheduled':
                 $title = 'Tx Scheduled Breakdown';
                 $query->whereIn('pl.ProcStatus', ProcStatus::treatmentPlanned())
-                    ->whereNotNull('pl.AptNum')
-                    ->whereNotIn('pl.AptNum', [0, '0']);
+                    ->whereRaw(TxScheduling::scheduledSql());
                 break;
             case 'tx_unscheduled':
                 $title = 'Tx Unscheduled Breakdown';
                 $query->whereIn('pl.ProcStatus', ProcStatus::treatmentPlanned())
-                    ->where(function ($q) {
-                        $q->whereNull('pl.AptNum')
-                            ->orWhereIn('pl.AptNum', [0, '0']);
-                    });
+                    ->whereRaw(TxScheduling::unscheduledSql());
                 break;
             case 'completed_tx':
                 $title = 'Completed Tx Breakdown';
@@ -660,7 +653,7 @@ class TxMinerController extends Controller
                 'pl.Surf',
                 'pl.ToothNum',
                 'pl.ProcStatus',
-                'pl.AptNum',
+                TxScheduling::scheduledAptColumn(),
                 'pc_drill.ProcCode',
                 'pc_drill.Descript as proc_descript',
             ])
@@ -712,11 +705,9 @@ class TxMinerController extends Controller
                 : ($log->ProvNum ? 'Provider '.$log->ProvNum : 'Unassigned');
 
             $isCompleted = in_array((string) $log->ProcStatus, ProcStatus::completed(), true);
-            $isScheduled = ! empty($log->AptNum) && $log->AptNum !== '0' && $log->AptNum !== 0;
-
             $statusText = $isCompleted
                 ? 'Completed'
-                : ($isScheduled ? 'Scheduled' : 'Unscheduled');
+                : (TxScheduling::isScheduled($log) ? 'Scheduled' : 'Unscheduled');
 
             $toothSurf = trim(($log->ToothNum ?? '').($log->Surf ? ' / '.$log->Surf : ''));
 
@@ -885,6 +876,21 @@ class TxMinerController extends Controller
     /**
      * Shared Base Query with comprehensive multi-parameter filtering.
      */
+    /**
+     * Add the tx_scheduled / tx_unscheduled SUMs (rule lives in TxScheduling).
+     *
+     * @param  string  $tpList  quoted treatment-planned status list for SQL IN (...)
+     */
+    private function selectScheduleSplit(Builder $query, string $tpList): void
+    {
+        $scheduled = TxScheduling::scheduledSql();
+        $unscheduled = TxScheduling::unscheduledSql();
+
+        TxScheduling::joinScheduledAppointment($query)
+            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tpList}) AND {$scheduled} THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
+            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tpList}) AND {$unscheduled} THEN pl.ProcFee ELSE 0 END) as tx_unscheduled");
+    }
+
     protected function baseQuery(Request $request, ClinicRegistry $clinicRegistry, ?string $overrideStartDate = null, ?string $overrideEndDate = null): Builder
     {
         $validStatuses = [...ProcStatus::treatmentPlanned(), ...ProcStatus::completed()];
