@@ -40,6 +40,26 @@
       </div>
 
       <form id="syncManagerForm" onsubmit="submitSyncManagerForm(event)" class="space-y-4">
+        <!-- Offices -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Offices</label>
+            <span class="flex items-center gap-2 text-[11px] font-semibold">
+              <button type="button" onclick="setAllSyncOffices(true)" class="text-amber-700 hover:underline">Select all</button>
+              <span class="text-slate-300">|</span>
+              <button type="button" onclick="setAllSyncOffices(false)" class="text-slate-500 hover:underline">Clear</button>
+            </span>
+          </div>
+          <div id="smOfficeList" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-2 bg-slate-50 border border-slate-300 rounded-xl p-3.5">
+            @foreach($offices as $office)
+              <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700">
+                <input type="checkbox" name="sync_offices[]" value="{{ $office->id }}" @if($office->id == ($currentOffice->id ?? null)) checked @endif class="w-4 h-4 text-amber-600 border-slate-300 rounded focus:ring-amber-500">
+                <span>{{ $office->name }}</span>
+              </label>
+            @endforeach
+          </div>
+        </div>
+
         <!-- Modules / Data Types -->
         <div>
           <div class="flex items-center justify-between mb-1.5">
@@ -107,6 +127,7 @@
           <thead class="text-xs uppercase bg-slate-100/80 text-slate-600 font-bold border-b border-slate-200">
             <tr>
               <th class="px-4 py-3.5">Job ID</th>
+              <th class="px-4 py-3.5">Office</th>
               <th class="px-4 py-3.5">Data Type</th>
               <th class="px-4 py-3.5">Date Range</th>
               <th class="px-4 py-3.5">Clean Deleted</th>
@@ -118,7 +139,7 @@
           </thead>
           <tbody id="smRequestsTbody" class="divide-y divide-slate-100 font-medium">
             <tr>
-              <td colspan="8" class="p-8 text-center text-slate-400 text-sm">Loading sync activity...</td>
+              <td colspan="9" class="p-8 text-center text-slate-400 text-sm">Loading sync activity...</td>
             </tr>
           </tbody>
         </table>
@@ -275,7 +296,7 @@
         .then(function (r) { return r.json(); })
         .then(function (res) {
           if (!res.requests || !res.requests.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 text-sm">No recent sync activity logged.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-slate-400 text-sm">No recent sync activity logged.</td></tr>';
             return;
           }
 
@@ -307,6 +328,7 @@
 
             return '<tr>' +
               '<td class="px-4 py-3.5 font-bold text-slate-800">#' + req.id + '</td>' +
+              '<td class="px-4 py-3.5 text-xs font-semibold text-slate-700">' + escHtml(req.office ? req.office.name : ('#' + req.office_id)) + '</td>' +
               '<td class="px-4 py-3.5 font-extrabold text-slate-900">' + escHtml(moduleLabel) + '</td>' +
               '<td class="px-4 py-3.5 text-xs text-slate-600">' + windowStr + '</td>' +
               '<td class="px-4 py-3.5 text-xs">' + pruneStr + '</td>' +
@@ -325,6 +347,10 @@
       document.querySelectorAll('#smModuleList input[name="sync_modules[]"]').forEach(function (box) { box.checked = checked; });
     }
 
+    function setAllSyncOffices(checked) {
+      document.querySelectorAll('#smOfficeList input[name="sync_offices[]"]').forEach(function (box) { box.checked = checked; });
+    }
+
     function submitSyncManagerForm(e) {
       e.preventDefault();
       var btn = document.getElementById('smSubmitBtn');
@@ -333,8 +359,17 @@
         document.querySelectorAll('#smModuleList input[name="sync_modules[]"]:checked'),
         function (box) { return box.value; }
       );
+      var officeIds = Array.prototype.map.call(
+        document.querySelectorAll('#smOfficeList input[name="sync_offices[]"]:checked'),
+        function (box) { return Number(box.value); }
+      );
 
       notice.classList.add('hidden');
+      if (!officeIds.length) {
+        notice.innerText = 'Tick at least one office to resync.';
+        notice.classList.remove('hidden');
+        return;
+      }
       if (!modules.length) {
         notice.innerText = 'Tick at least one data type to resync.';
         notice.classList.remove('hidden');
@@ -352,6 +387,7 @@
           'X-CSRF-TOKEN': '{{ csrf_token() }}'
         },
         body: JSON.stringify({
+          office_ids: officeIds,
           modules: modules,
           start_date: document.getElementById('smStartDate').value || null,
           end_date: document.getElementById('smEndDate').value || null,

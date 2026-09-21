@@ -17,20 +17,29 @@ use RuntimeException;
  */
 trait HandlesSyncRequests
 {
-    protected function listSyncRequests(int $officeId): JsonResponse
+    /**
+     * @param  int|null  $officeId  null lists every office (Sync Manager queues for several at once)
+     */
+    protected function listSyncRequests(?int $officeId): JsonResponse
     {
         return response()->json([
             'requests' => SyncRequest::with(['user:id,name', 'office:id,name'])
-                ->where('office_id', $officeId)
+                ->when($officeId !== null, fn ($query) => $query->where('office_id', $officeId))
                 ->orderByDesc('id')
                 ->take(50)
                 ->get(),
         ]);
     }
 
-    protected function createSyncRequest(Request $request, SyncRequestRunner $runner, int $officeId): JsonResponse
+    /**
+     * @param  bool  $officesFromRequest  let the request pick the offices (Sync Manager checkboxes);
+     *                                    otherwise $officeId (the active office) is authoritative
+     */
+    protected function createSyncRequest(Request $request, SyncRequestRunner $runner, int $officeId, bool $officesFromRequest = false): JsonResponse
     {
         $validated = $request->validate([
+            'office_ids' => ['nullable', 'array'],
+            'office_ids.*' => ['integer', 'exists:offices,id'],
             'module' => ['required_without:modules', 'string', Rule::in($runner->acceptedModules())],
             'modules' => ['required_without:module', 'array', 'min:1'],
             'modules.*' => ['string', Rule::in($runner->acceptedModules())],
@@ -39,34 +48,43 @@ trait HandlesSyncRequests
             'prune_deleted' => ['nullable', 'boolean'],
         ]);
 
+        $officeIds = $officesFromRequest && ! empty($validated['office_ids'])
+            ? array_values(array_unique(array_map('intval', $validated['office_ids'])))
+            : [$officeId];
+        $modules = $validated['modules'] ?? [$validated['module']];
+
         try {
-            $syncRequests = $runner->createAndQueueMany(
-                $officeId,
-                $validated['modules'] ?? [$validated['module']],
+            $syncRequests = array_merge(...array_map(fn (int $targetOfficeId) => $runner->createAndQueueMany(
+                $targetOfficeId,
+                $modules,
                 $validated['start_date'] ?? null,
                 $validated['end_date'] ?? null,
                 (bool) ($validated['prune_deleted'] ?? false),
                 auth()->id(),
-            );
+            ), $officeIds));
         } catch (InvalidArgumentException $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
-        $modules = implode(', ', array_map(fn (SyncRequest $syncRequest) => $syncRequest->module, $syncRequests));
+        $moduleList = implode(', ', array_unique(array_map(fn (SyncRequest $syncRequest) => $syncRequest->module, $syncRequests)));
+        $officeCount = count($officeIds);
 
         return response()->json([
             'success' => true,
             'message' => count($syncRequests) === 1
-                ? "Server-to-server sync request queued for '{$modules}'. It runs on the server — you can close this page."
-                : count($syncRequests)." sync requests queued ({$modules}). They run on the server — you can close this page.",
+                ? "Server-to-server sync request queued for '{$moduleList}'. It runs on the server — you can close this page."
+                : count($syncRequests)." sync requests queued ({$moduleList}".($officeCount > 1 ? " × {$officeCount} offices" : '').'). They run on the server — you can close this page.',
             'sync_request' => $syncRequests[0],
             'sync_requests' => $syncRequests,
         ]);
     }
 
-    protected function cancelRequest(int $id, int $officeId): JsonResponse
+    /**
+     * @param  int|null  $officeId  null allows any office (Sync Manager lists every office)
+     */
+    protected function cancelRequest(int $id, ?int $officeId): JsonResponse
     {
-        $syncRequest = SyncRequest::where('office_id', $officeId)->find($id);
+        $syncRequest = SyncRequest::when($officeId !== null, fn ($query) => $query->where('office_id', $officeId))->find($id);
 
         if ($syncRequest === null) {
             return response()->json(['error' => 'Sync request not found.'], 404);

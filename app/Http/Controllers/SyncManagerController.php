@@ -38,23 +38,24 @@ class SyncManagerController extends Controller
      */
     public function requests(): JsonResponse
     {
-        return $this->listSyncRequests($this->activeOfficeId());
+        // Every office: one submit can queue requests for several offices.
+        return $this->listSyncRequests(null);
     }
 
     /**
-     * Queue a new server-to-server date range sync request.
+     * Queue date range sync requests for the offices ticked on the page.
      */
     public function triggerSync(Request $request, SyncRequestRunner $runner): JsonResponse
     {
-        return $this->createSyncRequest($request, $runner, $this->activeOfficeId());
+        return $this->createSyncRequest($request, $runner, $this->activeOfficeId(), officesFromRequest: true);
     }
 
     /**
-     * Cancel a pending sync request.
+     * Cancel a pending sync request of any office listed on the page.
      */
     public function cancelSync(Request $request): JsonResponse
     {
-        return $this->cancelRequest((int) $request->input('id'), $this->activeOfficeId());
+        return $this->cancelRequest((int) $request->input('id'), null);
     }
 
     /**
