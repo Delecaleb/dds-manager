@@ -82,7 +82,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Total TX Plan
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -98,7 +98,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Tx Scheduled
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -114,7 +114,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Tx Unscheduled
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -130,7 +130,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Completed Tx
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -146,7 +146,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Case Acceptance %
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -162,7 +162,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         # TX Plan Presented
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -178,7 +178,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Average Treatment Plan $
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -194,7 +194,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Patients with Tx Plan %
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -345,7 +345,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Total TX Plan
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -361,7 +361,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Tx Scheduled
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -377,7 +377,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Tx Unscheduled
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -393,7 +393,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Completed Tx
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -409,7 +409,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Case Acceptance %
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -425,7 +425,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         # TX Plan Presented
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -441,7 +441,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Average Treatment Plan $
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -457,7 +457,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Patients with Tx Plan %
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -571,7 +571,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Total TX Plan
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -587,7 +587,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Tx Scheduled
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -603,7 +603,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Tx Unscheduled
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -619,7 +619,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Completed Tx
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -635,7 +635,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Case Acceptance %
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -651,7 +651,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         # TX Plan Presented
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -667,7 +667,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Average Treatment Plan $
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -683,7 +683,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         Patients with Tx Plan %
                                         <div class="relative group flex-shrink-0 font-normal normal-case">
-                                            <button type="button" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
+                                            <button type="button" onclick="event.stopPropagation();" class="text-slate-300 hover:text-emerald-500 transition-colors focus:outline-none cursor-help">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                                                 </svg>
@@ -849,16 +849,16 @@
                 if (mode === 'month') {
                     tables['month'] = DDS.dataTable(document.getElementById('tableByMonth'), {
                         processing: true,
-                        serverSide: true,
+                        serverSide: false,
                         searching: false,
-                        ordering: false,
+                        ordering: true,
                         paging: false,
-                        pageLength: 25,
+                        order: [],
                         ajax: {
                             url: baseUrl + '/tx-miner/data',
                             type: 'GET',
                             data: function (d) {
-                                Object.assign(d, getFilters('month'));
+                                return getFilters('month');
                             },
                             dataSrc: function (json) {
                                 updateFooterValues('month', json.total, json.average);
@@ -868,53 +868,82 @@
                         columns: [
                             {
                                 data: 'month',
-                                render: (data, type, row) => `<button type="button" class="font-bold text-gray-900 hover:text-emerald-600 hover:underline cursor-pointer focus:outline-none" onclick="openTxDrilldown('month', { month: '${row.month_group}' })">${data}</button>`
+                                type: 'string',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (row.month_group || '')
+                                    : `<button type="button" class="font-bold text-gray-900 hover:text-emerald-600 hover:underline cursor-pointer focus:outline-none" onclick="openTxDrilldown('month', { month: '${row.month_group}' })">${data}</button>`
                             },
                             {
                                 data: 'total_tx_plan',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.total_tx_plan, 'total_tx_plan', { month: row.month_group }, row.raw?.total_tx_plan)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.total_tx_plan) || 0)
+                                    : renderHeatCell(data, row.heat?.total_tx_plan, 'total_tx_plan', { month: row.month_group }, row.raw?.total_tx_plan)
                             },
                             {
                                 data: 'tx_scheduled',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.tx_scheduled, 'tx_scheduled', { month: row.month_group }, row.raw?.tx_scheduled)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.tx_scheduled) || 0)
+                                    : renderHeatCell(data, row.heat?.tx_scheduled, 'tx_scheduled', { month: row.month_group }, row.raw?.tx_scheduled)
                             },
                             {
                                 data: 'tx_unscheduled',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.tx_unscheduled, 'tx_unscheduled', { month: row.month_group }, row.raw?.tx_unscheduled)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.tx_unscheduled) || 0)
+                                    : renderHeatCell(data, row.heat?.tx_unscheduled, 'tx_unscheduled', { month: row.month_group }, row.raw?.tx_unscheduled)
                             },
                             {
                                 data: 'completed_tx',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.completed_tx, 'completed_tx', { month: row.month_group }, row.raw?.completed_tx)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.completed_tx) || 0)
+                                    : renderHeatCell(data, row.heat?.completed_tx, 'completed_tx', { month: row.month_group }, row.raw?.completed_tx)
                             },
                             {
                                 data: 'case_acceptance',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.case_acceptance, null, null, row.raw?.case_acceptance)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.case_acceptance) || 0)
+                                    : renderHeatCell(data, row.heat?.case_acceptance, null, null, row.raw?.case_acceptance)
                             },
                             {
                                 data: 'tx_presented',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.tx_presented, 'tx_presented', { month: row.month_group }, row.raw?.tx_presented)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseInt(row.raw?.tx_presented) || 0)
+                                    : renderHeatCell(data, row.heat?.tx_presented, 'tx_presented', { month: row.month_group }, row.raw?.tx_presented)
                             },
                             {
                                 data: 'avg_tx_plan',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.avg_tx_plan, null, null, row.raw?.avg_tx_plan)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.avg_tx_plan) || 0)
+                                    : renderHeatCell(data, row.heat?.avg_tx_plan, null, null, row.raw?.avg_tx_plan)
                             },
                             {
                                 data: 'patients_with_tx',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.patients_with_tx, null, null, row.raw?.patients_with_tx)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.patients_with_tx) || 0)
+                                    : renderHeatCell(data, row.heat?.patients_with_tx, null, null, row.raw?.patients_with_tx)
                             }
                         ]
                     });
                 } else if (mode === 'provider') {
                     tables['provider'] = DDS.dataTable(document.getElementById('tableByProvider'), {
                         processing: true,
-                        serverSide: true,
+                        serverSide: false,
                         searching: false,
-                        ordering: false,
+                        ordering: true,
+                        paging: false,
+                        order: [],
                         ajax: {
                             url: baseUrl + '/tx-miner/data-provider',
                             type: 'GET',
                             data: function (d) {
-                                Object.assign(d, getFilters('provider'));
+                                return getFilters('provider');
                             },
                             dataSrc: function (json) {
                                 updateFooterValues('provider', json.total, json.average);
@@ -924,7 +953,11 @@
                         columns: [
                             {
                                 data: 'provider',
+                                type: 'string',
                                 render: function (data, type, row) {
+                                    if (type === 'sort' || type === 'type') {
+                                        return (data || '').toLowerCase();
+                                    }
                                     const provNum = row.prov_num;
                                     return `
                                         <div class="flex items-center justify-between gap-2 font-bold text-gray-900">
@@ -946,49 +979,75 @@
                             },
                             {
                                 data: 'total_tx_plan',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.total_tx_plan, 'total_tx_plan', { prov_num: row.prov_num }, row.raw?.total_tx_plan)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.total_tx_plan) || 0)
+                                    : renderHeatCell(data, row.heat?.total_tx_plan, 'total_tx_plan', { prov_num: row.prov_num }, row.raw?.total_tx_plan)
                             },
                             {
                                 data: 'tx_scheduled',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.tx_scheduled, 'tx_scheduled', { prov_num: row.prov_num }, row.raw?.tx_scheduled)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.tx_scheduled) || 0)
+                                    : renderHeatCell(data, row.heat?.tx_scheduled, 'tx_scheduled', { prov_num: row.prov_num }, row.raw?.tx_scheduled)
                             },
                             {
                                 data: 'tx_unscheduled',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.tx_unscheduled, 'tx_unscheduled', { prov_num: row.prov_num }, row.raw?.tx_unscheduled)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.tx_unscheduled) || 0)
+                                    : renderHeatCell(data, row.heat?.tx_unscheduled, 'tx_unscheduled', { prov_num: row.prov_num }, row.raw?.tx_unscheduled)
                             },
                             {
                                 data: 'completed_tx',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.completed_tx, 'completed_tx', { prov_num: row.prov_num }, row.raw?.completed_tx)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.completed_tx) || 0)
+                                    : renderHeatCell(data, row.heat?.completed_tx, 'completed_tx', { prov_num: row.prov_num }, row.raw?.completed_tx)
                             },
                             {
                                 data: 'case_acceptance',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.case_acceptance, null, null, row.raw?.case_acceptance)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.case_acceptance) || 0)
+                                    : renderHeatCell(data, row.heat?.case_acceptance, null, null, row.raw?.case_acceptance)
                             },
                             {
                                 data: 'tx_presented',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.tx_presented, 'tx_presented', { prov_num: row.prov_num }, row.raw?.tx_presented)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseInt(row.raw?.tx_presented) || 0)
+                                    : renderHeatCell(data, row.heat?.tx_presented, 'tx_presented', { prov_num: row.prov_num }, row.raw?.tx_presented)
                             },
                             {
                                 data: 'avg_tx_plan',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.avg_tx_plan, null, null, row.raw?.avg_tx_plan)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.avg_tx_plan) || 0)
+                                    : renderHeatCell(data, row.heat?.avg_tx_plan, null, null, row.raw?.avg_tx_plan)
                             },
                             {
                                 data: 'patients_with_tx',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.patients_with_tx, null, null, row.raw?.patients_with_tx)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.patients_with_tx) || 0)
+                                    : renderHeatCell(data, row.heat?.patients_with_tx, null, null, row.raw?.patients_with_tx)
                             }
                         ]
                     });
                 } else if (mode === 'location') {
                     tables['location'] = DDS.dataTable(document.getElementById('tableByLocation'), {
                         processing: true,
-                        serverSide: true,
+                        serverSide: false,
                         searching: false,
-                        ordering: false,
+                        ordering: true,
+                        paging: false,
+                        order: [],
                         ajax: {
                             url: baseUrl + '/tx-miner/data-location',
                             type: 'GET',
                             data: function (d) {
-                                Object.assign(d, getFilters('location'));
+                                return getFilters('location');
                             },
                             dataSrc: function (json) {
                                 updateFooterValues('location', json.total, json.average);
@@ -998,39 +1057,69 @@
                         columns: [
                             {
                                 data: 'location',
-                                render: (data) => `<span class="font-bold text-gray-900">${data}</span>`
+                                type: 'string',
+                                render: function (data, type, row) {
+                                    if (type === 'sort' || type === 'type') {
+                                        return (data || '').toLowerCase();
+                                    }
+                                    return `<span class="font-bold text-gray-900">${data}</span>`;
+                                }
                             },
                             {
                                 data: 'total_tx_plan',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.total_tx_plan, 'total_tx_plan', { clinic_num: row.clinic_num }, row.raw?.total_tx_plan)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.total_tx_plan) || 0)
+                                    : renderHeatCell(data, row.heat?.total_tx_plan, 'total_tx_plan', { clinic_num: row.clinic_num }, row.raw?.total_tx_plan)
                             },
                             {
                                 data: 'tx_scheduled',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.tx_scheduled, 'tx_scheduled', { clinic_num: row.clinic_num }, row.raw?.tx_scheduled)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.tx_scheduled) || 0)
+                                    : renderHeatCell(data, row.heat?.tx_scheduled, 'tx_scheduled', { clinic_num: row.clinic_num }, row.raw?.tx_scheduled)
                             },
                             {
                                 data: 'tx_unscheduled',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.tx_unscheduled, 'tx_unscheduled', { clinic_num: row.clinic_num }, row.raw?.tx_unscheduled)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.tx_unscheduled) || 0)
+                                    : renderHeatCell(data, row.heat?.tx_unscheduled, 'tx_unscheduled', { clinic_num: row.clinic_num }, row.raw?.tx_unscheduled)
                             },
                             {
                                 data: 'completed_tx',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.completed_tx, 'completed_tx', { clinic_num: row.clinic_num }, row.raw?.completed_tx)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.completed_tx) || 0)
+                                    : renderHeatCell(data, row.heat?.completed_tx, 'completed_tx', { clinic_num: row.clinic_num }, row.raw?.completed_tx)
                             },
                             {
                                 data: 'case_acceptance',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.case_acceptance, null, null, row.raw?.case_acceptance)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.case_acceptance) || 0)
+                                    : renderHeatCell(data, row.heat?.case_acceptance, null, null, row.raw?.case_acceptance)
                             },
                             {
                                 data: 'tx_presented',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.tx_presented, 'tx_presented', { clinic_num: row.clinic_num }, row.raw?.tx_presented)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseInt(row.raw?.tx_presented) || 0)
+                                    : renderHeatCell(data, row.heat?.tx_presented, 'tx_presented', { clinic_num: row.clinic_num }, row.raw?.tx_presented)
                             },
                             {
                                 data: 'avg_tx_plan',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.avg_tx_plan, null, null, row.raw?.avg_tx_plan)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.avg_tx_plan) || 0)
+                                    : renderHeatCell(data, row.heat?.avg_tx_plan, null, null, row.raw?.avg_tx_plan)
                             },
                             {
                                 data: 'patients_with_tx',
-                                render: (data, type, row) => renderHeatCell(data, row.heat?.patients_with_tx, null, null, row.raw?.patients_with_tx)
+                                type: 'num',
+                                render: (data, type, row) => (type === 'sort' || type === 'type')
+                                    ? (parseFloat(row.raw?.patients_with_tx) || 0)
+                                    : renderHeatCell(data, row.heat?.patients_with_tx, null, null, row.raw?.patients_with_tx)
                             }
                         ]
                     });

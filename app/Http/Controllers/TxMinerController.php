@@ -232,7 +232,7 @@ class TxMinerController extends Controller
     {
         $draw = (int) $request->get('draw', 1);
         $start = (int) $request->get('start', 0);
-        $length = (int) $request->get('length', 100);
+        $length = $request->has('length') ? (int) $request->get('length') : -1;
 
         $completed = ProcStatus::inList(ProcStatus::completed());
         $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
@@ -348,7 +348,7 @@ class TxMinerController extends Controller
     {
         $draw = (int) $request->get('draw', 1);
         $start = (int) $request->get('start', 0);
-        $length = (int) $request->get('length', 100);
+        $length = $request->has('length') ? (int) $request->get('length') : -1;
 
         $completed = ProcStatus::inList(ProcStatus::completed());
         $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
