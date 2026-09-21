@@ -54,14 +54,15 @@ class TxMinerController extends Controller
 
         $completed = ProcStatus::inList(ProcStatus::completed());
         $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
-
-        $effectiveDateSql = DB::getDriverName() === 'sqlite'
-            ? "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END"
-            : "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END";
+        $tpOrCompleted = ProcStatus::inList([...ProcStatus::treatmentPlanned(), ...ProcStatus::completed()]);
 
         $monthGroupSql = DB::getDriverName() === 'sqlite'
-            ? "strftime('%Y-%m', {$effectiveDateSql})"
-            : "DATE_FORMAT({$effectiveDateSql}, '%Y-%m')";
+            ? "strftime('%Y-%m', pl.DateTP)"
+            : "DATE_FORMAT(pl.DateTP, '%Y-%m')";
+
+        $monthProcDateSql = DB::getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', pl.ProcDate)"
+            : "DATE_FORMAT(pl.ProcDate, '%Y-%m')";
 
         $hasMonth = $request->filled('month');
         $hasCustomRange = ! $hasMonth && $request->filled('start_date') && $request->filled('end_date');
@@ -84,47 +85,81 @@ class TxMinerController extends Controller
                     'month_group' => $m,
                     'total_tx_plan' => 0,
                     'tx_scheduled' => 0,
+                    'tx_unscheduled' => 0,
                     'completed_tx' => 0,
                     'tx_presented_count' => 0,
                     'patients_seen' => 0,
-                    'patients_with_tp' => 0,
                 ];
             }
 
             $query = $this->baseQuery($request, $clinicRegistry, $startDate, $endDate)
                 ->selectRaw("{$monthGroupSql} as month_group")
-                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
+                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND (pl.AptNum IS NULL OR pl.AptNum = 0 OR pl.AptNum = '0') THEN pl.ProcFee ELSE 0 END) as tx_unscheduled")
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
-                ->selectRaw("COUNT(CASE WHEN pl.ProcStatus IN ({$tp}) THEN 1 END) as tx_presented_count")
-                ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.PatNum END) as patients_seen")
-                ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.PatNum END) as patients_with_tp")
+                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tpOrCompleted}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
+                ->selectRaw('COUNT(DISTINCT pl.PatNum) as tx_presented_count')
                 ->groupBy('month_group')
                 ->orderBy('month_group', 'desc');
 
             $dbRecords = $query->get();
+
+            // Total unique patients seen in each month (completed procs with ProcDate in month)
+            $patientsSeenMap = $this->scopeQuery($request, $clinicRegistry)
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereNotNull('pl.ProcDate')
+                ->where('pl.ProcDate', '!=', '0001-01-01')
+                ->where('pl.ProcDate', '!=', '0000-00-00')
+                ->whereBetween('pl.ProcDate', [$startDate, $endDate])
+                ->selectRaw("{$monthProcDateSql} as month_group, COUNT(DISTINCT pl.PatNum) as patients_seen")
+                ->groupBy('month_group')
+                ->pluck('patients_seen', 'month_group');
+
             foreach ($dbRecords as $r) {
                 if (isset($monthList[$r->month_group])) {
+                    $r->patients_seen = (int) ($patientsSeenMap[$r->month_group] ?? 0);
                     $monthList[$r->month_group] = $r;
+                }
+            }
+
+            foreach ($monthList as $mKey => $mObj) {
+                if ($mObj->patients_seen === 0 && isset($patientsSeenMap[$mKey])) {
+                    $mObj->patients_seen = (int) $patientsSeenMap[$mKey];
                 }
             }
 
             $records = array_values($monthList);
             $totalRecords = count($records);
         } else {
+            $startDate = $request->input('start_date');
+            $endDate = $request->input('end_date');
+
             $query = $this->baseQuery($request, $clinicRegistry)
                 ->selectRaw("{$monthGroupSql} as month_group")
-                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
+                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND (pl.AptNum IS NULL OR pl.AptNum = 0 OR pl.AptNum = '0') THEN pl.ProcFee ELSE 0 END) as tx_unscheduled")
                 ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
-                ->selectRaw("COUNT(CASE WHEN pl.ProcStatus IN ({$tp}) THEN 1 END) as tx_presented_count")
-                ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.PatNum END) as patients_seen")
-                ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.PatNum END) as patients_with_tp")
+                ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tpOrCompleted}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
+                ->selectRaw('COUNT(DISTINCT pl.PatNum) as tx_presented_count')
                 ->groupBy('month_group')
                 ->orderBy('month_group', 'desc');
 
+            $patientsSeenMap = $this->scopeQuery($request, $clinicRegistry)
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereNotNull('pl.ProcDate')
+                ->where('pl.ProcDate', '!=', '0001-01-01')
+                ->where('pl.ProcDate', '!=', '0000-00-00')
+                ->when($startDate && $endDate, fn ($q) => $q->whereBetween('pl.ProcDate', [$startDate, $endDate]))
+                ->selectRaw("{$monthProcDateSql} as month_group, COUNT(DISTINCT pl.PatNum) as patients_seen")
+                ->groupBy('month_group')
+                ->pluck('patients_seen', 'month_group');
+
             $totalRecords = DB::query()->fromSub($query, 'sub')->count();
             $records = $query->skip($start)->take($length)->get();
+
+            foreach ($records as $r) {
+                $r->patients_seen = (int) ($patientsSeenMap[$r->month_group] ?? 0);
+            }
         }
 
         $stagedRows = [];
@@ -139,7 +174,7 @@ class TxMinerController extends Controller
         $data = [];
         foreach ($stagedRows as $row) {
             try {
-                $monthLabel = Carbon::createFromFormat('Y-m', $row['month_group'])->format('M y');
+                $monthLabel = Carbon::createFromFormat('Y-m', $row['month_group'])->format('F Y');
             } catch (\Exception $e) {
                 $monthLabel = $row['month_group'];
             }
@@ -201,18 +236,32 @@ class TxMinerController extends Controller
 
         $completed = ProcStatus::inList(ProcStatus::completed());
         $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
+        $tpOrCompleted = ProcStatus::inList([...ProcStatus::treatmentPlanned(), ...ProcStatus::completed()]);
+
+        $start_date = $request->input('start_date');
+        $end_date = $request->input('end_date');
 
         $query = $this->baseQuery($request, $clinicRegistry)
             ->selectRaw('pl.ProvNum')
-            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
+            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND (pl.AptNum IS NULL OR pl.AptNum = 0 OR pl.AptNum = '0') THEN pl.ProcFee ELSE 0 END) as tx_unscheduled")
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
-            ->selectRaw("COUNT(CASE WHEN pl.ProcStatus IN ({$tp}) THEN 1 END) as tx_presented_count")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.PatNum END) as patients_seen")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.PatNum END) as patients_with_tp")
+            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tpOrCompleted}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
+            ->selectRaw('COUNT(DISTINCT pl.PatNum) as tx_presented_count')
             ->groupBy('pl.ProvNum');
 
         $totalRecords = DB::query()->fromSub($query, 'sub')->count();
+
+        // Patients seen by provider (completed procs with ProcDate in range)
+        $patientsSeenByProv = $this->scopeQuery($request, $clinicRegistry)
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereNotNull('pl.ProcDate')
+            ->where('pl.ProcDate', '!=', '0001-01-01')
+            ->where('pl.ProcDate', '!=', '0000-00-00')
+            ->when($start_date && $end_date, fn ($q) => $q->whereBetween('pl.ProcDate', [$start_date, $end_date]))
+            ->selectRaw('pl.ProvNum, COUNT(DISTINCT pl.PatNum) as patients_seen')
+            ->groupBy('pl.ProvNum')
+            ->pluck('patients_seen', 'ProvNum');
 
         // Get provider details map
         $provMap = OdProvider::all()->keyBy('ProvNum');
@@ -222,6 +271,7 @@ class TxMinerController extends Controller
         $stagedRows = [];
         foreach ($records as $r) {
             $provNum = (int) $r->ProvNum;
+            $r->patients_seen = (int) ($patientsSeenByProv[$provNum] ?? 0);
             $provider = $provMap->get($provNum);
             if ($provider) {
                 $name = trim(($provider->LName ?? '').(($provider->LName && $provider->PName) ? ', ' : '').($provider->PName ?? ''));
@@ -302,18 +352,36 @@ class TxMinerController extends Controller
 
         $completed = ProcStatus::inList(ProcStatus::completed());
         $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
+        $tpOrCompleted = ProcStatus::inList([...ProcStatus::treatmentPlanned(), ...ProcStatus::completed()]);
+
+        $start_date = $request->input('start_date');
+        $end_date = $request->input('end_date');
 
         $query = $this->baseQuery($request, $clinicRegistry)
             ->selectRaw('pl.office_id, pl.ClinicNum')
-            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.AptNum IS NOT NULL AND pl.AptNum != 0 AND pl.AptNum != '0' THEN pl.ProcFee ELSE 0 END) as tx_scheduled")
+            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tp}) AND (pl.AptNum IS NULL OR pl.AptNum = 0 OR pl.AptNum = '0') THEN pl.ProcFee ELSE 0 END) as tx_unscheduled")
             ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.ProcFee ELSE 0 END) as completed_tx")
-            ->selectRaw("COUNT(CASE WHEN pl.ProcStatus IN ({$tp}) THEN 1 END) as tx_presented_count")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$completed}) THEN pl.PatNum END) as patients_seen")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN pl.ProcStatus IN ({$tp}) THEN pl.PatNum END) as patients_with_tp")
+            ->selectRaw("SUM(CASE WHEN pl.ProcStatus IN ({$tpOrCompleted}) THEN pl.ProcFee ELSE 0 END) as total_tx_plan")
+            ->selectRaw('COUNT(DISTINCT pl.PatNum) as tx_presented_count')
             ->groupBy('pl.office_id', 'pl.ClinicNum');
 
         $totalRecords = DB::query()->fromSub($query, 'sub')->count();
+
+        // Patients seen by location (completed procs with ProcDate in range)
+        $locKeySql = DB::getDriverName() === 'sqlite'
+            ? "pl.office_id || ':' || pl.ClinicNum"
+            : "CONCAT(pl.office_id, ':', pl.ClinicNum)";
+
+        $patientsSeenByLoc = $this->scopeQuery($request, $clinicRegistry)
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereNotNull('pl.ProcDate')
+            ->where('pl.ProcDate', '!=', '0001-01-01')
+            ->where('pl.ProcDate', '!=', '0000-00-00')
+            ->when($start_date && $end_date, fn ($q) => $q->whereBetween('pl.ProcDate', [$start_date, $end_date]))
+            ->selectRaw("{$locKeySql} as loc_key, COUNT(DISTINCT pl.PatNum) as patients_seen")
+            ->groupBy('pl.office_id', 'pl.ClinicNum')
+            ->pluck('patients_seen', 'loc_key');
 
         $records = $query->get();
 
@@ -321,6 +389,8 @@ class TxMinerController extends Controller
         foreach ($records as $r) {
             $officeId = (int) $r->office_id;
             $clinicNum = (int) $r->ClinicNum;
+            $locKey = "{$officeId}:{$clinicNum}";
+            $r->patients_seen = (int) ($patientsSeenByLoc[$locKey] ?? 0);
             $location = $clinicRegistry->locationFor($officeId, $clinicNum);
 
             $stagedRows[] = $this->mapRowMetrics($r, $txAcceptance) + [
@@ -495,29 +565,18 @@ class TxMinerController extends Controller
 
         $query = $this->baseQuery($request, $clinicRegistry);
 
-        $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
-        $effectiveDateSql = DB::getDriverName() === 'sqlite'
-            ? "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END"
-            : "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END";
-
-        // Scope to specific month if requested (e.g. '2026-07' or formatted 'Jul 26')
+        // Scope to specific month if requested (e.g. '2026-07' or formatted 'July 2026')
         if ($month) {
             try {
-                $monthDate = Carbon::createFromFormat('Y-m', $month);
-                $query->whereRaw("{$effectiveDateSql} BETWEEN ? AND ?", [
+                $monthDate = Carbon::hasFormat($month, 'Y-m')
+                    ? Carbon::createFromFormat('!Y-m', $month)
+                    : Carbon::parse($month);
+                $query->whereBetween('pl.DateTP', [
                     $monthDate->copy()->startOfMonth()->toDateString(),
                     $monthDate->copy()->endOfMonth()->toDateString(),
                 ]);
             } catch (\Exception $e) {
-                try {
-                    $monthDate = Carbon::parse($month);
-                    $query->whereRaw("{$effectiveDateSql} BETWEEN ? AND ?", [
-                        $monthDate->copy()->startOfMonth()->toDateString(),
-                        $monthDate->copy()->endOfMonth()->toDateString(),
-                    ]);
-                } catch (\Exception $ex) {
-                    // fallback if unparseable
-                }
+                // fallback if unparseable
             }
         }
 
@@ -558,13 +617,16 @@ class TxMinerController extends Controller
             case 'tx_presented':
             default:
                 $title = 'Total Tx Plan Breakdown';
-                $query->whereIn('pl.ProcStatus', ProcStatus::treatmentPlanned());
+                $query->whereIn('pl.ProcStatus', [...ProcStatus::treatmentPlanned(), ...ProcStatus::completed()]);
                 break;
         }
 
         if ($month) {
             try {
-                $title .= ' — '.Carbon::createFromFormat('Y-m', $month)->format('M Y');
+                $monthDate = Carbon::hasFormat($month, 'Y-m')
+                    ? Carbon::createFromFormat('!Y-m', $month)
+                    : Carbon::parse($month);
+                $title .= ' — '.$monthDate->format('F Y');
             } catch (\Exception $e) {
                 $title .= ' — '.$month;
             }
@@ -602,7 +664,7 @@ class TxMinerController extends Controller
                 'pc_drill.ProcCode',
                 'pc_drill.Descript as proc_descript',
             ])
-            ->orderByRaw("{$effectiveDateSql} DESC")
+            ->orderBy('pl.DateTP', 'desc')
             ->limit(500);
 
         $logs = $query->get();
@@ -658,8 +720,7 @@ class TxMinerController extends Controller
 
             $toothSurf = trim(($log->ToothNum ?? '').($log->Surf ? ' / '.$log->Surf : ''));
 
-            $isTp = in_array((string) $log->ProcStatus, ProcStatus::treatmentPlanned(), true);
-            $displayDate = ($isTp && ! empty($log->DateTP) && $log->DateTP !== '0001-01-01' && $log->DateTP !== '0000-00-00')
+            $displayDate = (! empty($log->DateTP) && $log->DateTP !== '0001-01-01' && $log->DateTP !== '0000-00-00')
                 ? Carbon::parse($log->DateTP)->format('M d, Y')
                 : ($log->ProcDate ? Carbon::parse($log->ProcDate)->format('M d, Y') : '—');
 
@@ -826,27 +887,23 @@ class TxMinerController extends Controller
      */
     protected function baseQuery(Request $request, ClinicRegistry $clinicRegistry, ?string $overrideStartDate = null, ?string $overrideEndDate = null): Builder
     {
-        $tp = ProcStatus::inList(ProcStatus::treatmentPlanned());
-        $effectiveDateSql = DB::getDriverName() === 'sqlite'
-            ? "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END"
-            : "CASE WHEN pl.ProcStatus IN ({$tp}) AND pl.DateTP IS NOT NULL AND pl.DateTP != '0001-01-01' AND pl.DateTP != '0000-00-00' THEN pl.DateTP ELSE pl.ProcDate END";
-
+        $validStatuses = [...ProcStatus::treatmentPlanned(), ...ProcStatus::completed()];
         $yearSql = DB::getDriverName() === 'sqlite'
-            ? "CAST(strftime('%Y', {$effectiveDateSql}) AS INT)"
-            : "YEAR({$effectiveDateSql})";
+            ? "CAST(strftime('%Y', pl.DateTP) AS INT)"
+            : 'YEAR(pl.DateTP)';
 
         $query = $this->scopeQuery($request, $clinicRegistry)
-            ->where(function ($q) {
-                $q->whereNotNull('pl.ProcDate')
-                    ->orWhereNotNull('pl.DateTP');
-            })
+            ->whereNotNull('pl.DateTP')
+            ->where('pl.DateTP', '!=', '0001-01-01')
+            ->where('pl.DateTP', '!=', '0000-00-00')
+            ->whereIn('pl.ProcStatus', $validStatuses)
             ->whereRaw("{$yearSql} >= 2000");
 
         // Date Range filter
         $start = $overrideStartDate ?? $request->input('start_date');
         $end = $overrideEndDate ?? $request->input('end_date');
         if ($start && $end) {
-            $query->whereRaw("{$effectiveDateSql} BETWEEN ? AND ?", [$start, $end]);
+            $query->whereBetween('pl.DateTP', [$start, $end]);
         }
 
         return $query;
@@ -1026,20 +1083,21 @@ class TxMinerController extends Controller
      */
     protected function mapRowMetrics($r, TreatmentAcceptanceService $txAcceptance): array
     {
-        $totalTx = (float) $r->total_tx_plan;
-        $txScheduled = (float) $r->tx_scheduled;
-        $unscheduled = max(0, $totalTx - $txScheduled);
-        $completed = (float) $r->completed_tx;
+        $txScheduled = (float) ($r->tx_scheduled ?? 0);
+        $unscheduled = (float) ($r->tx_unscheduled ?? 0);
+        $completed = (float) ($r->completed_tx ?? 0);
+        $totalTx = (float) ($r->total_tx_plan ?? ($txScheduled + $unscheduled + $completed));
 
-        $caseAcceptance = $txAcceptance->rateFrom($totalTx, $completed, $txScheduled);
+        $caseAcceptance = $totalTx > 0
+            ? min(100.0, round((($completed + $txScheduled) / $totalTx) * 100, 2))
+            : 0.0;
 
-        $txPresentedCount = (int) $r->tx_presented_count;
-        $avgTxPlan = $txPresentedCount > 0 ? $totalTx / $txPresentedCount : 0;
+        $txPresentedCount = (int) ($r->tx_presented_count ?? 0);
+        $avgTxPlan = $txPresentedCount > 0 ? round($totalTx / $txPresentedCount, 2) : 0.0;
 
         $patientsSeen = (int) ($r->patients_seen ?? 0);
-        $patientsWithTp = (int) ($r->patients_with_tp ?? 0);
         $patientsTxPct = $patientsSeen > 0
-            ? ($patientsWithTp / $patientsSeen) * 100
+            ? round(($txPresentedCount / $patientsSeen) * 100, 2)
             : 0.0;
 
         return [
@@ -1053,7 +1111,7 @@ class TxMinerController extends Controller
             'avg_tx_plan_raw' => $avgTxPlan,
             'patients_with_tx_raw' => $patientsTxPct,
             'patients_seen' => $patientsSeen,
-            'patients_with_tp' => $patientsWithTp,
+            'patients_with_tp' => $txPresentedCount,
         ];
     }
 
@@ -1175,18 +1233,20 @@ class TxMinerController extends Controller
         $sumPatientsSeen = array_sum(array_column($stagedRows, 'patients_seen'));
         $sumPatientsWithTp = array_sum(array_column($stagedRows, 'patients_with_tp'));
 
-        $overallCaseAcceptance = $txAcceptance->rateFrom($sumTotalTx, $sumCompleted, $sumScheduled);
-        $overallAvgTxPlan = $sumPresented > 0 ? ($sumTotalTx / $sumPresented) : 0;
-        $overallPatientsWithTx = $sumPatientsSeen > 0 ? (($sumPatientsWithTp / $sumPatientsSeen) * 100) : 0;
+        $overallCaseAcceptance = $sumTotalTx > 0
+            ? min(100.0, round((($sumCompleted + $sumScheduled) / $sumTotalTx) * 100, 2))
+            : 0.0;
+        $overallAvgTxPlan = $sumPresented > 0 ? round($sumTotalTx / $sumPresented, 2) : 0.0;
+        $overallPatientsWithTx = $sumPatientsSeen > 0 ? round(($sumPresented / $sumPatientsSeen) * 100, 2) : 0.0;
 
         $avgTotalTx = $sumTotalTx / $count;
         $avgScheduled = $sumScheduled / $count;
         $avgUnscheduled = $sumUnscheduled / $count;
         $avgCompleted = $sumCompleted / $count;
         $avgPresented = (int) round($sumPresented / $count);
-        $avgTxPlan = array_sum(array_column($stagedRows, 'avg_tx_plan_raw')) / $count;
-        $avgPatientsWithTx = array_sum(array_column($stagedRows, 'patients_with_tx_raw')) / $count;
-        $avgCaseAcceptance = array_sum(array_column($stagedRows, 'case_acceptance_raw')) / $count;
+        $avgTxPlan = $count > 0 ? array_sum(array_column($stagedRows, 'avg_tx_plan_raw')) / $count : 0.0;
+        $avgPatientsWithTx = $count > 0 ? array_sum(array_column($stagedRows, 'patients_with_tx_raw')) / $count : 0.0;
+        $avgCaseAcceptance = $count > 0 ? array_sum(array_column($stagedRows, 'case_acceptance_raw')) / $count : 0.0;
 
         return [
             'average' => [
