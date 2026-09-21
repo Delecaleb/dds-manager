@@ -742,6 +742,36 @@
             boxes.forEach(function (b) { b.addEventListener('change', render); });
             root.querySelector('[data-lp-all]').addEventListener('click', function () { boxes.forEach(function (b) { b.checked = true; }); render(); });
             root.querySelector('[data-lp-none]').addEventListener('click', function () { boxes.forEach(function (b) { b.checked = false; }); render(); });
+            function syncToServer(keys) {
+                try {
+                    localStorage.setItem('dds_selected_locations', JSON.stringify(keys));
+                    var token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                        || document.querySelector('input[name="_token"]')?.value
+                        || (window.jQuery && jQuery('meta[name="csrf-token"]').attr('content'));
+                    var base = (window.APP_URL || '').replace(/\/+$/, '');
+                    var url = (base ? base : '') + '/locations/select';
+                    if (window.fetch) {
+                        fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': token || ''
+                            },
+                            body: JSON.stringify({ locations: keys.join(',') })
+                        }).catch(function () {});
+                    } else if (window.jQuery) {
+                        jQuery.ajax({
+                            url: url,
+                            type: 'POST',
+                            headers: { 'X-CSRF-TOKEN': token || '' },
+                            contentType: 'application/json',
+                            data: JSON.stringify({ locations: keys.join(',') })
+                        });
+                    }
+                } catch (e) {}
+            }
+
             applyBtn.addEventListener('click', function () {
                 if (!checked().length) return;
                 applied = checked().map(function (b) { return b.value; });
@@ -749,11 +779,19 @@
                 menu.classList.add('hidden');
                 toggle.setAttribute('aria-expanded', 'false');
                 render();
+                syncToServer(applied);
                 document.dispatchEvent(new CustomEvent('locations:changed', { detail: { id: id, keys: applied.slice() } }));
             });
 
             render();
-            var api = { keys: function () { return applied.slice(); } };
+            var api = {
+                keys: function () { return applied.slice(); },
+                set: function (keys) {
+                    setChecked(keys);
+                    applied = checked().map(function (b) { return b.value; });
+                    render();
+                }
+            };
             root.__ddsLocationPicker = pickers[id] = api;
             return api;
         }

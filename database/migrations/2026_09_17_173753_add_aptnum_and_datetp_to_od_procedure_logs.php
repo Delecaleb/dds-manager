@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -12,10 +13,10 @@ return new class extends Migration
     public function up(): void
     {
         $hasIndex = function (string $table, string $indexName): bool {
-            if (\Illuminate\Support\Facades\DB::getDriverName() === 'sqlite') {
+            if (DB::getDriverName() === 'sqlite') {
                 return false;
             }
-            $res = \Illuminate\Support\Facades\DB::select("SHOW INDEX FROM `{$table}` WHERE Key_name = ?", [$indexName]);
+            $res = DB::select("SHOW INDEX FROM `{$table}` WHERE Key_name = ?", [$indexName]);
 
             return ! empty($res);
         };

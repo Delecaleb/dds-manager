@@ -114,7 +114,10 @@ class OfficeController extends Controller
         ]);
 
         $officeId = (int) $request->input('office_id');
-        session(['active_office_id' => $officeId]);
+        session([
+            'active_office_id' => $officeId,
+            'selected_locations' => [(string) $officeId],
+        ]);
 
         return redirect()->back()->with('status', 'Switched active office location.');
     }
@@ -132,15 +135,33 @@ class OfficeController extends Controller
         if ($officeId && $clinicNum !== 'all') {
             $clinicRegistry->setActiveClinicNum((int) $clinicNum, $officeId);
             $clinicName = $clinicRegistry->name((int) $clinicNum, $officeId);
+            session(['selected_locations' => ["{$officeId}:{$clinicNum}"]]);
             $message = "Switched active clinic to '{$clinicName}'.";
         } else {
             if ($officeId) {
                 session()->forget("active_clinic_id_{$officeId}");
+                session(['selected_locations' => [(string) $officeId]]);
             }
             $message = 'Viewing all clinics for location.';
         }
 
         return redirect()->back()->with('status', $message);
+    }
+
+    /**
+     * AJAX endpoint to persist user's chosen reporting location(s).
+     */
+    public function selectLocations(Request $request, ClinicRegistry $clinicRegistry): JsonResponse
+    {
+        $locations = $request->input('locations');
+        $selection = $clinicRegistry->select($locations);
+        $keys = $selection->keys();
+
+        return response()->json([
+            'success' => true,
+            'selected' => $keys,
+            'active_office_id' => Office::getActiveOfficeId(),
+        ]);
     }
 
     public function syncReport(Office $office, SyncReportService $syncReportService): JsonResponse

@@ -6,6 +6,7 @@ use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\LocationSelection;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
+use App\Domain\TreatmentAcceptance\TxMinerPatientBreakdownService;
 use App\Models\OdPatient;
 use App\Models\OdProvider;
 use App\Models\Office;
@@ -479,9 +480,14 @@ class TxMinerController extends Controller
     /**
      * AJAX endpoint for Tx Miner Drill-down modal.
      */
-    public function drilldown(Request $request, ClinicRegistry $clinicRegistry)
+    public function drilldown(Request $request, ClinicRegistry $clinicRegistry, TxMinerPatientBreakdownService $breakdown)
     {
         $metric = $request->input('metric', 'total_tx_plan');
+
+        if ($metric === 'month') {
+            return $this->drilldownMonth($request, $clinicRegistry, $breakdown);
+        }
+
         $provNum = $request->input('prov_num');
         $clinicNum = $request->input('clinic_num');
         $officeId = $request->input('office_id');
@@ -692,6 +698,130 @@ class TxMinerController extends Controller
     }
 
     /**
+     * Patient-level Treatment Miner Drill-down for Month.
+     */
+    protected function drilldownMonth(Request $request, ClinicRegistry $clinicRegistry, TxMinerPatientBreakdownService $breakdown)
+    {
+        [$startDate, $endDate] = $this->drilldownPeriod($request);
+
+        $scope = $this->scopeQuery($request, $clinicRegistry);
+
+        $provNum = $request->input('prov_num');
+        $clinicNum = $request->input('clinic_num');
+        $officeId = $request->input('office_id');
+        if ($provNum) {
+            $scope->where('pl.ProvNum', (int) $provNum);
+        }
+        if ($clinicNum !== null && $clinicNum !== '' && $clinicNum !== 'all') {
+            $scope->where('pl.ClinicNum', (int) $clinicNum);
+        }
+        if ($officeId && $officeId !== 'all') {
+            $scope->where('pl.office_id', (int) $officeId);
+        }
+
+        $patients = $breakdown->patients($scope, $startDate, $endDate, now());
+
+        $rows = [];
+        foreach ($patients as $p) {
+            $provNames = array_column($p->providers, 'name');
+            sort($provNames, SORT_STRING | SORT_FLAG_CASE);
+            $provAbbrs = array_filter(array_column($p->providers, 'abbr'));
+            sort($provAbbrs, SORT_STRING | SORT_FLAG_CASE);
+            $provIds = implode(',', array_column($p->providers, 'num'));
+
+            $rows[] = [
+                'pat_id' => $p->patNum,
+                'patient' => [
+                    'label' => $p->name,
+                    'link' => true,
+                ],
+                'chart_num' => $p->chartNumber,
+                'phone' => $p->homePhone,
+                'mobile' => $p->wirelessPhone,
+                'email' => $p->email,
+                'type' => $p->isNew ? 'New' : 'Existing',
+                'tx_scheduled' => $p->txScheduled,
+                'tx_unscheduled' => $p->txUnscheduled,
+                'completed_tx' => $p->completedTx,
+                'next_visit' => $p->nextVisit ?? '',
+                'next_hygiene_visit' => $p->nextHygieneVisit ?? '',
+                'referred_to' => '',
+                'referral_source' => '',
+                'remaining_benefits' => '—',
+                'status' => $p->status,
+                'provider' => implode('|', $provNames),
+                'provider_id' => $provAbbrs ? $provIds.' - '.implode(',', $provAbbrs) : $provIds,
+                'insurance' => $p->insurance ?? '',
+                'date_planned' => implode(',', $p->datesPlanned),
+                'date_created' => implode(',', $p->datesCreated),
+            ];
+        }
+
+        $columns = [
+            ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
+            ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
+            ['key' => 'chart_num', 'label' => 'Chart #', 'type' => 'text'],
+            ['key' => 'phone', 'label' => 'Phone', 'type' => 'text'],
+            ['key' => 'mobile', 'label' => 'Mobile', 'type' => 'text'],
+            ['key' => 'email', 'label' => 'Email', 'type' => 'text'],
+            ['key' => 'type', 'label' => 'Type', 'type' => 'text'],
+            ['key' => 'tx_scheduled', 'label' => 'Tx Scheduled', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'tx_unscheduled', 'label' => 'Tx Unscheduled', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'completed_tx', 'label' => 'Completed TX $', 'type' => 'money', 'agg' => 'sum'],
+            ['key' => 'next_visit', 'label' => 'Next Visit Date', 'type' => 'text'],
+            ['key' => 'next_hygiene_visit', 'label' => 'Next Hygiene Visit Date', 'type' => 'text'],
+            ['key' => 'referred_to', 'label' => 'Referred To', 'type' => 'text'],
+            ['key' => 'referral_source', 'label' => 'Referral Source', 'type' => 'text'],
+            // Not computable yet: benefit / patplan / inssub are not synced.
+            ['key' => 'remaining_benefits', 'label' => 'Remaining Benefits', 'type' => 'text'],
+            ['key' => 'status', 'label' => 'Status', 'type' => 'text'],
+            ['key' => 'provider', 'label' => 'Preferred Provider', 'type' => 'text'],
+            ['key' => 'provider_id', 'label' => 'Provider ID', 'type' => 'text'],
+            ['key' => 'insurance', 'label' => 'Insurance', 'type' => 'text'],
+            ['key' => 'date_planned', 'label' => 'Date Planned', 'type' => 'text'],
+            ['key' => 'date_created', 'label' => 'Date Created', 'type' => 'text'],
+        ];
+
+        $totals = [
+            'tx_scheduled' => array_sum(array_column($rows, 'tx_scheduled')),
+            'tx_unscheduled' => array_sum(array_column($rows, 'tx_unscheduled')),
+            'completed_tx' => array_sum(array_column($rows, 'completed_tx')),
+        ];
+
+        $title = 'Treatment Miner Breakdown — '.Carbon::parse($startDate)->format('M Y');
+        $providerInfo = null;
+
+        return view('components.app-components.drilldown.table-content', compact('title', 'columns', 'rows', 'totals', 'providerInfo'));
+    }
+
+    /**
+     * The month a month drill-down covers ('Y-m' or any parseable date), falling back to
+     * start_date/end_date and then the current month.
+     *
+     * @return array{0: string, 1: string} ['Y-m-d', 'Y-m-d']
+     */
+    private function drilldownPeriod(Request $request): array
+    {
+        $month = $request->input('month');
+        if ($month) {
+            try {
+                $monthDate = Carbon::hasFormat($month, 'Y-m')
+                    ? Carbon::createFromFormat('!Y-m', $month)
+                    : Carbon::parse($month);
+
+                return [$monthDate->copy()->startOfMonth()->toDateString(), $monthDate->copy()->endOfMonth()->toDateString()];
+            } catch (\Exception $e) {
+                // Unparseable month: fall through to the explicit range.
+            }
+        }
+
+        return [
+            $request->input('start_date', now()->startOfMonth()->toDateString()),
+            $request->input('end_date', now()->endOfMonth()->toDateString()),
+        ];
+    }
+
+    /**
      * Shared Base Query with comprehensive multi-parameter filtering.
      */
     protected function baseQuery(Request $request, ClinicRegistry $clinicRegistry, ?string $overrideStartDate = null, ?string $overrideEndDate = null): Builder
@@ -705,12 +835,30 @@ class TxMinerController extends Controller
             ? "CAST(strftime('%Y', {$effectiveDateSql}) AS INT)"
             : "YEAR({$effectiveDateSql})";
 
-        $query = DB::table('od_procedure_logs as pl')
+        $query = $this->scopeQuery($request, $clinicRegistry)
             ->where(function ($q) {
                 $q->whereNotNull('pl.ProcDate')
                     ->orWhereNotNull('pl.DateTP');
             })
             ->whereRaw("{$yearSql} >= 2000");
+
+        // Date Range filter
+        $start = $overrideStartDate ?? $request->input('start_date');
+        $end = $overrideEndDate ?? $request->input('end_date');
+        if ($start && $end) {
+            $query->whereRaw("{$effectiveDateSql} BETWEEN ? AND ?", [$start, $end]);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Procedure logs narrowed by every Tx Miner filter except the date range
+     * (locations, providers, procedures, patients, line of business).
+     */
+    protected function scopeQuery(Request $request, ClinicRegistry $clinicRegistry): Builder
+    {
+        $query = DB::table('od_procedure_logs as pl');
 
         // Scopes via LocationSelection
         $locationSelection = $this->resolveLocations($request, $clinicRegistry);
@@ -739,13 +887,6 @@ class TxMinerController extends Controller
                 });
             }
         });
-
-        // Date Range filter
-        $start = $overrideStartDate ?? $request->input('start_date');
-        $end = $overrideEndDate ?? $request->input('end_date');
-        if ($start && $end) {
-            $query->whereRaw("{$effectiveDateSql} BETWEEN ? AND ?", [$start, $end]);
-        }
 
         // Provider filter
         $providers = $request->input('providers') ?? $request->input('prov_nums');

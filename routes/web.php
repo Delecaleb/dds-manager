@@ -31,6 +31,7 @@ Route::middleware('auth')->group(function () {
     // Shared user profile & location switching
     Route::post('offices/switch', [OfficeController::class, 'switch'])->name('offices.switch');
     Route::post('clinics/switch', [OfficeController::class, 'switchClinic'])->name('clinics.switch');
+    Route::post('locations/select', [OfficeController::class, 'selectLocations'])->name('locations.select');
     Route::get('offices/{office}/sync-report', [OfficeController::class, 'syncReport'])->name('offices.sync-report');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

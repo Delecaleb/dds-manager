@@ -868,7 +868,7 @@
                         columns: [
                             {
                                 data: 'month',
-                                render: (data) => `<span class="font-bold text-gray-900">${data}</span>`
+                                render: (data, type, row) => `<button type="button" class="font-bold text-gray-900 hover:text-emerald-600 hover:underline cursor-pointer focus:outline-none" onclick="openTxDrilldown('month', { month: '${row.month_group}' })">${data}</button>`
                             },
                             {
                                 data: 'total_tx_plan',

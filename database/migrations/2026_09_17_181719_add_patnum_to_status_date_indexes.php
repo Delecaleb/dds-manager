@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -11,24 +12,24 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $isMysql = in_array(\Illuminate\Support\Facades\DB::getDriverName(), ['mysql', 'mariadb'], true);
+        $isMysql = in_array(DB::getDriverName(), ['mysql', 'mariadb'], true);
 
         if ($isMysql) {
-            \Illuminate\Support\Facades\DB::statement("SET SESSION sql_mode = ''");
+            DB::statement("SET SESSION sql_mode = ''");
         }
 
         $hasIndex = function (string $table, string $indexName) use ($isMysql): bool {
             if (! $isMysql) {
                 return false;
             }
-            $res = \Illuminate\Support\Facades\DB::select("SHOW INDEX FROM `{$table}` WHERE Key_name = ?", [$indexName]);
+            $res = DB::select("SHOW INDEX FROM `{$table}` WHERE Key_name = ?", [$indexName]);
 
             return ! empty($res);
         };
 
         if (Schema::hasTable('od_procedure_logs')) {
             if ($isMysql) {
-                \Illuminate\Support\Facades\DB::statement('
+                DB::statement('
                     ALTER TABLE `od_procedure_logs`
                     MODIFY `PatNum` BIGINT NULL,
                     MODIFY `ClinicNum` BIGINT NULL,
@@ -47,7 +48,7 @@ return new class extends Migration
 
         if (Schema::hasTable('od_appointments')) {
             if ($isMysql) {
-                \Illuminate\Support\Facades\DB::statement('
+                DB::statement('
                     ALTER TABLE `od_appointments`
                     MODIFY `PatNum` BIGINT NULL,
                     MODIFY `ClinicNum` BIGINT NULL,

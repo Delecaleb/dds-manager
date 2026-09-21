@@ -179,17 +179,18 @@ class ClinicRegistry
     /**
      * Resolve a comma-separated list of location keys (the `locations` request param).
      * Unknown keys are dropped. "all" selects every location. Missing or fully invalid
-     * input falls back to the active office (and its active clinic, if one is set).
+     * input falls back to the persisted session selection, or the active office.
      */
-    public function select(?string $param): LocationSelection
+    public function select(?string $param, bool $persist = true): LocationSelection
     {
         $all = $this->locations();
+        $isParamProvided = $param !== null && trim($param) !== '';
         $tokens = array_values(array_filter(array_map('trim', explode(',', (string) $param)), 'strlen'));
 
         $selected = [];
         if (in_array('all', $tokens, true)) {
             $selected = $all;
-        } else {
+        } elseif ($tokens !== []) {
             foreach ($tokens as $token) {
                 if (isset($all[$token])) {
                     $selected[$token] = $all[$token];
@@ -212,7 +213,42 @@ class ClinicRegistry
         // Keep registry display order regardless of the order keys were passed in.
         $ordered = array_values(array_intersect_key($all, $selected));
 
+        if ($isParamProvided && $persist && app()->bound('session')) {
+            $keys = in_array('all', $tokens, true) ? ['all'] : array_map(fn (Location $l) => $l->key(), $ordered);
+            session(['selected_locations' => $keys]);
+
+            if (! empty($ordered)) {
+                $firstLoc = $ordered[0];
+                session(['active_office_id' => $firstLoc->officeId]);
+                if ($firstLoc->clinicNum !== null) {
+                    $this->setActiveClinicNum($firstLoc->clinicNum, $firstLoc->officeId);
+                }
+            }
+        }
+
         return new LocationSelection($ordered, $this->scopesFor($ordered));
+    }
+
+    /**
+     * Explicitly set and persist the selected locations.
+     *
+     * @param  string|array<string|int>  $keys
+     */
+    public function setSelectedLocations(string|array $keys): LocationSelection
+    {
+        $param = is_array($keys) ? implode(',', $keys) : (string) $keys;
+
+        return $this->select($param, true);
+    }
+
+    /**
+     * Get the currently selected location keys (from session or default).
+     *
+     * @return string[]
+     */
+    public function getSelectedLocationKeys(): array
+    {
+        return $this->select(null, false)->keys();
     }
 
     /**
@@ -221,6 +257,34 @@ class ClinicRegistry
      */
     private function defaultLocations(array $all): array
     {
+        if (app()->bound('session') && session()->has('selected_locations')) {
+            $saved = session('selected_locations');
+            $keys = is_array($saved) ? $saved : explode(',', (string) $saved);
+            $keys = array_filter(array_map('trim', $keys));
+
+            if (in_array('all', $keys, true)) {
+                return $all;
+            }
+
+            $selected = [];
+            foreach ($keys as $token) {
+                if (isset($all[$token])) {
+                    $selected[$token] = $all[$token];
+
+                    continue;
+                }
+                foreach ($all as $key => $location) {
+                    if (ctype_digit((string) $token) && $location->officeId === (int) $token) {
+                        $selected[$key] = $location;
+                    }
+                }
+            }
+
+            if (! empty($selected)) {
+                return $selected;
+            }
+        }
+
         $officeId = Office::getActiveOfficeId();
         if ($officeId === null) {
             return array_slice($all, 0, 1, true);
@@ -232,7 +296,9 @@ class ClinicRegistry
             return [$key => $all[$key]];
         }
 
-        return array_filter($all, fn (Location $l) => $l->officeId === $officeId);
+        $filtered = array_filter($all, fn (Location $l) => $l->officeId === $officeId);
+
+        return ! empty($filtered) ? $filtered : array_slice($all, 0, 1, true);
     }
 
     /**
