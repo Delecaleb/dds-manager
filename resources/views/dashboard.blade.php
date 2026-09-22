@@ -42,6 +42,10 @@
       <!-- Date range picker -->
       <x-daterange-picker id="dashDateRange" on-apply="onDrpApply" />
       <x-location-picker id="dashLocations" :locations="$locations ?? null" :selected="$selectedLocations ?? null" />
+      <button id="refreshBtn"
+        class="bg-white border border-[#00c58e] text-[#00c58e] px-5 py-1.5 rounded text-sm font-bold hover:bg-emerald-50 transition shadow-xs cursor-pointer">
+        Refresh
+      </button>
     </div>
 
     <!-- Right: status + user -->
@@ -715,8 +719,18 @@
 
     /* ── Data fetching ────────────────────────────────── */
     function fetchAll(start, end) {
-      _currentStart = start;
-      _currentEnd = end;
+      if (start) _currentStart = start;
+      if (end) _currentEnd = end;
+      if (!_currentStart || !_currentEnd) {
+        var range = (window.DDS && window.DDS.date) ? window.DDS.date.getRange() : {
+          start: moment().startOf('month').format('YYYY-MM-DD'),
+          end: moment().format('YYYY-MM-DD')
+        };
+        _currentStart = _currentStart || range.start;
+        _currentEnd = _currentEnd || range.end;
+      }
+      start = _currentStart;
+      end = _currentEnd;
 
       showSkeletons();
 
@@ -961,6 +975,12 @@
       fetchAll(start, end);
     };
 
+    document.addEventListener('daterange:changed', function (e) {
+      if (e.detail && e.detail.start && e.detail.end) {
+        fetchAll(e.detail.start, e.detail.end);
+      }
+    });
+
     $(document).ready(function () {
 
       /* Search + sort handlers */
@@ -970,6 +990,11 @@
         searchTimer = setTimeout(renderProviders, 200);
       });
       $('#providerSort').on('change', renderProviders);
+
+      /* Refresh handler */
+      $('#refreshBtn').on('click', function () {
+        fetchAll(_currentStart, _currentEnd);
+      });
 
       /* Export handlers */
       $('#exportFinPerLocBtn').on('click', exportFinPerLocCsv);

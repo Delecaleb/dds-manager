@@ -891,10 +891,13 @@ class PatientController extends Controller
 
         // Date Added to Open Dental Filter
         $dateMode = $request->get('date_mode', 'all');
-        $dateFrom = $request->get('date_from');
-        $dateTo = $request->get('date_to');
+        $dateFrom = null;
+        $dateTo = null;
 
-        if ($dateMode !== 'all' && $dateMode !== 'custom') {
+        if ($dateMode === 'custom') {
+            $dateFrom = $request->get('date_from');
+            $dateTo = $request->get('date_to');
+        } elseif ($dateMode !== 'all') {
             $now = Carbon::now();
             if ($dateMode === 'today') {
                 $dateFrom = $now->format('Y-m-d');

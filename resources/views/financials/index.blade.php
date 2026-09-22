@@ -269,6 +269,11 @@
       <x-daterange-picker on-apply="onDrpApply" />
       <x-location-picker id="finLocations" :locations="$locations ?? null" :selected="$selectedLocations ?? null" />
 
+      <button id="updateBtn"
+        class="bg-white border border-[#00c58e] text-[#00c58e] px-5 py-1.5 rounded text-sm font-bold hover:bg-emerald-50 transition shadow-xs cursor-pointer">
+        Update
+      </button>
+
       <span id="fetchError" class="hidden text-xs text-red-600 font-medium">
         <i class="fa-solid fa-triangle-exclamation mr-1"></i>Failed to load data.
       </span>
@@ -835,6 +840,19 @@
     }
 
     function fetchAnalytics(start, end) {
+      if (start) _currentStartDate = start;
+      if (end) _currentEndDate = end;
+      if (!_currentStartDate || !_currentEndDate) {
+        var range = (window.DDS && window.DDS.date) ? window.DDS.date.getRange() : {
+          start: moment().startOf('month').format('YYYY-MM-DD'),
+          end: moment().format('YYYY-MM-DD')
+        };
+        _currentStartDate = _currentStartDate || range.start;
+        _currentEndDate = _currentEndDate || range.end;
+      }
+      start = _currentStartDate;
+      end = _currentEndDate;
+
       showSkeletons();
       var locs = getFinLocations();
       var baseParams = { start_date: start, end_date: end };
@@ -1268,7 +1286,26 @@
       }
     };
 
+    document.addEventListener('daterange:changed', function (e) {
+      if (e.detail && e.detail.start && e.detail.end) {
+        _currentStartDate = e.detail.start;
+        _currentEndDate = e.detail.end;
+        fetchAnalytics(_currentStartDate, _currentEndDate);
+        if (_sc.data || !document.getElementById('scoreCardsPanel').classList.contains('hidden')) {
+          _sc.data = null;
+          loadScoreCards();
+        }
+      }
+    });
+
     $(document).ready(function () {
+      $('#updateBtn, #refreshBtn').on('click', function () {
+        fetchAnalytics(_currentStartDate, _currentEndDate);
+        if (_sc.data || !document.getElementById('scoreCardsPanel').classList.contains('hidden')) {
+          _sc.data = null;
+          loadScoreCards();
+        }
+      });
       $('#clinicSelect').on('change', function () {
         fetchAnalytics(_currentStartDate, _currentEndDate);
         if (_sc.data || !document.getElementById('scoreCardsPanel').classList.contains('hidden')) {

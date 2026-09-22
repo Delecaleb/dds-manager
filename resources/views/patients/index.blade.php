@@ -210,7 +210,7 @@
                         </div>
                         <div>
                             <h2 class="text-base font-bold text-slate-900">1. Filter Parameters</h2>
-                            <p class="text-xs text-slate-500">Filter patients based on the date added to Open Dental, clinic location, status, and keywords</p>
+                            <p class="text-xs text-slate-500">Filter patients based on the date added to Open Dental, status, and keywords</p>
                         </div>
                     </div>
 
@@ -226,7 +226,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <!-- Filter 1: Date Added Mode -->
                     <div>
                         <label for="expDateMode" class="block text-xs font-bold text-slate-700 mb-1.5">
@@ -258,20 +258,6 @@
                             <input type="date" id="expDateTo" value="{{ date('Y-m-d') }}"
                                 class="w-full bg-white border border-slate-300 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
-                    </div>
-
-                    <!-- Filter 3: Clinic / Office -->
-                    <div>
-                        <label for="expClinic" class="block text-xs font-bold text-slate-700 mb-1.5">Clinic Location</label>
-                        <select id="expClinic"
-                            class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer">
-                            <option value="all" {{ ($activeClinicNum ?? null) === null ? 'selected' : '' }}>All Clinics</option>
-                            @if(isset($clinics) && count($clinics))
-                                @foreach($clinics as $cNum => $cName)
-                                    <option value="{{ $cNum }}" {{ ($activeClinicNum ?? null) !== null && (string)$cNum === (string)$activeClinicNum ? 'selected' : '' }}>{{ $cName }}</option>
-                                @endforeach
-                            @endif
-                        </select>
                     </div>
 
                     <!-- Filter 4: Patient Status -->
@@ -970,7 +956,6 @@
             // Reset Filters
             $('#expResetFiltersBtn').on('click', function () {
                 $('#expDateMode').val('all').trigger('change');
-                $('#expClinic').val('all');
                 $('#expStatus').val('all');
                 $('#expSearch').val('');
                 fetchExportPreview(1);
@@ -1001,12 +986,12 @@
 
                 let loc = document.getElementById('patientSingleLocation')?.value || '';
 
+                let dateMode = $('#expDateMode').val();
                 let params = {
                     locations: loc ? [loc] : [],
-                    date_mode: $('#expDateMode').val(),
-                    date_from: $('#expDateFrom').val(),
-                    date_to: $('#expDateTo').val(),
-                    clinic_id: $('#expClinic').val(),
+                    date_mode: dateMode,
+                    date_from: dateMode === 'custom' ? $('#expDateFrom').val() : '',
+                    date_to: dateMode === 'custom' ? $('#expDateTo').val() : '',
                     status: $('#expStatus').val(),
                     search: $('#expSearch').val(),
                     columns: cols,
@@ -1070,12 +1055,12 @@
 
                 let filename = $('#expFilenameInput').val() || 'patients_export';
                 let loc = document.getElementById('patientSingleLocation')?.value || '';
+                let dateMode = $('#expDateMode').val();
                 let params = $.param({
                     locations: loc ? [loc] : [],
-                    date_mode: $('#expDateMode').val(),
-                    date_from: $('#expDateFrom').val(),
-                    date_to: $('#expDateTo').val(),
-                    clinic_id: $('#expClinic').val(),
+                    date_mode: dateMode,
+                    date_from: dateMode === 'custom' ? $('#expDateFrom').val() : '',
+                    date_to: dateMode === 'custom' ? $('#expDateTo').val() : '',
                     status: $('#expStatus').val(),
                     search: $('#expSearch').val(),
                     columns: cols,
