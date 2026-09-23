@@ -1060,7 +1060,7 @@ class FrontOfficeController extends Controller
         $data = [];
 
         if ($section === 'office') {
-            $off = $kpisCtrl->officeKpis($start, $end);
+            $off = $kpisCtrl->officeKpis(new MetricFilter($start, $end));
             $data = [
                 ['id' => 'pat_retention', 'current' => $off['patient_retention'] ?? '-', 'target' => 85, 'last' => '-'],
                 ['id' => 'tot_tx_plans', 'current' => $off['tx_plans_per_day'] ?? 0, 'target' => 2, 'last' => '-'],
@@ -1075,7 +1075,7 @@ class FrontOfficeController extends Controller
                 ['id' => 'unsch_hyg_ret', 'current' => $off['active_in_recare_pct'] ?? '-', 'target' => '-', 'last' => '-'],
             ];
         } elseif ($section === 'doctor') {
-            $doc = $kpisCtrl->doctorKpis($start, $end);
+            $doc = $kpisCtrl->doctorKpis(new MetricFilter($start, $end));
             $data = [
                 ['id' => 'doc_prod_same_day', 'current' => $doc['case_acceptance_same_day'] ?? '-', 'target' => '-', 'last' => '-'],
                 ['id' => 'doc_case_acc', 'current' => $doc['case_acceptance_rate'] ?? '-', 'target' => 75, 'last' => '-'],
@@ -1095,7 +1095,7 @@ class FrontOfficeController extends Controller
                 ['id' => 'doc_tot_prod', 'current' => $doc['total_production'] ?? 0, 'target' => '-', 'last' => '-'],
             ];
         } elseif ($section === 'hygiene') {
-            $hyg = $kpisCtrl->hygieneKpis($start, $end);
+            $hyg = $kpisCtrl->hygieneKpis(new MetricFilter($start, $end));
             $data = [
                 ['id' => 'hyg_pre_apt', 'current' => $hyg['reappt'] ?? '-', 'target' => 85, 'last' => '-'],
                 ['id' => 'hyg_unfilled', 'current' => '-', 'target' => '-', 'last' => '-'],
