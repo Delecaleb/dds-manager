@@ -108,6 +108,17 @@
                             </a>
                         @endif
 
+                        {{-- Growth Engine leaves the analytics shell behind: its own layout and nav. --}}
+                        @if(auth()->user()->hasModuleAccess('marketing'))
+                            <a href="{{ route('marketing.index') }}"
+                                class="flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium">
+                                <span class="flex items-center gap-2.5">
+                                    <i data-lucide="trending-up" class="w-4 h-4"></i> Growth Engine
+                                </span>
+                                <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-slate-400"></i>
+                            </a>
+                        @endif
+
                         @if(auth()->user()->hasModuleAccess('kpis'))
                             <a href="{{ route('kpis.index') }}"
                                 class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('kpis.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"

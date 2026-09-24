@@ -10,6 +10,7 @@ use App\Http\Controllers\FinancialController;
 use App\Http\Controllers\FrontOfficeController;
 use App\Http\Controllers\HygieneRecallController;
 use App\Http\Controllers\KpisController;
+use App\Http\Controllers\MarketingController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\OpenDentalExplorerController;
 use App\Http\Controllers\OperationsController;
@@ -103,6 +104,7 @@ Route::middleware('auth')->group(function () {
     // KPIs Module
     Route::middleware('module:kpis')->group(function () {
         Route::get('kpis', [KpisController::class, 'index'])->name('kpis.index');
+        Route::get('kpis/detail', [KpisController::class, 'detail'])->name('kpis.detail');
         Route::get('kpis/hygiene', [KpisController::class, 'hygiene'])->name('kpis.hygiene');
         Route::get('kpis/hygiene-providers', [KpisController::class, 'hygieneProviders'])->name('kpis.hygiene-providers');
         Route::get('kpis/doctor', [KpisController::class, 'doctor'])->name('kpis.doctor');
@@ -118,6 +120,19 @@ Route::middleware('auth')->group(function () {
         Route::get('kpis/os-providers', [KpisController::class, 'osProviders'])->name('kpis.os-providers');
         Route::get('kpis/pedo', [KpisController::class, 'pedo'])->name('kpis.pedo');
         Route::get('kpis/pedo-providers', [KpisController::class, 'pedoProviders'])->name('kpis.pedo-providers');
+    });
+
+    // Marketing Module — "Growth Engine". Runs as its own app: own shell, own nav.
+    Route::middleware('module:marketing')->prefix('marketing')->name('marketing.')->group(function () {
+        Route::get('/', [MarketingController::class, 'index'])->name('index');
+        Route::get('funnel', [MarketingController::class, 'funnel'])->name('funnel');
+        Route::get('channels', [MarketingController::class, 'channels'])->name('channels');
+        Route::get('campaigns', [MarketingController::class, 'campaigns'])->name('campaigns');
+        Route::get('leads', [MarketingController::class, 'leads'])->name('leads');
+        Route::get('automations', [MarketingController::class, 'automations'])->name('automations');
+        Route::get('alerts', [MarketingController::class, 'alerts'])->name('alerts');
+        Route::get('integrations', [MarketingController::class, 'integrations'])->name('integrations');
+        Route::get('settings', [MarketingController::class, 'settings'])->name('settings');
     });
 
     // Provider Portal Module

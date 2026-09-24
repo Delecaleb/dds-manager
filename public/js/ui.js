@@ -263,11 +263,36 @@
         // Already initialised → reuse it, UNLESS the caller wants a rebuild (destroy:true,
         // e.g. a modal table re-opened with fresh data).
         if (jQuery.fn.DataTable.isDataTable($el) && !opts.destroy) return $el.DataTable();
-        return $el.DataTable(Object.assign({
+
+        // Check if a reusable pagination container is attached via data-pagination-id
+        var paginationId = opts.dataPaginationId || opts.paginationId || $el.data('paginationId') || $el.attr('data-pagination-id');
+        if (!paginationId) {
+            var $modal = $el.closest('.ds-limitless-modal, .dds-modal');
+            if ($modal.length) {
+                var $pager = $modal.find('[id$="-pagination-container"]');
+                if ($pager.length) {
+                    var containerId = $pager.attr('id') || '';
+                    paginationId = containerId.replace(/-pagination-container$/, '');
+                }
+            }
+        }
+        if (!paginationId) {
+            var $scroll = $el.closest('.dds-table-scroll, .overflow-x-auto, .overflow-y-auto');
+            var $pager = $scroll.length ? $scroll.siblings('[id$="-pagination-container"]') : jQuery();
+            if (!$pager.length) {
+                $pager = $el.closest('.bg-white, .border, [class*="rounded"]').find('[id$="-pagination-container"]');
+            }
+            if ($pager.length) {
+                var containerId = $pager.attr('id') || '';
+                paginationId = containerId.replace(/-pagination-container$/, '');
+            }
+        }
+
+        var defaultOpts = {
             paging: true,
-            pageLength: 10,
+            pageLength: opts.pageLength || 10,
             lengthChange: true,
-            lengthMenu: [[10, 20, 50, 100, -1], [10, 20, 50, 100, 'All']],
+            lengthMenu: [[10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 250, 500, 1000, -1], [10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 250, 500, 1000, 'All']],
             searching: true,
             ordering: true,          // every column sortable
             info: true,
@@ -285,17 +310,90 @@
                     last: '»'
                 }
             }
-        }, opts || {}));
+        };
+
+        if (paginationId) {
+            var $itemsPerPage = jQuery('#' + paginationId + 'ItemsPerPage');
+            if ($itemsPerPage.length && !opts.pageLength) {
+                var parsedLen = parseInt($itemsPerPage.val(), 10);
+                if (!isNaN(parsedLen) && parsedLen > 0) {
+                    defaultOpts.pageLength = parsedLen;
+                }
+            }
+            // When connected to <x-table-pagination>, suppress DataTables default duplicate pager controls
+            defaultOpts.dom = 'rt';
+            defaultOpts.layout = { topStart: null, topEnd: null, bottomStart: null, bottomEnd: null };
+            defaultOpts.lengthChange = false;
+            defaultOpts.info = false;
+        }
+
+        var dt = $el.DataTable(Object.assign(defaultOpts, opts));
+
+        if (paginationId) {
+            DDS.bindPagination(dt, paginationId, {
+                onLoading: opts.onLoading
+            });
+        }
+
+        return dt;
     };
     // Init every not-yet-initialised .dds-datatable within a root (called after a modal opens).
     DDS.dataTableAll = function (root) {
         (root || document).querySelectorAll('table.dds-datatable').forEach(function (t) { DDS.dataTable(t); });
     };
 
+    // ── Helper to render reusable pagination markup dynamically in JS ─────────
+    DDS.renderPaginationHtml = function (id, defaultLen, lengths) {
+        defaultLen = defaultLen || 10;
+        lengths = lengths || [10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 250, 500, 1000, -1];
+        var lenOptions = lengths.map(function (len) {
+            var sel = (String(len) === String(defaultLen)) ? ' selected' : '';
+            var label = (len === -1) ? ' All ' : ' ' + len + ' ';
+            return '<option value="' + len + '"' + sel + '>' + label + '</option>';
+        }).join('');
+
+        return '<div id="' + id + '-pagination-container" class="p-4 bg-white border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-3 rounded-b-lg">' +
+            '<div class="flex items-center">' +
+                '<div tabindex="-1" class="flex items-center px-0">' +
+                    '<label for="' + id + 'ItemsPerPage" class="hidden md:mr-2 md:inline-block font-medium text-slate-600">Items per page</label>' +
+                    '<select id="' + id + 'ItemsPerPage" class="p-1.5 px-2 rounded border border-slate-300 bg-white text-slate-700 focus:outline-none focus:border-emerald-500 text-xs cursor-pointer">' +
+                        lenOptions +
+                    '</select>' +
+                '</div>' +
+                '<div class="md:px-3 md:flex md:items-center text-slate-600">' +
+                    '<span class="hidden md:inline md:mr-1" id="' + id + 'RangeInfo">0-0</span> of <span id="' + id + 'TotalCount" class="font-bold text-slate-800 ml-1 mr-1">0</span> items' +
+                '</div>' +
+            '</div>' +
+            '<div class="flex items-center gap-2">' +
+                '<div class="flex items-center px-2">' +
+                    '<div class="mr-2">' +
+                        '<select id="' + id + 'PageSelect" class="p-1.5 px-2 rounded border border-slate-300 bg-white text-slate-700 focus:outline-none focus:border-emerald-500 text-xs cursor-pointer">' +
+                            '<option value="1" selected> 1 </option>' +
+                        '</select>' +
+                    '</div>' +
+                    '<span class="text-slate-600">of <span id="' + id + 'TotalPages" class="font-medium text-slate-800">1</span> <span class="ml-1 hidden md:inline">pages</span></span>' +
+                '</div>' +
+                '<div class="flex items-center">' +
+                    '<button id="' + id + 'PrevBtn" disabled type="button" class="py-1.5 px-3 rounded-l border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors" title="Previous Page">' +
+                        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="flex-shrink-0 stroke-current"><path d="M15 3l-8 9 8 9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>' +
+                    '</button>' +
+                    '<button id="' + id + 'NextBtn" disabled type="button" class="py-1.5 px-3 rounded-r border-t border-b border-r border-slate-300 bg-white text-slate-600 hover:bg-slate-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors" title="Next Page">' +
+                        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="flex-shrink-0 stroke-current"><path d="M9 21l8-9-8-9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>' +
+                    '</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    };
+
     // ── Reusable Custom Pagination Binder ──────────────────────────────────────
     // Connects <x-table-pagination :id="$prefix" /> controls to a DataTables instance.
     DDS.bindPagination = function (tableApi, idPrefix, opts) {
         if (!tableApi || !idPrefix || !window.jQuery) return null;
+        var api = (tableApi && tableApi.page && typeof tableApi.page.info === 'function')
+            ? tableApi
+            : (window.jQuery && jQuery.fn && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(tableApi) ? jQuery(tableApi).DataTable() : null);
+        if (!api) return null;
+
         opts = opts || {};
         var onLoading = typeof opts.onLoading === 'function' ? opts.onLoading : null;
 
@@ -309,7 +407,7 @@
         var $selectAll = jQuery('#' + idPrefix + 'SelectAll');
 
         function update() {
-            var info = tableApi.page.info();
+            var info = api.page.info();
             var totalRecords = info.recordsDisplay;
             var totalPages = info.pages > 0 ? info.pages : 1;
             var currentPage = info.page + 1; // 1-indexed
@@ -357,33 +455,33 @@
         $itemsPerPage.off('change.ddsPagination').on('change.ddsPagination', function () {
             var val = parseInt(jQuery(this).val(), 10);
             if (onLoading) onLoading();
-            tableApi.page.len(val).draw('page');
+            api.page.len(val).draw('page');
         });
 
         $pageSelect.off('change.ddsPagination').on('change.ddsPagination', function () {
             var targetPage = parseInt(jQuery(this).val(), 10) - 1;
             if (targetPage >= 0) {
                 if (onLoading) onLoading();
-                tableApi.page(targetPage).draw('page');
+                api.page(targetPage).draw('page');
             }
         });
 
         $prevBtn.off('click.ddsPagination').on('click.ddsPagination', function () {
             if (!jQuery(this).prop('disabled')) {
                 if (onLoading) onLoading();
-                tableApi.page('previous').draw('page');
+                api.page('previous').draw('page');
             }
         });
 
         $nextBtn.off('click.ddsPagination').on('click.ddsPagination', function () {
             if (!jQuery(this).prop('disabled')) {
                 if (onLoading) onLoading();
-                tableApi.page('next').draw('page');
+                api.page('next').draw('page');
             }
         });
 
         // Listen for table draw events automatically
-        tableApi.off('draw.ddsPagination').on('draw.ddsPagination', function () {
+        api.off('draw.ddsPagination').on('draw.ddsPagination', function () {
             update();
         });
 
@@ -409,9 +507,23 @@
        Total rows stay pinned.
     -------------------------------------------------------------------------- */
     DDS.sortable = function (el, opts) {
+        opts = opts || {};
+        var paginationId = opts.paginationId || opts.dataPaginationId ||
+            (el && (el.getAttribute('data-pagination-id') || (el.dataset && el.dataset.paginationId)));
+        if (!paginationId && el && window.jQuery) {
+            var $c = jQuery(el).closest('.dds-table-scroll').siblings('[id$="-pagination-container"]');
+            if (!$c.length) {
+                $c = jQuery(el).closest('.bg-white, .border, [class*="rounded"]').find('[id$="-pagination-container"]');
+            }
+            if ($c.length) {
+                paginationId = $c.attr('id').replace(/-pagination-container$/, '');
+            }
+        }
+        var hasPagination = !!paginationId || (opts.paging === true);
+
         var dt = DDS.dataTable(el, Object.assign({
-            paging: false,
-            searching: false,
+            paging: hasPagination,
+            searching: hasPagination ? true : false,
             info: false,
             ordering: true,
             order: [],           // keep the server's row order until a header is clicked
@@ -419,7 +531,7 @@
             // sort apart from the page repainting the table with new data.
             preDrawCallback: function () { el.__ddsDrawing = true; },
             drawCallback: function () { el.__ddsDrawing = false; }
-        }, opts || {}));
+        }, opts));
         DDS.sortableObserve(el);
         return dt;
     };
@@ -471,10 +583,11 @@
 
     // Embedded-details drilldown from a rows[] array — the ONE implementation, replacing the
     // duplicated openOpsDrilldown / openMarketingDrilldown. Renders the shared, SORTABLE
-    // DataTable (DDS.dataTable). Stackable; money/count auto-format + sort numerically.
+    // DataTable (DDS.dataTable) with reusable pagination. Stackable; money/count auto-format + sort numerically.
     DDS.modal.details = function (title, rows) {
         rows = rows || [];
         var body, tableId = 'dds-dt-' + (DDS._dtSeq = (DDS._dtSeq || 0) + 1);
+        var pagerHtml = '';
         if (!rows.length) {
             body = '<div class="py-8 text-center text-gray-400 text-sm">No records found.</div>';
         } else {
@@ -496,18 +609,22 @@
                     return '<td class="py-3 px-4 text-gray-700 font-semibold">' + (v == null || v === '' ? '—' : v) + '</td>';
                 }).join('') + '</tr>';
             }).join('');
-            body = '<table id="' + tableId + '" class="dds-table dds-datatable w-full text-left text-xs whitespace-nowrap">' +
+            body = '<table id="' + tableId + '" data-pagination-id="' + tableId + '" class="dds-table dds-datatable w-full text-left text-xs whitespace-nowrap">' +
                 '<thead>' + head + '</thead><tbody>' + rowsHtml + '</tbody></table>';
+            pagerHtml = '<div class="shrink-0 border-t border-slate-100 bg-white rounded-b-lg">' +
+                DDS.renderPaginationHtml(tableId, 10) +
+                '</div>';
         }
-        var html = '<div class="dds-modal"><div class="dds-modal-panel">' +
-            '<div class="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/50">' +
+        var html = '<div class="dds-modal"><div class="dds-modal-panel flex flex-col max-h-[85vh]">' +
+            '<div class="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/50 rounded-t-lg shrink-0">' +
             '<h4 class="text-sm font-bold text-gray-900">Breakdown | ' + (title || 'Details') + '</h4>' +
             '<div class="flex items-center gap-3">' +
             (rows.length ? '<button type="button" onclick="exportDrilldownModalCsv(this)" class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded border border-emerald-500 text-emerald-600 hover:bg-emerald-50 focus:outline-none transition-colors cursor-pointer shadow-xs"><svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>' : '') +
             '<button type="button" data-dds-close class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button></div></div>' +
-            '<div class="flex-1 overflow-y-auto p-6">' + body + '</div></div></div>';
+            '<div class="flex-1 overflow-y-auto p-6">' + body + '</div>' +
+            pagerHtml +
+            '</div></div>';
         var modal = DDS.modal.openHtml(html);
-        if (rows.length) DDS.dataTable(document.getElementById(tableId)); // sortable columns
         return modal;
     };
 

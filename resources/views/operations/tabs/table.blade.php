@@ -44,7 +44,7 @@
     </div>
 
     {{-- The table (all 3 types handled by the component; real sticky columns) --}}
-    <x-analytics-table :spec="$spec" :active-subtab="$activeSubtab" />
+    <x-analytics-table :spec="$spec" :active-subtab="$activeSubtab" :paginate="$paginate ?? (($tab ?? '') === 'services')" :tab="$tab ?? null" />
 </div>
 
 {{-- Drilldowns use the shared, stackable DDS.modal.details (ui.js). The old embedded

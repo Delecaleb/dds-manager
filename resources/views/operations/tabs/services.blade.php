@@ -201,7 +201,7 @@
 
     {{-- Datatable with subtabs --}}
     <div class="mt-8">
-        @include('operations.tabs.table', ['spec' => $spec, 'subtabs' => $subtabs ?? [], 'tab' => $tab, 'activeSubtab' => $activeSubtab ?? 'default'])
+        @include('operations.tabs.table', ['spec' => $spec, 'subtabs' => $subtabs ?? [], 'tab' => $tab, 'activeSubtab' => $activeSubtab ?? 'default', 'paginate' => true])
     </div>
 
 </div>

@@ -159,6 +159,17 @@ class ModuleManager
                     ],
                 ],
             ],
+            'growth' => [
+                'label' => 'Growth & Marketing',
+                'modules' => [
+                    'marketing' => [
+                        'name' => 'Growth Engine',
+                        'description' => 'Marketing attribution, campaigns, lead nurturing and automations',
+                        'icon' => 'trending-up',
+                        'route' => 'marketing.index',
+                    ],
+                ],
+            ],
             'system' => [
                 'label' => 'System & Integrations',
                 'modules' => [

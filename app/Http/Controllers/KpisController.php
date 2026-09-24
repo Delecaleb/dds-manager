@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Kpi\HygieneKpiDetailService;
 use App\Domain\Patient\PatientService;
 use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\Location;
@@ -30,12 +31,20 @@ class KpisController extends Controller
     ) {
         $this->completedIn = ProcStatus::inList(ProcStatus::completed());
         $this->tpIn = ProcStatus::inList(ProcStatus::treatmentPlanned());
-        $this->hygieneCodesIn = "'".implode("','", [
-            'D1110', 'D1120', 'D4341', 'D4342', 'D4910', 'D4346', 'D4355',
-            'D1206', 'D1208', 'D0210', 'D1351', 'D9972', 'D9973', 'D9974', 'D9975', 'D4381',
-            '1110', '1120', '4341', '4342', '4910', '4346', '4355',
-            '1206', '1208', '0210', '1351', '4381',
-        ])."'";
+        $this->hygieneCodesIn = $this->codeIn(HygieneKpiDetailService::HYGIENE_PRODUCTION_CODES);
+    }
+
+    /**
+     * Quoted code list for a raw-SQL IN (...).
+     *
+     * The lists themselves live on HygieneKpiDetailService so a card and its drill-down
+     * can never filter on different codes.
+     *
+     * @param  list<string>  $codes
+     */
+    private function codeIn(array $codes): string
+    {
+        return "'".implode("','", array_map('addslashes', $codes))."'";
     }
 
     public function index()
@@ -59,6 +68,39 @@ class KpisController extends Controller
     public function office(Request $request): JsonResponse
     {
         return $this->perLocation($request, fn (MetricFilter $f) => $this->officeKpiSet($f));
+    }
+
+    /**
+     * The records behind one KPI card — the drill-down its icon opens.
+     *
+     * Rows come from the domain service, never from this controller, and are computed per
+     * location for the same reason the cards are (each office is its own OpenDental
+     * instance). With several locations selected each row names the one it came from.
+     */
+    public function detail(Request $request, HygieneKpiDetailService $details): JsonResponse
+    {
+        $metric = (string) $request->input('metric', '');
+        $section = (string) $request->input('section', 'hygiene');
+
+        if ($section !== 'hygiene' || ! $details->supports($metric)) {
+            return response()->json(['message' => 'No drill-down available for this KPI.'], 404);
+        }
+
+        $scopes = $this->locationFilters($request, now()->startOfYear()->toDateString());
+        $multi = count($scopes) > 1;
+        $rows = [];
+
+        foreach ($scopes as $scope) {
+            foreach ($details->rows($metric, $scope['filter']) as $row) {
+                $rows[] = $multi ? ['Location' => $scope['location']->name] + $row : $row;
+            }
+        }
+
+        return response()->json([
+            'metric' => $metric,
+            'title' => $details->title($metric),
+            'rows' => $rows,
+        ]);
     }
 
     // ─── Location plumbing ───────────────────────────────────────────────────
@@ -243,6 +285,17 @@ class KpisController extends Controller
         $sub12 = $this->dateSubMonths(12);
         $sub6 = $this->dateSubMonths(6);
 
+        // Code lists come from the drill-down service, their single home.
+        $perioCodes = $this->codeIn(HygieneKpiDetailService::PERIO_CODES);
+        $perioReapptCodes = $this->codeIn(HygieneKpiDetailService::PERIO_REAPPT_CODES);
+        $visitCodes = $this->codeIn(HygieneKpiDetailService::HYGIENE_VISIT_CODES);
+        $fluorideCodes = $this->codeIn(HygieneKpiDetailService::FLUORIDE_CODES);
+        $srpCodes = $this->codeIn(HygieneKpiDetailService::SRP_CODES);
+        $fmxCodes = $this->codeIn(HygieneKpiDetailService::FMX_CODES);
+        $sealantCodes = $this->codeIn(HygieneKpiDetailService::SEALANT_CODES);
+        $whiteningCodes = $this->codeIn(HygieneKpiDetailService::WHITENING_CODES);
+        $antimicrobialCodes = $this->codeIn(HygieneKpiDetailService::ANTIMICROBIAL_CODES);
+
         // ① One scan for all per-procedure aggregates (replaces ~10 separate queries)
         $s = DB::selectOne("
             SELECT
@@ -250,19 +303,19 @@ class KpisController extends Controller
                 COUNT(*)                                                                                AS total_procs,
                 COUNT(DISTINCT pl.ProcDate)                                                             AS work_days,
                 COUNT(DISTINCT {$patDate})                                                              AS visits,
-                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D4341','D4342','D4910','D4346','D4355','4341','4342','4910','4346','4355')
+                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ({$perioCodes})
                                     THEN {$patDate} END)                                                AS perio_visits,
-                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D1110','D1120','D4341','D4342','D4910','D4346','D4355','1110','1120','4341','4342','4910','4346','4355')
+                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ({$visitCodes})
                                     THEN {$patDate} END)                                                AS hygiene_appts,
-                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D1206','D1208','1206','1208') 
+                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ({$fluorideCodes})
                                     THEN pl.PatNum END)                                                AS fluoride_count,
-                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D4341','D4342','4341','4342') 
+                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ({$srpCodes})
                                     THEN {$patDate} END)                                                AS srp_count,
-                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ('D0210','0210') 
+                COUNT(DISTINCT CASE WHEN pc.ProcCode IN ({$fmxCodes})
                                     THEN pl.PatNum END)                                                AS fmx_count,
-                SUM(CASE WHEN pc.ProcCode IN ('D1351') THEN 1 ELSE 0 END)                               AS sealants,
-                SUM(CASE WHEN pc.ProcCode IN ('D9972','D9973','D9974','D9975') THEN 1 ELSE 0 END)       AS whitening,
-                SUM(CASE WHEN pc.ProcCode IN ('D4381') THEN 1 ELSE 0 END)                               AS antimicrobial
+                SUM(CASE WHEN pc.ProcCode IN ({$sealantCodes}) THEN 1 ELSE 0 END)                       AS sealants,
+                SUM(CASE WHEN pc.ProcCode IN ({$whiteningCodes}) THEN 1 ELSE 0 END)                     AS whitening,
+                SUM(CASE WHEN pc.ProcCode IN ({$antimicrobialCodes}) THEN 1 ELSE 0 END)                 AS antimicrobial
             FROM od_procedure_logs pl
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             WHERE pl.office_id = ?
@@ -306,7 +359,7 @@ class KpisController extends Controller
             JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
             JOIN od_appointments a ON pl.AptNum = a.AptNum AND a.office_id = ?
             WHERE pl.office_id = ?
-              AND pc.ProcCode IN ('D4341','D4342','D4910','4341','4342','4910')
+              AND pc.ProcCode IN ({$perioReapptCodes})
               AND pl.ProcStatus IN ({$this->completedIn})
               AND pl.ProcDate BETWEEN ? AND ?
               AND pl.AptNum IS NOT NULL AND pl.AptNum != '0'{$clinic}

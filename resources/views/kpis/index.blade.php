@@ -747,13 +747,72 @@
         } else {
           html += '<span class="text-[17px] font-extrabold text-gray-900 tabular-nums leading-tight">' + fmtKpi(val, card.fmt) + '</span>';
         }
-        html += '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" '
-          + 'stroke="#d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
-          + '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>';
+        html += drillHtml(containerId, card, val);
         html += '</div>';
         html += '</div>';
       });
       $c.innerHTML = html;
+    }
+
+    /* ── Card drill-down ───────────────────────────────────────────────────────
+       The pulse icon opens the records behind the number (DDS.modal.details).
+       Only sections with a detail endpoint are clickable; the rest keep the plain icon. */
+    var DRILLABLE_SECTIONS = { hygiene: true };
+
+    /* Pulse: a card with no drill-down. Square-with-arrow: opens the records behind it. */
+    function kpiIconSvg(stroke) {
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" '
+        + 'stroke="' + stroke + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        + '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>';
+    }
+
+    function kpiDrillIconSvg() {
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" '
+        + 'stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>'
+        + '<polyline points="15 3 21 3 21 9"></polyline>'
+        + '<line x1="10" y1="14" x2="21" y2="3"></line></svg>';
+    }
+
+    function drillHtml(containerId, card, val) {
+      var section = String(containerId).replace('-grid', '');
+      if (!DRILLABLE_SECTIONS[section] || val === null || val === undefined) {
+        return kpiIconSvg('#d1d5db');
+      }
+      return '<button type="button" class="kpi-drill text-gray-300 hover:text-emerald-600 cursor-pointer focus:outline-none leading-none"'
+        + ' data-kpi-section="' + section + '" data-kpi-metric="' + card.k + '"'
+        + ' title="View the records behind this number"'
+        + ' aria-label="View details for ' + escHtml(card.label).replace(/"/g, '&quot;') + '">'
+        + kpiDrillIconSvg() + '</button>';
+    }
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('.kpi-drill') : null;
+      if (!btn) return;
+      openKpiDetail(btn);
+    });
+
+    function openKpiDetail(btn) {
+      if (btn.dataset.loading === '1') return;
+      btn.dataset.loading = '1';
+      btn.classList.add('animate-pulse');
+
+      var qs = getKpiQueryString(_kpiStart, _kpiEnd)
+        + '&section=' + encodeURIComponent(btn.dataset.kpiSection)
+        + '&metric=' + encodeURIComponent(btn.dataset.kpiMetric);
+
+      fetch(_kpiBase + '/kpis/detail' + qs)
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+        .then(function (d) {
+          DDS.modal.details(d.title || 'Details', d.rows || []);
+        })
+        .catch(function () {
+          DDS.modal.details('Details', []);
+        })
+        .finally(function () {
+          btn.dataset.loading = '0';
+          btn.classList.remove('animate-pulse');
+        });
     }
 
     function escHtml(s) {
