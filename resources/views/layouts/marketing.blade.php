@@ -26,6 +26,8 @@
                 'label' => 'Measure',
                 'items' => [
                     ['route' => 'marketing.index', 'icon' => 'gauge', 'label' => 'Overview'],
+                    ['route' => 'marketing.websites', 'icon' => 'globe', 'label' => 'Websites'],
+                    ['route' => 'marketing.journeys', 'icon' => 'route', 'label' => 'Visitor Journeys'],
                     ['route' => 'marketing.funnel', 'icon' => 'filter', 'label' => 'Attribution Funnel'],
                     ['route' => 'marketing.channels', 'icon' => 'share-2', 'label' => 'Channels'],
                     ['route' => 'marketing.campaigns', 'icon' => 'megaphone', 'label' => 'Campaigns'],
@@ -42,6 +44,7 @@
             [
                 'label' => 'Configure',
                 'items' => [
+                    ['route' => 'marketing.tracking', 'icon' => 'code', 'label' => 'Tracking Script'],
                     ['route' => 'marketing.integrations', 'icon' => 'plug', 'label' => 'Integrations'],
                     ['route' => 'marketing.settings', 'icon' => 'sliders', 'label' => 'Settings'],
                 ],

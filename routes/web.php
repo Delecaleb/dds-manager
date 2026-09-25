@@ -19,6 +19,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProviderPortalController;
 use App\Http\Controllers\RcmController;
 use App\Http\Controllers\SyncManagerController;
+use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\TxMinerController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +27,18 @@ Route::get('/', function () {
     return auth()->check()
         ? redirect()->route('dashboard')
         : redirect()->route('login');
+});
+
+/*
+ * Public web tracking. Called by visitors' browsers on tracked third-party sites, so these
+ * two routes are deliberately outside auth: the site key in the payload says which site is
+ * reporting. Rate limited because the endpoint is open to anyone who views a page's source.
+ */
+Route::prefix('t')->name('tracking.')->group(function () {
+    Route::get('dds.js', [TrackingController::class, 'script'])->name('script');
+    Route::post('collect', [TrackingController::class, 'collect'])
+        ->middleware('throttle:tracking')->name('collect');
+    Route::options('collect', [TrackingController::class, 'options']);
 });
 
 Route::middleware('auth')->group(function () {
@@ -126,6 +139,11 @@ Route::middleware('auth')->group(function () {
     Route::middleware('module:marketing')->prefix('marketing')->name('marketing.')->group(function () {
         Route::get('/', [MarketingController::class, 'index'])->name('index');
         Route::get('funnel', [MarketingController::class, 'funnel'])->name('funnel');
+        Route::get('websites', [MarketingController::class, 'websites'])->name('websites');
+        Route::get('journeys', [MarketingController::class, 'journeys'])->name('journeys');
+        Route::get('tracking', [MarketingController::class, 'tracking'])->name('tracking');
+        Route::post('sites', [MarketingController::class, 'storeSite'])->name('sites.store');
+        Route::patch('sites/{site}/toggle', [MarketingController::class, 'toggleSite'])->name('sites.toggle');
         Route::get('channels', [MarketingController::class, 'channels'])->name('channels');
         Route::get('campaigns', [MarketingController::class, 'campaigns'])->name('campaigns');
         Route::get('leads', [MarketingController::class, 'leads'])->name('leads');

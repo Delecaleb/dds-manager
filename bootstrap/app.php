@@ -17,6 +17,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'module' => EnsureModuleAccess::class,
             'super_admin' => EnsureSuperAdmin::class,
         ]);
+
+        // The tracking beacon is posted cross-origin by visitors' browsers on other
+        // domains, so it cannot carry a session CSRF token. It is safe to exempt because
+        // it is sent without cookies and only ever writes tracking rows for the site whose
+        // public key it names — it can neither read nor act as a logged-in user.
+        $middleware->validateCsrfTokens(except: ['t/collect']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

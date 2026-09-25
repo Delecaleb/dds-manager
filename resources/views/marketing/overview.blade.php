@@ -40,6 +40,32 @@
             </div>
         </x-marketing.panel>
 
+        {{-- Getting started: website tracking is the part that works today, so the overview
+             points straight at it rather than leaving someone to find it. --}}
+        <x-marketing.panel title="Start tracking a website" subtitle="Three steps — works on WordPress, Wix, Squarespace or a custom site" icon="globe">
+            <x-slot:actions>
+                <a href="{{ route('marketing.tracking') }}"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-lg border border-emerald-500 text-emerald-700 hover:bg-emerald-50">
+                    <i data-lucide="code" class="w-3.5 h-3.5"></i> Get the script
+                </a>
+            </x-slot:actions>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                @foreach ([
+                    ['1. Add the site', 'Name, domain and the office its leads belong to. You get a key and a snippet.', 'plus-circle'],
+                    ['2. Paste the snippet', 'On WordPress: a header plugin such as WPCode, or the child theme. Step-by-step instructions, with your key already filled in, are on the Tracking Script page.', 'clipboard-paste'],
+                    ['3. Mark signups', 'One line on form submit turns a visitor into a lead, and their earlier visits join to them.', 'user-plus'],
+                ] as [$step, $detail, $icon])
+                    <div class="border border-slate-200 rounded-xl p-4">
+                        <div class="flex items-center gap-2 text-[12px] font-bold text-slate-900">
+                            <i data-lucide="{{ $icon }}" class="w-4 h-4 text-slate-400"></i> {{ $step }}
+                        </div>
+                        <p class="mt-1.5 text-[11px] text-slate-500 leading-relaxed">{{ $detail }}</p>
+                    </div>
+                @endforeach
+            </div>
+        </x-marketing.panel>
+
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <x-marketing.panel title="Channel performance" subtitle="Spend and return by channel" icon="share-2" class="xl:col-span-2">
                 <x-slot:actions>
