@@ -44,4 +44,9 @@ class TreatmentPlanSyncService extends BaseQuerySyncService
     {
         return 'TreatPlanNum';
     }
+
+    protected function dateColumn(): ?string
+    {
+        return 'DateTP';
+    }
 }

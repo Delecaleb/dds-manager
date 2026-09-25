@@ -26,10 +26,28 @@ class Office extends Model
      */
     public static function getActiveOfficeId(): ?int
     {
-        $sessionOfficeId = session('active_office_id');
+        if (app()->bound('session')) {
+            $sessionOfficeId = session('active_office_id');
 
-        if ($sessionOfficeId && static::where('id', $sessionOfficeId)->where('is_active', true)->exists()) {
-            return (int) $sessionOfficeId;
+            if ($sessionOfficeId && static::where('id', $sessionOfficeId)->where('is_active', true)->exists()) {
+                return (int) $sessionOfficeId;
+            }
+
+            if (session()->has('selected_locations')) {
+                $saved = session('selected_locations');
+                $keys = is_array($saved) ? $saved : explode(',', (string) $saved);
+                foreach ($keys as $k) {
+                    if ($k === 'all') {
+                        continue;
+                    }
+                    $officeId = (int) explode(':', (string) $k)[0];
+                    if ($officeId > 0 && static::where('id', $officeId)->where('is_active', true)->exists()) {
+                        session(['active_office_id' => $officeId]);
+
+                        return $officeId;
+                    }
+                }
+            }
         }
 
         $defaultOffice = static::where('is_active', true)->first();

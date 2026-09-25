@@ -8,17 +8,14 @@
     </a>
   </header>
 
-  <section class="bg-white border-b border-gray-200 px-8 py-4 flex flex-wrap items-center justify-between gap-4">
+  <section class="relative z-30 bg-white border-b border-gray-200 px-8 py-4 flex flex-wrap items-center justify-between gap-4">
     <div class="flex flex-wrap items-center gap-3">
       <div class="relative flex items-center border border-gray-300 rounded px-3 py-1.5 bg-white shadow-sm">
         <i class="fa-regular fa-calendar text-gray-400 mr-2 text-sm"></i>
         <span class="text-sm font-medium text-gray-700">Jun 01, 2026 - Jun 24, 2026</span>
       </div>
 
-      <select class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
-        <option selected>8 Mile</option>
-        <option>Detroit Main</option>
-      </select>
+      <x-location-picker id="snapLocations" />
 
       <select class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
         <option selected>Detroit Dental Specialist</option>
@@ -36,9 +33,9 @@
     </div>
   </section>
 
-  <section class="px-8 pt-4 bg-white border-b border-gray-200">
-    <div class="flex space-x-6">
-      <button class="border-b-2 border-emerald-500 text-emerald-600 font-bold text-sm pb-3">Default</button>
+  <section class="px-8 pt-4 bg-white border-b border-gray-200 overflow-x-auto">
+    <div class="flex flex-nowrap overflow-x-auto space-x-6 dds-tab-nav">
+      <button class="border-b-2 border-emerald-500 text-emerald-600 font-bold text-sm pb-3 whitespace-nowrap flex-shrink-0">Default</button>
     </div>
   </section>
 

@@ -3,7 +3,7 @@
 <div
     class="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200 ds-limitless-modal">
     <div class="bg-white rounded-lg shadow-xl border border-gray-200 w-full max-w-5xl flex flex-col max-h-[85vh]">
-        <div class="p-6 border-b border-gray-100 bg-white rounded-t-lg">
+        <div class="p-6 border-b border-gray-100 bg-white rounded-t-lg shrink-0">
             <div class="flex justify-between items-start">
                 <h2 class="text-2xl font-extrabold text-gray-900 tracking-tight">{{ $title }}</h2>
                 <button onclick="this.closest('.ds-limitless-modal').remove()"
@@ -42,6 +42,11 @@
             </div>
             {{ $slot }}
         </div>
+        @if (isset($footer))
+            <div class="shrink-0 border-t border-slate-100 bg-white rounded-b-lg">
+                {{ $footer }}
+            </div>
+        @endif
     </div>
 </div>
 

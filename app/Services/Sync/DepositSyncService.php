@@ -25,4 +25,9 @@ class DepositSyncService extends BaseQuerySyncService
     {
         return 'DateDeposit';
     }
+
+    protected function dateColumn(): ?string
+    {
+        return 'DateDeposit';
+    }
 }

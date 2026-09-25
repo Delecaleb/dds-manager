@@ -3,12 +3,14 @@
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\AgingController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepositSlipController;
 use App\Http\Controllers\FinancialController;
 use App\Http\Controllers\FrontOfficeController;
 use App\Http\Controllers\HygieneRecallController;
 use App\Http\Controllers\KpisController;
+use App\Http\Controllers\MarketingController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\OpenDentalExplorerController;
 use App\Http\Controllers\OperationsController;
@@ -17,6 +19,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProviderPortalController;
 use App\Http\Controllers\RcmController;
 use App\Http\Controllers\SyncManagerController;
+use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\TxMinerController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,13 +29,46 @@ Route::get('/', function () {
         : redirect()->route('login');
 });
 
+/*
+ * Public web tracking. Called by visitors' browsers on tracked third-party sites, so these
+ * two routes are deliberately outside auth: the site key in the payload says which site is
+ * reporting. Rate limited because the endpoint is open to anyone who views a page's source.
+ */
+Route::prefix('t')->name('tracking.')->group(function () {
+    Route::get('dds.js', [TrackingController::class, 'script'])->name('script');
+    Route::post('collect', [TrackingController::class, 'collect'])
+        ->middleware('throttle:tracking')->name('collect');
+    Route::options('collect', [TrackingController::class, 'options']);
+});
+
 Route::middleware('auth')->group(function () {
     // Shared user profile & location switching
     Route::post('offices/switch', [OfficeController::class, 'switch'])->name('offices.switch');
+    Route::post('clinics/switch', [OfficeController::class, 'switchClinic'])->name('clinics.switch');
+    Route::post('locations/select', [OfficeController::class, 'selectLocations'])->name('locations.select');
     Route::get('offices/{office}/sync-report', [OfficeController::class, 'syncReport'])->name('offices.sync-report');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // System Configuration
+    Route::post('configuration/basic/save', [ConfigurationController::class, 'saveBasicSetting'])->name('configuration.basic.save');
+    Route::get('configuration/providers/data', [ConfigurationController::class, 'getProvidersData'])->name('configuration.providers.data');
+    Route::post('configuration/providers/toggle-visibility', [ConfigurationController::class, 'toggleProviderVisibility'])->name('configuration.providers.toggle-visibility');
+    Route::post('configuration/providers/set-specialty', [ConfigurationController::class, 'setProviderSpecialty'])->name('configuration.providers.set-specialty');
+    Route::post('configuration/providers/clear-settings', [ConfigurationController::class, 'clearProviderSettings'])->name('configuration.providers.clear-settings');
+    Route::post('configuration/providers/apply-defaults', [ConfigurationController::class, 'applyDefaultProviderSettings'])->name('configuration.providers.apply-defaults');
+    Route::get('configuration/goals/data', [ConfigurationController::class, 'getGoalsData'])->name('configuration.goals.data');
+    Route::post('configuration/goals/save-office', [ConfigurationController::class, 'saveOfficeGoal'])->name('configuration.goals.save-office');
+    Route::post('configuration/goals/save-specialty', [ConfigurationController::class, 'saveSpecialtyGoal'])->name('configuration.goals.save-specialty');
+    Route::post('configuration/goals/save-provider', [ConfigurationController::class, 'saveProviderGoal'])->name('configuration.goals.save-provider');
+    Route::post('configuration/kpis/save', [ConfigurationController::class, 'saveKpiConfig'])->name('configuration.kpis.save');
+    Route::post('configuration/kpis/custom/save', [ConfigurationController::class, 'saveCustomKpi'])->name('configuration.kpis.custom.save');
+    Route::post('configuration/kpis/custom/delete', [ConfigurationController::class, 'deleteCustomKpi'])->name('configuration.kpis.custom.delete');
+    Route::post('configuration/kpis/import-csv', [ConfigurationController::class, 'importKpiCsv'])->name('configuration.kpis.import-csv');
+    Route::post('configuration/eod/save', [ConfigurationController::class, 'saveEodConfig'])->name('configuration.eod.save');
+    Route::get('configuration', [ConfigurationController::class, 'index'])->name('configuration.index');
+    Route::get('configuration/{tab}/{subtab?}/{action?}/{subaction?}', [ConfigurationController::class, 'index'])->name('configuration.tab');
 
     // Super Admin: User and Access Privilege Management
     Route::middleware('super_admin')->prefix('admin')->name('admin.')->group(function () {
@@ -56,6 +92,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('offices', OfficeController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::post('offices/{office}/sync', [OfficeController::class, 'syncNow'])->name('offices.sync');
         Route::post('offices/{office}/sync-module', [OfficeController::class, 'syncModule'])->name('offices.sync-module');
+        Route::post('offices/{office}/reset-sync-checkpoint', [OfficeController::class, 'resetSyncCheckpoint'])->name('offices.reset-sync-checkpoint');
     });
 
     // Patients Module
@@ -80,6 +117,7 @@ Route::middleware('auth')->group(function () {
     // KPIs Module
     Route::middleware('module:kpis')->group(function () {
         Route::get('kpis', [KpisController::class, 'index'])->name('kpis.index');
+        Route::get('kpis/detail', [KpisController::class, 'detail'])->name('kpis.detail');
         Route::get('kpis/hygiene', [KpisController::class, 'hygiene'])->name('kpis.hygiene');
         Route::get('kpis/hygiene-providers', [KpisController::class, 'hygieneProviders'])->name('kpis.hygiene-providers');
         Route::get('kpis/doctor', [KpisController::class, 'doctor'])->name('kpis.doctor');
@@ -95,6 +133,24 @@ Route::middleware('auth')->group(function () {
         Route::get('kpis/os-providers', [KpisController::class, 'osProviders'])->name('kpis.os-providers');
         Route::get('kpis/pedo', [KpisController::class, 'pedo'])->name('kpis.pedo');
         Route::get('kpis/pedo-providers', [KpisController::class, 'pedoProviders'])->name('kpis.pedo-providers');
+    });
+
+    // Marketing Module — "Growth Engine". Runs as its own app: own shell, own nav.
+    Route::middleware('module:marketing')->prefix('marketing')->name('marketing.')->group(function () {
+        Route::get('/', [MarketingController::class, 'index'])->name('index');
+        Route::get('funnel', [MarketingController::class, 'funnel'])->name('funnel');
+        Route::get('websites', [MarketingController::class, 'websites'])->name('websites');
+        Route::get('journeys', [MarketingController::class, 'journeys'])->name('journeys');
+        Route::get('tracking', [MarketingController::class, 'tracking'])->name('tracking');
+        Route::post('sites', [MarketingController::class, 'storeSite'])->name('sites.store');
+        Route::patch('sites/{site}/toggle', [MarketingController::class, 'toggleSite'])->name('sites.toggle');
+        Route::get('channels', [MarketingController::class, 'channels'])->name('channels');
+        Route::get('campaigns', [MarketingController::class, 'campaigns'])->name('campaigns');
+        Route::get('leads', [MarketingController::class, 'leads'])->name('leads');
+        Route::get('automations', [MarketingController::class, 'automations'])->name('automations');
+        Route::get('alerts', [MarketingController::class, 'alerts'])->name('alerts');
+        Route::get('integrations', [MarketingController::class, 'integrations'])->name('integrations');
+        Route::get('settings', [MarketingController::class, 'settings'])->name('settings');
     });
 
     // Provider Portal Module
@@ -225,7 +281,7 @@ Route::middleware('auth')->group(function () {
         Route::post('open-dental-explorer/query', [OpenDentalExplorerController::class, 'query'])->name('od-explorer.query');
         Route::post('open-dental-explorer/sync-to-local', [OpenDentalExplorerController::class, 'syncToLocal'])->name('od-explorer.sync');
         Route::get('open-dental-explorer/sync-checkpoints', [OpenDentalExplorerController::class, 'syncCheckpoints'])->name('od-explorer.checkpoints');
-        Route::post('open-dental-explorer/reset-sync-checkpoint', [OpenDentalExplorerController::class, 'resetSyncCheckpoint'])->name('od-explorer.reset-checkpoint');
+        Route::post('open-dental-explorer/reset-sync-checkpoint', [OpenDentalExplorerController::class, 'resetSyncCheckpoint'])->name('od-explorer.reset-sync-checkpoint');
         Route::get('open-dental-explorer/sync-requests', [OpenDentalExplorerController::class, 'getSyncRequests'])->name('od-explorer.sync-requests');
         Route::post('open-dental-explorer/trigger-date-sync', [OpenDentalExplorerController::class, 'triggerDateSync'])->name('od-explorer.trigger-date-sync');
         Route::post('open-dental-explorer/reconcile-diff', [OpenDentalExplorerController::class, 'reconcileDiff'])->name('od-explorer.reconcile-diff');
@@ -241,7 +297,10 @@ Route::middleware('auth')->group(function () {
         Route::post('sync-manager/cancel', [SyncManagerController::class, 'cancelSync'])->name('sync-manager.cancel');
         Route::get('sync-manager/checkpoints', [SyncManagerController::class, 'checkpoints'])->name('sync-manager.checkpoints');
         Route::post('sync-manager/reset-checkpoint', [SyncManagerController::class, 'resetCheckpoint'])->name('sync-manager.reset-checkpoint');
+        Route::get('sync-manager/health', [SyncManagerController::class, 'health'])->name('sync-manager.health');
+        Route::post('sync-manager/health/requeue', [SyncManagerController::class, 'requeueMissing'])->name('sync-manager.health.requeue');
     });
+
 });
 
 require __DIR__.'/auth.php';

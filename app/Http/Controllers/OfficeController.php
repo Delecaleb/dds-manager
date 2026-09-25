@@ -2,19 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Support\ClinicRegistry;
+use App\Http\Controllers\Concerns\HandlesSyncRequests;
 use App\Models\Office;
-use App\Services\Sync\AppointmentSyncService;
-use App\Services\Sync\PatientSyncService;
-use App\Services\Sync\ProcedureLogSyncService;
+use App\Services\Sync\SyncCheckpointService;
 use App\Services\Sync\SyncReportService;
-use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use InvalidArgumentException;
 
 class OfficeController extends Controller
 {
+    use HandlesSyncRequests;
+
     public function index(): View
     {
         $offices = Office::orderBy('id')->get();
@@ -112,9 +114,54 @@ class OfficeController extends Controller
         ]);
 
         $officeId = (int) $request->input('office_id');
-        session(['active_office_id' => $officeId]);
+        session([
+            'active_office_id' => $officeId,
+            'selected_locations' => [(string) $officeId],
+        ]);
 
         return redirect()->back()->with('status', 'Switched active office location.');
+    }
+
+    public function switchClinic(Request $request, ClinicRegistry $clinicRegistry): RedirectResponse
+    {
+        $request->validate([
+            'clinic_num' => 'required',
+            'office_id' => 'nullable|exists:offices,id',
+        ]);
+
+        $officeId = $request->filled('office_id') ? (int) $request->input('office_id') : Office::getActiveOfficeId();
+        $clinicNum = $request->input('clinic_num');
+
+        if ($officeId && $clinicNum !== 'all') {
+            $clinicRegistry->setActiveClinicNum((int) $clinicNum, $officeId);
+            $clinicName = $clinicRegistry->name((int) $clinicNum, $officeId);
+            session(['selected_locations' => ["{$officeId}:{$clinicNum}"]]);
+            $message = "Switched active clinic to '{$clinicName}'.";
+        } else {
+            if ($officeId) {
+                session()->forget("active_clinic_id_{$officeId}");
+                session(['selected_locations' => [(string) $officeId]]);
+            }
+            $message = 'Viewing all clinics for location.';
+        }
+
+        return redirect()->back()->with('status', $message);
+    }
+
+    /**
+     * AJAX endpoint to persist user's chosen reporting location(s).
+     */
+    public function selectLocations(Request $request, ClinicRegistry $clinicRegistry): JsonResponse
+    {
+        $locations = $request->input('locations');
+        $selection = $clinicRegistry->select($locations);
+        $keys = $selection->keys();
+
+        return response()->json([
+            'success' => true,
+            'selected' => $keys,
+            'active_office_id' => Office::getActiveOfficeId(),
+        ]);
     }
 
     public function syncReport(Office $office, SyncReportService $syncReportService): JsonResponse
@@ -132,45 +179,30 @@ class OfficeController extends Controller
 
         $moduleKey = (string) $request->input('module');
 
-        ob_start();
-
         try {
-            $result = $syncReportService->syncModuleForOffice($office, $moduleKey);
-            ob_end_clean();
-
-            return response()->json($result);
-        } catch (Exception $e) {
-            ob_end_clean();
-
+            return response()->json($syncReportService->queueModuleForOffice($office, $moduleKey));
+        } catch (InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,
-                'error' => "Sync failed for {$moduleKey}: ".$e->getMessage(),
-            ], 500);
+                'error' => $e->getMessage(),
+            ], 422);
         }
     }
 
-    public function syncNow(Office $office): JsonResponse
+    /**
+     * Queue a full server-side sync for the office. Returns immediately; the
+     * queue worker does the work, so it never depends on the browser session.
+     */
+    public function syncNow(Office $office, SyncReportService $syncReportService): JsonResponse
     {
-        ob_start();
+        return response()->json($syncReportService->queueAllModulesForOffice($office));
+    }
 
-        try {
-            app(PatientSyncService::class)->forOffice($office)->sync();
-            app(AppointmentSyncService::class)->forOffice($office)->sync();
-            app(ProcedureLogSyncService::class)->forOffice($office)->sync();
-
-            ob_end_clean();
-
-            return response()->json([
-                'success' => true,
-                'message' => "Successfully synced data for office '{$office->name}'.",
-            ]);
-        } catch (Exception $e) {
-            ob_end_clean();
-
-            return response()->json([
-                'success' => false,
-                'error' => "Sync failed for office '{$office->name}': ".$e->getMessage(),
-            ], 500);
-        }
+    /**
+     * Reset sync checkpoint / start date for the office.
+     */
+    public function resetSyncCheckpoint(Request $request, Office $office, SyncCheckpointService $checkpoints): JsonResponse
+    {
+        return $this->resetSyncCheckpointFor($request, $checkpoints, (int) $office->id);
     }
 }

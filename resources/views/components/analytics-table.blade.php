@@ -16,6 +16,10 @@
     // Column sorting is on by default (DDS.sortable picks up .dds-sortable). Pass
     // :sortable="false" for a table whose row order carries meaning on its own.
     'sortable' => true,
+    'paginate' => false,
+    'paginationId' => null,
+    'defaultLength' => 20,
+    'tab' => null,
 ])
 
 @php
@@ -105,10 +109,11 @@
     // Sort only a table that actually has rows — DataTables needs one cell per column,
     // and the empty state is a single colspan cell.
     $isSortable = $sortable && count($rows) > 0;
+    $paginationId = $paginationId ?? ($paginate ? ('ops_' . ($tab ?? 'table') . '_pg') : null);
 @endphp
 
 <div class="dds-table-scroll border-t border-slate-200 max-h-[70vh]">
-    <table class="dds-table {{ $isSortable ? 'dds-sortable' : '' }}" style="min-width: max-content;">
+    <table class="dds-table {{ $isSortable ? 'dds-sortable' : '' }} {{ $paginate ? 'dds-datatable' : '' }}" @if($paginate) data-pagination-id="{{ $paginationId }}" @endif style="min-width: max-content;">
         <thead class="dds-head-sticky z-50 shadow-sm bg-white ring-1 ring-gray-200">
             @if (!empty($groups))
                 @php
@@ -213,8 +218,12 @@
                                     $cellDate = $col['date'] ?? $row['date_raw'] ?? null;
                                     $startDate = $cellDate ?? request('start_date', now()->startOfMonth()->toDateString());
                                     $endDate = $cellDate ?? request('end_date', now()->toDateString());
+                                    // A location row drills into its own office; rows that span
+                                    // locations (e.g. Performance days) drill into the page selection.
                                     $ddUrl = route('operations.drilldown', array_filter([
                                         'metric' => $col['drilldown_type'],
+                                        'office_id' => $row['office_id'] ?? null,
+                                        'locations' => isset($row['office_id']) ? null : request('locations'),
                                         'clinic_num' => $row['clinic_num'] ?? request('clinic_num'),
                                         'prov_num' => $row['prov_num'] ?? request('prov_num'),
                                         'start_date' => $startDate,
@@ -308,3 +317,8 @@
         @endif
     </table>
 </div>
+
+@if ($paginate)
+    <x-table-pagination :id="$paginationId" :default-length="$defaultLength" />
+@endif
+

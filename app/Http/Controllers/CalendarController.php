@@ -25,27 +25,36 @@ class CalendarController extends Controller
         private readonly PatientService $patients,
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
-        return view('calendar.index');
+        return view('calendar.index', [
+            'locations' => $this->clinics->locations(),
+            'selectedLocations' => $this->clinics->select($request->input('locations'))->keys(),
+        ]);
     }
 
     public function getData(Request $request, CalendarService $calendar)
     {
         $start = $request->get('start') ?? date('Y-m-d');
         $end = $request->get('end') ?? date('Y-m-d');
+        $loc = $this->resolveSingleLocation($request);
+        $officeId = $loc['office_id'];
+        $clinicNum = $loc['clinic_num'];
 
-        Log::info("Fetching appointments from OpenDental API for date range: {$start} to {$end}");
+        Log::info("Fetching appointments from OpenDental API for date range: {$start} to {$end}, office: {$officeId}, clinic: ".($clinicNum ?? 'all'));
 
-        return response()->json($calendar->events($start, $end));
+        return response()->json($calendar->events($start, $end, $clinicNum, $officeId));
     }
 
     public function getResources(Request $request, CalendarService $calendar)
     {
         $date = $request->get('date') ?? date('Y-m-d');
         $activeOnly = $request->get('active_only') == '1';
+        $loc = $this->resolveSingleLocation($request);
+        $officeId = $loc['office_id'];
+        $clinicNum = $loc['clinic_num'];
 
-        return response()->json($calendar->resources($date, $date, $activeOnly));
+        return response()->json($calendar->resources($date, $date, $activeOnly, $clinicNum, $officeId));
     }
 
     /**
@@ -66,62 +75,124 @@ class CalendarController extends Controller
     {
         $start = $request->get('start') ?? $request->get('date') ?? date('Y-m-d');
         $end = $request->get('end') ?? $request->get('date') ?? $start;
-        $officeId = Office::getActiveOfficeId();
+        $loc = $this->resolveSingleLocation($request);
+        $officeId = $loc['office_id'];
+        $clinicNum = $loc['clinic_num'];
 
-        $gross = (float) OdProcedureLog::query()
+        $grossQuery = OdProcedureLog::query()
+            ->where('office_id', $officeId)
             ->whereIn('ProcStatus', ['C', '2'])
-            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $grossQuery->where('ClinicNum', $clinicNum);
+        }
+        $gross = (float) $grossQuery
             ->selectRaw('COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
 
-        $adjustments = (float) OdAdjustment::query()
-            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+        $adjQuery = OdAdjustment::query()
+            ->where('office_id', $officeId)
+            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $adjQuery->where('ClinicNum', $clinicNum);
+        }
+        $adjustments = (float) $adjQuery
             ->selectRaw('COALESCE(SUM(CAST(AdjAmt AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
 
-        $writeoffs = (float) DB::table('od_claim_procs as c')
+        $woQuery = DB::table('od_claim_procs as c')
             ->where('c.office_id', $officeId)
-            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null && Schema::hasColumn('od_claim_procs', 'ClinicNum')) {
+            $woQuery->where('c.ClinicNum', $clinicNum);
+        }
+        $writeoffs = (float) $woQuery
             ->selectRaw('COALESCE(SUM(CAST(c.WriteOff AS DECIMAL(12,2))), 0) AS total')
             ->value('total');
 
         $produced = $this->production->netFrom($gross, $adjustments, $writeoffs);
 
-        $scheduled = $gross;
+        $schedQuery = OdAppointment::withoutGlobalScopes()
+            ->join('od_procedure_logs as pl', function ($join) use ($officeId) {
+                $join->on('pl.AptNum', '=', 'od_appointments.AptNum')
+                    ->where('pl.office_id', '=', $officeId);
+            })
+            ->where('od_appointments.office_id', $officeId)
+            ->where('od_appointments.AptStatus', '1')
+            ->whereRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $schedQuery->where('od_appointments.ClinicNum', $clinicNum);
+        }
+        $scheduled = (float) $schedQuery
+            ->selectRaw('COALESCE(SUM(CAST(pl.ProcFee AS DECIMAL(12,2))), 0) AS total')
+            ->value('total');
 
-        // Fetch active providers in this date range
-        $providerApts = OdAppointment::query()
-            ->whereIn('AptStatus', [1, 2, 4, 5])
-            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+        // Active appointments query to get providers who have appointments scheduled
+        $appointmentsQuery = OdAppointment::withoutGlobalScopes()
             ->with('provider')
-            ->get();
+            ->where('od_appointments.office_id', $officeId)
+            ->whereIn('AptStatus', [1, 2, '1', '2'])
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $appointmentsQuery->where('ClinicNum', $clinicNum);
+        }
+        $appointments = $appointmentsQuery->get();
 
         $providersData = [];
-        $grouped = $providerApts->groupBy(function ($apt) {
-            return $apt->ProvNum ? (int) $apt->ProvNum : 0;
-        });
+        $grouped = $appointments->groupBy('ProvNum');
 
         foreach ($grouped as $provNum => $apts) {
-            if ($provNum > 0) {
-                $firstApt = $apts->first();
-                $prov = $firstApt?->provider;
-                if ($prov) {
-                    $lastName = $prov->LName ?? '';
-                    $firstName = $prov->PName ?? '';
-                    $initials = (strlen($lastName) >= 2) ? substr($lastName, 0, 2) : substr($lastName, 0, 1);
-                    $specialtyText = ($provNum == 81) ? 'Invis' : (($provNum == 64) ? 'Gen' : 'General');
-                    $color = '#94a3b8';
-                    if ($provNum == 81) {
-                        $color = '#6DE5C1';
-                    } elseif ($provNum == 64) {
-                        $color = '#996BE5';
-                    }
+            $firstApt = $apts->first();
+            $provider = $firstApt->provider;
 
+            if ($provider) {
+                $initials = '';
+                if ($provider->FName && $provider->LName) {
+                    $initials = strtoupper(substr($provider->FName, 0, 1).substr($provider->LName, 0, 1));
+                } elseif ($provider->Abbr) {
+                    $initials = strtoupper(substr($provider->Abbr, 0, 2));
+                } else {
+                    $initials = strtoupper(substr($provider->LName ?? 'PR', 0, 2));
+                }
+
+                $name = trim(($provider->LName ?? '').', '.($provider->FName ?: ($provider->PName ?? '')));
+                if (! $name || $name === ',') {
+                    $name = $provider->Abbr ?: 'Provider #'.$provider->ProvNum;
+                }
+
+                $color = '#'.substr(md5($provider->ProvNum.$name), 0, 6);
+                if (! empty($provider->ProvColor) && is_numeric($provider->ProvColor) && (int) $provider->ProvColor !== 0) {
+                    $c = (int) $provider->ProvColor;
+                    $r = ($c >> 16) & 0xFF;
+                    $g = ($c >> 8) & 0xFF;
+                    $b = $c & 0xFF;
+                    $color = sprintf('#%02x%02x%02x', $r, $g, $b);
+                }
+
+                $specialty = '';
+                if ($provider->Specialty) {
+                    $specialty = DB::table('od_definitions')
+                        ->where('office_id', $officeId)
+                        ->where('DefNum', $provider->Specialty)
+                        ->value('ItemName') ?? '';
+                }
+
+                $existingIdx = null;
+                foreach ($providersData as $idx => $pData) {
+                    if ($pData['id'] == $provider->ProvNum) {
+                        $existingIdx = $idx;
+                        break;
+                    }
+                }
+
+                if ($existingIdx !== null) {
+                    $providersData[$existingIdx]['count'] += $apts->count();
+                } else {
                     $providersData[] = [
-                        'id' => $provNum,
-                        'name' => trim($lastName.', '.$firstName),
+                        'id' => $provider->ProvNum,
+                        'name' => $name,
                         'initials' => $initials,
-                        'specialty' => $specialtyText,
+                        'specialty' => $specialty,
                         'count' => $apts->count(),
                         'color' => $color,
                     ];
@@ -153,44 +224,59 @@ class CalendarController extends Controller
     {
         $start = $request->input('start') ?: date('Y-m-d');
         $end = $request->input('end') ?: $start;
-        $officeId = Office::getActiveOfficeId();
+        $scopes = $this->resolveScopes($request);
+        $officeIds = array_keys($scopes);
 
         $startDateTime = substr($start, 0, 10).' 00:00:00';
         $endDateTime = substr($end, 0, 10).' 23:59:59';
 
-        $confirmationDefs = DB::table('od_definitions')
-            ->where('office_id', $officeId)
-            ->where('Category', 2)
-            ->pluck('ItemName', 'DefNum')
-            ->toArray();
+        $confirmationDefs = [];
+        if (Schema::hasTable('od_definitions')) {
+            $defs = DB::table('od_definitions')
+                ->whereIn('office_id', $officeIds)
+                ->where('Category', 2)
+                ->get(['office_id', 'DefNum', 'ItemName']);
+            foreach ($defs as $d) {
+                $confirmationDefs[$d->office_id.':'.$d->DefNum] = $d->ItemName;
+            }
+        }
 
         $operatoryMap = [];
         if (Schema::hasTable('od_operatories')) {
-            $operatoryMap = DB::table('od_operatories')
-                ->where('office_id', $officeId)
-                ->pluck('OpName', 'OperatoryNum')
-                ->toArray();
-        }
-        if (empty($operatoryMap)) {
-            $operatoryMap = [
-                1 => 'DR-1',
-                2 => 'DR-2',
-                3 => 'DR-3',
-                4 => 'DR-4',
-                5 => 'DR-5',
-                6 => 'Unassigned 6',
-                7 => 'Unassigned 7',
-                8 => 'Unassigned 8',
-                9 => 'Unassigned 9',
-                10 => 'Unassigned 10',
-            ];
+            $operatoryQuery = DB::table('od_operatories')
+                ->where(function ($q) use ($scopes) {
+                    foreach ($scopes as $officeId => $clinics) {
+                        $q->orWhere(function ($sub) use ($officeId, $clinics) {
+                            $sub->where('office_id', $officeId);
+                            if (! empty($clinics) && Schema::hasColumn('od_operatories', 'ClinicNum')) {
+                                $sub->where(function ($c) use ($clinics) {
+                                    $c->whereIn('ClinicNum', $clinics)->orWhere('ClinicNum', 0);
+                                });
+                            }
+                        });
+                    }
+                });
+            $ops = $operatoryQuery->get(['office_id', 'OperatoryNum', 'OpName']);
+            foreach ($ops as $op) {
+                $operatoryMap[$op->office_id.':'.$op->OperatoryNum] = $op->OpName;
+            }
         }
 
-        $query = OdAppointment::query()
+        $query = OdAppointment::withoutGlobalScopes()
             ->select('od_appointments.*')
             ->with(['patient', 'provider'])
             ->whereIn('od_appointments.AptStatus', [1, 2, 4, 5])
-            ->whereBetween('od_appointments.AptDateTime', [$startDateTime, $endDateTime]);
+            ->whereBetween('od_appointments.AptDateTime', [$startDateTime, $endDateTime])
+            ->where(function ($scopeQuery) use ($scopes) {
+                foreach ($scopes as $officeId => $clinics) {
+                    $scopeQuery->orWhere(function ($q) use ($officeId, $clinics) {
+                        $q->where('od_appointments.office_id', $officeId);
+                        if (! empty($clinics)) {
+                            $q->whereIn('od_appointments.ClinicNum', $clinics);
+                        }
+                    });
+                }
+            });
 
         if ($status = $request->input('status')) {
             $query->where('od_appointments.AptStatus', $status);
@@ -201,93 +287,94 @@ class CalendarController extends Controller
         }
 
         // Fast string-indexed batch lookups for candidates in date range
-        $candidateApts = (clone $query)->get(['AptNum', 'PatNum', 'InsPlan1', 'InsPlan2']);
-        $patNums = array_values(array_filter(array_unique($candidateApts->pluck('PatNum')->map(fn ($p) => (string) $p)->toArray()), fn ($s) => $s !== '' && $s !== '0'));
-        $aptNums = array_values(array_filter(array_unique($candidateApts->pluck('AptNum')->map(fn ($a) => (string) $a)->toArray()), fn ($s) => $s !== '' && $s !== '0'));
-        $insPlanNums = array_values(array_filter(array_unique(array_merge(
-            $candidateApts->pluck('InsPlan1')->map(fn ($i) => (string) $i)->toArray(),
-            $candidateApts->pluck('InsPlan2')->map(fn ($i) => (string) $i)->toArray()
-        )), fn ($s) => $s !== '' && $s !== '0'));
+        $candidateApts = (clone $query)->get(['AptNum', 'PatNum', 'InsPlan1', 'InsPlan2', 'office_id']);
 
-        // Batch procedure logs & CDT codes (using PatNum index + AptNum filter)
+        // Batch procedure logs, unscheduled tx, last visits, carriers grouped per office
         $procLogsMap = [];
-        if (! empty($patNums) && ! empty($aptNums)) {
-            foreach (array_chunk($patNums, 200) as $patChunk) {
-                $procLogs = DB::table('od_procedure_logs as pl')
-                    ->leftJoin('od_procedures as p', function ($join) use ($officeId) {
-                        $join->on('pl.CodeNum', '=', 'p.CodeNum')
-                            ->where('p.office_id', '=', $officeId);
-                    })
-                    ->where('pl.office_id', $officeId)
-                    ->whereIn('pl.PatNum', $patChunk)
-                    ->whereIn('pl.AptNum', $aptNums)
-                    ->select('pl.AptNum', 'pl.ProcFee', 'pl.OldCode', 'p.ProcCode')
-                    ->get();
-
-                foreach ($procLogs as $pl) {
-                    $procLogsMap[$pl->AptNum][] = $pl;
-                }
-            }
-        }
-
-        // Batch unscheduled treatment plan fees
         $unscheduledMap = [];
-        if (! empty($patNums)) {
-            foreach (array_chunk($patNums, 200) as $patChunk) {
-                $fees = DB::table('od_procedure_logs')
-                    ->where('office_id', $officeId)
-                    ->whereIn('PatNum', $patChunk)
-                    ->whereIn('ProcStatus', ['1', 'TP'])
-                    ->where(function ($sub) {
-                        $sub->whereNull('AptNum')->orWhere('AptNum', '0')->orWhere('AptNum', '');
-                    })
-                    ->groupBy('PatNum')
-                    ->selectRaw('PatNum, COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0) as total')
-                    ->pluck('total', 'PatNum')
-                    ->toArray();
-
-                foreach ($fees as $pNum => $total) {
-                    $unscheduledMap[$pNum] = $total;
-                }
-            }
-        }
-
-        // Batch last visit dates
         $lastVisitMap = [];
-        if (! empty($patNums)) {
-            foreach (array_chunk($patNums, 200) as $patChunk) {
-                $dates = DB::table('od_procedure_logs')
-                    ->where('office_id', $officeId)
-                    ->whereIn('PatNum', $patChunk)
-                    ->whereIn('ProcStatus', ['2', 'C', 'D'])
-                    ->where('ProcDate', '<=', $endDateTime)
-                    ->groupBy('PatNum')
-                    ->selectRaw('PatNum, MAX(ProcDate) as max_date')
-                    ->pluck('max_date', 'PatNum')
-                    ->toArray();
+        $carrierMap = [];
 
-                foreach ($dates as $pNum => $d) {
-                    $lastVisitMap[$pNum] = $d;
+        foreach ($candidateApts->groupBy('office_id') as $offId => $aptsGroup) {
+            $patNums = array_values(array_filter(array_unique($aptsGroup->pluck('PatNum')->map(fn ($p) => (string) $p)->toArray()), fn ($s) => $s !== '' && $s !== '0'));
+            $aptNums = array_values(array_filter(array_unique($aptsGroup->pluck('AptNum')->map(fn ($a) => (string) $a)->toArray()), fn ($s) => $s !== '' && $s !== '0'));
+            $insPlanNums = array_values(array_filter(array_unique(array_merge(
+                $aptsGroup->pluck('InsPlan1')->map(fn ($i) => (string) $i)->toArray(),
+                $aptsGroup->pluck('InsPlan2')->map(fn ($i) => (string) $i)->toArray()
+            )), fn ($s) => $s !== '' && $s !== '0'));
+
+            if (! empty($patNums) && ! empty($aptNums)) {
+                foreach (array_chunk($patNums, 200) as $patChunk) {
+                    $procLogs = DB::table('od_procedure_logs as pl')
+                        ->leftJoin('od_procedures as p', function ($join) use ($offId) {
+                            $join->on('pl.CodeNum', '=', 'p.CodeNum')
+                                ->where('p.office_id', '=', $offId);
+                        })
+                        ->where('pl.office_id', $offId)
+                        ->whereIn('pl.PatNum', $patChunk)
+                        ->whereIn('pl.AptNum', $aptNums)
+                        ->select('pl.AptNum', 'pl.ProcFee', 'pl.OldCode', 'p.ProcCode')
+                        ->get();
+
+                    foreach ($procLogs as $pl) {
+                        $procLogsMap[$offId.':'.$pl->AptNum][] = $pl;
+                    }
                 }
             }
-        }
 
-        // Batch insurance carriers
-        $carrierMap = [];
-        if (! empty($insPlanNums)) {
-            foreach (array_chunk($insPlanNums, 200) as $planChunk) {
-                $carriers = DB::table('od_insplans as ip')
-                    ->join('od_carriers as c', function ($join) use ($officeId) {
-                        $join->on('ip.CarrierNum', '=', 'c.CarrierNum')
-                            ->where('c.office_id', '=', $officeId);
-                    })
-                    ->where('ip.office_id', $officeId)
-                    ->whereIn('ip.PlanNum', $planChunk)
-                    ->pluck('c.CarrierName', 'ip.PlanNum')
-                    ->toArray();
+            if (! empty($patNums)) {
+                foreach (array_chunk($patNums, 200) as $patChunk) {
+                    $fees = DB::table('od_procedure_logs')
+                        ->where('office_id', $offId)
+                        ->whereIn('PatNum', $patChunk)
+                        ->whereIn('ProcStatus', ['1', 'TP'])
+                        ->where(function ($sub) {
+                            $sub->whereNull('AptNum')->orWhere('AptNum', '0')->orWhere('AptNum', '');
+                        })
+                        ->groupBy('PatNum')
+                        ->selectRaw('PatNum, COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0) as total')
+                        ->pluck('total', 'PatNum')
+                        ->toArray();
 
-                foreach ($carriers as $pNum => $cName) {
-                    $carrierMap[$pNum] = $cName;
+                    foreach ($fees as $pNum => $total) {
+                        $unscheduledMap[$offId.':'.$pNum] = $total;
+                    }
+                }
+            }
+
+            if (! empty($patNums)) {
+                foreach (array_chunk($patNums, 200) as $patChunk) {
+                    $dates = DB::table('od_procedure_logs')
+                        ->where('office_id', $offId)
+                        ->whereIn('PatNum', $patChunk)
+                        ->whereIn('ProcStatus', ['2', 'C', 'D'])
+                        ->where('ProcDate', '<=', $endDateTime)
+                        ->groupBy('PatNum')
+                        ->selectRaw('PatNum, MAX(ProcDate) as max_date')
+                        ->pluck('max_date', 'PatNum')
+                        ->toArray();
+
+                    foreach ($dates as $pNum => $d) {
+                        $lastVisitMap[$offId.':'.$pNum] = $d;
+                    }
+                }
+            }
+
+            if (! empty($insPlanNums)) {
+                foreach (array_chunk($insPlanNums, 200) as $planChunk) {
+                    $carriers = DB::table('od_insplans as ip')
+                        ->join('od_carriers as c', function ($join) use ($offId) {
+                            $join->on('ip.CarrierNum', '=', 'c.CarrierNum')
+                                ->where('c.office_id', '=', $offId);
+                        })
+                        ->where('ip.office_id', $offId)
+                        ->whereIn('ip.PlanNum', $planChunk)
+                        ->pluck('c.CarrierName', 'ip.PlanNum')
+                        ->toArray();
+
+                    foreach ($carriers as $pNum => $cName) {
+                        $carrierMap[$offId.':'.$pNum] = $cName;
+                    }
                 }
             }
         }
@@ -350,7 +437,7 @@ class CalendarController extends Controller
             ->orderColumn('referral_source', 'od_appointments.AptNum $1')
             ->orderColumn('unscheduled_tx', 'od_appointments.AptNum $1')
             ->orderColumn('last_visit_date', 'od_appointments.AptNum $1')
-            ->addColumn('location', fn ($row) => $this->clinics->name((int) ($row->ClinicNum ?? 0), $officeId))
+            ->addColumn('location', fn ($row) => $this->clinics->locationFor((int) $row->office_id, (int) ($row->ClinicNum ?? 0))->name)
             ->addColumn('patient_name', fn ($row) => preg_replace('/\s+/', ' ', trim(($row->patient?->FName ?? '').' '.($row->patient?->LName ?? ''))))
             ->addColumn('appointment_date', fn ($row) => $row->AptDateTime ? (new Carbon($row->AptDateTime))->format('Y-m-d') : '')
             ->addColumn('appointment_time', fn ($row) => $row->AptDateTime ? (new Carbon($row->AptDateTime))->format('H:i A') : '')
@@ -360,7 +447,7 @@ class CalendarController extends Controller
 
                 return sprintf('%.2f', $minutes);
             })
-            ->addColumn('operatory_name', fn ($row) => $operatoryMap[$row->Op] ?? ('DR-'.($row->Op ?? '')))
+            ->addColumn('operatory_name', fn ($row) => $operatoryMap[$row->office_id.':'.$row->Op] ?? ($operatoryMap[$row->Op] ?? ('DR-'.($row->Op ?? ''))))
             ->addColumn('appointment_status', function ($row) {
                 $map = [
                     1 => 'Scheduled',
@@ -388,11 +475,14 @@ class CalendarController extends Controller
             ->addColumn('appointment_notes', fn ($row) => $row->Note ?: 'N/A')
             ->addColumn('confirmation_status', function ($row) use ($confirmationDefs) {
                 $conf = (int) ($row->Confirmed ?? 0);
+                if (isset($confirmationDefs[$row->office_id.':'.$conf])) {
+                    return $confirmationDefs[$row->office_id.':'.$conf];
+                }
                 if ($conf === 0) {
                     return 'No Status';
                 }
 
-                return $confirmationDefs[$conf] ?? 'Confirmed';
+                return 'Confirmed';
             })
             ->addColumn('provider_name', function ($row) {
                 if (! $row->ProvNum || ! $row->provider) {
@@ -408,7 +498,7 @@ class CalendarController extends Controller
                 return $lastName ?: $firstName;
             })
             ->addColumn('procedure_codes', function ($row) use ($procLogsMap) {
-                $logs = $procLogsMap[$row->AptNum] ?? [];
+                $logs = $procLogsMap[$row->office_id.':'.$row->AptNum] ?? [];
                 if (! empty($logs)) {
                     $codes = array_values(array_unique(array_filter(array_map(fn ($l) => $l->ProcCode ?: $l->OldCode, $logs))));
                     if (! empty($codes)) {
@@ -421,7 +511,7 @@ class CalendarController extends Controller
                 return ($descript !== '' && $descript !== '--') ? $descript : 'N/A';
             })
             ->addColumn('production', function ($row) use ($procLogsMap) {
-                $logs = $procLogsMap[$row->AptNum] ?? [];
+                $logs = $procLogsMap[$row->office_id.':'.$row->AptNum] ?? [];
                 $prod = 0;
                 if (! empty($logs)) {
                     foreach ($logs as $l) {
@@ -431,16 +521,16 @@ class CalendarController extends Controller
 
                 return $this->formatMoneyValue($prod);
             })
-            ->addColumn('primary_insurance', fn ($row) => $carrierMap[$row->InsPlan1] ?? 'N/A')
-            ->addColumn('secondary_insurance', fn ($row) => $carrierMap[$row->InsPlan2] ?? 'N/A')
+            ->addColumn('primary_insurance', fn ($row) => $carrierMap[$row->office_id.':'.$row->InsPlan1] ?? 'N/A')
+            ->addColumn('secondary_insurance', fn ($row) => $carrierMap[$row->office_id.':'.$row->InsPlan2] ?? 'N/A')
             ->addColumn('referral_source', fn ($row) => 'No Source Listed')
             ->addColumn('unscheduled_tx', function ($row) use ($unscheduledMap) {
-                $unscheduled = (float) ($unscheduledMap[$row->PatNum] ?? 0);
+                $unscheduled = (float) ($unscheduledMap[$row->office_id.':'.$row->PatNum] ?? 0);
 
                 return $this->formatMoneyValue($unscheduled);
             })
             ->addColumn('last_visit_date', function ($row) use ($lastVisitMap) {
-                return ! empty($lastVisitMap[$row->PatNum]) ? substr($lastVisitMap[$row->PatNum], 0, 10) : 'N/A';
+                return ! empty($lastVisitMap[$row->office_id.':'.$row->PatNum]) ? substr($lastVisitMap[$row->office_id.':'.$row->PatNum], 0, 10) : 'N/A';
             })
             ->make(true);
     }
@@ -475,85 +565,171 @@ class CalendarController extends Controller
     {
         $start = $request->get('start') ?? date('Y-m-d');
         $end = $request->get('end') ?? $start;
-        $officeId = Office::getActiveOfficeId();
 
         $startDateTime = substr($start, 0, 10).' 00:00:00';
         $endDateTime = substr($end, 0, 10).' 23:59:59';
 
-        // We fetch scheduled & completed appointments for the date frame using indexed AptDateTime range.
-        $appointments = OdAppointment::whereBetween('AptDateTime', [$startDateTime, $endDateTime])
-            ->whereIn('AptStatus', [1, 2, 4, 5])
-            ->where(function ($q) {
-                $q->whereNull('SecDateTEntry')->orWhere('SecDateTEntry', '!=', '0001-01-01T00:00:00');
-            })
-            ->where(function ($q) {
-                $q->whereNull('Op')->orWhere('Op', '!=', 3);
-            })
-            ->get();
+        $locationSelection = $this->clinics->select($request->input('locations'));
+        $targetLocations = $locationSelection->locations();
 
-        // Calculate aggregate metrics
-        $scheduledApts = $appointments->count();
-        $providerCount = $appointments->pluck('ProvNum')->filter(fn ($p) => (int) $p > 0)->unique()->count();
+        if (empty($targetLocations)) {
+            $officeId = Office::getActiveOfficeId() ?? 1;
+            $clinicNum = $this->resolveClinicNum($request, $officeId);
+            $targetLocations = [$this->clinics->locationFor($officeId, $clinicNum ?? 0)];
+        }
 
-        $bookedMinutes = $appointments->sum(function ($apt) {
-            return strlen($apt->Pattern ?? '') > 0 ? strlen($apt->Pattern) * 5 : 60;
-        });
+        $rawRows = [];
+        foreach ($targetLocations as $loc) {
+            $query = OdAppointment::withoutGlobalScopes()
+                ->where('od_appointments.office_id', $loc->officeId)
+                ->whereBetween('od_appointments.AptDateTime', [$startDateTime, $endDateTime])
+                ->whereIn('od_appointments.AptStatus', [1, 2, 4, 5])
+                ->where(function ($q) {
+                    $q->whereNull('od_appointments.SecDateTEntry')
+                        ->orWhere('od_appointments.SecDateTEntry', '!=', '0001-01-01T00:00:00');
+                })
+                ->where(function ($q) {
+                    $q->whereNull('od_appointments.Op')
+                        ->orWhere('od_appointments.Op', '!=', 3);
+                });
 
-        // Compute Lead Time logic
-        $allLeadTimes = [];
-        $newPatLeadTimes = [];
-        $emergLeadTimes = [];
-
-        foreach ($appointments as $apt) {
-            $createdStr = ($apt->SecDateTEntry && $apt->SecDateTEntry !== '0001-01-01T00:00:00')
-                ? $apt->SecDateTEntry
-                : ($apt->DateTStamp ?? $apt->AptDateTime);
-
-            $createdDt = new Carbon($createdStr);
-            $aptDt = new Carbon($apt->AptDateTime);
-            $diffDays = max(0, $createdDt->diffInDays($aptDt));
-
-            $allLeadTimes[] = $diffDays;
-
-            if ((bool) $apt->IsNewPatient) {
-                $newPatLeadTimes[] = $diffDays;
+            if ($loc->clinicNum !== null) {
+                $query->where('od_appointments.ClinicNum', $loc->clinicNum);
             }
 
-            $isEmerg = str_contains(strtolower($apt->ProcDescript ?? ''), 'emergency')
-                || str_contains(strtolower($apt->ProcDescript ?? ''), 'd0140')
-                || str_contains(strtolower($apt->Pattern ?? ''), 'emerg');
+            $appointments = $query->get();
 
-            if ($isEmerg) {
-                $emergLeadTimes[] = $diffDays;
+            $scheduledApts = $appointments->count();
+            $providerCount = $appointments->pluck('ProvNum')->filter(fn ($p) => (int) $p > 0)->unique()->count();
+            $bookedMinutes = $appointments->sum(function ($apt) {
+                return strlen($apt->Pattern ?? '') > 0 ? strlen($apt->Pattern) * 5 : 60;
+            });
+
+            $allLeadTimes = [];
+            $newPatLeadTimes = [];
+            $emergLeadTimes = [];
+
+            foreach ($appointments as $apt) {
+                $createdStr = ($apt->SecDateTEntry && $apt->SecDateTEntry !== '0001-01-01T00:00:00')
+                    ? $apt->SecDateTEntry
+                    : ($apt->DateTStamp ?? $apt->AptDateTime);
+
+                $createdDt = new Carbon($createdStr);
+                $aptDt = new Carbon($apt->AptDateTime);
+                $diffDays = max(0, $createdDt->diffInDays($aptDt));
+
+                $allLeadTimes[] = $diffDays;
+
+                if ((bool) $apt->IsNewPatient) {
+                    $newPatLeadTimes[] = $diffDays;
+                }
+
+                $isEmerg = str_contains(strtolower($apt->ProcDescript ?? ''), 'emergency')
+                    || str_contains(strtolower($apt->ProcDescript ?? ''), 'd0140')
+                    || str_contains(strtolower($apt->Pattern ?? ''), 'emerg');
+
+                if ($isEmerg) {
+                    $emergLeadTimes[] = $diffDays;
+                }
+            }
+
+            $avgLeadTime = count($allLeadTimes) > 0 ? array_sum($allLeadTimes) / count($allLeadTimes) : 0;
+            $avgNewPatientLeadTime = count($newPatLeadTimes) > 0 ? array_sum($newPatLeadTimes) / count($newPatLeadTimes) : 0;
+            $avgEmergLeadTime = count($emergLeadTimes) > 0 ? array_sum($emergLeadTimes) / count($emergLeadTimes) : 0;
+
+            $rawRows[] = [
+                'location' => $loc->name,
+                'location_key' => $loc->key(),
+                'office_id' => $loc->officeId,
+                'clinic_num' => $loc->clinicNum,
+                'scheduled_appointments' => $scheduledApts,
+                'provider_count' => $providerCount,
+                'booked_hours' => round($bookedMinutes / 60, 2),
+                'avg_lead_all' => round($avgLeadTime, 2),
+                'avg_lead_new' => round($avgNewPatientLeadTime, 2),
+                'avg_lead_emerg' => round($avgEmergLeadTime, 2),
+            ];
+        }
+
+        $data = $this->assignCapacityTiers($rawRows);
+
+        return DataTables::of(collect($data))
+            ->editColumn('booked_hours', fn ($r) => number_format((float) $r['booked_hours'], 2))
+            ->editColumn('avg_lead_all', fn ($r) => number_format((float) $r['avg_lead_all'], 2))
+            ->editColumn('avg_lead_new', fn ($r) => number_format((float) $r['avg_lead_new'], 2))
+            ->editColumn('avg_lead_emerg', fn ($r) => number_format((float) $r['avg_lead_emerg'], 2))
+            ->make(true);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function assignCapacityTiers(array $rows): array
+    {
+        $count = count($rows);
+        if ($count === 0) {
+            return $rows;
+        }
+
+        if ($count === 1) {
+            $rows[0]['_tiers'] = [
+                'scheduled_appointments' => 'top',
+                'provider_count' => 'top',
+                'booked_hours' => 'top',
+                'avg_lead_all' => ((float) $rows[0]['avg_lead_all'] <= 14) ? 'top' : 'bottom',
+                'avg_lead_new' => ((float) $rows[0]['avg_lead_new'] <= 7) ? 'top' : 'bottom',
+                'avg_lead_emerg' => ((float) $rows[0]['avg_lead_emerg'] <= 2) ? 'top' : 'bottom',
+            ];
+
+            return $rows;
+        }
+
+        $metrics = ['scheduled_appointments', 'provider_count', 'booked_hours', 'avg_lead_all', 'avg_lead_new', 'avg_lead_emerg'];
+        $tierMap = [];
+
+        foreach ($metrics as $metric) {
+            $isLowerBetter = str_starts_with($metric, 'avg_lead_');
+            $values = array_column($rows, $metric);
+            $uniqueVals = array_values(array_unique($values));
+            sort($uniqueVals, SORT_NUMERIC);
+            $n = count($uniqueVals);
+
+            if ($isLowerBetter) {
+                foreach ($rows as $idx => $row) {
+                    $val = $row[$metric];
+                    $pos = array_search($val, $uniqueVals, true);
+                    $pct = ($pos + 1) / $n;
+                    if ($pct <= 0.34) {
+                        $tierMap[$idx][$metric] = 'top';
+                    } elseif ($pct > 0.66) {
+                        $tierMap[$idx][$metric] = 'bottom';
+                    } else {
+                        $tierMap[$idx][$metric] = 'mid';
+                    }
+                }
+            } else {
+                foreach ($rows as $idx => $row) {
+                    $val = $row[$metric];
+                    $pos = array_search($val, $uniqueVals, true);
+                    $pct = ($pos + 1) / $n;
+                    if ($pct >= 0.67) {
+                        $tierMap[$idx][$metric] = 'top';
+                    } elseif ($pct <= 0.33) {
+                        $tierMap[$idx][$metric] = 'bottom';
+                    } else {
+                        $tierMap[$idx][$metric] = 'mid';
+                    }
+                }
             }
         }
 
-        $avgLeadTime = count($allLeadTimes) > 0 ? array_sum($allLeadTimes) / count($allLeadTimes) : 0;
-        $avgNewPatientLeadTime = count($newPatLeadTimes) > 0 ? array_sum($newPatLeadTimes) / count($newPatLeadTimes) : 0;
-        $avgEmergLeadTime = count($emergLeadTimes) > 0 ? array_sum($emergLeadTimes) / count($emergLeadTimes) : 0;
+        foreach ($rows as $idx => &$row) {
+            $row['_tiers'] = $tierMap[$idx] ?? [];
+        }
+        unset($row);
 
-        // Mock tiers heavily matching the requested UI visually
-        $data = [
-            [
-                'location' => $this->clinics->name(0, $officeId),
-                'scheduled_appointments' => $scheduledApts,
-                'provider_count' => $providerCount,
-                'booked_hours' => number_format($bookedMinutes / 60, 2),
-                'avg_lead_all' => number_format($avgLeadTime, 2),
-                'avg_lead_new' => number_format($avgNewPatientLeadTime, 2),
-                'avg_lead_emerg' => number_format($avgEmergLeadTime, 2),
-                '_tiers' => [
-                    'scheduled_appointments' => 'top',
-                    'provider_count' => 'top',
-                    'booked_hours' => 'top',
-                    'avg_lead_all' => 'bottom',
-                    'avg_lead_new' => 'top',
-                    'avg_lead_emerg' => 'top',
-                ],
-            ],
-        ];
-
-        return DataTables::of(collect($data))->make(true);
+        return $rows;
     }
 
     public function capacityBreakdown(Request $request)
@@ -561,26 +737,40 @@ class CalendarController extends Controller
         $start = $request->get('start') ?? $request->get('date') ?? date('Y-m-d');
         $end = $request->get('end') ?? $start;
         $type = $request->get('type', 'scheduled_appointments');
+        $scopes = $this->resolveScopes($request);
 
         $startDateTime = substr($start, 0, 10).' 00:00:00';
         $endDateTime = substr($end, 0, 10).' 23:59:59';
 
-        $query = OdAppointment::whereBetween('AptDateTime', [$startDateTime, $endDateTime])
-            ->whereIn('AptStatus', [1, 2, 4, 5])
+        $query = OdAppointment::withoutGlobalScopes()
+            ->whereBetween('od_appointments.AptDateTime', [$startDateTime, $endDateTime])
+            ->whereIn('od_appointments.AptStatus', [1, 2, 4, 5])
             ->where(function ($q) {
-                $q->whereNull('SecDateTEntry')->orWhere('SecDateTEntry', '!=', '0001-01-01T00:00:00');
+                $q->whereNull('od_appointments.SecDateTEntry')
+                    ->orWhere('od_appointments.SecDateTEntry', '!=', '0001-01-01T00:00:00');
             })
             ->where(function ($q) {
-                $q->whereNull('Op')->orWhere('Op', '!=', 3);
+                $q->whereNull('od_appointments.Op')
+                    ->orWhere('od_appointments.Op', '!=', 3);
+            })
+            ->where(function ($scopeQuery) use ($scopes) {
+                foreach ($scopes as $officeId => $clinics) {
+                    $scopeQuery->orWhere(function ($q) use ($officeId, $clinics) {
+                        $q->where('od_appointments.office_id', $officeId);
+                        if (! empty($clinics)) {
+                            $q->whereIn('od_appointments.ClinicNum', $clinics);
+                        }
+                    });
+                }
             });
 
         if ($type === 'avg_lead_new') {
-            $query->whereIn('IsNewPatient', ['1', 1, 'true', true]);
+            $query->whereIn('od_appointments.IsNewPatient', ['1', 1, 'true', true]);
         } elseif ($type === 'avg_lead_emerg') {
             $query->where(function ($q) {
-                $q->where('ProcDescript', 'LIKE', '%emergency%')
-                    ->orWhere('ProcDescript', 'LIKE', '%D0140%')
-                    ->orWhere('Pattern', 'LIKE', '%emerg%');
+                $q->where('od_appointments.ProcDescript', 'LIKE', '%emergency%')
+                    ->orWhere('od_appointments.ProcDescript', 'LIKE', '%D0140%')
+                    ->orWhere('od_appointments.Pattern', 'LIKE', '%emerg%');
             });
         }
 
@@ -673,12 +863,21 @@ class CalendarController extends Controller
     {
         $start = $request->get('start') ?? $request->get('date') ?? date('Y-m-d');
         $end = $request->get('end') ?? $request->get('date') ?? $start;
+        $loc = $this->resolveSingleLocation($request);
+        $officeId = $loc['office_id'];
+        $clinicNum = $loc['clinic_num'];
 
-        $scheduledAppointments = OdAppointment::query()
+        $query = OdAppointment::withoutGlobalScopes()
             ->with(['patient', 'provider', 'procedureLogs'])
-            ->where('AptStatus', '1')
-            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
-            ->get();
+            ->where('od_appointments.office_id', $officeId)
+            ->whereIn('AptStatus', [1, 2, '1', '2'])
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+
+        if ($clinicNum !== null) {
+            $query->where('ClinicNum', $clinicNum);
+        }
+
+        $scheduledAppointments = $query->get();
 
         $totalScheduled = 0;
         $providerTotals = [];
@@ -756,53 +955,82 @@ class CalendarController extends Controller
     {
         $start = $request->get('start') ?? date('Y-m-01');
         $end = $request->get('end') ?? date('Y-m-t');
-        $officeId = Office::getActiveOfficeId();
+        $loc = $this->resolveSingleLocation($request);
+        $officeId = $loc['office_id'];
+        $clinicNum = $loc['clinic_num'];
 
         // 1. Gross production per date
-        $grossByDate = OdProcedureLog::query()
+        $grossQuery = OdProcedureLog::query()
+            ->where('office_id', $officeId)
             ->whereIn('ProcStatus', ['C', '2'])
-            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $grossQuery->where('ClinicNum', $clinicNum);
+        }
+        $grossByDate = $grossQuery
             ->selectRaw("DATE(REPLACE(ProcDate, 'T', ' ')) as date_str, COALESCE(SUM(CAST(ProcFee AS DECIMAL(12,2))), 0) AS total")
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
 
         // 2. Adjustments per date
-        $adjByDate = OdAdjustment::query()
-            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+        $adjQuery = OdAdjustment::query()
+            ->where('office_id', $officeId)
+            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $adjQuery->where('ClinicNum', $clinicNum);
+        }
+        $adjByDate = $adjQuery
             ->selectRaw("DATE(REPLACE(AdjDate, 'T', ' ')) as date_str, COALESCE(SUM(CAST(AdjAmt AS DECIMAL(12,2))), 0) AS total")
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
 
         // 3. Writeoffs per date
-        $woByDate = DB::table('od_claim_procs as c')
+        $woQuery = DB::table('od_claim_procs as c')
             ->where('c.office_id', $officeId)
-            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null && Schema::hasColumn('od_claim_procs', 'ClinicNum')) {
+            $woQuery->where('c.ClinicNum', $clinicNum);
+        }
+        $woByDate = $woQuery
             ->selectRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) as date_str, COALESCE(SUM(CAST(c.WriteOff AS DECIMAL(12,2))), 0) AS total")
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
 
-        // 3. Scheduled production per date
-        $schedByDate = OdAppointment::query()
-            ->join('od_procedure_logs as pl', 'pl.AptNum', '=', 'od_appointments.AptNum')
+        // 4. Scheduled production per date
+        $schedQuery = OdAppointment::withoutGlobalScopes()
+            ->join('od_procedure_logs as pl', function ($join) use ($officeId) {
+                $join->on('pl.AptNum', '=', 'od_appointments.AptNum')
+                    ->where('pl.office_id', '=', $officeId);
+            })
+            ->where('od_appointments.office_id', $officeId)
             ->where('od_appointments.AptStatus', '1')
-            ->whereRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
-            ->selectRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) as date_str, COALESCE(SUM(CAST(pl.ProcFee AS DECIMAL(12,2))), 0) AS total")
+            ->whereRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $schedQuery->where('od_appointments.ClinicNum', $clinicNum);
+        }
+        $schedByDate = $schedQuery
+            ->selectRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) as date_str, COALESCE(SUM(CAST(pl.ProcFee AS DECIMAL(12,2))), 0) as total")
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
 
-        // 4. Appointments count per date
-        $aptsByDate = OdAppointment::query()
+        // 5. Appointments count per date
+        $aptsQuery = OdAppointment::withoutGlobalScopes()
+            ->where('od_appointments.office_id', $officeId)
             ->whereIn('AptStatus', [1, 2, 4, 5])
-            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $aptsQuery->where('ClinicNum', $clinicNum);
+        }
+        $aptsByDate = $aptsQuery
             ->selectRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) as date_str, COUNT(*) as total_apts")
             ->groupBy('date_str')
             ->pluck('total_apts', 'date_str');
 
-        // 5. New Patients (first completed procedure cohort) per date
-        $newPtsByDate = DB::table('od_procedure_logs as pl')
+        // 6. New Patients (first completed procedure cohort) per date
+        $newPtsQuery = DB::table('od_procedure_logs as pl')
             ->where('pl.office_id', $officeId)
             ->joinSub(
-                $this->patients->firstVisitCohort($officeId),
+                $this->patients->firstVisitCohort($officeId, $clinicNum),
                 'fv',
                 'pl.PatNum',
                 '=',
@@ -810,7 +1038,11 @@ class CalendarController extends Controller
             )
             ->whereIn('pl.ProcStatus', ['C', '2'])
             ->whereRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) = DATE(REPLACE(fv.first_date, 'T', ' '))")
-            ->whereRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+        if ($clinicNum !== null) {
+            $newPtsQuery->where('pl.ClinicNum', $clinicNum);
+        }
+        $newPtsByDate = $newPtsQuery
             ->selectRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) as date_str, COUNT(DISTINCT pl.PatNum) as total")
             ->groupBy('date_str')
             ->pluck('total', 'date_str');
@@ -867,5 +1099,66 @@ class CalendarController extends Controller
         }
 
         return response()->json($result);
+    }
+
+    /**
+     * @return array{office_id: int, clinic_num: ?int}
+     */
+    private function resolveSingleLocation(Request $request): array
+    {
+        $param = $request->input('location') ?? $request->input('locations');
+        if ($param !== null && $param !== '' && $param !== 'all') {
+            $strParam = trim((string) $param);
+            if (str_contains($strParam, ':')) {
+                [$offId, $cNum] = explode(':', $strParam, 2);
+                if (is_numeric($offId) && is_numeric($cNum)) {
+                    return [
+                        'office_id' => (int) $offId,
+                        'clinic_num' => (int) $cNum,
+                    ];
+                }
+            } elseif (is_numeric($strParam)) {
+                $officeId = (int) $strParam;
+                $clinicNum = $this->resolveClinicNum($request, $officeId);
+
+                return [
+                    'office_id' => $officeId,
+                    'clinic_num' => $clinicNum,
+                ];
+            }
+        }
+
+        $officeId = Office::getActiveOfficeId() ?? 1;
+        $clinicNum = $this->resolveClinicNum($request, $officeId);
+
+        return [
+            'office_id' => $officeId,
+            'clinic_num' => $clinicNum,
+        ];
+    }
+
+    private function resolveClinicNum(Request $request, int|string $officeId): ?int
+    {
+        $clinicNum = $request->input('clinic_id') ?? $request->input('clinic_num') ?? $this->clinics->getActiveClinicNum($officeId);
+        if ($clinicNum === 'all' || $clinicNum === '' || $clinicNum === null) {
+            return null;
+        }
+
+        return (int) $clinicNum;
+    }
+
+    /**
+     * @return array<int, int[]> officeId => ClinicNum[]
+     */
+    private function resolveScopes(Request $request): array
+    {
+        if ($request->filled('locations')) {
+            return $this->clinics->select($request->input('locations'))->scopes();
+        }
+
+        $officeId = Office::getActiveOfficeId() ?? 1;
+        $clinicNum = $this->resolveClinicNum($request, $officeId);
+
+        return [$officeId => $clinicNum !== null ? [$clinicNum] : []];
     }
 }

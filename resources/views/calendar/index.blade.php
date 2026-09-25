@@ -137,17 +137,51 @@
             min-height: 115px;
             height: 100%;
         }
+
+        /* Mobile overrides for calendar and sidebar */
+        @media (max-width: 767.98px) {
+            #apt-sidebar {
+                position: fixed !important;
+                top: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                left: auto !important;
+                width: 100% !important;
+                max-width: 340px !important;
+                z-index: 60 !important;
+                box-shadow: -4px 0 25px rgba(0, 0, 0, 0.25) !important;
+            }
+
+            .fc .fc-col-header-cell-cushion {
+                font-size: 0.7rem;
+                padding: 4px 2px;
+            }
+
+            .fc-datagrid-cell-cushion {
+                font-size: 0.65rem;
+                padding: 4px 2px;
+            }
+
+            .fc .fc-timegrid-slot-label-cushion {
+                font-size: 0.62rem;
+            }
+
+            .fc-daygrid-day,
+            .fc-daygrid-day-frame {
+                min-height: 80px;
+            }
+        }
     </style>
-    <header class="bg-white border-b border-gray-100 px-8 py-4 flex justify-between items-center">
+    <header class="bg-white border-b border-gray-100 px-4 md:px-8 py-3 md:py-4 flex justify-between items-center">
         <div class="flex items-center space-x-2">
-            <h1 class="text-3xl font-extrabold tracking-tight text-gray-900">Calendar</h1>
+            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">Calendar</h1>
         </div>
     </header>
     <div class="flex flex-col bg-slate-50" style="min-height: calc(100vh - 64px);">
 
         {{-- ══════════════════ TOP TOOLBAR ══════════════════ --}}
-        <div class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0">
-            <div class="flex items-center gap-3">
+        <div class="relative z-30 bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+            <div class="flex flex-wrap items-center gap-2 md:gap-3">
                 <div id="singleDateWrapper"
                     class="relative flex items-center border border-slate-300 rounded px-3 py-1.5 gap-2 bg-white shadow-sm">
                     <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor"
@@ -162,48 +196,62 @@
                         value="{{ date('Y-m-d') }}">
                 </div>
 
+                {{-- Single location selector for Appointments Calendar tab (only 1 location at a time, no multiple selection) --}}
+                <div id="singleLocationWrapper" class="relative">
+                    <select id="calSingleLocation"
+                        class="appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 text-sm font-medium text-slate-700 pr-8 focus:outline-none focus:border-emerald-500 shadow-sm cursor-pointer min-w-[160px]">
+                        @foreach($locations as $key => $loc)
+                            <option value="{{ $key }}" @selected(in_array((string)$key, (array)$selectedLocations, true))>{{ $loc->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </div>
+
                 <div id="rangeDateWrapper" class="hidden">
                     <x-daterange-picker id="calDateRange" on-apply="onCalendarRangeApply" />
                 </div>
 
-                <select id="clinicFilter"
-                    class="border border-slate-300 rounded px-3 py-1.5 text-sm font-medium text-slate-700 bg-white shadow-sm focus:outline-none focus:border-emerald-500 min-w-[120px]">
-                    <option>8 Mile</option>
-                </select>
+                <div id="calLocationWrapper" class="hidden">
+                    <x-location-picker id="calLocations" :locations="$locations" :selected="$selectedLocations" />
+                </div>
 
                 <button id="refreshBtn"
-                    class="border border-emerald-500 text-emerald-600 px-5 py-1.5 rounded text-sm font-semibold hover:bg-emerald-50 transition shadow-sm">
+                    class="border border-emerald-500 text-emerald-600 px-4 md:px-5 py-1.5 rounded text-sm font-semibold hover:bg-emerald-50 transition shadow-sm">
                     Refresh
                 </button>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 md:gap-3">
                 <div id="viewToggleWrapper" class="flex bg-slate-100 rounded-md border border-slate-200 p-0.5 gap-0.5">
-                    <button class="view-btn px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
+                    <button class="view-btn px-3 md:px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
                         data-view="dayGridMonth">Month</button>
-                    <button class="view-btn px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
+                    <button class="view-btn px-3 md:px-4 py-1.5 text-xs font-medium rounded text-slate-500 transition-all"
                         data-view="resourceTimeGridWeek">Week</button>
-                    <button class="view-btn active px-4 py-1.5 text-xs font-medium rounded transition-all"
+                    <button class="view-btn active px-3 md:px-4 py-1.5 text-xs font-medium rounded transition-all"
                         data-view="resourceTimeGridDay">Day</button>
                 </div>
             </div>
         </div>
 
         {{-- ══════════════════ TABS ══════════════════ --}}
-        <div class="bg-white border-b border-slate-200 px-6">
-            <nav class="flex gap-6">
+        <div class="bg-white border-b border-slate-200 px-4 md:px-6">
+            <nav class="flex gap-6 dds-tab-nav flex-nowrap overflow-x-auto">
                 <button id="tab-calendar"
-                    class="cal-tab py-2.5 text-sm font-bold text-slate-900 border-b-2 border-emerald-500"
+                    class="cal-tab py-2.5 text-sm font-bold text-slate-900 border-b-2 border-emerald-500 flex-shrink-0 whitespace-nowrap"
                     data-target="view-calendar">
                     Appointments Calendar
                 </button>
                 <button id="tab-details"
-                    class="cal-tab py-2.5 text-sm font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-colors"
+                    class="cal-tab py-2.5 text-sm font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-colors flex-shrink-0 whitespace-nowrap"
                     data-target="view-details">
                     Appointment Details
                 </button>
                 <button id="tab-capacity"
-                    class="cal-tab py-2.5 text-sm font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-colors"
+                    class="cal-tab py-2.5 text-sm font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-colors flex-shrink-0 whitespace-nowrap"
                     data-target="view-capacity">
                     Appointment Capacity
                 </button>
@@ -213,53 +261,55 @@
         <div id="view-calendar" class="flex flex-col flex-1 overflow-hidden">
 
             {{-- ══════════════════ STATS ROW ══════════════════ --}}
-            <div class="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-10 flex-shrink-0">
-                <div>
-                    <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
-                        <span id="stat-production-title">Production</span>
-                        <span class="text-slate-400 cursor-help" id="stat-production-help"
-                            title="Display $ amount of what has been produced for the day">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </span>
-                    </p>
-                    <p class="text-xl font-bold text-slate-900" id="stat-production">—</p>
+            <div class="bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
+                <div class="flex items-center gap-6 sm:gap-10 flex-wrap">
+                    <div>
+                        <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1">
+                            <span id="stat-production-title">Production</span>
+                            <span class="text-slate-400 cursor-help" id="stat-production-help"
+                                title="Display $ amount of what has been produced for the day">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </span>
+                        </p>
+                        <p class="text-xl font-bold text-slate-900" id="stat-production">—</p>
+                    </div>
+                    <div id="stat-scheduled-container" class="cursor-pointer group rounded-lg p-1.5 -m-1.5 transition hover:bg-emerald-50/60" title="Click to view scheduled production breakdown" onclick="openScheduledProductionModal()">
+                        <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1.5">
+                            <span id="stat-scheduled-title">Scheduled Production</span>
+                            <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                Breakdown
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </span>
+                        </p>
+                        <p class="text-xl font-bold text-slate-900 group-hover:text-emerald-700 transition-colors" id="stat-scheduled">—</p>
+                    </div>
                 </div>
-                <div id="stat-scheduled-container" class="cursor-pointer group rounded-lg p-1.5 -m-1.5 transition hover:bg-emerald-50/60" title="Click to view scheduled production breakdown" onclick="openScheduledProductionModal()">
-                    <p class="text-xs text-slate-500 mb-0.5 flex items-center gap-1.5">
-                        <span id="stat-scheduled-title">Scheduled Production</span>
-                        <span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                            Breakdown
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                            </svg>
-                        </span>
-                    </p>
-                    <p class="text-xl font-bold text-slate-900 group-hover:text-emerald-700 transition-colors" id="stat-scheduled">—</p>
-                </div>
-                <div class="ml-auto flex items-center gap-2">
+                <div class="flex items-center gap-2">
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="activeColumnsToggle" class="sr-only peer" checked>
                         <div class="w-9 h-5 bg-slate-200 rounded-full peer peer-checked:bg-emerald-500
                      after:content-[''] after:absolute after:top-[2px] after:left-[2px]
                      after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
                      peer-checked:after:translate-x-full"></div>
-                        <span class="ml-2 text-sm font-medium text-slate-600">Active Columns only</span>
+                        <span class="ml-2 text-xs sm:text-sm font-medium text-slate-600">Active Columns only</span>
                     </label>
                 </div>
             </div>
 
             {{-- ══════════════════ NAV BAR ══════════════════ --}}
-            <div class="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between flex-shrink-0">
+            <div class="bg-white border-b border-slate-200 px-4 md:px-6 py-2 flex items-center justify-between gap-2 flex-shrink-0">
                 <button id="prevBtn" class="p-1.5 rounded border border-slate-300 hover:bg-slate-50 transition">
                     <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
-                <div class="flex items-center gap-3 text-sm">
-                    <span id="calDateLabel" class="font-bold text-slate-900 text-base"></span>
+                <div class="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm truncate">
+                    <span id="calDateLabel" class="font-bold text-slate-900 text-sm md:text-base truncate"></span>
                     <span class="text-slate-300">|</span>
                     <span id="liveTime" class="font-medium text-slate-500"></span>
                 </div>
@@ -272,7 +322,7 @@
 
             {{-- ══════════════════ PROVIDER HEADER ══════════════════ --}}
             <div id="provider-header"
-                class="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 overflow-x-auto select-none flex-shrink-0">
+                class="bg-white border-b border-slate-200 px-4 md:px-6 py-2.5 flex items-center gap-3 overflow-x-auto select-none flex-shrink-0 dds-tabs-scroll">
                 <!-- Rendered dynamically -->
             </div>
 
@@ -311,9 +361,9 @@
 
         </div>
 
-        <div id="view-details" class="hidden flex-col flex-1 overflow-y-auto bg-slate-50 p-6">
+        <div id="view-details" class="hidden flex-col flex-1 overflow-y-auto bg-slate-50 p-4 md:p-6">
             {{-- Filters --}}
-            <div class="flex gap-4 mb-6">
+            <div class="flex flex-col sm:flex-row gap-3 md:gap-4 mb-4 md:mb-6">
                 <div class="flex flex-col flex-1">
                     <label class="text-xs font-bold text-slate-900 mb-1">Provider(s)</label>
                     <select id="detailsFilterProvider"
@@ -335,32 +385,32 @@
             </div>
 
             {{-- White container for DataTable --}}
-            <div class="bg-white border border-slate-200 p-0 flex flex-col flex-1 h-full relative">
+            <div class="bg-white border border-slate-200 p-0 flex flex-col flex-1 h-full relative rounded-lg overflow-hidden">
                 {{-- Toolbar inside the table container --}}
-                <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-                    <div class="flex text-sm">
+                <div class="px-4 md:px-5 py-3 md:py-4 border-b border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div class="flex text-sm dds-tab-nav flex-nowrap overflow-x-auto">
                         <button
-                            class="bg-green-100 text-green-700 font-medium px-4 py-1.5 border border-transparent rounded-sm hover:bg-green-200 transition">Top
+                            class="bg-green-100 text-green-700 font-medium px-4 py-1.5 border border-transparent rounded-sm hover:bg-green-200 transition flex-shrink-0 whitespace-nowrap">Top
                             20%</button>
                         <button
-                            class="bg-yellow-100/70 text-yellow-700 font-medium px-4 py-1.5 border border-transparent 0 rounded-sm ml-1 hover:bg-yellow-200 transition">Mid
+                            class="bg-yellow-100/70 text-yellow-700 font-medium px-4 py-1.5 border border-transparent 0 rounded-sm ml-1 hover:bg-yellow-200 transition flex-shrink-0 whitespace-nowrap">Mid
                             Tier</button>
                         <button
-                            class="bg-red-100 text-red-600 font-medium px-4 py-1.5 border border-transparent rounded-sm ml-1 hover:bg-red-200 transition">Bottom
+                            class="bg-red-100 text-red-600 font-medium px-4 py-1.5 border border-transparent rounded-sm ml-1 hover:bg-red-200 transition flex-shrink-0 whitespace-nowrap">Bottom
                             20%</button>
                     </div>
-                    <div class="flex items-center gap-3 text-sm">
-                        <div class="relative">
+                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 md:gap-3 text-sm">
+                        <div class="relative flex-1 sm:flex-initial">
                             <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none"
                                 stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
                             <input type="text" id="detailsSearch" placeholder="Search"
-                                class="border border-slate-300 pl-9 pr-3 py-1.5 text-slate-700 w-64 focus:outline-emerald-500">
+                                class="border border-slate-300 pl-9 pr-3 py-1.5 text-slate-700 w-full sm:w-64 focus:outline-emerald-500 rounded-sm">
                         </div>
                         <button id="exportDetailsCsvBtn" onclick="exportAppointmentDetailsCsv()"
-                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5">
+                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5 flex-shrink-0">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
@@ -370,199 +420,208 @@
                 </div>
 
                 {{-- Table --}}
-                <div class="flex-1 w-full relative">
-                    <x-table-skeleton />
-                    <x-data-table id="appointmentDetailsTable" min-width="1800px" max-height="100%">
-                        <x-slot:head>
-                            <tr class="bg-white">
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left"
-                                    style="min-width: 12rem;">Location</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left"
-                                    style="min-width: 12rem; left: 12rem;">Patient Name</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
-                                    style="min-width: 12rem; left: 24rem;">Appointment Date</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Appointment Time</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Appointment Duration</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Operatory Name</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Appointment Status</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Patient Age</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Patient Phone</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Email Address</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Patient Type</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Appointment Notes</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Confirmation Status</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Provider Name</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Procedure Codes</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Production</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Primary Insurance Carrier</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Secondary Insurance Carrier</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Referral Source</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Unscheduled Tx $</th>
-                                <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
-                                    style="min-width: 10rem;">Last Visit Date</th>
-                            </tr>
-                        </x-slot:head>
+                <div class="flex-1 w-full relative flex flex-col min-h-[480px]">
+                    <!-- Skeleton Loader Section (Replaces table while loading) -->
+                    <div id="detailsSkeleton" class="w-full bg-white overflow-hidden" style="max-height: calc(100vh - 280px); min-height: 480px;">
+                        <x-table-skeleton />
+                    </div>
 
-                        <x-slot:foot>
-                            <tr class="bg-gray-200">
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
-                                    style="min-width: 12rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
-                                    style="min-width: 12rem; width: 12rem; left: 12rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
-                                    style="min-width: 12rem; width: 12rem; left: 24rem;">Average:</td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class=""></span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">()--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class=""></span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">--</span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class=""></span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="">-</span></td>
-                            </tr>
-                            <tr class="bg-gray-200">
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
-                                    style="min-width: 12rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
-                                    style="min-width: 12rem; width: 12rem; left: 12rem;"><span
-                                        class="block flex justify-end"><span><strong class="block truncate">--</strong>
-                                            <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
-                                    style="min-width: 12rem; width: 12rem; left: 24rem;">Total:</td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class=""></span></strong>
-                                            <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class=""></span></strong>
-                                            <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate"><span class=""></span></strong>
-                                            <!----></span> </span></td>
-                                <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
-                                    style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
-                                                class="block truncate">--</strong> <!----></span> </span></td>
-                            </tr>
-                        </x-slot:foot>
-                    </x-data-table>
+                    <!-- Details Table Scroll Container (Hidden while loading) -->
+                    <div id="detailsTableContainer" class="hidden flex-1 w-full overflow-hidden flex flex-col">
+                        <x-data-table id="appointmentDetailsTable" min-width="1800px" max-height="calc(100vh - 340px)">
+                            <x-slot:head>
+                                <tr class="bg-white">
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left"
+                                        style="min-width: 12rem;">Location</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left"
+                                        style="min-width: 12rem; left: 12rem;">Patient Name</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200 dt-col-sticky text-left shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
+                                        style="min-width: 12rem; left: 24rem;">Appointment Date</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Appointment Time</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Appointment Duration</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Operatory Name</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Appointment Status</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Patient Age</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Patient Phone</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Email Address</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Patient Type</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Appointment Notes</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Confirmation Status</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Provider Name</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Procedure Codes</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Production</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Primary Insurance Carrier</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Secondary Insurance Carrier</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Referral Source</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Unscheduled Tx $</th>
+                                    <th class="text-xs font-semibold py-4 pl-5 pr-3 border-l border-t border-gray-200"
+                                        style="min-width: 10rem;">Last Visit Date</th>
+                                </tr>
+                            </x-slot:head>
+
+                            <x-slot:foot>
+                                <tr class="bg-gray-200">
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
+                                        style="min-width: 12rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
+                                        style="min-width: 12rem; width: 12rem; left: 12rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
+                                        style="min-width: 12rem; width: 12rem; left: 24rem;">Average:</td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class=""></span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">()--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class=""></span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">--</span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class=""></span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="">-</span></td>
+                                </tr>
+                                <tr class="bg-gray-200">
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
+                                        style="min-width: 12rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky"
+                                        style="min-width: 12rem; width: 12rem; left: 12rem;"><span
+                                            class="block flex justify-end"><span><strong class="block truncate">--</strong>
+                                                <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white dt-col-sticky shadow-[2px_0_5px_-2px_rgba(0,0,0,0.10)]"
+                                        style="min-width: 12rem; width: 12rem; left: 24rem;">Total:</td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate"><span class=""></span></strong>
+                                                <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate"><span class=""></span></strong>
+                                                <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate"><span class=""></span></strong>
+                                                <!----></span> </span></td>
+                                    <td class="text-right text-xs font-semibold py-2 px-3 border-l border-t border-white"
+                                        style="min-width: 10rem;"><span class="block flex justify-end"><span><strong
+                                                    class="block truncate">--</strong> <!----></span> </span></td>
+                                </tr>
+                            </x-slot:foot>
+                        </x-data-table>
+                    </div>
+
+                    <x-table-pagination id="details" :default-length="25" />
                 </div>
             </div>
         </div>
 
-        <div id="view-capacity" class="hidden flex-col flex-1 bg-slate-50 p-6 relative">
-            <div class="bg-white rounded-lg shadow-sm w-full p-5 border border-slate-200 flex flex-col flex-1">
+        <div id="view-capacity" class="hidden flex-col flex-1 bg-slate-50 p-4 md:p-6 relative overflow-y-auto">
+            <div class="bg-white rounded-lg shadow-sm w-full p-4 md:p-5 border border-slate-200 flex flex-col flex-1">
 
                 {{-- Header Actions --}}
-                <div class="flex items-center justify-between mb-4 flex-shrink-0">
-                    <div class="flex items-center gap-1 text-xs">
-                        <span class="px-3 py-1.5 font-semibold text-emerald-700 bg-emerald-100 rounded-sm">Top
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4 flex-shrink-0">
+                    <div class="flex items-center gap-1 text-xs dds-tab-nav flex-nowrap overflow-x-auto">
+                        <span class="px-3 py-1.5 font-semibold text-emerald-700 bg-emerald-100 rounded-sm flex-shrink-0 whitespace-nowrap">Top
                             20%</span>
-                        <span class="px-3 py-1.5 font-semibold text-yellow-700 bg-yellow-100 rounded-sm">Mid Tier</span>
-                        <span class="px-3 py-1.5 font-semibold text-red-700 bg-red-100/70 rounded-sm">Bottom 20%</span>
+                        <span class="px-3 py-1.5 font-semibold text-yellow-700 bg-yellow-100 rounded-sm flex-shrink-0 whitespace-nowrap">Mid Tier</span>
+                        <span class="px-3 py-1.5 font-semibold text-red-700 bg-red-100/70 rounded-sm flex-shrink-0 whitespace-nowrap">Bottom 20%</span>
                     </div>
 
-                    <div class="flex items-center gap-3 text-sm">
-                        <div class="relative">
+                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 md:gap-3 text-sm">
+                        <div class="relative flex-1 sm:flex-initial">
                             <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none"
                                 stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
                             <input type="text" id="capacitySearch" placeholder="Search"
-                                class="border border-slate-300 pl-9 pr-3 py-1.5 rounded-sm text-slate-700 w-48 focus:outline-emerald-500">
+                                class="border border-slate-300 pl-9 pr-3 py-1.5 rounded-sm text-slate-700 w-full sm:w-48 focus:outline-emerald-500">
                         </div>
                         <button id="exportCapacityCsvBtn" onclick="exportAppointmentCapacityCsv()"
-                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5">
+                            class="border border-emerald-500 text-emerald-600 font-semibold px-4 py-1.5 rounded-sm hover:bg-emerald-50 transition shadow-sm flex items-center gap-1.5 flex-shrink-0">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
@@ -572,123 +631,132 @@
                 </div>
 
                 {{-- Table UI --}}
-                <div class="flex-1 w-full relative">
-                    <x-table-skeleton />
-                    <x-data-table id="appointmentCapacityTable" min-width="1200px" max-height="100%">
-                        <x-slot:head>
-                            <tr class="bg-slate-100 border-b border-t border-slate-200">
-                                <th class="text-xs font-bold text-slate-700 py-3 pl-4 pr-3 dt-col-sticky text-left border-r border-slate-200"
-                                    style="width: 14rem;">
-                                    Location
-                                </th>
-                                <th
-                                    class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-40">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span>Scheduled Appointments</span> <svg
-                                                class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                                <th
-                                    class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-32">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span># of Providers</span> <svg
-                                                class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                                <th
-                                    class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-32">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span>Booked Hours</span> <svg
-                                                class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                                <th
-                                    class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-48">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span>Avg. Lead Time - All<br>Appointments
-                                                (days)</span> <svg class="w-3.5 h-3.5 text-slate-400" fill="none"
-                                                stroke="currentColor" viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                                <th
-                                    class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-48">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span>Avg. Lead Time - New<br>Patient
-                                                Appointments (days)</span> <svg class="w-3.5 h-3.5 text-slate-400"
-                                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                                <th class="text-xs font-bold text-slate-700 py-3 px-3 text-center w-48">
-                                    <div class="flex flex-col items-center gap-0.5 justify-center">
-                                        <div class="flex items-center gap-1"><span>Avg. Lead Time -<br>Emergency
-                                                Appointments (days)</span> <svg class="w-3.5 h-3.5 text-slate-400"
-                                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2" />
-                                                <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
-                                            </svg></div>
-                                    </div>
-                                </th>
-                            </tr>
-                        </x-slot:head>
+                <div class="flex-1 w-full relative flex flex-col min-h-[400px]">
+                    <!-- Skeleton Loader Section (Replaces table while loading) -->
+                    <div id="capacitySkeleton" class="w-full bg-white overflow-hidden" style="max-height: calc(100vh - 280px); min-height: 400px;">
+                        <x-table-skeleton />
+                    </div>
 
-                        <x-slot:foot>
-                            <tr class="bg-gray-50 border-t border-slate-200">
-                                <td class="text-left font-bold text-xs py-3 px-4 dt-col-sticky border-r border-slate-200 shadow-sm"
-                                    style="width:14rem">Total:</td>
-                                <td onclick="openCapacityBreakdown('scheduled_appointments')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-1 cursor-pointer hover:bg-slate-100 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('provider_count')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-2 cursor-pointer hover:bg-slate-100 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('booked_hours')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-3 cursor-pointer hover:bg-slate-100 transition">
-                                    -</td>
-                                <td class="border-r border-slate-200 bg-white"></td>
-                                <td class="border-r border-slate-200 bg-white"></td>
-                                <td class="bg-white"></td>
-                            </tr>
-                            <tr class="bg-white border-t border-slate-50">
-                                <td class="text-left font-bold text-xs py-3 px-4 dt-col-sticky border-r border-slate-200 shadow-sm"
-                                    style="width:14rem">Average:</td>
-                                <td onclick="openCapacityBreakdown('scheduled_appointments')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-1 cursor-pointer hover:bg-slate-50 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('provider_count')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-2 cursor-pointer hover:bg-slate-50 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('booked_hours')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-3 cursor-pointer hover:bg-slate-50 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('avg_lead_all')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-4 cursor-pointer hover:bg-slate-50 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('avg_lead_new')"
-                                    class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-5 cursor-pointer hover:bg-slate-50 transition">
-                                    -</td>
-                                <td onclick="openCapacityBreakdown('avg_lead_emerg')"
-                                    class="text-right font-bold text-xs py-3 px-6 capacity-avg-6 cursor-pointer hover:bg-slate-50 transition">-</td>
-                            </tr>
-                        </x-slot:foot>
-                    </x-data-table>
+                    <!-- Capacity Table Scroll Container (Hidden while loading) -->
+                    <div id="capacityTableContainer" class="hidden flex-1 w-full overflow-hidden flex flex-col">
+                        <x-data-table id="appointmentCapacityTable" min-width="1200px" max-height="100%">
+                            <x-slot:head>
+                                <tr class="bg-slate-100 border-b border-t border-slate-200">
+                                    <th class="text-xs font-bold text-slate-700 py-3 pl-4 pr-3 dt-col-sticky text-left border-r border-slate-200"
+                                        style="width: 14rem;">
+                                        Location
+                                    </th>
+                                    <th
+                                        class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-40">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span>Scheduled Appointments</span> <svg
+                                                    class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                    <th
+                                        class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-32">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span># of Providers</span> <svg
+                                                    class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                    <th
+                                        class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-32">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span>Booked Hours</span> <svg
+                                                    class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                    <th
+                                        class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-48">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span>Avg. Lead Time - All<br>Appointments
+                                                    (days)</span> <svg class="w-3.5 h-3.5 text-slate-400" fill="none"
+                                                    stroke="currentColor" viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                    <th
+                                        class="text-xs font-bold text-slate-700 py-3 px-3 text-center border-r border-slate-200 w-48">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span>Avg. Lead Time - New<br>Patient
+                                                    Appointments (days)</span> <svg class="w-3.5 h-3.5 text-slate-400"
+                                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                    <th class="text-xs font-bold text-slate-700 py-3 px-3 text-center w-48">
+                                        <div class="flex flex-col items-center gap-0.5 justify-center">
+                                            <div class="flex items-center gap-1"><span>Avg. Lead Time -<br>Emergency
+                                                    Appointments (days)</span> <svg class="w-3.5 h-3.5 text-slate-400"
+                                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                                                    <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round" />
+                                                </svg></div>
+                                        </div>
+                                    </th>
+                                </tr>
+                            </x-slot:head>
+
+                            <x-slot:foot>
+                                <tr class="bg-gray-50 border-t border-slate-200">
+                                    <td class="text-left font-bold text-xs py-3 px-4 dt-col-sticky border-r border-slate-200 shadow-sm"
+                                        style="width:14rem">Total:</td>
+                                    <td onclick="openCapacityBreakdown('scheduled_appointments')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-1 cursor-pointer hover:bg-slate-100 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('provider_count')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-2 cursor-pointer hover:bg-slate-100 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('booked_hours')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-total-3 cursor-pointer hover:bg-slate-100 transition">
+                                        -</td>
+                                    <td class="border-r border-slate-200 bg-white"></td>
+                                    <td class="border-r border-slate-200 bg-white"></td>
+                                    <td class="bg-white"></td>
+                                </tr>
+                                <tr class="bg-white border-t border-slate-50">
+                                    <td class="text-left font-bold text-xs py-3 px-4 dt-col-sticky border-r border-slate-200 shadow-sm"
+                                        style="width:14rem">Average:</td>
+                                    <td onclick="openCapacityBreakdown('scheduled_appointments')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-1 cursor-pointer hover:bg-slate-50 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('provider_count')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-2 cursor-pointer hover:bg-slate-50 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('booked_hours')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-3 cursor-pointer hover:bg-slate-50 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('avg_lead_all')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-4 cursor-pointer hover:bg-slate-50 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('avg_lead_new')"
+                                        class="text-right font-bold text-xs py-3 px-6 border-r border-slate-200 capacity-avg-5 cursor-pointer hover:bg-slate-50 transition">
+                                        -</td>
+                                    <td onclick="openCapacityBreakdown('avg_lead_emerg')"
+                                        class="text-right font-bold text-xs py-3 px-6 capacity-avg-6 cursor-pointer hover:bg-slate-50 transition">-</td>
+                                </tr>
+                            </x-slot:foot>
+                        </x-data-table>
+                    </div>
+
+                    <x-table-pagination id="capacity" :default-length="10" />
                 </div>
             </div>
         </div>
@@ -932,10 +1000,15 @@
             // Show skeleton immediately before the calendar even starts constructing
             showCalSkeleton('Initializing...', 'resourceTimeGridDay');
 
+            var initialCalDate = (window.DDS && window.DDS.date) ? window.DDS.date.getDate('{{ date("Y-m-d") }}') : '{{ date("Y-m-d") }}';
+            if (document.getElementById('calDate')) {
+                document.getElementById('calDate').value = initialCalDate;
+            }
+
             calendar = new FullCalendar.Calendar(calEl, {
                 schedulerLicenseKey: 'CC-Attribution-NonCommercialNoDerivatives',
                 initialView: 'resourceTimeGridDay',
-                initialDate: '{{ date("Y-m-d") }}',
+                initialDate: initialCalDate,
                 headerToolbar: false,
                 nowIndicator: true,
                 slotDuration: '00:30:00',
@@ -951,7 +1024,8 @@
                     setProgress(20, 'Loading providers...');
                     const date = (info.startStr || info.start?.toISOString() || document.getElementById('calDate').value || '{{ date("Y-m-d") }}').substring(0, 10);
                     const activeOnly = document.getElementById('activeColumnsToggle').checked ? '1' : '0';
-                    fetch(baseUrl + '/calendar/resources?date=' + date + '&active_only=' + activeOnly)
+                    const loc = document.getElementById('calSingleLocation')?.value || '';
+                    fetch(baseUrl + '/calendar/resources?date=' + date + '&active_only=' + activeOnly + (loc ? '&location=' + encodeURIComponent(loc) : ''))
                         .then(r => r.json())
                         .then(data => {
                             console.log('[FC Resources]', data);
@@ -973,7 +1047,8 @@
                     const end = info.end
                         ? new Date(info.end - 1).toISOString().substring(0, 10)
                         : start;
-                    fetch(baseUrl + '/calendar/data?start=' + start + '&end=' + end)
+                    const loc = document.getElementById('calSingleLocation')?.value || '';
+                    fetch(baseUrl + '/calendar/data?start=' + start + '&end=' + end + (loc ? '&location=' + encodeURIComponent(loc) : ''))
                         .then(r => r.json())
                         .then(data => {
                             console.log('[FC Events] count:', data.length);
@@ -1060,6 +1135,10 @@
                     const dateChanged = currentCalDate !== null && currentCalDate !== dateStr;
                     currentCalDate = dateStr;
 
+                    if (window.DDS && window.DDS.date) {
+                        window.DDS.date.setDate(dateStr);
+                    }
+
                     document.getElementById('calDate').value = dateStr;
                     updateDateLabel(d, info.view?.type);
 
@@ -1080,7 +1159,7 @@
             calendar.render();
 
             // initialise date label & clock
-            updateDateLabel(new Date('{{ date("Y-m-d") }}T00:00:00'), calendar.view?.type);
+            updateDateLabel(new Date(initialCalDate + 'T00:00:00'), calendar.view?.type);
             startClock();
 
             // ── Active Columns Toggle ───────────────────────────────────────
@@ -1103,9 +1182,15 @@
             document.getElementById('refreshBtn').addEventListener('click', () => {
                 const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
                 if (activeTab === 'view-details') {
-                    if (aptDetailsTable) aptDetailsTable.ajax.reload();
+                    if (aptDetailsTable) {
+                        showDetailsLoading();
+                        aptDetailsTable.ajax.reload();
+                    }
                 } else if (activeTab === 'view-capacity') {
-                    if (aptCapacityTable) aptCapacityTable.ajax.reload();
+                    if (aptCapacityTable) {
+                        showCapacityLoading();
+                        aptCapacityTable.ajax.reload();
+                    }
                 } else {
                     const range = getViewDateRange(calendar?.view);
                     showCalSkeleton('Refreshing...', calendar?.view?.type);
@@ -1123,6 +1208,9 @@
             // ── Date picker ───────────────────────────────────────────────
             document.getElementById('calDate').addEventListener('change', function () {
                 showCalSkeleton('Loading date...', calendar?.view?.type);
+                if (window.DDS && window.DDS.date) {
+                    window.DDS.date.setDate(this.value);
+                }
                 calendar.gotoDate(this.value);
             });
 
@@ -1221,7 +1309,8 @@
                 endStr = startStr;
             }
 
-            fetch(baseUrl + '/calendar/monthly-summary?start=' + startStr + '&end=' + endStr)
+            const loc = document.getElementById('calSingleLocation')?.value || '';
+            fetch(baseUrl + '/calendar/monthly-summary?start=' + startStr + '&end=' + endStr + (loc ? '&location=' + encodeURIComponent(loc) : ''))
                 .then(r => r.json())
                 .then(data => {
                     renderMonthlySummary(data);
@@ -1357,7 +1446,8 @@
                     : (vType === 'week' ? 'Scheduled Production <span class="text-[10px] text-slate-400 font-normal">(Week)</span>' : 'Scheduled Production');
             }
 
-            fetch(baseUrl + '/calendar/stats?start=' + encodeURIComponent(sDate) + '&end=' + encodeURIComponent(eDate) + '&date=' + encodeURIComponent(sDate))
+            const loc = document.getElementById('calSingleLocation')?.value || '';
+            fetch(baseUrl + '/calendar/stats?start=' + encodeURIComponent(sDate) + '&end=' + encodeURIComponent(eDate) + '&date=' + encodeURIComponent(sDate) + (loc ? '&location=' + encodeURIComponent(loc) : ''))
                 .then(r => r.json())
                 .then(s => {
                     if (prodEl) prodEl.textContent = usd.format(parseFloat(s.production) || 0);
@@ -1505,8 +1595,10 @@
         window.onCalendarRangeApply = function(start, end) {
             const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
             if (activeTab === 'view-details' && aptDetailsTable) {
+                showDetailsLoading();
                 aptDetailsTable.ajax.reload();
             } else if (activeTab === 'view-capacity' && aptCapacityTable) {
+                showCapacityLoading();
                 aptCapacityTable.ajax.reload();
             }
         };
@@ -1544,17 +1636,23 @@
 
                 // Toggle date selection input vs range picker & calendar view buttons based on tab
                 const singleDateWrapper = document.getElementById('singleDateWrapper');
+                const singleLocationWrapper = document.getElementById('singleLocationWrapper');
                 const rangeDateWrapper = document.getElementById('rangeDateWrapper');
+                const calLocationWrapper = document.getElementById('calLocationWrapper');
                 const viewToggleWrapper = document.getElementById('viewToggleWrapper');
 
                 if (target === 'view-calendar') {
                     singleDateWrapper?.classList.remove('hidden');
+                    singleLocationWrapper?.classList.remove('hidden');
                     rangeDateWrapper?.classList.add('hidden');
+                    calLocationWrapper?.classList.add('hidden');
                     viewToggleWrapper?.classList.remove('hidden');
                 } else {
                     syncDateRangeFromSinglePicker();
                     singleDateWrapper?.classList.add('hidden');
+                    singleLocationWrapper?.classList.add('hidden');
                     rangeDateWrapper?.classList.remove('hidden');
+                    calLocationWrapper?.classList.remove('hidden');
                     viewToggleWrapper?.classList.add('hidden');
                 }
 
@@ -1571,16 +1669,20 @@
 
                     if (target === 'view-details') {
                         if (aptDetailsTable) {
+                            showDetailsLoading();
                             aptDetailsTable.ajax.reload();
                         } else {
+                            showDetailsLoading();
                             initAptDetailsTable();
                         }
                     }
 
                     if (target === 'view-capacity') {
                         if (aptCapacityTable) {
+                            showCapacityLoading();
                             aptCapacityTable.ajax.reload();
                         } else {
+                            showCapacityLoading();
                             initAptCapacityTable();
                         }
                     }
@@ -1588,7 +1690,23 @@
             });
         });
 
+        function showDetailsLoading() {
+            $('#detailsSkeleton').removeClass('hidden');
+            $('#detailsTableContainer').addClass('hidden');
+            var scrollContainer = document.getElementById('detailsTableContainer');
+            if (scrollContainer) {
+                scrollContainer.scrollTop = 0;
+                scrollContainer.scrollLeft = 0;
+            }
+        }
+
+        function hideDetailsLoading() {
+            $('#detailsSkeleton').addClass('hidden');
+            $('#detailsTableContainer').removeClass('hidden');
+        }
+
         let aptDetailsTable = null;
+        let aptDetailsPager = null;
         function initAptDetailsTable() {
             if (aptDetailsTable) return;
 
@@ -1611,18 +1729,35 @@
             }
 
             aptDetailsTable = DDS.dataTable(document.getElementById('appointmentDetailsTable'), {
-                processing: true,
+                processing: false,
                 serverSide: true,
+                paging: true,
+                pageLength: 25,
+                lengthChange: false,
+                info: false,
+                searching: true,
+                ordering: true,
+                layout: { topStart: null, topEnd: null, bottomStart: null, bottomEnd: null },
                 ajax: {
                     url: "{{ route('calendar.appointments-details-data') }}",
                     data: function (d) {
                         const range = getCalendarDateRange();
                         d.start = range.start;
                         d.end = range.end;
+                        const locs = window.DDS && DDS.getLocations ? DDS.getLocations('calLocations') : [];
+                        if (locs && locs.length > 0) {
+                            d.locations = locs.join(',');
+                        }
                         const provVal = $('#detailsFilterProvider').val();
                         if (provVal) d.provider_id = provVal;
                         const statusVal = $('#detailsFilterStatus').val();
                         if (statusVal) d.status = statusVal;
+                    },
+                    beforeSend: function () { showDetailsLoading(); },
+                    complete: function () { hideDetailsLoading(); },
+                    error: function (xhr, error, thrown) {
+                        console.error("Details DataTables error:", error, thrown, xhr.responseText);
+                        hideDetailsLoading();
                     }
                 },
                 columns: [
@@ -1648,16 +1783,7 @@
                     { data: 'unscheduled_tx', name: 'unscheduled_tx' },
                     { data: 'last_visit_date', name: 'last_visit_date' }
                 ],
-                dom: 'rt<"flex justify-between items-center px-4 py-3 border-t border-slate-200"ip>',
-                pagingType: 'simple_numbers',
-                pageLength: 25,
-                language: {
-                    paginate: {
-                        previous: "Prev",
-                        next: "Next"
-                    },
-                    processing: ""
-                },
+                dom: 'rt',
                 createdRow: function (row, data, dataIndex) {
                     $(row).addClass('hover:bg-slate-50 transition-colors');
                     $('td', row).addClass('px-4 py-2.5 border-r border-slate-200 text-xs bg-white text-right');
@@ -1673,6 +1799,12 @@
 
                     // Notes column truncation and hover attribute
                     $('td:eq(11)', row).addClass('notes-cell').attr('data-note', data.appointment_notes || '');
+                },
+                drawCallback: function () {
+                    hideDetailsLoading();
+                    if (aptDetailsPager && typeof aptDetailsPager.update === 'function') {
+                        aptDetailsPager.update();
+                    }
                 },
                 footerCallback: function (row, data, start, end, display) {
                     var api = this.api();
@@ -1696,26 +1828,28 @@
                 }
             });
 
-            // Toggle Skeleton
-            aptDetailsTable.on('processing.dt', function (e, settings, processing) {
-                if (processing) {
-                    $('#tableSkeleton').removeClass('hidden');
-                } else {
-                    $('#tableSkeleton').addClass('hidden');
-                }
-            });
+            aptDetailsPager = DDS.bindPagination(aptDetailsTable, 'details', { onLoading: showDetailsLoading });
 
             $('#calDate').on('change', function () {
                 syncDateRangeFromSinglePicker();
-                if (aptDetailsTable) aptDetailsTable.ajax.reload();
+                if (aptDetailsTable) {
+                    showDetailsLoading();
+                    aptDetailsTable.ajax.reload();
+                }
             });
 
             $('#detailsFilterProvider, #detailsFilterStatus').on('change', function () {
-                if (aptDetailsTable) aptDetailsTable.ajax.reload();
+                if (aptDetailsTable) {
+                    showDetailsLoading();
+                    aptDetailsTable.ajax.reload();
+                }
             });
 
             $('#detailsSearch').on('keyup', function () {
-                if (aptDetailsTable) aptDetailsTable.search(this.value).draw();
+                if (aptDetailsTable) {
+                    showDetailsLoading();
+                    aptDetailsTable.search(this.value).draw();
+                }
             });
 
             // Notes hover cards
@@ -1751,19 +1885,52 @@
             });
         }
 
+        function showCapacityLoading() {
+            $('#capacitySkeleton').removeClass('hidden');
+            $('#capacityTableContainer').addClass('hidden');
+            var scrollContainer = document.getElementById('capacityTableContainer');
+            if (scrollContainer) {
+                scrollContainer.scrollTop = 0;
+                scrollContainer.scrollLeft = 0;
+            }
+        }
+
+        function hideCapacityLoading() {
+            $('#capacitySkeleton').addClass('hidden');
+            $('#capacityTableContainer').removeClass('hidden');
+        }
+
         let aptCapacityTable = null;
+        let aptCapacityPager = null;
         function initAptCapacityTable() {
             if (aptCapacityTable) return;
 
             aptCapacityTable = DDS.dataTable(document.getElementById('appointmentCapacityTable'), {
-                processing: true,
+                processing: false,
                 serverSide: true,
+                paging: true,
+                pageLength: 10,
+                lengthChange: false,
+                info: false,
+                searching: true,
+                ordering: true,
+                layout: { topStart: null, topEnd: null, bottomStart: null, bottomEnd: null },
                 ajax: {
                     url: "{{ route('calendar.appointment-capacity-data') }}",
                     data: function (d) {
                         const range = getCalendarDateRange();
                         d.start = range.start;
                         d.end = range.end;
+                        const locs = window.DDS && DDS.getLocations ? DDS.getLocations('calLocations') : [];
+                        if (locs && locs.length > 0) {
+                            d.locations = locs.join(',');
+                        }
+                    },
+                    beforeSend: function () { showCapacityLoading(); },
+                    complete: function () { hideCapacityLoading(); },
+                    error: function (xhr, error, thrown) {
+                        console.error("Capacity DataTables error:", error, thrown, xhr.responseText);
+                        hideCapacityLoading();
                     }
                 },
                 columns: [
@@ -1775,10 +1942,7 @@
                     { data: 'avg_lead_new', name: 'avg_lead_new' },
                     { data: 'avg_lead_emerg', name: 'avg_lead_emerg' }
                 ],
-                dom: 'rt<"flex justify-between items-center px-5 py-4 border-t border-slate-200 bg-white"ip>',
-                pagingType: 'simple_numbers',
-                pageLength: 10,
-                language: { paginate: { previous: "Prev", next: "Next" }, processing: "" },
+                dom: 'rt',
                 createdRow: function (row, data, dataIndex) {
                     $(row).addClass('hover:bg-slate-50 transition-colors bg-white');
                     $('td', row).addClass('border-r border-slate-200 text-sm');
@@ -1808,24 +1972,112 @@
                         td.html('<div class="flex items-center justify-end gap-2 w-full"><span class="truncate">' + val + '</span> <div class="border border-black/10 rounded-sm p-0.5 bg-black/5 flex-shrink-0">' + arrow + '</div></div>');
                     });
                 },
+                drawCallback: function () {
+                    hideCapacityLoading();
+                    if (aptCapacityPager && typeof aptCapacityPager.update === 'function') {
+                        aptCapacityPager.update();
+                    }
+                },
                 footerCallback: function (row, data, start, end, display) {
                     if (data.length > 0) {
-                        const first = data[0];
-                        ['scheduled_appointments', 'provider_count', 'booked_hours', 'avg_lead_all', 'avg_lead_new', 'avg_lead_emerg'].forEach((col, idx) => {
-                            $('.capacity-total-' + (idx + 1)).text(first[col]);
-                            $('.capacity-avg-' + (idx + 1)).text(first[col]);
-                        });
+                        const numRows = data.length;
+                        const parseNum = (val) => {
+                            if (val === null || val === undefined) return 0;
+                            const num = parseFloat(String(val).replace(/[^0-9.-]+/g, ''));
+                            return isNaN(num) ? 0 : num;
+                        };
+
+                        const sum = (col) => data.reduce((acc, r) => acc + parseNum(r[col]), 0);
+
+                        const totalSched = sum('scheduled_appointments');
+                        const totalProv = sum('provider_count');
+                        const totalHours = sum('booked_hours');
+
+                        const avgSched = (totalSched / numRows).toFixed(2);
+                        const avgProv = (totalProv / numRows).toFixed(2);
+                        const avgHours = (totalHours / numRows).toFixed(2);
+
+                        const avgLeadAll = (sum('avg_lead_all') / numRows).toFixed(2);
+                        const avgLeadNew = (sum('avg_lead_new') / numRows).toFixed(2);
+                        const avgLeadEmerg = (sum('avg_lead_emerg') / numRows).toFixed(2);
+
+                        $('.capacity-total-1').text(totalSched);
+                        $('.capacity-total-2').text(totalProv);
+                        $('.capacity-total-3').text(totalHours.toFixed(2));
+
+                        $('.capacity-avg-1').text(avgSched);
+                        $('.capacity-avg-2').text(avgProv);
+                        $('.capacity-avg-3').text(avgHours);
+                        $('.capacity-avg-4').text(avgLeadAll);
+                        $('.capacity-avg-5').text(avgLeadNew);
+                        $('.capacity-avg-6').text(avgLeadEmerg);
                     }
                 }
             });
 
+            aptCapacityPager = DDS.bindPagination(aptCapacityTable, 'capacity', { onLoading: showCapacityLoading });
+
             $('#calDate').on('change', function () {
-                if (aptCapacityTable) aptCapacityTable.ajax.reload();
+                if (aptCapacityTable) {
+                    showCapacityLoading();
+                    aptCapacityTable.ajax.reload();
+                }
             });
             $('#capacitySearch').on('keyup', function () {
-                if (aptCapacityTable) aptCapacityTable.search(this.value).draw();
+                if (aptCapacityTable) {
+                    showCapacityLoading();
+                    aptCapacityTable.search(this.value).draw();
+                }
             });
         }
+
+        // ── Location Change Listener ─────────────────────────────────────
+        if (window.DDS && typeof DDS.onLocations === 'function') {
+            DDS.onLocations('calLocations', function () {
+                const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
+                if (activeTab === 'view-details' && aptDetailsTable) {
+                    showDetailsLoading();
+                    aptDetailsTable.ajax.reload();
+                } else if (activeTab === 'view-capacity' && aptCapacityTable) {
+                    showCapacityLoading();
+                    aptCapacityTable.ajax.reload();
+                }
+            });
+        }
+
+        // ── Single Location Change Listener (Appointments Calendar tab) ──
+        document.getElementById('calSingleLocation')?.addEventListener('change', function () {
+            if (calendar) {
+                showCalSkeleton('Loading location...', calendar.view?.type);
+                calendar.refetchResources();
+                calendar.refetchEvents();
+                const range = getViewDateRange(calendar.view);
+                if (calendar.view?.type === 'dayGridMonth') {
+                    fetchMonthlySummary({ view: calendar.view });
+                }
+                fetchCalendarStats(range.start, range.end, range.type);
+            }
+        });
+
+        document.getElementById('refreshBtn')?.addEventListener('click', function () {
+            const activeTab = document.querySelector('.cal-tab.font-bold')?.getAttribute('data-target');
+            if (activeTab === 'view-calendar' && calendar) {
+                showCalSkeleton('Refreshing...', calendar.view?.type);
+                calendar.refetchEvents();
+                calendar.refetchResources();
+                const range = getViewDateRange(calendar.view);
+                if (calendar.view?.type === 'dayGridMonth') {
+                    fetchMonthlySummary({ view: calendar.view });
+                }
+                fetchCalendarStats(range.start, range.end, range.type);
+            } else if (activeTab === 'view-details' && aptDetailsTable) {
+                showDetailsLoading();
+                aptDetailsTable.ajax.reload();
+            } else if (activeTab === 'view-capacity' && aptCapacityTable) {
+                showCapacityLoading();
+                aptCapacityTable.ajax.reload();
+            }
+        });
 
         // ── CSV Export Helpers ───────────────────────────────────────────
         function downloadCsv(filename, rows) {
@@ -1854,7 +2106,11 @@
             }
 
             const range = getCalendarDateRange();
-            const url = `${baseUrl}/calendar/appointments-details-data?start=${range.start}&end=${range.end}&length=-1`;
+            const locs = window.DDS && DDS.getLocations ? DDS.getLocations('calLocations') : [];
+            let url = `${baseUrl}/calendar/appointments-details-data?start=${range.start}&end=${range.end}&length=-1`;
+            if (locs && locs.length > 0) {
+                url += `&locations=${encodeURIComponent(locs.join(','))}`;
+            }
 
             fetch(url)
                 .then(r => r.json())
@@ -1975,7 +2231,11 @@
             }
 
             const range = getCalendarDateRange();
-            const url = `${baseUrl}/calendar/appointment-capacity-data?start=${range.start}&end=${range.end}&length=-1`;
+            const locs = window.DDS && DDS.getLocations ? DDS.getLocations('calLocations') : [];
+            let url = `${baseUrl}/calendar/appointment-capacity-data?start=${range.start}&end=${range.end}&length=-1`;
+            if (locs && locs.length > 0) {
+                url += `&locations=${encodeURIComponent(locs.join(','))}`;
+            }
 
             fetch(url)
                 .then(r => r.json())
@@ -2022,6 +2282,7 @@
         function openCapacityBreakdown(type) {
             const range = getCalendarDateRange();
             const date = range.start || "{{ date('Y-m-d') }}";
+            const locs = window.DDS && DDS.getLocations ? DDS.getLocations('calLocations') : [];
 
             let title = 'Capacity Breakdown';
             let columns = [];
@@ -2088,7 +2349,12 @@
 
             setDataTableModalLoading('capacity-breakdown-modal', title);
 
-            fetch(`${baseUrl}/calendar/capacity-breakdown?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}&date=${encodeURIComponent(date)}&type=${encodeURIComponent(type)}`)
+            let breakdownUrl = `${baseUrl}/calendar/capacity-breakdown?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}&date=${encodeURIComponent(date)}&type=${encodeURIComponent(type)}`;
+            if (locs && locs.length > 0) {
+                breakdownUrl += `&locations=${encodeURIComponent(locs.join(','))}`;
+            }
+
+            fetch(breakdownUrl)
                 .then(r => r.json())
                 .then(data => {
                     openDataTableModal('capacity-breakdown-modal', title, columns, data);
@@ -2114,7 +2380,8 @@
             document.getElementById('sched-modal-prov-count').textContent = '…';
             document.getElementById('sched-view-provider').innerHTML = '<div class="p-8 text-center text-xs text-slate-400">Loading breakdown data...</div>';
 
-            fetch(baseUrl + '/calendar/scheduled-production-breakdown?start=' + encodeURIComponent(range.start) + '&end=' + encodeURIComponent(range.end) + '&date=' + encodeURIComponent(range.start))
+            const loc = document.getElementById('calSingleLocation')?.value || '';
+            fetch(baseUrl + '/calendar/scheduled-production-breakdown?start=' + encodeURIComponent(range.start) + '&end=' + encodeURIComponent(range.end) + '&date=' + encodeURIComponent(range.start) + (loc ? '&location=' + encodeURIComponent(loc) : ''))
                 .then(r => r.json())
                 .then(data => {
                     rawSchedData = data;
@@ -2266,18 +2533,18 @@
     <x-app-components.datatable-modal id="capacity-breakdown-modal" />
 
     {{-- Scheduled Production Breakdown Modal --}}
-    <div id="scheduled-prod-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+    <div id="scheduled-prod-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+        <div class="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
             {{-- Modal Header --}}
-            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
+            <div class="px-4 md:px-6 py-3 md:py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-2.5 sm:gap-3">
+                    <div class="p-1.5 sm:p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-base font-bold text-white">Scheduled Production Breakdown</h3>
+                        <h3 class="text-sm sm:text-base font-bold text-white">Scheduled Production Breakdown</h3>
                         <p class="text-xs text-slate-400 font-medium" id="sched-modal-date">—</p>
                     </div>
                 </div>
@@ -2290,38 +2557,38 @@
             </div>
 
             {{-- Summary Cards Header --}}
-            <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 grid grid-cols-3 gap-4 flex-shrink-0">
+            <div class="bg-slate-50 border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 flex-shrink-0">
                 <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
                     <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Scheduled Production</p>
-                    <p class="text-2xl font-black text-emerald-600" id="sched-modal-total">—</p>
+                    <p class="text-xl sm:text-2xl font-black text-emerald-600" id="sched-modal-total">—</p>
                 </div>
                 <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
                     <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Scheduled Appointments</p>
-                    <p class="text-2xl font-black text-slate-800" id="sched-modal-count">—</p>
+                    <p class="text-xl sm:text-2xl font-black text-slate-800" id="sched-modal-count">—</p>
                 </div>
                 <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
                     <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Active Providers</p>
-                    <p class="text-2xl font-black text-slate-800" id="sched-modal-prov-count">—</p>
+                    <p class="text-xl sm:text-2xl font-black text-slate-800" id="sched-modal-prov-count">—</p>
                 </div>
             </div>
 
             {{-- Modal Navigation Tabs --}}
-            <div class="bg-white border-b border-slate-200 px-6 flex-shrink-0">
-                <nav class="flex gap-6">
-                    <button onclick="switchSchedTab('provider')" id="sched-tab-provider" class="sched-modal-tab py-3 text-xs font-bold text-slate-900 border-b-2 border-emerald-500">
+            <div class="bg-white border-b border-slate-200 px-4 md:px-6 flex-shrink-0">
+                <nav class="flex gap-4 md:gap-6 dds-tab-nav flex-nowrap overflow-x-auto">
+                    <button onclick="switchSchedTab('provider')" id="sched-tab-provider" class="sched-modal-tab py-3 text-xs font-bold text-slate-900 border-b-2 border-emerald-500 flex-shrink-0 whitespace-nowrap">
                         By Provider
                     </button>
-                    <button onclick="switchSchedTab('procedure')" id="sched-tab-procedure" class="sched-modal-tab py-3 text-xs font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition">
+                    <button onclick="switchSchedTab('procedure')" id="sched-tab-procedure" class="sched-modal-tab py-3 text-xs font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition flex-shrink-0 whitespace-nowrap">
                         By Procedure
                     </button>
-                    <button onclick="switchSchedTab('appointments')" id="sched-tab-appointments" class="sched-modal-tab py-3 text-xs font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition">
+                    <button onclick="switchSchedTab('appointments')" id="sched-tab-appointments" class="sched-modal-tab py-3 text-xs font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition flex-shrink-0 whitespace-nowrap">
                         Itemized Appointments
                     </button>
                 </nav>
             </div>
 
             {{-- Modal Body Content --}}
-            <div class="p-6 flex-1 overflow-y-auto bg-slate-50">
+            <div class="p-3 md:p-6 flex-1 overflow-y-auto bg-slate-50">
                 {{-- Tab 1: By Provider --}}
                 <div id="sched-view-provider" class="sched-modal-view space-y-3">
                     <!-- Rendered dynamically -->

@@ -4,6 +4,7 @@ namespace App\Services\OpenDental;
 
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\MetricFilter;
+use App\Models\BasicSetting;
 
 class FinancialAnalyticsService
 {
@@ -11,9 +12,13 @@ class FinancialAnalyticsService
         private readonly ProductionService $production,
     ) {}
 
-    public function filterAnalysis($start, $end, ?int $officeId = null)
+    public function filterAnalysis($start, $end, ?int $officeId = null, array $clinics = [])
     {
-        $s = $this->production->summary(new MetricFilter($start, $end, [], [], null, $officeId));
+        $s = $this->production->summary(new MetricFilter($start, $end, $clinics, [], null, $officeId));
+
+        $basicSettings = BasicSetting::forOffice($officeId);
+        $metricBasis = $basicSettings->collection_rate_metric ?? 'net';
+        $prodForRate = $metricBasis === 'gross' ? $s->gross : $s->net;
 
         return [
             'gross_production' => $s->gross,
@@ -23,9 +28,8 @@ class FinancialAnalyticsService
             'writeoffs' => $s->writeOffs,
             'collections' => $s->collection,
             'collection' => $s->collection,
-            // Rates here are expressed over GROSS (not net) — preserved as-is.
             'adjustment_rate' => $s->gross > 0 ? round((abs($s->adjustments) / $s->gross) * 100, 2) : 0,
-            'collection_rate' => $s->gross > 0 ? round(($s->collection / $s->gross) * 100, 2) : 0,
+            'collection_rate' => $prodForRate > 0 ? round(($s->collection / $prodForRate) * 100, 2) : 0,
         ];
     }
 }

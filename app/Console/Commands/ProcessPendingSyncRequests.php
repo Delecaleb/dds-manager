@@ -2,19 +2,10 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Office;
+use App\Models\SyncLog;
 use App\Models\SyncRequest;
-use App\Services\Sync\AdjustmentSyncService;
-use App\Services\Sync\AppointmentSyncService;
-use App\Services\Sync\ClaimProcSyncService;
-use App\Services\Sync\HardDeleteSyncService;
-use App\Services\Sync\PatientSyncService;
-use App\Services\Sync\PaymentSyncService;
-use App\Services\Sync\ProcedureLogSyncService;
-use App\Services\Sync\TreatmentPlanSyncService;
-use Exception;
+use App\Services\Sync\SyncRequestRunner;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 
 class ProcessPendingSyncRequests extends Command
 {
@@ -23,168 +14,101 @@ class ProcessPendingSyncRequests extends Command
      *
      * @var string
      */
-    protected $signature = 'sync:process-pending {--id= : Process a specific sync request ID}';
+    protected $signature = 'sync:process-pending {--id= : Run one sync request now, in this process}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Process pending server-to-server date range sync requests';
+    protected $description = 'Queue pending server-to-server date range sync requests (or run one with --id)';
 
     /**
      * Execute the console command.
      */
-    public function handle(): int
+    public function handle(SyncRequestRunner $runner): int
     {
-        @set_time_limit(0);
-        @ini_set('memory_limit', '512M');
+        $this->recoverAbandonedRequests();
 
-        // Self-heal any stale 'running' jobs (older than 10 minutes)
-        SyncRequest::where('status', 'running')
-            ->where('started_at', '<', now()->subMinutes(10))
-            ->update([
-                'status' => 'failed',
-                'error_message' => 'Sync process timed out or was terminated by server.',
-                'completed_at' => now(),
-            ]);
-
-        $specificId = $this->option('id');
-
-        $query = SyncRequest::where('status', 'pending')->orderBy('id', 'asc');
-        if ($specificId) {
-            $query = SyncRequest::where('id', $specificId)->whereIn('status', ['pending', 'running']);
+        if ($this->option('id')) {
+            return $this->runOne($runner, (int) $this->option('id'));
         }
 
-        $requests = $query->get();
+        $pending = SyncRequest::where('status', 'pending')->orderBy('id')->get();
 
-        if ($requests->isEmpty()) {
+        if ($pending->isEmpty()) {
             $this->info('No pending sync requests found.');
 
             return Command::SUCCESS;
         }
 
-        foreach ($requests as $req) {
-            $this->processRequest($req);
-        }
+        // Duplicates of an already-queued request are dropped by ShouldBeUnique.
+        $pending->each(fn (SyncRequest $request) => $runner->queue($request));
+
+        $this->info("Queued {$pending->count()} pending sync request(s).");
 
         return Command::SUCCESS;
     }
 
-    protected function processRequest(SyncRequest $req): void
+    private function runOne(SyncRequestRunner $runner, int $id): int
     {
-        $req->update([
-            'status' => 'running',
-            'started_at' => now(),
-            'error_message' => null,
-        ]);
+        $request = SyncRequest::find($id);
 
-        // Register shutdown function to catch fatal errors and prevent stuck jobs
-        register_shutdown_function(function () use ($req) {
-            $error = error_get_last();
-            if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-                $req->update([
-                    'status' => 'failed',
-                    'error_message' => 'Fatal PHP Error: '.$error['message'],
-                    'completed_at' => now(),
-                ]);
-            }
-        });
+        if ($request === null) {
+            $this->error("Sync request #{$id} not found.");
 
-        $this->info("Starting sync request #{$req->id} for module '{$req->module}' (Window: {$req->start_date} to {$req->end_date})");
-
-        try {
-            $office = Office::find($req->office_id) ?? Office::first();
-            $module = strtolower(trim($req->module));
-            $startDate = $req->start_date ? $req->start_date->format('Y-m-d') : null;
-            $endDate = $req->end_date ? $req->end_date->format('Y-m-d') : null;
-
-            $moduleServiceMap = [
-                'appointment' => AppointmentSyncService::class,
-                'appointments' => AppointmentSyncService::class,
-                'procedurelog' => ProcedureLogSyncService::class,
-                'procedurelogs' => ProcedureLogSyncService::class,
-                'patient' => PatientSyncService::class,
-                'patients' => PatientSyncService::class,
-                'adjustment' => AdjustmentSyncService::class,
-                'adjustments' => AdjustmentSyncService::class,
-                'payment' => PaymentSyncService::class,
-                'payments' => PaymentSyncService::class,
-                'claimproc' => ClaimProcSyncService::class,
-                'claimprocs' => ClaimProcSyncService::class,
-                'treatmentplan' => TreatmentPlanSyncService::class,
-                'treatmentplans' => TreatmentPlanSyncService::class,
-            ];
-
-            if ($module === 'all') {
-                $modulesToRun = array_unique(array_values($moduleServiceMap));
-                foreach ($modulesToRun as $serviceClass) {
-                    $service = app($serviceClass)->forOffice($office);
-                    if ($startDate || $endDate) {
-                        try {
-                            $service->withDateWindow($startDate, $endDate);
-                        } catch (Exception $e) {
-                            // If service doesn't support dateWindow, skip window for that service
-                        }
-                    }
-                    $service->sync();
-                }
-            } elseif (isset($moduleServiceMap[$module])) {
-                $serviceClass = $moduleServiceMap[$module];
-                $service = app($serviceClass)->forOffice($office);
-                if ($startDate || $endDate) {
-                    $service->withDateWindow($startDate, $endDate);
-                }
-                $service->sync();
-            } else {
-                throw new Exception("Unknown sync module '{$module}'.");
-            }
-
-            // If prune_deleted is requested, run HardDeleteSyncService
-            if ($req->prune_deleted) {
-                $deleter = app(HardDeleteSyncService::class);
-                $tableMap = [
-                    'appointment' => 'od_appointments',
-                    'appointments' => 'od_appointments',
-                    'procedurelog' => 'od_procedure_logs',
-                    'procedurelogs' => 'od_procedure_logs',
-                    'patient' => 'od_patients',
-                    'patients' => 'od_patients',
-                    'adjustment' => 'od_adjustments',
-                    'adjustments' => 'od_adjustments',
-                    'payment' => 'od_payments',
-                    'payments' => 'od_payments',
-                ];
-
-                $targetTable = $tableMap[$module] ?? 'all';
-                $tablesToPrune = $targetTable === 'all'
-                    ? $deleter->getSupportedTables()
-                    : [$targetTable];
-
-                foreach ($tablesToPrune as $tbl) {
-                    if ($startDate && $endDate) {
-                        $deleter->pruneTable($tbl, $startDate, $endDate, $office, false);
-                    } else {
-                        $deleter->pruneAllRecords($tbl, $office, false);
-                    }
-                }
-            }
-
-            $req->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-            ]);
-
-            $this->info("Completed sync request #{$req->id} successfully.");
-
-        } catch (Exception $e) {
-            Log::error("SyncRequest #{$req->id} failed: ".$e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            $req->update([
-                'status' => 'failed',
-                'error_message' => $e->getMessage(),
-                'completed_at' => now(),
-            ]);
-            $this->error("Sync request #{$req->id} failed: ".$e->getMessage());
+            return Command::FAILURE;
         }
+
+        $this->info("Running sync request #{$id} for module '{$request->module}'...");
+
+        $outcome = $runner->run($request);
+        $this->info("Sync request #{$id}: {$outcome}.");
+
+        return $outcome === SyncRequestRunner::OUTCOME_FAILED ? Command::FAILURE : Command::SUCCESS;
+    }
+
+    /**
+     * Recover 'running' requests whose worker process is really gone.
+     *
+     * A long backfill legitimately runs for more than 10 minutes, so age alone
+     * is not proof of death: a request counts as abandoned only when no sync for
+     * its office has sent a heartbeat within the stale window.
+     *
+     * Hosts kill long-running processes, and every sync resumes from its saved
+     * cursor, so an abandoned request is re-queued to continue. Only a request
+     * that keeps dying for a day is given up on.
+     */
+    protected function recoverAbandonedRequests(): void
+    {
+        $staleAfter = (int) config('sync.stale_after_seconds', 600);
+        $cutoff = now()->subSeconds($staleAfter);
+        $giveUpBefore = now()->subDay();
+
+        SyncRequest::where('status', 'running')
+            ->where('started_at', '<', $cutoff)
+            ->get()
+            ->reject(fn (SyncRequest $req) => SyncLog::withoutGlobalScopes()
+                ->where('module', 'like', "office_{$req->office_id}:%")
+                ->where('status', 'running')
+                ->where('updated_at', '>=', $cutoff)
+                ->exists())
+            ->each(function (SyncRequest $req) use ($giveUpBefore) {
+                if ($req->created_at !== null && $req->created_at->lt($giveUpBefore)) {
+                    $req->update([
+                        'status' => 'failed',
+                        'error_message' => 'Sync process was repeatedly terminated by the server for over 24 hours. Check storage/logs/laravel.log and failed jobs.',
+                        'completed_at' => now(),
+                    ]);
+
+                    return;
+                }
+
+                $req->update([
+                    'status' => 'pending',
+                    'started_at' => null,
+                    'error_message' => 'Worker stopped mid-run (server terminated the process); resuming from the saved position.',
+                ]);
+            });
     }
 }

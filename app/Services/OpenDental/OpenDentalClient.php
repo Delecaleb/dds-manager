@@ -40,7 +40,8 @@ class OpenDentalClient
         ])
             ->withoutVerifying()
             ->baseUrl($baseUrl)
-            ->timeout(120);
+            ->connectTimeout(15)
+            ->timeout(90);
     }
 
     public function get($endpoint, array $params = [])

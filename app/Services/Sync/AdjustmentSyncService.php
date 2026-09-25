@@ -30,4 +30,9 @@ class AdjustmentSyncService extends BaseQuerySyncService
     {
         return 'SecDateTEdit';
     }
+
+    protected function dateColumn(): ?string
+    {
+        return 'AdjDate';
+    }
 }

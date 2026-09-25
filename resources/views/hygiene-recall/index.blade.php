@@ -8,29 +8,22 @@
     </div>
 
     {{-- Controls Header --}}
-    <div class="bg-white px-6 py-3.5 flex flex-wrap items-center gap-3 border-b border-slate-200">
-        <x-daterange-picker id="hygieneDateRange" />
+    <div class="relative z-40 bg-white px-6 py-3.5 flex flex-wrap items-center gap-3 border-b border-slate-200">
+        <x-daterange-picker id="hygieneDateRange" on-apply="onHygieneDateRangeApply" />
+        <x-location-picker id="hygieneLocations" :locations="$locations ?? null" :selected="$selectedLocations ?? null" />
 
-        <select id="hygieneLocation"
-            class="h-9 border border-slate-300 rounded-lg shadow-sm px-3 font-medium text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 min-w-[180px]">
-            <option value="all">All Locations</option>
-            @foreach ($clinics as $clinicId => $clinicName)
-                <option value="{{ $clinicId }}">{{ $clinicName }}</option>
-            @endforeach
-        </select>
-
-        <button id="refreshBtn"
-            class="h-9 inline-flex items-center gap-1.5 border border-emerald-500 text-emerald-700 font-bold px-4 rounded-lg shadow-sm hover:bg-emerald-50 transition text-sm">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <button id="refreshBtn" type="button"
+            class="h-9 inline-flex items-center gap-1.5 border border-emerald-500 text-emerald-700 font-bold px-4 rounded-lg shadow-sm hover:bg-emerald-50 active:scale-95 transition-all text-sm disabled:opacity-60 disabled:cursor-not-allowed">
+            <svg class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Refresh
+            <span>Refresh</span>
         </button>
     </div>
 
     {{-- Main Content --}}
-    <main class="p-6 bg-slate-50/50 min-h-[calc(100vh-140px)]">
+    <div class="relative z-10 isolate p-6 bg-slate-50/50 min-h-[calc(100vh-140px)]">
         <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
 
             {{-- Table Tools --}}
@@ -121,35 +114,82 @@
             </div>
 
         </div>
-    </main>
+    </div>
 
     <script>
         const baseUrl = "{{ url('') }}";
+        let hygieneTable = null;
+        let isReloading = false;
 
-        $(document).ready(function () {
-            function getFilters() {
-                let startDate = null;
-                let endDate = null;
-                const drp = $('#hygieneDateRange').data('daterangepicker');
-                if (drp && drp.startDate && drp.endDate) {
-                    startDate = drp.startDate.format('YYYY-MM-DD');
-                    endDate = drp.endDate.format('YYYY-MM-DD');
+        function getFilters() {
+            let startDate = null;
+            let endDate = null;
+
+            const drp = $('#hygieneDateRange').data('daterangepicker');
+            if (drp && drp.startDate && drp.endDate) {
+                startDate = typeof drp.startDate.format === 'function' ? drp.startDate.format('YYYY-MM-DD') : moment(drp.startDate).format('YYYY-MM-DD');
+                endDate = typeof drp.endDate.format === 'function' ? drp.endDate.format('YYYY-MM-DD') : moment(drp.endDate).format('YYYY-MM-DD');
+            } else if (window.DDS && typeof DDS.getRange === 'function') {
+                const r = DDS.getRange('hygieneDateRange');
+                if (r) {
+                    startDate = r.start;
+                    endDate = r.end;
                 }
-                const clinic = $('#hygieneLocation').val();
-
-                return {
-                    start_date: startDate,
-                    end_date: endDate,
-                    clinic: clinic
-                };
             }
 
-            window.openHygieneDrilldown = function (metric, provNum, clinicNum) {
+            if (!startDate && window.DDS && window.DDS.date) {
+                const r = window.DDS.date.getRange();
+                if (r && r.start) {
+                    startDate = r.start;
+                    endDate = r.end;
+                }
+            }
+
+            const locs = (window.DDS && typeof DDS.getLocations === 'function') ? DDS.getLocations('hygieneLocations').join(',') : '';
+
+            return {
+                start_date: startDate,
+                end_date: endDate,
+                locations: locs
+            };
+        }
+
+        function reloadHygieneData() {
+            if (isReloading) return;
+            isReloading = true;
+
+            const $btn = $('#refreshBtn');
+            const $icon = $btn.find('svg');
+            $icon.addClass('animate-spin');
+            $btn.prop('disabled', true).addClass('opacity-60 cursor-not-allowed');
+
+            function resetBtn() {
+                isReloading = false;
+                $icon.removeClass('animate-spin');
+                $btn.prop('disabled', false).removeClass('opacity-60 cursor-not-allowed');
+            }
+
+            if (hygieneTable && typeof hygieneTable.ajax?.reload === 'function') {
+                hygieneTable.ajax.reload(function () {
+                    resetBtn();
+                }, false);
+            } else {
+                setTimeout(resetBtn, 300);
+            }
+        }
+
+        window.onHygieneDateRangeApply = function (start, end) {
+            reloadHygieneData();
+        };
+
+        $(document).ready(function () {
+            window.openHygieneDrilldown = function (metric, provNum, clinicNum, officeId) {
                 const filters = getFilters();
                 const params = Object.assign({}, filters, {
                     metric: metric,
                     prov_num: provNum,
-                    clinic: clinicNum || filters.clinic
+                    clinic_num: clinicNum,
+                    office_id: officeId
                 });
                 const url = baseUrl + '/hygiene-recall/drilldown?' + $.param(params);
                 if (window.DDS && DDS.modal && typeof DDS.modal.open === 'function') {
@@ -180,7 +220,7 @@
                 const orderAttr = rawVal !== undefined && rawVal !== null ? `data-order="${rawVal}"` : '';
                 return `
                     <button type="button" ${orderAttr} class="w-full py-1 px-2.5 rounded text-right font-medium text-slate-800 hover:text-emerald-700 hover:bg-emerald-50/80 transition focus:outline-none cursor-pointer flex items-center justify-end gap-1.5"
-                        onclick="openHygieneDrilldown('${metric}', '${row.prov_num}', '${row.clinic_num}')"
+                        onclick="openHygieneDrilldown('${metric}', '${row.prov_num}', '${row.clinic_num}', '${row.office_id || ''}')"
                         title="Click to view patient breakdown">
                         <span>${data}</span>
                         <svg class="w-3 h-3 text-slate-400 opacity-60 group-hover:opacity-100 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -190,7 +230,7 @@
                 `;
             }
 
-            let table = DDS.dataTable(document.getElementById('hygieneRecallTable'), {
+            hygieneTable = DDS.dataTable(document.getElementById('hygieneRecallTable'), {
                 processing: true,
                 serverSide: true,
                 searching: true,
@@ -269,26 +309,37 @@
                 }
             });
 
+            $('#hygieneRecallTable').on('error.dt', function () {
+                isReloading = false;
+                $('#refreshBtn').prop('disabled', false).removeClass('opacity-60 cursor-not-allowed')
+                    .find('svg').removeClass('animate-spin');
+            });
+
             $('#tableSearch').on('keyup', function () {
-                table.search(this.value).draw();
+                if (hygieneTable) {
+                    hygieneTable.search(this.value).draw();
+                }
             });
 
-            $('#hygieneLocation').on('change', function () {
-                table.ajax.reload();
-            });
+            if (window.DDS && typeof DDS.onLocations === 'function') {
+                DDS.onLocations('hygieneLocations', function () {
+                    reloadHygieneData();
+                });
+            }
 
-            $('#refreshBtn').on('click', function () {
-                table.ajax.reload();
+            $('#refreshBtn').on('click', function (e) {
+                e.preventDefault();
+                reloadHygieneData();
             });
 
             if (window.DDS && typeof DDS.onDateRange === 'function') {
                 DDS.onDateRange('hygieneDateRange', function () {
-                    table.ajax.reload();
+                    reloadHygieneData();
                 });
             }
 
             $('#hygieneDateRange').on('apply.daterangepicker', function () {
-                table.ajax.reload();
+                reloadHygieneData();
             });
 
             // CSV Export Handler

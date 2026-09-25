@@ -19,6 +19,7 @@ class OdProvider extends Model
         'Abbr',
         'ItemOrder',
         'LName',
+        'FName',
         'PName',
         'MI',
         'Suffix',

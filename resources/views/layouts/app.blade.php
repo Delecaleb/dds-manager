@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>DDS Manager Multi-Location Dental Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -104,6 +105,17 @@
                                 class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('hygiene-recall.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
                                 @if(request()->routeIs('hygiene-recall.index')) aria-current="page" @endif>
                                 <i data-lucide="refresh-cw" class="w-4 h-4"></i> Hygiene Recall
+                            </a>
+                        @endif
+
+                        {{-- Growth Engine leaves the analytics shell behind: its own layout and nav. --}}
+                        @if(auth()->user()->hasModuleAccess('marketing'))
+                            <a href="{{ route('marketing.index') }}"
+                                class="flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-md text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium">
+                                <span class="flex items-center gap-2.5">
+                                    <i data-lucide="trending-up" class="w-4 h-4"></i> Growth Engine
+                                </span>
+                                <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-slate-400"></i>
                             </a>
                         @endif
 
@@ -250,10 +262,6 @@
                     class="p-2 rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none">
                     <i data-lucide="menu" class="w-6 h-6"></i>
                 </button>
-                <div class="flex items-center gap-2">
-                    <i data-lucide="bar-chart-big" class="text-blue-600 w-5 h-5"></i>
-                    <span class="font-bold text-md tracking-tight text-slate-900">DDS Manager</span>
-                </div>
             </div>
             <div class="flex items-center gap-3">
                 @php
@@ -262,20 +270,6 @@
                     $currentOffice = $allOffices->firstWhere('id', $activeOfficeId) ?? $allOffices->first();
                 @endphp
                 @if($allOffices->count() > 0)
-                    <form method="POST" action="{{ route('offices.switch') }}" class="flex items-center gap-2">
-                        @csrf
-                        <div class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg text-xs font-semibold text-slate-700 border border-slate-200">
-                            <i data-lucide="building" class="w-3.5 h-3.5 text-blue-600"></i>
-                            <select name="office_id" onchange="this.form.submit()" class="bg-transparent font-medium text-slate-800 text-xs focus:outline-none cursor-pointer">
-                                @foreach($allOffices as $off)
-                                    <option value="{{ $off->id }}" {{ $off->id == $activeOfficeId ? 'selected' : '' }}>
-                                        Location: {{ $off->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </form>
-
                     <!-- Header Live Sync Report Button -->
                     <button onclick="window.openGlobalSyncReport({{ $activeOfficeId ?? ($allOffices->first()->id ?? 1) }}, '{{ addslashes($currentOffice->name ?? 'Office') }}')" type="button"
                         class="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-lg border border-emerald-200 shadow-xs transition-colors cursor-pointer"
@@ -308,9 +302,6 @@
                         <div class="px-4 py-2.5 border-b border-slate-100">
                             <p class="text-xs font-bold text-slate-900">{{ auth()->user()->name }}</p>
                             <p class="text-[11px] text-slate-400 truncate">{{ auth()->user()->email }}</p>
-                            <span class="inline-block mt-1 text-[9px] font-semibold px-2 py-0.5 rounded-full border {{ auth()->user()->getRoleBadgeClass() }}">
-                                {{ auth()->user()->getRoleName() }}
-                            </span>
                         </div>
 
                         @if(auth()->user()->isSuperAdmin())
@@ -320,6 +311,12 @@
                                 <span>User & Access Management</span>
                             </a>
                         @endif
+
+                        <a href="{{ url('/configuration/basic') }}"
+                            class="flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors">
+                            <i data-lucide="sliders" class="w-4 h-4 text-slate-400"></i>
+                            <span>Configuration</span>
+                        </a>
 
                         <a href="{{ route('profile.edit') }}"
                             class="flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors">

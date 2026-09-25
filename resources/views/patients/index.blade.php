@@ -1,8 +1,43 @@
 <x-app-layout>
+    <style>
+        /* Patient Table Sticky Header & Column rules */
+        #patientsTable thead tr th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 20 !important;
+            background-color: #f8fafc !important;
+        }
+
+        #patientsTable thead tr th:first-child,
+        #patientsTable thead tr th.dds-stick {
+            position: sticky !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 40 !important;
+            background-color: #f8fafc !important;
+        }
+
+        #patientsTable tbody tr td:first-child,
+        #patientsTable tbody tr td.dds-stick {
+            position: sticky !important;
+            left: 0 !important;
+            z-index: 10 !important;
+            background-color: #ffffff !important;
+        }
+
+        #patientsTable tbody tr:hover td:first-child,
+        #patientsTable tbody tr:hover td.dds-stick,
+        #patientsTable tbody tr.group:hover td:first-child,
+        #patientsTable tbody tr.group:hover td.dds-stick,
+        #patientsTable tbody tr:hover td.sticky,
+        #patientsTable tbody tr.group:hover td.sticky {
+            background-color: #f8fafc !important;
+        }
+    </style>
     <div class="min-h-screen flex flex-col relative bg-slate-50">
 
         <!-- Top Header Banner -->
-        <div class="bg-white border-b border-slate-200 px-8 pt-6 pb-0 shadow-sm">
+        <div class="relative z-50 bg-white border-b border-slate-200 px-8 pt-6 pb-0 shadow-sm">
             <div class="flex items-center justify-between mb-4">
                 <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Patient Portal</h1>
                 <button
@@ -12,20 +47,18 @@
             </div>
 
             <div class="flex items-center gap-3 mb-6">
-                <div class="relative w-48">
-                    <select id="globalClinicSelect"
-                        class="w-full appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer">
-                        <option value="all">All Locations</option>
-                        @if(isset($clinics) && count($clinics))
-                            @foreach($clinics as $c)
-                                <option value="{{ $c->id ?? $c->ClinicNum ?? $loop->index + 1 }}">{{ $c->name ?? $c->Description ?? 'Clinic '.$loop->iteration }}</option>
-                            @endforeach
-                        @else
-                            <option value="1" selected>{{ \App\Models\Office::getActiveOffice()?->name ?? 'Main Office' }}</option>
-                        @endif
+                {{-- Single location selector for Patients Portal (only 1 location at a time, matching Appointments Calendar) --}}
+                <div id="singleLocationWrapper" class="relative">
+                    <select id="patientSingleLocation"
+                        class="appearance-none bg-white border border-slate-300 rounded px-3 py-1.5 text-sm font-medium text-slate-700 pr-8 focus:outline-none focus:border-emerald-500 shadow-sm cursor-pointer min-w-[180px]">
+                        @foreach($locations as $key => $loc)
+                            <option value="{{ $key }}" @selected(in_array((string)$key, (array)$selectedLocations, true))>{{ $loc->name }}</option>
+                        @endforeach
                     </select>
-                    <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-500">
-                        <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
                     </div>
                 </div>
                 <button id="refreshPatients"
@@ -35,7 +68,7 @@
             </div>
 
             <!-- Portal Navigation Tabs -->
-            <div class="flex gap-8 border-b border-slate-200 text-sm font-medium">
+            <div class="flex flex-nowrap overflow-x-auto gap-8 border-b border-slate-200 text-sm font-medium dds-tab-nav portal-tabs-nav">
                 <button type="button" id="tabPatientsBtn"
                     class="portal-tab-btn border-b-2 border-emerald-500 text-slate-900 pb-3 font-bold flex items-center gap-2 cursor-pointer transition-all">
                     <i data-lucide="users" class="w-4 h-4"></i> Patients
@@ -43,7 +76,6 @@
                 <button type="button" id="tabExportDataBtn"
                     class="portal-tab-btn border-b-2 border-transparent text-slate-500 hover:text-slate-800 pb-3 flex items-center gap-2 cursor-pointer transition-all">
                     <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i> Export Data
-                    <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">New</span>
                 </button>
                 <button type="button" id="tabRemindersBtn"
                     class="portal-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 pb-3 cursor-pointer">
@@ -113,50 +145,53 @@
 
             <div class="flex-1 px-8 pb-8">
                 <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden flex flex-col">
-                    <div class="overflow-x-auto custom-table-scrollbar relative">
+                    <!-- Skeleton Loader Section (Replaces table while loading) -->
+                    <div id="tableSkeleton" class="w-full bg-white overflow-hidden" style="max-height: calc(100vh - 280px); min-height: 480px;">
                         <x-table-skeleton />
-                        <table id="patientsTable" class="dds-table w-full text-left border-collapse table-auto">
-                            <thead>
-                                <tr class="bg-slate-50 text-slate-700 font-bold text-xs border-b border-slate-200">
+                    </div>
+
+                    <!-- Patients Table Scroll Container (Hidden while loading) -->
+                    <div id="patientsTableContainer" class="hidden overflow-x-auto overflow-y-auto custom-table-scrollbar" style="max-height: calc(100vh - 280px); min-height: 480px;">
+                        <table id="patientsTable" class="dds-table w-full text-left border-separate border-spacing-0 table-auto">
+                            <thead class="dds-head-sticky">
+                                <tr class="bg-slate-50 text-slate-700 font-bold text-xs">
                                     <th
-                                        class="p-3 bg-slate-50 sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] border-r border-slate-200 min-w-[260px] max-w-[260px]">
+                                        class="dds-stick dds-stick-shadow p-3 bg-slate-50 sticky left-0 top-0 z-40 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] border-b border-r border-slate-200 min-w-[260px] max-w-[260px]">
                                         <div class="flex items-center gap-3">
-                                            <input type="checkbox"
-                                                class="w-4 h-4 text-emerald-500 border-slate-300 rounded focus:ring-0">
+                                            <input type="checkbox" id="patientsSelectAll"
+                                                class="w-4 h-4 text-emerald-500 border-slate-300 rounded focus:ring-0 cursor-pointer">
                                             <span class="flex items-center gap-1 cursor-pointer select-none">
                                                 <i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i>
                                                 Patient Name
                                             </span>
                                         </div>
                                     </th>
-                                    <th class="p-3 min-w-[100px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Patient ID</span></th>
-                                    <th class="p-3 min-w-[150px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Guarantor</span></th>
-                                    <th class="p-3 min-w-[110px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Guarantor ID</span></th>
-                                    <th class="p-3 min-w-[70px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Age</span></th>
-                                    <th class="p-3 min-w-[90px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Gender</span></th>
-                                    <th class="p-3 min-w-[160px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Address</span></th>
-                                    <th class="p-3 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> City</span></th>
-                                    <th class="p-3 min-w-[80px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> State</span></th>
-                                    <th class="p-3 min-w-[90px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> ZIP</span></th>
-                                    <th class="p-3 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Work Phone</span></th>
-                                    <th class="p-3 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Home Phone</span></th>
-                                    <th class="p-3 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Mobile Phone</span></th>
-                                    <th class="p-3 min-w-[160px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Email</span></th>
-                                    <th class="p-3 min-w-[100px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Birth Date</span></th>
-                                    <th class="p-3 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> First Visit</span></th>
-                                    <th class="p-3 min-w-[180px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Lifetime Value Production</span></th>
-                                    <th class="p-3 min-w-[180px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Lifetime Value Collection</span></th>
-                                    <th class="p-3 min-w-[140px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Referral Source</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[100px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Patient ID</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[150px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Guarantor</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[110px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Guarantor ID</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[70px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Age</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[90px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Gender</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[160px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Address</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> City</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[80px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> State</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[90px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> ZIP</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Work Phone</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Home Phone</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Mobile Phone</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[160px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Email</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[100px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Birth Date</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[120px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> First Visit</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[180px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Lifetime Value Production</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[180px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Lifetime Value Collection</span></th>
+                                    <th class="p-3 bg-slate-50 sticky top-0 z-20 border-b border-slate-200 min-w-[140px] text-xs font-bold whitespace-nowrap"><span class="flex items-center gap-1 cursor-pointer"><i data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-400"></i> Referral Source</span></th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-100 text-xs text-slate-700 bg-white whitespace-nowrap">
+                            <tbody class="text-xs text-slate-700 bg-white whitespace-nowrap">
                             </tbody>
                         </table>
                     </div>
 
-                    <div id="custom-pagination-container"
-                        class="p-4 bg-white border-t border-slate-100 flex items-center justify-between">
-                    </div>
+                    <x-table-pagination id="patients" :default-length="20" />
                 </div>
             </div>
         </div>
@@ -175,7 +210,7 @@
                         </div>
                         <div>
                             <h2 class="text-base font-bold text-slate-900">1. Filter Parameters</h2>
-                            <p class="text-xs text-slate-500">Filter patients based on the date added to Open Dental, clinic location, status, and keywords</p>
+                            <p class="text-xs text-slate-500">Filter patients based on the date added to Open Dental, status, and keywords</p>
                         </div>
                     </div>
 
@@ -191,7 +226,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <!-- Filter 1: Date Added Mode -->
                     <div>
                         <label for="expDateMode" class="block text-xs font-bold text-slate-700 mb-1.5">
@@ -199,12 +234,12 @@
                         </label>
                         <select id="expDateMode"
                             class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer">
-                            <option value="all">All Time</option>
+                            <option value="all" selected>All Time</option>
                             <option value="today">Today</option>
                             <option value="yesterday">Yesterday</option>
                             <option value="last_7_days">Last 7 Days</option>
                             <option value="last_30_days">Last 30 Days</option>
-                            <option value="this_month" selected>This Month</option>
+                            <option value="this_month">This Month</option>
                             <option value="last_month">Last Month</option>
                             <option value="this_year">Year to Date (YTD)</option>
                             <option value="custom">Custom Date Range</option>
@@ -223,20 +258,6 @@
                             <input type="date" id="expDateTo" value="{{ date('Y-m-d') }}"
                                 class="w-full bg-white border border-slate-300 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
-                    </div>
-
-                    <!-- Filter 3: Clinic / Office -->
-                    <div>
-                        <label for="expClinic" class="block text-xs font-bold text-slate-700 mb-1.5">Location / Clinic</label>
-                        <select id="expClinic"
-                            class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer">
-                            <option value="all">All Locations</option>
-                            @if(isset($clinics) && count($clinics))
-                                @foreach($clinics as $c)
-                                    <option value="{{ $c->id ?? $c->ClinicNum ?? $loop->iteration }}">{{ $c->name ?? $c->Description ?? 'Clinic '.$loop->iteration }}</option>
-                                @endforeach
-                            @endif
-                        </select>
                     </div>
 
                     <!-- Filter 4: Patient Status -->
@@ -531,7 +552,7 @@
         <!-- POPUP & MODALS                             -->
         <!-- ========================================== -->
         <div id="exportModal"
-            class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center transition-opacity">
+            class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[250] flex items-center justify-center transition-opacity">
             <div
                 class="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-md overflow-hidden transform transition-transform scale-100 p-6">
                 <div class="flex items-center gap-3 mb-4 text-slate-900">
@@ -627,57 +648,86 @@
                 fetchExportPreview();
             });
 
+            function showPatientsLoading() {
+                $('#tableSkeleton').removeClass('hidden');
+                $('#patientsTableContainer').addClass('hidden');
+                var scrollContainer = document.getElementById('patientsTableContainer');
+                if (scrollContainer) {
+                    scrollContainer.scrollTop = 0;
+                    scrollContainer.scrollLeft = 0;
+                }
+            }
+
+            function hidePatientsLoading() {
+                $('#tableSkeleton').addClass('hidden');
+                $('#patientsTableContainer').removeClass('hidden');
+            }
+
             // Initialize Patients Main DataTable
             table = DDS.dataTable(document.getElementById('patientsTable'), {
-                processing: true,
+                processing: false,
                 serverSide: true,
-                pagingType: 'simple_numbers',
+                paging: true,
+                pageLength: 20,
+                lengthChange: false,
                 info: false,
-                layout: { topStart: null, topEnd: null, bottomStart: null, bottomEnd: 'paging' },
+                searching: true,
+                ordering: true,
+                layout: { topStart: null, topEnd: null, bottomStart: null, bottomEnd: null },
                 ajax: {
                     url: "{{ route('patients.data') }}",
                     type: "GET",
-                    beforeSend: function () { $("#tableSkeleton").removeClass('hidden'); },
-                    complete: function () { $("#tableSkeleton").addClass('hidden'); }
+                    data: function (d) {
+                        var loc = document.getElementById('patientSingleLocation')?.value || '';
+                        d.locations = loc ? [loc] : [];
+                    },
+                    beforeSend: function () { showPatientsLoading(); },
+                    complete: function () { hidePatientsLoading(); },
+                    error: function (xhr, error, thrown) {
+                        console.error("Patients DataTables error:", error, thrown, xhr.responseText);
+                        hidePatientsLoading();
+                    }
                 },
                 columns: [
                     {
                         data: 'name',
                         name: 'name',
+                        className: 'dds-stick dds-stick-shadow sticky left-0 bg-white z-10 border-b border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] p-3 min-w-[260px] max-w-[260px]',
                         render: function (data, type, row) {
                             return `
-                        <div class="p-3 bg-white sticky left-0 group-hover:bg-slate-50/80 z-10 border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] flex items-center justify-between">
+                        <div class="flex items-center justify-between w-full">
                             <div class="flex items-center gap-3">
-                                <input type="checkbox" class="w-4 h-4 text-emerald-500 border-slate-300 rounded focus:ring-0">
-                                <span class="font-medium">${data}</span>
+                                <input type="checkbox" class="patient-row-chk w-4 h-4 text-emerald-500 border-slate-300 rounded focus:ring-0 cursor-pointer">
+                                <span class="font-medium text-slate-900">${data}</span>
                             </div>
-                            <button onclick="openPatient(${row.id})" class="text-slate-400 hover:text-emerald-500 transition-colors p-1">
+                            <button onclick="openPatient(${row.id})" class="text-slate-400 hover:text-emerald-500 transition-colors p-1 cursor-pointer">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
                             </button>
                         </div>
                         `;
                         }
                     },
-                    { data: 'patient_id', name: 'PatNum' },
-                    { data: 'guarantor', name: 'guarantor_name', orderable: false, searchable: false },
-                    { data: 'guarantor_id', name: 'Guarantor' },
-                    { data: 'age', name: 'age', orderable: false, searchable: false },
-                    { data: 'gender', name: 'Gender' },
-                    { data: 'address', name: 'Address' },
-                    { data: 'city', name: 'City' },
-                    { data: 'state', name: 'State' },
-                    { data: 'zip', name: 'Zip' },
-                    { data: 'work_phone', name: 'WkPhone' },
-                    { data: 'home_phone', name: 'HmPhone' },
-                    { data: 'mobile_phone', name: 'WirelessPhone' },
-                    { data: 'email', name: 'Email' },
-                    { data: 'birthdate', name: 'Birthdate' },
-                    { data: 'first_visit', name: 'first_visit', orderable: false, searchable: false },
+                    { data: 'patient_id', name: 'PatNum', className: 'p-3 border-b border-slate-100' },
+                    { data: 'guarantor', name: 'guarantor_name', orderable: false, searchable: false, className: 'p-3 border-b border-slate-100' },
+                    { data: 'guarantor_id', name: 'Guarantor', className: 'p-3 border-b border-slate-100' },
+                    { data: 'age', name: 'age', orderable: false, searchable: false, className: 'p-3 border-b border-slate-100' },
+                    { data: 'gender', name: 'Gender', className: 'p-3 border-b border-slate-100' },
+                    { data: 'address', name: 'Address', className: 'p-3 border-b border-slate-100' },
+                    { data: 'city', name: 'City', className: 'p-3 border-b border-slate-100' },
+                    { data: 'state', name: 'State', className: 'p-3 border-b border-slate-100' },
+                    { data: 'zip', name: 'Zip', className: 'p-3 border-b border-slate-100' },
+                    { data: 'work_phone', name: 'WkPhone', className: 'p-3 border-b border-slate-100' },
+                    { data: 'home_phone', name: 'HmPhone', className: 'p-3 border-b border-slate-100' },
+                    { data: 'mobile_phone', name: 'WirelessPhone', className: 'p-3 border-b border-slate-100' },
+                    { data: 'email', name: 'Email', className: 'p-3 border-b border-slate-100' },
+                    { data: 'birthdate', name: 'Birthdate', className: 'p-3 border-b border-slate-100' },
+                    { data: 'first_visit', name: 'first_visit', orderable: false, searchable: false, className: 'p-3 border-b border-slate-100' },
                     {
                         data: 'lifetime_value_production',
                         name: 'lifetime_production',
                         orderable: false,
                         searchable: false,
+                        className: 'p-3 border-b border-slate-100',
                         render: function (data) { return data ? '$' + Number(data).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'; }
                     },
                     {
@@ -685,14 +735,18 @@
                         name: 'lifetime_value_collection',
                         orderable: false,
                         searchable: false,
+                        className: 'p-3 border-b border-slate-100',
                         render: function (data) { return data ? '$' + Number(data).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'; }
                     },
-                    { data: 'referral_source', name: 'referral_source', orderable: false, searchable: false }
+                    { data: 'referral_source', name: 'referral_source', orderable: false, searchable: false, className: 'p-3 border-b border-slate-100' }
                 ],
                 order: [[0, 'asc']],
+                createdRow: function (row, data, dataIndex) {
+                    $(row).addClass('hover:bg-slate-50/80 group');
+                },
                 drawCallback: function () {
+                    hidePatientsLoading();
                     lucide.createIcons();
-                    $('#custom-pagination-container').append($('.dt-paging'));
                 },
                 initComplete: function () {
                     let container = $('#columnCheckboxesContainer');
@@ -710,6 +764,20 @@
                 }
             });
 
+            // Reusable custom pagination binder
+            DDS.bindPagination(table, 'patients', { onLoading: showPatientsLoading });
+
+            // Select all row checkboxes
+            $('#patientsSelectAll').on('change', function () {
+                $('.patient-row-chk').prop('checked', $(this).prop('checked'));
+            });
+
+            $(document).on('change', '.patient-row-chk', function () {
+                var totalChks = $('.patient-row-chk').length;
+                var checkedChks = $('.patient-row-chk:checked').length;
+                $('#patientsSelectAll').prop('checked', totalChks > 0 && totalChks === checkedChks);
+            });
+
             // Column Visibility 
             $(document).on('change', '.col-toggle-chk', function () {
                 let colIndex = $(this).data('column');
@@ -725,15 +793,33 @@
 
             // Custom search mechanism
             $("#searchBtn").on('click', function () {
+                showPatientsLoading();
                 table.search($("#searchInput").val()).draw();
             });
             $("#searchInput").on('keypress', function (e) {
-                if (e.which == 13) { $("#searchBtn").click(); }
+                if (e.which == 13) {
+                    showPatientsLoading();
+                    $("#searchBtn").click();
+                }
             });
 
             $("#resetBtn").on('click', function () {
                 $("#searchInput").val("");
+                showPatientsLoading();
                 table.search("").draw();
+            });
+
+            $('#patientSingleLocation').on('change', function () {
+                showPatientsLoading();
+                table.ajax.reload();
+                if (!$('#exportDataTabContent').hasClass('hidden')) {
+                    fetchExportPreview(1);
+                }
+            });
+
+            $("#refreshPatients").on('click', function () {
+                showPatientsLoading();
+                table.ajax.reload();
             });
 
             // Export Modal in Tab 1
@@ -750,20 +836,18 @@
             $("#confirmExportBtn").click(function () {
                 let currentSearchValue = $("#searchInput").val();
                 let customName = $("#exportFileName").val() || "patient_export";
+                let loc = document.getElementById('patientSingleLocation')?.value || '';
                 $("#exportModal").addClass('hidden');
 
-                $.ajax({
-                    url: "{{ url('/patients/export') }}",
-                    method: 'POST',
-                    data: {
-                        _token: "{{csrf_token()}}",
-                        search: currentSearchValue,
-                        filename: customName
-                    },
-                    success: function (file) {
-                        window.location = file.url;
-                    }
+                let params = $.param({
+                    locations: loc ? [loc] : [],
+                    search: currentSearchValue,
+                    date_mode: 'all',
+                    status: 'all',
+                    filename: customName
                 });
+
+                window.location.href = "{{ route('patients.export-download') }}?" + params;
             });
 
             // ========================================================
@@ -871,8 +955,7 @@
 
             // Reset Filters
             $('#expResetFiltersBtn').on('click', function () {
-                $('#expDateMode').val('this_month').trigger('change');
-                $('#expClinic').val('all');
+                $('#expDateMode').val('all').trigger('change');
                 $('#expStatus').val('all');
                 $('#expSearch').val('');
                 fetchExportPreview(1);
@@ -901,11 +984,14 @@
                     cols = ['patient_id', 'first_name', 'last_name', 'date_added'];
                 }
 
+                let loc = document.getElementById('patientSingleLocation')?.value || '';
+
+                let dateMode = $('#expDateMode').val();
                 let params = {
-                    date_mode: $('#expDateMode').val(),
-                    date_from: $('#expDateFrom').val(),
-                    date_to: $('#expDateTo').val(),
-                    clinic_id: $('#expClinic').val(),
+                    locations: loc ? [loc] : [],
+                    date_mode: dateMode,
+                    date_from: dateMode === 'custom' ? $('#expDateFrom').val() : '',
+                    date_to: dateMode === 'custom' ? $('#expDateTo').val() : '',
                     status: $('#expStatus').val(),
                     search: $('#expSearch').val(),
                     columns: cols,
@@ -968,11 +1054,13 @@
                 }
 
                 let filename = $('#expFilenameInput').val() || 'patients_export';
+                let loc = document.getElementById('patientSingleLocation')?.value || '';
+                let dateMode = $('#expDateMode').val();
                 let params = $.param({
-                    date_mode: $('#expDateMode').val(),
-                    date_from: $('#expDateFrom').val(),
-                    date_to: $('#expDateTo').val(),
-                    clinic_id: $('#expClinic').val(),
+                    locations: loc ? [loc] : [],
+                    date_mode: dateMode,
+                    date_from: dateMode === 'custom' ? $('#expDateFrom').val() : '',
+                    date_to: dateMode === 'custom' ? $('#expDateTo').val() : '',
                     status: $('#expStatus').val(),
                     search: $('#expSearch').val(),
                     columns: cols,

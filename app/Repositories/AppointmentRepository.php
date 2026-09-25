@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\OdAppointment;
+use App\Models\Office;
 use Illuminate\Database\Eloquent\Collection;
 
 class AppointmentRepository
@@ -11,7 +12,7 @@ class AppointmentRepository
      * Retrieve appointments with relationships eager-loaded, within a date range.
      * Filter dynamically active apt status logic.
      */
-    public function getAppointmentsByDateRange(string $start, string $end, ?string $clinicId = null): Collection
+    public function getAppointmentsByDateRange(string $start, string $end, int|string|null $clinicId = null, ?int $officeId = null): Collection
     {
         // AptDateTime may be stored either as OpenDental's raw ISO string with
         // a 'T' separator (varchar) or as a normalized MySQL DATETIME, depending
@@ -21,17 +22,23 @@ class AppointmentRepository
         $startDate = substr($start, 0, 10);
         $endDate = substr($end, 0, 10);
 
-        $query = OdAppointment::query()
+        $query = OdAppointment::withoutGlobalScopes()
             ->with(['patient', 'provider'])
             ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$startDate, $endDate]);
+
+        if ($officeId !== null) {
+            $query->where('office_id', $officeId);
+        } else {
+            $query->where('office_id', Office::getActiveOfficeId() ?? 1);
+        }
 
         // Filter out unused status codes to match legacy Calendar logic
         // E.g., skip planned or unscheduled if needed in calendar view, though OpenDental API filtered these dynamically
         // 1=Scheduled, 2=Complete, 4=ASAP, 5=Broken
         $query->whereIn('AptStatus', [1, 2, 4, 5]);
 
-        if ($clinicId && $clinicId !== 'all') {
-            $query->where('ClinicNum', $clinicId);
+        if ($clinicId !== null && $clinicId !== '' && $clinicId !== 'all') {
+            $query->where('ClinicNum', (int) $clinicId);
         }
 
         return $query->get();

@@ -3,9 +3,8 @@
 namespace App\Services\Sync;
 
 use App\Models\Office;
-use App\Models\SyncLog;
-use Exception;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Guarantor-level balance is not an OpenDental table — it is a local rollup
@@ -42,21 +41,11 @@ class PatientBalanceSyncService
         $office = $this->getOffice();
         $officeId = $office->id ?? 1;
 
-        $log = SyncLog::withoutGlobalScopes()->firstOrCreate(
-            ['module' => $this->module()],
-            [
-                'office_id' => $officeId,
-                'status' => 'idle',
-                'total_processed' => 0,
-            ]
-        );
+        $lease = SyncLease::acquire($this->module(), (int) $officeId);
 
-        $log->update([
-            'office_id' => $officeId,
-            'status' => 'running',
-            'started_at' => now(),
-            'last_error' => null,
-        ]);
+        if ($lease === null) {
+            return;
+        }
 
         try {
             $rows = $this->guarantorRollups($officeId);
@@ -69,20 +58,14 @@ class PatientBalanceSyncService
                 );
             }
 
-            $log->update([
-                'status' => 'completed',
-                'finished_at' => now(),
+            $lease->complete([
                 'total_processed' => count($rows),
                 'last_synced_at' => now(),
-                'retry_count' => 0,
             ]);
-        } catch (Exception $e) {
-            $log->increment('retry_count');
-
-            $log->update([
-                'status' => 'failed',
-                'last_error' => $e->getMessage(),
-            ]);
+        } catch (SyncLeaseLostException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            $lease->fail($e);
 
             throw $e;
         }

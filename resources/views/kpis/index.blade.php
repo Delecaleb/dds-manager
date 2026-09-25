@@ -49,18 +49,39 @@
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      background: #fff
+      background: #fff;
+    }
+
+    @media (max-width: 1200px) {
+      .kpi-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .kpi-card:nth-child(5n) {
+        border-right: 1px solid #f1f5f9;
+      }
+      .kpi-card:nth-child(3n) {
+        border-right: none;
+      }
+    }
+
+    @media (max-width: 767.98px) {
+      .kpi-grid {
+        grid-template-columns: repeat(1, 1fr);
+      }
+      .kpi-card {
+        border-right: none !important;
+      }
     }
 
     .kpi-card {
       padding: 14px 16px 12px;
       border-right: 1px solid #f1f5f9;
       border-bottom: 1px solid #f1f5f9;
-      position: relative
+      position: relative;
     }
 
     .kpi-card:nth-child(5n) {
-      border-right: none
+      border-right: none;
     }
 
     /* Tooltip */
@@ -91,6 +112,117 @@
     .kpi-tip-wrap:hover .tip-box {
       display: block
     }
+
+    /* Sub-tabs within a main tab (Hygiene/Doctor/Office, Endo/Perio/…) */
+    .kpi-subtabs {
+      display: flex;
+      gap: 24px;
+      border-bottom: 1px solid #e5e7eb;
+      margin-bottom: 20px
+    }
+
+    .kpi-subtab {
+      padding: 8px 2px 10px;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #64748b;
+      background: none;
+      cursor: pointer
+    }
+
+    .kpi-subtab:hover {
+      color: #334155
+    }
+
+    .kpi-subtab[aria-selected="true"] {
+      color: #0f172a;
+      font-weight: 700;
+      border-bottom-color: #0f172a
+    }
+
+    /* Multi-location comparison table (shares the .dds-table shell from ui.css) */
+    .kpi-loc-wrap {
+      background: #fff
+    }
+
+    .kpi-loc-table th,
+    .kpi-loc-table td {
+      font-size: 12px;
+      padding: 9px 14px;
+      border: 0;
+      border-bottom: 1px solid #f1f5f9
+    }
+
+    .kpi-loc-table th.kpi-loc-head {
+      text-align: right;
+      font-weight: 700;
+      color: #0f172a;
+      white-space: normal;
+      vertical-align: top;
+      min-width: 150px;
+      max-width: 190px
+    }
+
+    /* Location name: the frozen first column, in the header, every body row and the footer.
+       ui.css pins the sticky header/footer cells at z-index 20, so the layering here is:
+       body column (10) < sticky header/footer row (20) < the two corner cells (30). Without
+       that, the corner cells stay put but the columns scrolling past paint straight over them. */
+    .kpi-loc-table .kpi-loc-name {
+      position: sticky;
+      left: 0;
+      background: #fff;
+      text-align: left;
+      font-weight: 600;
+      color: #0f172a;
+      white-space: nowrap;
+      min-width: 190px;
+      border-right: 1px solid #e5e7eb;
+      box-shadow: 2px 0 5px rgba(0, 0, 0, .03)
+    }
+
+    .kpi-loc-table tbody .kpi-loc-name {
+      z-index: 10
+    }
+
+    /* Header × Location and footer × Location corners — specificity has to beat
+       `.dds-table thead.dds-head-sticky th` / `.dds-table tfoot.dds-foot-sticky td` in ui.css. */
+    .kpi-loc-table thead.dds-head-sticky th.kpi-loc-name {
+      left: 0;
+      z-index: 30;
+      font-weight: 700;
+      background-color: var(--dds-head-bg, #f9fafb)
+    }
+
+    .kpi-loc-table tfoot.dds-foot-sticky td.kpi-loc-name {
+      left: 0;
+      z-index: 30;
+      background-color: #eef2f7
+    }
+
+    .kpi-loc-table tbody tr:hover td {
+      background: #f8fafc
+    }
+
+    .kpi-loc-table .kpi-loc-val {
+      text-align: right;
+      font-weight: 600;
+      color: #111827;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap
+    }
+
+    .kpi-loc-table tfoot.dds-foot-sticky td {
+      background-color: #eef2f7;
+      font-weight: 700;
+      padding: 9px 14px;
+      border-top: 2px solid #e2e8f0
+    }
+
+    .kpi-loc-table tfoot tr.kpi-loc-total td {
+      color: #475569
+    }
   </style>
 
   <!-- ── Header ─────────────────────────────────────────────────────────────── -->
@@ -99,14 +231,9 @@
   </header>
 
   <!-- ── Filter bar ─────────────────────────────────────────────────────────── -->
-  <section class="bg-white border-b border-gray-200 px-8 py-3 flex flex-wrap items-center gap-3">
+  <section class="relative z-30 bg-white border-b border-gray-200 px-8 py-3 flex flex-wrap items-center gap-3">
     <x-daterange-picker id="kpiDateRange" />
-
-    <select id="kpiLocation"
-      class="border border-gray-300 rounded px-4 py-1.5 text-sm bg-white focus:outline-none focus:border-emerald-500 shadow-sm font-medium text-gray-700">
-      <option value="all">All Locations</option>
-      <option value="0" selected>8 Mile</option>
-    </select>
+    <x-location-picker id="kpiLocations" :locations="$locations" :selected="$selectedLocations" />
 
     <button id="kpiUpdateBtn"
       class="bg-white border border-emerald-500 text-emerald-600 px-5 py-1.5 rounded text-sm font-semibold hover:bg-emerald-50 transition shadow-sm">
@@ -136,89 +263,120 @@
   </section>
 
   <!-- ── Tab: Main ─────────────────────────────────────────────────────────── -->
-  <main id="tab-main" class="p-6 space-y-6 kpi-tab-content">
+  <main id="tab-main" class="p-6 kpi-tab-content">
+
+    <div class="kpi-subtabs" role="tablist" data-kpi-subtabs="main">
+      <button type="button" class="kpi-subtab" role="tab" data-key="hygiene">Hygiene</button>
+      <button type="button" class="kpi-subtab" role="tab" data-key="doctor">Doctor</button>
+      <button type="button" class="kpi-subtab" role="tab" data-key="office">Office</button>
+    </div>
 
     <!-- Hygiene Section -->
-    <div class="kpi-section">
-      <div class="kpi-section-hdr text-emerald-700" style="border-color:#10b981">
-        <span class="text-base font-extrabold tracking-tight">Hygiene</span>
-      </div>
-      <div class="kpi-grid" id="hygiene-grid">
-        <!-- rendered by JS -->
+    <div class="kpi-subpanel" data-kpi-subpanel="main" data-key="hygiene">
+      <div class="kpi-section">
+        <div class="kpi-section-hdr text-emerald-700" style="border-color:#10b981">
+          <span class="text-base font-extrabold tracking-tight">Hygiene</span>
+        </div>
+        <div class="kpi-grid" id="hygiene-grid">
+          <!-- rendered by JS -->
+        </div>
       </div>
     </div>
 
     <!-- Doctor Section -->
-    <div class="kpi-section">
-      <div class="kpi-section-hdr text-indigo-700" style="border-color: rgb(107, 83, 215)">
-        <span class="text-base font-extrabold tracking-tight">Doctor</span>
-      </div>
-      <div class="kpi-grid" id="doctor-grid">
-        <!-- rendered by JS -->
+    <div class="kpi-subpanel hidden" data-kpi-subpanel="main" data-key="doctor">
+      <div class="kpi-section">
+        <div class="kpi-section-hdr text-indigo-700" style="border-color: rgb(107, 83, 215)">
+          <span class="text-base font-extrabold tracking-tight">Doctor</span>
+        </div>
+        <div class="kpi-grid" id="doctor-grid">
+          <!-- rendered by JS -->
+        </div>
       </div>
     </div>
 
     <!-- Office Section -->
-    <div class="kpi-section">
-      <div class="kpi-section-hdr text-teal-700" style="border-color: rgb(0, 194, 255)">
-        <span class="text-base font-extrabold tracking-tight">Office</span>
-      </div>
-      <div class="kpi-grid" id="office-grid">
-        <!-- rendered by JS -->
+    <div class="kpi-subpanel hidden" data-kpi-subpanel="main" data-key="office">
+      <div class="kpi-section">
+        <div class="kpi-section-hdr text-teal-700" style="border-color: rgb(0, 194, 255)">
+          <span class="text-base font-extrabold tracking-tight">Office</span>
+        </div>
+        <div class="kpi-grid" id="office-grid">
+          <!-- rendered by JS -->
+        </div>
       </div>
     </div>
 
   </main>
 
-  <!-- ── Other tabs (stubs) ─────────────────────────────────────────────────── -->
   <!-- ── Tab: Specialty ─────────────────────────────────────────────────────── -->
-  <main id="tab-specialty" class="hidden p-6 space-y-6 kpi-tab-content">
+  <main id="tab-specialty" class="hidden p-6 kpi-tab-content">
+
+    <div class="kpi-subtabs" role="tablist" data-kpi-subtabs="specialty">
+      <button type="button" class="kpi-subtab" role="tab" data-key="endo">Endo</button>
+      <button type="button" class="kpi-subtab" role="tab" data-key="perio">Perio</button>
+      <button type="button" class="kpi-subtab" role="tab" data-key="ortho">Ortho</button>
+      <button type="button" class="kpi-subtab" role="tab" data-key="os">OS</button>
+      <button type="button" class="kpi-subtab" role="tab" data-key="pedo">Pedo</button>
+    </div>
+
     <!-- Endo Section -->
-    <div class="kpi-section">
-      <div class="kpi-section-hdr text-emerald-700" style="border-color:#10b981">
-        <span class="text-base font-extrabold tracking-tight">Endo</span>
-      </div>
-      <div class="kpi-grid" id="endo-grid">
-        <!-- rendered by JS -->
+    <div class="kpi-subpanel" data-kpi-subpanel="specialty" data-key="endo">
+      <div class="kpi-section">
+        <div class="kpi-section-hdr text-emerald-700" style="border-color:#10b981">
+          <span class="text-base font-extrabold tracking-tight">Endo</span>
+        </div>
+        <div class="kpi-grid" id="endo-grid">
+          <!-- rendered by JS -->
+        </div>
       </div>
     </div>
 
     <!-- Perio Section -->
-    <div class="kpi-section">
-      <div class="kpi-section-hdr text-indigo-700" style="border-color:#6366f1">
-        <span class="text-base font-extrabold tracking-tight">Perio</span>
-      </div>
-      <div class="kpi-grid" id="perio-grid">
-        <!-- rendered by JS -->
+    <div class="kpi-subpanel hidden" data-kpi-subpanel="specialty" data-key="perio">
+      <div class="kpi-section">
+        <div class="kpi-section-hdr text-indigo-700" style="border-color:#6366f1">
+          <span class="text-base font-extrabold tracking-tight">Perio</span>
+        </div>
+        <div class="kpi-grid" id="perio-grid">
+          <!-- rendered by JS -->
+        </div>
       </div>
     </div>
+
     <!-- Ortho Section -->
-    <div class="kpi-section">
-      <div class="kpi-section-hdr text-sky-700" style="border-color:#0ea5e9">
-        <span class="text-base font-extrabold tracking-tight">Ortho</span>
-      </div>
-      <div class="kpi-grid" id="ortho-grid">
-        <!-- rendered by JS -->
+    <div class="kpi-subpanel hidden" data-kpi-subpanel="specialty" data-key="ortho">
+      <div class="kpi-section">
+        <div class="kpi-section-hdr text-sky-700" style="border-color:#0ea5e9">
+          <span class="text-base font-extrabold tracking-tight">Ortho</span>
+        </div>
+        <div class="kpi-grid" id="ortho-grid">
+          <!-- rendered by JS -->
+        </div>
       </div>
     </div>
 
     <!-- OS Section -->
-    <div class="kpi-section">
-      <div class="kpi-section-hdr text-rose-700" style="border-color:#e11d48">
-        <span class="text-base font-extrabold tracking-tight">OS (Oral Surgery)</span>
-      </div>
-      <div class="kpi-grid" id="os-grid">
-        <!-- rendered by JS -->
+    <div class="kpi-subpanel hidden" data-kpi-subpanel="specialty" data-key="os">
+      <div class="kpi-section">
+        <div class="kpi-section-hdr text-rose-700" style="border-color:#e11d48">
+          <span class="text-base font-extrabold tracking-tight">OS (Oral Surgery)</span>
+        </div>
+        <div class="kpi-grid" id="os-grid">
+          <!-- rendered by JS -->
+        </div>
       </div>
     </div>
 
     <!-- Pedo Section -->
-    <div class="kpi-section">
-      <div class="kpi-section-hdr text-amber-700" style="border-color:#d97706">
-        <span class="text-base font-extrabold tracking-tight">Pedo</span>
-      </div>
-      <div class="kpi-grid" id="pedo-grid">
-        <!-- rendered by JS -->
+    <div class="kpi-subpanel hidden" data-kpi-subpanel="specialty" data-key="pedo">
+      <div class="kpi-section">
+        <div class="kpi-section-hdr text-amber-700" style="border-color:#d97706">
+          <span class="text-base font-extrabold tracking-tight">Pedo</span>
+        </div>
+        <div class="kpi-grid" id="pedo-grid">
+          <!-- rendered by JS -->
+        </div>
       </div>
     </div>
   </main>
@@ -493,23 +651,95 @@
       }
     }
 
+    /* ── Render a section ──────────────────────────────────────────────────────
+       Every card endpoint answers with { locations: [{ key, name, metrics }] }, one entry
+       per selected location. Offices are separate OpenDental instances, so their ratios are
+       never pooled: a single location renders the familiar card grid, several render a
+       comparison table (one row per KPI, one column per location). */
+    function renderSection(containerId, cards, payload) {
+      var locs = (payload && payload.locations) ? payload.locations : null;
+
+      if (locs && locs.length > 1) {
+        renderLocationTable(containerId, cards, locs, payload.footer);
+        return;
+      }
+      renderGrid(containerId, cards, locs && locs.length ? locs[0].metrics : (payload ? {} : null));
+    }
+
+    function tipHtml(tip, width) {
+      return '<span class="kpi-tip-wrap flex-shrink-0">'
+        + '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" '
+        + 'stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cursor-default">'
+        + '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line>'
+        + '<line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+        + '<div class="tip-box"' + (width ? ' style="width:' + width + '"' : '') + '>' + escHtml(tip) + '</div>'
+        + '</span>';
+    }
+
+    /* One row per location, one column per KPI, closed by the Average/Total rows — the
+       layout the Jarvis main-view export uses. A rate has no meaningful total, so the
+       server sends null for it and the Total row prints "-". */
+    function renderLocationTable(containerId, cards, locations, footer) {
+      var $c = document.getElementById(containerId);
+      if (!$c) return;
+      $c.className = 'dds-table-scroll kpi-loc-wrap';
+
+      var html = '<table class="dds-table kpi-loc-table"><thead class="dds-head-sticky"><tr>';
+      html += '<th class="kpi-loc-name">Location</th>';
+      cards.forEach(function (card) {
+        html += '<th class="kpi-loc-head"><span class="flex items-start justify-end gap-1">'
+          + '<span class="leading-tight text-right">' + escHtml(card.label) + '</span>'
+          + tipHtml(card.tip, '220px')
+          + '</span></th>';
+      });
+      html += '</tr></thead><tbody>';
+
+      locations.forEach(function (loc) {
+        html += '<tr><td class="kpi-loc-name">' + escHtml(loc.name) + '</td>';
+        cards.forEach(function (card) {
+          var val = loc.metrics ? loc.metrics[card.k] : null;
+          html += '<td class="kpi-loc-val">'
+            + (val === null || val === undefined ? '—' : fmtKpi(val, card.fmt))
+            + '</td>';
+        });
+        html += '</tr>';
+      });
+      html += '</tbody>';
+
+      if (footer) {
+        html += '<tfoot class="dds-foot-sticky">';
+        html += footerRow('Average:', cards, footer.average, 'kpi-loc-avg');
+        html += footerRow('Total:', cards, footer.total, 'kpi-loc-total');
+        html += '</tfoot>';
+      }
+
+      html += '</table>';
+      $c.innerHTML = html;
+    }
+
+    function footerRow(label, cards, values, cls) {
+      var row = '<tr class="' + cls + '"><td class="kpi-loc-name">' + label + '</td>';
+      cards.forEach(function (card) {
+        var val = values ? values[card.k] : null;
+        row += '<td class="kpi-loc-val">'
+          + (val === null || val === undefined ? '-' : fmtKpi(val, card.fmt))
+          + '</td>';
+      });
+      return row + '</tr>';
+    }
+
     /* ── Render grids ──────────────────────────────────────────────────────── */
     function renderGrid(containerId, cards, data) {
       var $c = document.getElementById(containerId);
       if (!$c) return;
+      $c.className = 'kpi-grid'; // may be returning from the multi-location table
       var html = '';
       cards.forEach(function (card) {
         var val = data ? data[card.k] : null;
         html += '<div class="kpi-card">';
         html += '<div class="flex items-start justify-between mb-2">';
         html += '<span class="text-xs text-gray-500 leading-tight pr-2">' + escHtml(card.label) + '</span>';
-        html += '<span class="kpi-tip-wrap flex-shrink-0">'
-          + '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" '
-          + 'stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cursor-default">'
-          + '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line>'
-          + '<line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
-          + '<div class="tip-box">' + escHtml(card.tip) + '</div>'
-          + '</span>';
+        html += tipHtml(card.tip);
         html += '</div>';
         html += '<div class="flex items-end justify-between">';
         if (val === null || val === undefined) {
@@ -517,13 +747,72 @@
         } else {
           html += '<span class="text-[17px] font-extrabold text-gray-900 tabular-nums leading-tight">' + fmtKpi(val, card.fmt) + '</span>';
         }
-        html += '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" '
-          + 'stroke="#d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
-          + '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>';
+        html += drillHtml(containerId, card, val);
         html += '</div>';
         html += '</div>';
       });
       $c.innerHTML = html;
+    }
+
+    /* ── Card drill-down ───────────────────────────────────────────────────────
+       The pulse icon opens the records behind the number (DDS.modal.details).
+       Only sections with a detail endpoint are clickable; the rest keep the plain icon. */
+    var DRILLABLE_SECTIONS = { hygiene: true };
+
+    /* Pulse: a card with no drill-down. Square-with-arrow: opens the records behind it. */
+    function kpiIconSvg(stroke) {
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" '
+        + 'stroke="' + stroke + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        + '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>';
+    }
+
+    function kpiDrillIconSvg() {
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" '
+        + 'stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>'
+        + '<polyline points="15 3 21 3 21 9"></polyline>'
+        + '<line x1="10" y1="14" x2="21" y2="3"></line></svg>';
+    }
+
+    function drillHtml(containerId, card, val) {
+      var section = String(containerId).replace('-grid', '');
+      if (!DRILLABLE_SECTIONS[section] || val === null || val === undefined) {
+        return kpiIconSvg('#d1d5db');
+      }
+      return '<button type="button" class="kpi-drill text-gray-300 hover:text-emerald-600 cursor-pointer focus:outline-none leading-none"'
+        + ' data-kpi-section="' + section + '" data-kpi-metric="' + card.k + '"'
+        + ' title="View the records behind this number"'
+        + ' aria-label="View details for ' + escHtml(card.label).replace(/"/g, '&quot;') + '">'
+        + kpiDrillIconSvg() + '</button>';
+    }
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('.kpi-drill') : null;
+      if (!btn) return;
+      openKpiDetail(btn);
+    });
+
+    function openKpiDetail(btn) {
+      if (btn.dataset.loading === '1') return;
+      btn.dataset.loading = '1';
+      btn.classList.add('animate-pulse');
+
+      var qs = getKpiQueryString(_kpiStart, _kpiEnd)
+        + '&section=' + encodeURIComponent(btn.dataset.kpiSection)
+        + '&metric=' + encodeURIComponent(btn.dataset.kpiMetric);
+
+      fetch(_kpiBase + '/kpis/detail' + qs)
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+        .then(function (d) {
+          DDS.modal.details(d.title || 'Details', d.rows || []);
+        })
+        .catch(function () {
+          DDS.modal.details('Details', []);
+        })
+        .finally(function () {
+          btn.dataset.loading = '0';
+          btn.classList.remove('animate-pulse');
+        });
     }
 
     function escHtml(s) {
@@ -544,16 +833,28 @@
     /* ── Data fetch — 3 parallel independent requests ──────────────────────── */
     var _kpiPending = 0;
 
+    /* The backend resolves `locations` with ClinicRegistry::select(), which takes the keys
+       comma-joined — the same param every other page sends. */
+    function getKpiQueryString(start, end) {
+      var qs = '?start_date=' + encodeURIComponent(start) + '&end_date=' + encodeURIComponent(end);
+      var locs = (window.DDS && typeof window.DDS.getLocations === 'function')
+        ? window.DDS.getLocations('kpiLocations') : [];
+      if (locs && locs.length) {
+        qs += '&locations=' + encodeURIComponent(locs.join(','));
+      }
+      return qs;
+    }
+
     function fetchSection(path, gridId, cards, start, end) {
-      var qs = '?start_date=' + start + '&end_date=' + end;
+      var qs = getKpiQueryString(start, end);
       _kpiPending++;
       fetch(_kpiBase + path + qs)
         .then(function (r) { return r.json(); })
         .then(function (d) {
-          renderGrid(gridId, cards, d);
+          renderSection(gridId, cards, d);
         })
         .catch(function () {
-          renderGrid(gridId, cards, {});
+          renderSection(gridId, cards, { locations: [] });
         })
         .finally(function () {
           _kpiPending--;
@@ -600,7 +901,7 @@
 
     // Function to fetch specialty providers
     function fetchSpecialtyProvidersSection(path, type, start, end) {
-      var qs = '?start_date=' + start + '&end_date=' + end;
+      var qs = getKpiQueryString(start, end);
       _kpiPending++;
       fetch(_kpiBase + path + qs)
         .then(function (r) { return r.json(); })
@@ -619,7 +920,7 @@
     }
 
     function fetchProvidersSection(path, type, start, end) {
-      var qs = '?start_date=' + start + '&end_date=' + end;
+      var qs = getKpiQueryString(start, end);
       _kpiPending++;
       fetch(_kpiBase + path + qs)
         .then(function (r) { return r.json(); })
@@ -873,6 +1174,36 @@
       // Deep-link: honor ?tab= on load, else the default 'main' tab.
       activateKpiTab(kpiTabs.initial || 'main');
 
+      /* Sub-tabs inside a main tab. Panels are pre-rendered and shown/hidden here, with
+         DDS.tabs.deeplink adding the URL sync, deep-linking and back/forward — the case its
+         docblock describes, so the page does not grow a second tab system. */
+      function initKpiSubtabs(group, param, defaultKey) {
+        var nav = document.querySelector('[data-kpi-subtabs="' + group + '"]');
+        if (!nav) return;
+        var tabs = nav.querySelectorAll('.kpi-subtab');
+        var panels = document.querySelectorAll('[data-kpi-subpanel="' + group + '"]');
+
+        function activate(key) {
+          var known = false;
+          tabs.forEach(function (t) { if (t.dataset.key === key) known = true; });
+          if (!known) key = defaultKey;
+          tabs.forEach(function (t) {
+            t.setAttribute('aria-selected', t.dataset.key === key ? 'true' : 'false');
+          });
+          panels.forEach(function (p) { p.classList.toggle('hidden', p.dataset.key !== key); });
+        }
+
+        var deeplink = DDS.tabs.deeplink(param, activate);
+        nav.addEventListener('click', function (e) {
+          var tab = e.target.closest('.kpi-subtab');
+          if (tab) deeplink.go(tab.dataset.key);
+        });
+        activate(deeplink.initial || defaultKey);
+      }
+
+      initKpiSubtabs('main', 'section', 'hygiene');
+      initKpiSubtabs('specialty', 'specialty', 'endo');
+
       // Providers Sub-tabs
       document.querySelectorAll('.kpi-subtab-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -965,11 +1296,25 @@
         }
       });
 
+      if (window.DDS && typeof window.DDS.onLocations === 'function') {
+        window.DDS.onLocations('kpiLocations', function () {
+          var drp = $('#kpiDateRange').data('daterangepicker');
+          if (!drp) return;
+          fetchKpis(drp.startDate.format('YYYY-MM-DD'), drp.endDate.format('YYYY-MM-DD'));
+          if (!document.getElementById('tab-providers').classList.contains('hidden')) {
+            renderProvidersTable();
+          }
+        });
+      }
+
       // Initial load — wait for moment to be available
       var _tryInit = setInterval(function () {
         if (typeof moment === 'undefined') return;
         clearInterval(_tryInit);
-        fetchKpis(moment().startOf('year').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'));
+        var _kpiRange = (window.DDS && window.DDS.date) ? window.DDS.date.getRange() : null;
+        var s = (_kpiRange && !_kpiRange.isDefault) ? _kpiRange.start : moment().startOf('year').format('YYYY-MM-DD');
+        var e = (_kpiRange && !_kpiRange.isDefault) ? _kpiRange.end : moment().format('YYYY-MM-DD');
+        fetchKpis(s, e);
       }, 30);
     });
   </script>

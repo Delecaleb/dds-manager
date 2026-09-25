@@ -9,6 +9,8 @@ class OdClinics extends Model
 {
     use BelongsToOffice;
 
+    protected $table = 'od_clinics';
+
     protected $primaryKey = 'ClinicNum';
 
     public $incrementing = false;
@@ -16,12 +18,26 @@ class OdClinics extends Model
     protected $fillable = [
         'office_id',
         'ClinicNum',
+        'Description',
         'Abbr',
-        'ItemOrder',
-        'ItemName',
-        'ItemValue',
-        'ItemColor',
+        'Phone',
+        'Fax',
+        'Address',
+        'Address2',
+        'City',
+        'State',
+        'Zip',
         'IsHidden',
-        'Supp',
+        'ItemOrder',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'ClinicNum' => 'integer',
+            'office_id' => 'integer',
+            'IsHidden' => 'boolean',
+            'ItemOrder' => 'integer',
+        ];
+    }
 }

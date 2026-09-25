@@ -444,6 +444,7 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
 <script>
     /* ── Patient Modal globals ─────────────────────────────────────── */
     var currentPatientId = null;
+    var currentPatientOfficeId = null;
 
     function activatePmTab(tabId) {
         $('#patientTabNav .pm-tab').removeClass('border-emerald-500 text-slate-900 font-semibold').addClass('border-transparent text-slate-400 font-medium');
@@ -454,9 +455,10 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
     }
 
     /* Public: open the modal for a given patient ID. Safe to call from
-       DataTables inline onclick (e.g. onclick="openPatient(${row.id})"). */
-    function openPatient(id) {
+       DataTables inline onclick (e.g. onclick="openPatient(${row.id}, ${row.office_id})"). */
+    function openPatient(id, officeId) {
         currentPatientId = id;
+        currentPatientOfficeId = officeId || null;
         activatePmTab('pm-info');
         $('#patientModal').removeClass('hidden');
 
@@ -474,11 +476,19 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
             .forEach(function (aid) { $('#' + aid).text('$ 0'); });
         $('#pm-ar-body').html('<tr><td colspan="5" class="p-4 text-center text-slate-400">No Data</td></tr>');
 
+        var url = "{{ url('/patients') }}/" + id;
+        if (currentPatientOfficeId) {
+            url += '?office_id=' + encodeURIComponent(currentPatientOfficeId);
+        }
+
         $.ajax({
-            url: "{{ url('/patients') }}/" + id,
+            url: url,
             type: 'GET',
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             success: function (p) {
+                if (p.office_id && !currentPatientOfficeId) {
+                    currentPatientOfficeId = p.office_id;
+                }
                 var nameParts = p.name ? p.name.split(', ') : ['', ''];
                 var initials = ((nameParts[1] || '').charAt(0) + (nameParts[0] || '').charAt(0)).toUpperCase() || '??';
                 $('#patientAvatar').text(initials);
@@ -595,8 +605,12 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
 
     function _loadPatientTXPlans(patientId) {
         $('#pm-txplans-body').html(_txSkeletonRows());
+        var url = "{{ url('/patients') }}/" + patientId + '/treatment-plans';
+        if (currentPatientOfficeId) {
+            url += '?office_id=' + encodeURIComponent(currentPatientOfficeId);
+        }
         $.ajax({
-            url: "{{ url('/patients') }}/" + patientId + '/treatment-plans',
+            url: url,
             type: 'GET',
             success: function (data) {
                 var txplans = data || [];
@@ -642,8 +656,12 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
     function _loadPatientAR(patientId) {
         $('#ar-card-grid').html(_arCardSkeleton());
         $('#pm-ar-body').html(_arTableSkeleton());
+        var url = "{{ url('/patients') }}/" + patientId + '/ar';
+        if (currentPatientOfficeId) {
+            url += '?office_id=' + encodeURIComponent(currentPatientOfficeId);
+        }
         $.ajax({
-            url: "{{ url('/patients') }}/" + patientId + '/ar',
+            url: url,
             type: 'GET',
             success: function (ar) {
                 $('#ar-card-grid').html(
@@ -689,8 +707,12 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
             skeleton += '</tr>';
         }
         $('#pm-family-body').html(skeleton);
+        var url = "{{ url('/patients') }}/" + patientId + '/family';
+        if (currentPatientOfficeId) {
+            url += '?office_id=' + encodeURIComponent(currentPatientOfficeId);
+        }
         $.ajax({
-            url: "{{ url('/patients') }}/" + patientId + '/family',
+            url: url,
             type: 'GET',
             success: function (family) {
                 if (family.length) {
@@ -718,8 +740,12 @@ All AJAX calls use inline {{ url() }} — no dependency on a page-level baseUrl.
 
     function _loadPatientEmployer(patientId) {
         $('#pm-employer-name').html('<div class="h-4 w-40 bg-slate-200 rounded animate-pulse"></div>');
+        var url = "{{ url('/patients') }}/" + patientId + '/employer';
+        if (currentPatientOfficeId) {
+            url += '?office_id=' + encodeURIComponent(currentPatientOfficeId);
+        }
         $.ajax({
-            url: "{{ url('/patients') }}/" + patientId + '/employer',
+            url: url,
             type: 'GET',
             success: function (data) {
                 $('#pm-employer-name').text(data.name || 'No employer information available.');

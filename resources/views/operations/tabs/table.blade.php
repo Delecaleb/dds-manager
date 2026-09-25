@@ -10,7 +10,7 @@
 
     {{-- Subtab bar (Operations deep-link routes; handled by the ops tab JS) --}}
     @if (!empty($subtabs))
-        <ul class="flex border-b border-slate-200 px-4 pt-3 gap-1">
+        <ul class="flex flex-nowrap overflow-x-auto border-b border-slate-200 px-4 pt-3 gap-1 dds-tab-nav">
             @foreach ($subtabs as $slug => $label)
                 <a href="{{ route('operations.tab', $slug === 'default' ? [$tab] : [$tab, $slug]) }}"
                    data-ops-subtab="{{ $slug }}"
@@ -44,7 +44,7 @@
     </div>
 
     {{-- The table (all 3 types handled by the component; real sticky columns) --}}
-    <x-analytics-table :spec="$spec" :active-subtab="$activeSubtab" />
+    <x-analytics-table :spec="$spec" :active-subtab="$activeSubtab" :paginate="$paginate ?? (($tab ?? '') === 'services')" :tab="$tab ?? null" />
 </div>
 
 {{-- Drilldowns use the shared, stackable DDS.modal.details (ui.js). The old embedded

@@ -88,11 +88,10 @@ class ProductionService
         $this->applyClinicProvider($q, $filter, 'p');
         $pat = (float) $q->sum('p.SplitAmt');
 
-        $qIns = DB::table('od_claim_procs as cp')
-            ->whereBetween('cp.DateCP', [$filter->start, $filter->end])
-            ->where('cp.Status', '!=', 0);
+        $qIns = DB::table('od_claim_payments as cp')
+            ->whereBetween('cp.CheckDate', [$filter->start, $filter->end]);
         $this->applyClinicProvider($qIns, $filter, 'cp');
-        $ins = (float) $qIns->sum('cp.InsPayAmt');
+        $ins = (float) $qIns->sum('cp.CheckAmt');
 
         return round($pat + $ins, 2);
     }
@@ -109,7 +108,7 @@ class ProductionService
         $excludedCodes = ProcCode::brokenAppointmentCodeNums($filter->officeId);
 
         return (int) $this->completedProcedures($filter)
-            ->whereNotIn(DB::raw("COALESCE(pl.CodeNum, '')"), $excludedCodes)
+            ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('pl.CodeNum', $excludedCodes))
             ->distinct()
             ->count(DB::raw($this->visitKeyExpr()));
     }

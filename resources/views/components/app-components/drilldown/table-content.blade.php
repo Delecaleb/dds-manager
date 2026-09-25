@@ -1,7 +1,13 @@
+@php
+    $paginationId = 'drilldown_pg_' . uniqid();
+    $tableId = $paginationId . '_tbl';
+@endphp
+
 <x-app-components.drilldown.table-modal :title="$title" :provider-info="$providerInfo ?? null">
-    {{-- dds-datatable → auto-initialised as the shared, sortable DataTable when the modal
-         opens (DDS.dataTableAll). No fixed id, so stacked drilldowns never collide. --}}
-    <table class="dds-table {{ count($rows) ? 'dds-datatable' : '' }} w-full text-left text-xs whitespace-nowrap">
+    {{-- dds-datatable → auto-initialised as the shared, sortable DataTable with reusable pagination
+         when the modal opens (DDS.dataTableAll). Unique IDs ensure stacked drilldowns never collide. --}}
+    <table id="{{ $tableId }}" data-pagination-id="{{ $paginationId }}"
+        class="dds-table {{ count($rows) ? 'dds-datatable' : '' }} w-full text-left text-xs whitespace-nowrap">
         <thead>
             <tr>
                 @foreach ($columns as $col)
@@ -21,7 +27,7 @@
                             $align = ($col['type'] ?? 'text') === 'money' || ($col['type'] ?? 'text') === 'percent' || ($col['type'] ?? 'text') === 'number_2' || ($col['type'] ?? 'text') === 'number' ? 'text-right' : 'text-left';
 
                             $isLink = is_array($val) && !empty($val['link']);
-                            $displayStr = $isLink ? $val['label'] : $val;
+                            $displayStr = is_array($val) ? ($val['label'] ?? ($val['name'] ?? '')) : (string) ($val ?? '');
 
                             // Numeric columns carry data-order so the DataTable sorts by the raw
                             // value, not the formatted "$ 1,234.56" / "12.34%" text.
@@ -116,4 +122,10 @@
             </tfoot>
         @endif
     </table>
+
+    <x-slot:footer>
+        @if (count($rows))
+            <x-table-pagination :id="$paginationId" :default-length="10" />
+        @endif
+    </x-slot:footer>
 </x-app-components.drilldown.table-modal>

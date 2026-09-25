@@ -24,11 +24,10 @@ class DepositSlipController extends Controller
      */
     public function index()
     {
-        $offices = Office::where('is_active', true)->orderBy('name')->get();
-        $activeOfficeId = Office::getActiveOfficeId();
-        $clinics = $this->clinics->all($activeOfficeId);
+        $locations = $this->clinics->locations();
+        $selectedLocations = $this->clinics->select(request('locations'))->keys();
 
-        return view('deposit.index', compact('offices', 'activeOfficeId', 'clinics'));
+        return view('deposit.index', compact('locations', 'selectedLocations'));
     }
 
     /**
@@ -84,19 +83,59 @@ class DepositSlipController extends Controller
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
 
-        $officeInput = $request->input('office_id');
-        $officeId = ($officeInput !== null && $officeInput !== '' && $officeInput !== 'all')
-            ? (int) $officeInput
-            : ($officeInput === 'all' ? null : Office::getActiveOfficeId());
+        if ($request->filled('locations')) {
+            $locations = $this->clinics->select($request->input('locations'));
+        } elseif ($request->filled('office_id') || $request->filled('clinic_num') || $request->filled('clinic_id')) {
+            $officeInput = $request->input('office_id');
+            if ($officeInput === 'all') {
+                $locations = $this->clinics->select('all');
+            } else {
+                $officeId = ($officeInput !== null && $officeInput !== '') ? (int) $officeInput : Office::getActiveOfficeId();
+                $clinicInput = $request->input('clinic_id') ?? $request->input('clinic_num');
+                if ($clinicInput === null && $officeId !== null) {
+                    $clinicInput = $this->clinics->getActiveClinicNum($officeId);
+                }
+                if ($clinicInput !== null && $clinicInput !== '' && $clinicInput !== 'all') {
+                    $locations = $this->clinics->select("{$officeId}:{$clinicInput}");
+                } elseif ($officeId !== null) {
+                    $locations = $this->clinics->select((string) $officeId);
+                } else {
+                    $locations = $this->clinics->select(null);
+                }
+            }
+        } else {
+            $locations = $this->clinics->select(null);
+        }
 
-        $clinicNum = ($request->filled('clinic_num') && $request->input('clinic_num') !== 'all')
-            ? (int) $request->input('clinic_num')
-            : null;
+        $scopes = $locations->scopes();
+        if (empty($scopes)) {
+            return response()->json([
+                'deposits' => [],
+                'details' => [],
+                'summary' => [
+                    'total_amount' => 0.0,
+                ],
+            ]);
+        }
 
         $paymentTable = (new OdPayment)->getTable();
         $defTable = (new OdDefinition)->getTable();
         $patientTable = (new OdPatient)->getTable();
         $claimPaymentTable = (new OdClaimPayment)->getTable();
+
+        $applyScopes = function ($query, string $table = '') use ($scopes) {
+            $prefix = $table !== '' ? "{$table}." : '';
+            $query->where(function ($q) use ($scopes, $prefix) {
+                foreach ($scopes as $officeId => $scopedClinics) {
+                    $q->orWhere(function ($sub) use ($officeId, $scopedClinics, $prefix) {
+                        $sub->where("{$prefix}office_id", $officeId);
+                        if (! empty($scopedClinics)) {
+                            $sub->whereIn("{$prefix}ClinicNum", $scopedClinics);
+                        }
+                    });
+                }
+            });
+        };
 
         // ── 1. SUMMARY PAYMENTS QUERY ──
         $paymentsQuery = OdPayment::withoutGlobalScopes()
@@ -109,12 +148,7 @@ class DepositSlipController extends Controller
             })
             ->whereBetween("{$paymentTable}.PayDate", [$start, $end]);
 
-        if ($officeId !== null) {
-            $paymentsQuery->where("{$paymentTable}.office_id", $officeId);
-        }
-        if ($clinicNum !== null) {
-            $paymentsQuery->where("{$paymentTable}.ClinicNum", $clinicNum);
-        }
+        $applyScopes($paymentsQuery, $paymentTable);
 
         $payments = $paymentsQuery
             ->select(
@@ -127,9 +161,9 @@ class DepositSlipController extends Controller
             ->get();
 
         $results = [];
-        $totalAmount = 0;
+        $totalAmount = 0.0;
         foreach ($payments as $p) {
-            $loc = $this->clinics->name((int) ($p->ClinicNum ?? 0), (int) ($p->office_id ?? $officeId ?? 1));
+            $loc = $this->clinics->locationFor((int) ($p->office_id ?? 1), (int) ($p->ClinicNum ?? 0))->name;
             $type = $p->type ?: 'Uncategorized Payment';
             $amt = (float) $p->amount;
             $totalAmount += $amt;
@@ -145,12 +179,7 @@ class DepositSlipController extends Controller
         $claimPaymentsQuery = OdClaimPayment::withoutGlobalScopes()
             ->whereBetween('CheckDate', [$start, $end]);
 
-        if ($officeId !== null) {
-            $claimPaymentsQuery->where('office_id', $officeId);
-        }
-        if ($clinicNum !== null) {
-            $claimPaymentsQuery->where('ClinicNum', $clinicNum);
-        }
+        $applyScopes($claimPaymentsQuery);
 
         $claimPayments = $claimPaymentsQuery
             ->select(
@@ -166,7 +195,7 @@ class DepositSlipController extends Controller
             $totalAmount += $amt;
 
             $results[] = [
-                'location' => $this->clinics->name((int) ($cp->ClinicNum ?? 0), (int) ($cp->office_id ?? $officeId ?? 1)),
+                'location' => $this->clinics->locationFor((int) ($cp->office_id ?? 1), (int) ($cp->ClinicNum ?? 0))->name,
                 'type' => 'Insurance Co Pmt',
                 'amount' => $amt,
             ];
@@ -181,10 +210,7 @@ class DepositSlipController extends Controller
 
         // Provider lookup: office_id => [ProvNum => Abbr]
         $providerMap = [];
-        $provQuery = OdProvider::withoutGlobalScopes();
-        if ($officeId !== null) {
-            $provQuery->where('office_id', $officeId);
-        }
+        $provQuery = OdProvider::withoutGlobalScopes()->whereIn('office_id', array_keys($scopes));
         foreach ($provQuery->get(['office_id', 'ProvNum', 'Abbr']) as $pr) {
             $providerMap[$pr->office_id][$pr->ProvNum] = $pr->Abbr;
         }
@@ -203,12 +229,7 @@ class DepositSlipController extends Controller
             })
             ->whereBetween("{$paymentTable}.PayDate", [$start, $end]);
 
-        if ($officeId !== null) {
-            $paymentsForDetailsQuery->where("{$paymentTable}.office_id", $officeId);
-        }
-        if ($clinicNum !== null) {
-            $paymentsForDetailsQuery->where("{$paymentTable}.ClinicNum", $clinicNum);
-        }
+        $applyScopes($paymentsForDetailsQuery, $paymentTable);
 
         $paymentsForDetails = $paymentsForDetailsQuery
             ->select(
@@ -231,26 +252,18 @@ class DepositSlipController extends Controller
         $paySplitsProvMap = [];
         if ($paymentsForDetails->isNotEmpty()) {
             $splitsQuery = PaySplit::withoutGlobalScopes()->whereNotNull('ProvNum')->where('ProvNum', '>', 0);
-            if ($officeId !== null) {
-                $splitsQuery->where('office_id', $officeId);
-                $payNums = $paymentsForDetails->pluck('PayNum')->filter()->values()->all();
-                if (! empty($payNums)) {
-                    $splitsQuery->whereIn('PayNum', $payNums);
-                }
-            } else {
-                $officePayNums = $paymentsForDetails->groupBy('office_id')
-                    ->map(fn ($g) => $g->pluck('PayNum')->filter()->values()->all());
+            $officePayNums = $paymentsForDetails->groupBy('office_id')
+                ->map(fn ($g) => $g->pluck('PayNum')->filter()->values()->all());
 
-                $splitsQuery->where(function ($q) use ($officePayNums) {
-                    foreach ($officePayNums as $oId => $nums) {
-                        if (! empty($nums)) {
-                            $q->orWhere(function ($sub) use ($oId, $nums) {
-                                $sub->where('office_id', $oId)->whereIn('PayNum', $nums);
-                            });
-                        }
+            $splitsQuery->where(function ($q) use ($officePayNums) {
+                foreach ($officePayNums as $oId => $nums) {
+                    if (! empty($nums)) {
+                        $q->orWhere(function ($sub) use ($oId, $nums) {
+                            $sub->where('office_id', $oId)->whereIn('PayNum', $nums);
+                        });
                     }
-                });
-            }
+                }
+            });
 
             foreach ($splitsQuery->get(['office_id', 'PayNum', 'ProvNum']) as $split) {
                 $key = "{$split->office_id}:{$split->PayNum}";
@@ -259,13 +272,13 @@ class DepositSlipController extends Controller
         }
 
         foreach ($paymentsForDetails as $p) {
-            $pOfficeId = (int) ($p->office_id ?? $officeId ?? 1);
+            $pOfficeId = (int) ($p->office_id ?? 1);
             $key = "{$pOfficeId}:{$p->PayNum}";
             $provNum = $paySplitsProvMap[$key] ?? null;
             $provAbbr = $provNum ? ($providerMap[$pOfficeId][$provNum] ?? '') : '';
 
             $details[] = [
-                'office' => $this->clinics->name((int) ($p->ClinicNum ?? 0), $pOfficeId),
+                'office' => $this->clinics->locationFor($pOfficeId, (int) ($p->ClinicNum ?? 0))->name,
                 'patient_name' => ($p->LName || $p->FName) ? trim($p->LName.', '.$p->FName, ', ') : '',
                 'patient_id' => $p->PatNum,
                 'provider' => $provAbbr,
@@ -292,12 +305,7 @@ class DepositSlipController extends Controller
             })
             ->whereBetween("{$claimPaymentTable}.CheckDate", [$start, $end]);
 
-        if ($officeId !== null) {
-            $claimPaymentsForDetailsQuery->where("{$claimPaymentTable}.office_id", $officeId);
-        }
-        if ($clinicNum !== null) {
-            $claimPaymentsForDetailsQuery->where("{$claimPaymentTable}.ClinicNum", $clinicNum);
-        }
+        $applyScopes($claimPaymentsForDetailsQuery, $claimPaymentTable);
 
         $claimPaymentsForDetails = $claimPaymentsForDetailsQuery
             ->select(
@@ -314,9 +322,9 @@ class DepositSlipController extends Controller
             ->get();
 
         foreach ($claimPaymentsForDetails as $cp) {
-            $cpOfficeId = (int) ($cp->office_id ?? $officeId ?? 1);
+            $cpOfficeId = (int) ($cp->office_id ?? 1);
             $details[] = [
-                'office' => $this->clinics->name((int) ($cp->ClinicNum ?? 0), $cpOfficeId),
+                'office' => $this->clinics->locationFor($cpOfficeId, (int) ($cp->ClinicNum ?? 0))->name,
                 'patient_name' => '',
                 'patient_id' => '',
                 'provider' => '',

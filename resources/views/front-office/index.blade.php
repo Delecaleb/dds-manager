@@ -23,15 +23,7 @@
                         class="appearance-none bg-gray-100 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-700">
                 </div>
 
-                <div class="relative">
-                    <select
-                        class="appearance-none bg-gray-100 border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-700">
-                        <option>8 Mile</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                        <i class="fa-solid fa-chevron-down text-xs"></i>
-                    </div>
-                </div>
+                <x-location-picker id="foLocations" />
                 <button id="updateStatsBtn"
                     class="bg-white hover:bg-gray-50 text-emerald-600 border border-emerald-500 font-medium text-sm px-4 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5">
                     <i class="fa-solid fa-arrows-rotate text-xs"></i> Update
@@ -45,7 +37,7 @@
         </button>
     </header>
 
-    <nav class="bg-white border-b border-gray-200 px-6 flex gap-6 text-sm font-medium text-gray-500">
+    <nav class="bg-white border-b border-gray-200 px-6 flex flex-nowrap overflow-x-auto gap-6 text-sm font-medium text-gray-500 dds-tab-nav" id="foTabNav">
         <a href="{{ route('front-office.index') }}"
             class="fo-nav-link border-b-2 py-3.5 px-1 transition-colors {{ ($activeTab ?? 'schedule') === 'schedule' ? 'border-emerald-500 text-emerald-600' : 'border-transparent hover:text-gray-700' }}">Schedule</a>
         <a href="{{ route('front-office.tasks') }}"
@@ -226,6 +218,17 @@
         };
 
         document.addEventListener('DOMContentLoaded', function () {
+            if (window.DDS && window.DDS.date) {
+                var foRange = window.DDS.date.getRange();
+                if (foRange && !foRange.isDefault) {
+                    if (document.getElementById('frontOfficeStartDate')) document.getElementById('frontOfficeStartDate').value = foRange.start;
+                    if (document.getElementById('frontOfficeEndDate')) document.getElementById('frontOfficeEndDate').value = foRange.end;
+                    if (document.getElementById('frontOfficeMonth') && foRange.start.slice(0, 7) === foRange.end.slice(0, 7)) {
+                        document.getElementById('frontOfficeMonth').value = foRange.start.slice(0, 7);
+                    }
+                }
+            }
+
             $(document).on('change', '#foDateType', function () {
                 if ($(this).val() === 'range') {
                     $('#foMonthContainer').addClass('hidden');
@@ -237,13 +240,34 @@
                 window.reloadAllFoData();
             });
 
-            $(document).on('change', '#frontOfficeMonth, #frontOfficeStartDate, #frontOfficeEndDate', function () {
+            $(document).on('change', '#frontOfficeStartDate, #frontOfficeEndDate', function () {
+                var s = $('#frontOfficeStartDate').val();
+                var e = $('#frontOfficeEndDate').val();
+                if (s && e && window.DDS && window.DDS.date) {
+                    window.DDS.date.setRange(s, e);
+                }
+                window.reloadAllFoData();
+            });
+
+            $(document).on('change', '#frontOfficeMonth', function () {
+                var m = $(this).val();
+                if (m && window.DDS && window.DDS.date && typeof moment !== 'undefined') {
+                    var s = moment(m + '-01').startOf('month').format('YYYY-MM-DD');
+                    var e = moment(m + '-01').endOf('month').format('YYYY-MM-DD');
+                    window.DDS.date.setRange(s, e);
+                }
                 window.reloadAllFoData();
             });
 
             $(document).on('click', '#updateStatsBtn', function () {
                 window.reloadAllFoData();
             });
+
+            if (window.DDS && typeof DDS.onLocations === 'function') {
+                DDS.onLocations('foLocations', function () {
+                    window.reloadAllFoData();
+                });
+            }
 
             // SPA Tab Switching Engine
             $('.fo-nav-link').on('click', function (e) {

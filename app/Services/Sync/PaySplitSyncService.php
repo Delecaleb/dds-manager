@@ -25,4 +25,9 @@ class PaySplitSyncService extends BaseQuerySyncService
     {
         return 'SecDateTEdit';
     }
+
+    protected function dateColumn(): ?string
+    {
+        return 'DatePay';
+    }
 }
