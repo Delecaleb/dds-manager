@@ -1,99 +1,84 @@
 <x-guest-layout>
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
+    <x-slot:title>Sign in</x-slot:title>
 
-    <div class="col-span-1 bg-[#f8fafc] lg:bg-white flex flex-col justify-between p-8 sm:p-12 lg:p-16">
-            
-            <!-- Mobile Header Only Display Vector -->
-            <div class="flex lg:hidden items-center gap-2 mb-8">
-                <div class="w-7 h-7 rounded bg-[#001f3f] flex items-center justify-center text-emerald-400">
-                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+    <div class="text-center">
+        <h1 class="text-xl font-bold text-slate-900 tracking-tight">Sign in</h1>
+        <p class="mt-1 text-[13px] text-slate-500">Welcome back. Enter your details to continue.</p>
+    </div>
+
+    <x-auth-session-status class="mt-5" :status="session('status')" />
+
+    @if ($errors->any())
+        <div class="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700 space-y-1" role="alert">
+            @foreach ($errors->all() as $error)
+                <div class="flex items-start gap-2">
+                    <i data-lucide="circle-alert" class="w-4 h-4 shrink-0 text-rose-500 mt-px"></i>
+                    <span>{{ $error }}</span>
                 </div>
-                <span class="text-sm font-bold text-slate-800 tracking-tight">DDS Manager Portal</span>
-            </div>
-
-            <div class="my-auto space-y-6 w-full max-w-md mx-auto">
-                <!-- Portal Titles -->
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Sign In</h2>
-                    <p class="text-xs text-slate-500 mt-1.5">
-                        Authorized clinical personnel access node. Need support? <a href="#" class="text-sky-600 font-semibold hover:underline">Contact Administrator</a>
-                    </p>
-                </div>
-
-                <!-- ATTENTION NOTICE ALERT BOX STRIP -->
-                <div class="bg-sky-50 border border-sky-100 rounded text-slate-700 p-3.5 font-medium text-[11px] leading-relaxed">
-                    Please provide verified organization practice credentials to access authorized modules and clinical databases.
-                </div>
-
-                @if ($errors->any())
-                    <div class="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded text-xs space-y-1">
-                        @foreach ($errors->all() as $error)
-                            <div class="flex items-center gap-1.5">
-                                <i data-lucide="alert-circle" class="w-3.5 h-3.5 shrink-0 text-rose-500"></i>
-                                <span>{{ $error }}</span>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-
-                <!-- MAIN EXECUTION FORM ACTION -->
-                <form method="POST" action="{{ route('login') }}" class="space-y-4">
-                    @csrf
-                    <!-- USER IDENTITY INPUT ROW -->
-                    <div class="space-y-1">
-                        <label for="email" class="block font-bold text-slate-500 uppercase tracking-wider text-[10px]">
-                            Email Address or Username <span class="text-red-500">*</span>
-                        </label>
-                        <div class="relative">
-                            <input id="email" name="email" type="text" value="{{ old('email', old('username')) }}" placeholder="admin@dds-manager.local" class="app-input pl-9 w-full" required autofocus autocomplete="username">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                                <i data-lucide="user" class="w-3.5 h-3.5"></i>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- PASSKEY ACCESS MATRIX ROW -->
-                    <div class="space-y-1">
-                        <div class="flex items-center justify-between">
-                            <label for="password" class="block font-bold text-slate-500 uppercase tracking-wider text-[10px]">
-                                Password <span class="text-red-500">*</span>
-                            </label>
-                            @if (Route::has('password.request'))
-                                <a href="{{ route('password.request') }}" class="text-[10px] font-bold text-sky-600 hover:underline">Forgot?</a>
-                            @endif
-                        </div>
-                        <div class="relative">
-                            <input id="password" name="password" type="password" placeholder="••••••••" class="app-input pl-9 w-full" required autocomplete="current-password">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                                <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- PERSISTENCE SYSTEM CONFIG CHECKBOX -->
-                    <div class="flex items-center pt-1">
-                        <label class="flex items-center gap-2.5 cursor-pointer font-medium text-slate-600 text-xs">
-                            <input type="checkbox" name="remember" class="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-0 accent-[#001f3f]">
-                            <span>Keep me signed in on this workstation</span>
-                        </label>
-                    </div>
-
-                    <!-- SUBMIT AUTHENTICATION PROCESS TRIPPERS -->
-                    <div class="pt-2">
-                        <button type="submit" class="w-full bg-[#001f3f] hover:bg-[#002b57] text-white font-bold text-xs py-3 px-4 rounded shadow-sm transition-all tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer">
-                            <span>Authenticate Access</span>
-                            <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-emerald-400"></i>
-                        </button>
-                    </div>
-
-                </form>
-            </div>
-
-            <!-- Mobile Footer Element Segment -->
-            <div class="lg:hidden text-center text-slate-400 text-[10px] pt-8 border-t border-slate-100 mt-auto">
-                &copy; 2026 DDS Manager Unified Platform.
-            </div>
-
+            @endforeach
         </div>
+    @endif
+
+    <form method="POST" action="{{ route('login') }}" class="mt-6 space-y-4">
+        @csrf
+
+        <div>
+            <label for="email" class="block text-[13px] font-semibold text-slate-700 mb-1.5">Email or username</label>
+            <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <i data-lucide="user" class="w-4 h-4"></i>
+                </span>
+                <input id="email" name="email" type="text" value="{{ old('email', old('username')) }}" placeholder="you@marcelo.local"
+                    class="app-input pl-10" required autofocus autocomplete="username"
+                    @if($errors->has('email')) aria-invalid="true" @endif>
+            </div>
+        </div>
+
+        <div>
+            <div class="flex items-center justify-between mb-1.5">
+                <label for="password" class="block text-[13px] font-semibold text-slate-700">Password</label>
+                @if (Route::has('password.request'))
+                    <a href="{{ route('password.request') }}" class="text-[12px] font-semibold text-blue-700 hover:underline">Forgot password?</a>
+                @endif
+            </div>
+            <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <i data-lucide="lock" class="w-4 h-4"></i>
+                </span>
+                <input id="password" name="password" type="password" placeholder="••••••••"
+                    class="app-input pl-10 pr-11" required autocomplete="current-password">
+                <button type="button" data-toggle-password="password" aria-label="Show password" aria-pressed="false"
+                    class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-700">
+                    <i data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+
+        <label class="flex items-center gap-2.5 text-[13px] text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" name="remember" class="w-4 h-4 rounded border-slate-300 accent-blue-700">
+            Remember me on this device
+        </label>
+
+        <button type="submit" class="app-btn mt-2">
+            Sign in
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+    </form>
+
+    <p class="mt-6 text-center text-[12px] text-slate-400">Trouble signing in? Contact your administrator.</p>
+
+    <script>
+        // Show / hide the password.
+        document.querySelectorAll('[data-toggle-password]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var input = document.getElementById(btn.getAttribute('data-toggle-password'));
+                var show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+                btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+                btn.innerHTML = '<i data-lucide="' + (show ? 'eye-off' : 'eye') + '" class="w-4 h-4"></i>';
+                lucide.createIcons();
+            });
+        });
+    </script>
 </x-guest-layout>

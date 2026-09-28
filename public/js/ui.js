@@ -1,5 +1,5 @@
 /* ============================================================================
-   DDS Manager — shared UI module (single source of truth for front-end behavior)
+   Marcelo Analytics — shared UI module (single source of truth for front-end behavior)
    Loaded once in layouts/app.blade.php, after jQuery + DataTables.
    Exposes a single global: window.DDS
    No build step; plain ES5-safe-ish JS so it runs straight from the CDN stack.
@@ -793,6 +793,138 @@
         };
     };
 
+    /* Declarative pre-rendered tabs / segmented controls, URL-synced through deeplink.
+       Markup contract:
+         <div data-dds-panels="view">                          ← the URL param name
+           <button data-dds-panel-tab="list">List</button>
+           <button data-dds-panel-tab="map">Map</button>
+         </div>
+         <div data-dds-panel-for="view" data-dds-panel="list">…</div>
+         <div data-dds-panel-for="view" data-dds-panel="map" hidden>…</div>
+       The first tab is the default. The active tab gets aria-selected="true"; style it
+       with aria-selected:… utilities. Each shown panel fires 'dds:panel-shown' (charts
+       and tables inside a hidden panel use it to size themselves). */
+    DDS.tabs.panels = function (bar) {
+        if (!bar || bar.__ddsPanels) return;
+        bar.__ddsPanels = true;
+        var param = bar.getAttribute('data-dds-panels');
+        var tabs = bar.querySelectorAll('[data-dds-panel-tab]');
+        if (!tabs.length) return;
+        var fallback = tabs[0].getAttribute('data-dds-panel-tab');
+
+        function activate(mode) {
+            var known = false;
+            tabs.forEach(function (t) { if (t.getAttribute('data-dds-panel-tab') === mode) known = true; });
+            if (!known) mode = fallback;
+            tabs.forEach(function (t) {
+                t.setAttribute('role', 'tab');
+                t.setAttribute('aria-selected', t.getAttribute('data-dds-panel-tab') === mode ? 'true' : 'false');
+            });
+            document.querySelectorAll('[data-dds-panel-for="' + param + '"]').forEach(function (p) {
+                var on = p.getAttribute('data-dds-panel') === mode;
+                p.hidden = !on;
+                if (on) p.dispatchEvent(new CustomEvent('dds:panel-shown', { bubbles: true }));
+            });
+        }
+
+        var link = DDS.tabs.deeplink(param, activate);
+        bar.addEventListener('click', function (e) {
+            var tab = e.target.closest('[data-dds-panel-tab]');
+            if (!tab || !bar.contains(tab)) return;
+            e.preventDefault();
+            link.go(tab.getAttribute('data-dds-panel-tab'));
+        });
+        activate(link.initial || fallback);
+    };
+
+    /* ── Charts: the ONE Chart.js configuration (line / area / stacked bar) ──────
+       Pages pass data, never Chart.js options:
+         DDS.chart(canvas, {
+           type: 'line' | 'area' | 'bar',       // bar = stacked
+           labels: ['08-24', …],
+           series: [{ name: 'New patient', data: [..], color: '#6b9bd1' }, …],
+           format: 'number' | 'percent',        // y axis + tooltip (DDS.fmt)
+           max: 100                             // optional fixed y max
+         });
+       With no data points the chart keeps its frame and shows an empty-state note, so a
+       page renders the same shape before and after its data source is connected.
+       Needs Chart.js 4 on the page (the x-front-desk.chart component loads it once). */
+    DDS.chart = function (canvas, spec) {
+        if (!canvas || !window.Chart) return null;
+        spec = spec || {};
+        var series = spec.series || [];
+        var labels = spec.labels || [];
+        var isBar = spec.type === 'bar';
+        var fmt = spec.format === 'percent'
+            ? function (v) { return DDS.fmt.percent(v, 0); }
+            : DDS.fmt.number;
+        var hasData = labels.length > 0 && series.some(function (s) {
+            return (s.data || []).some(function (v) { return v !== null && v !== undefined; });
+        });
+
+        if (canvas.__ddsChart) canvas.__ddsChart.destroy();
+
+        var datasets = series.map(function (s) {
+            return {
+                label: s.name,
+                data: s.data || [],
+                borderColor: s.color,
+                backgroundColor: isBar ? s.color : (spec.type === 'area' ? s.color + '33' : s.color),
+                fill: spec.type === 'area' ? 'origin' : false,
+                borderWidth: isBar ? 0 : 1.75,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                maxBarThickness: 22
+            };
+        });
+
+        var grid = { color: '#e2e8f0', borderDash: [3, 3], drawTicks: false };
+        canvas.__ddsChart = new window.Chart(canvas, {
+            type: isBar ? 'bar' : 'line',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        align: 'start',
+                        labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, font: { size: 10 }, color: '#64748b' }
+                    },
+                    tooltip: { callbacks: { label: function (c) { return ' ' + c.dataset.label + ': ' + fmt(c.parsed.y); } } }
+                },
+                scales: {
+                    x: { stacked: isBar, grid: grid, border: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8', maxRotation: 0, autoSkipPadding: 12 } },
+                    y: {
+                        stacked: isBar,
+                        beginAtZero: true,
+                        min: 0,
+                        max: spec.max,
+                        grid: grid,
+                        border: { display: false },
+                        ticks: { font: { size: 10 }, color: '#94a3b8', maxTicksLimit: 5, callback: function (v) { return fmt(v); } }
+                    }
+                }
+            }
+        });
+
+        var host = canvas.parentNode;
+        var note = host.querySelector('[data-dds-chart-empty]');
+        if (!hasData && !note) {
+            note = document.createElement('div');
+            note.setAttribute('data-dds-chart-empty', '');
+            note.className = 'absolute inset-0 flex items-center justify-center text-[11px] font-medium text-slate-400 pointer-events-none';
+            note.textContent = spec.emptyText || 'No data yet';
+            host.appendChild(note);
+        } else if (hasData && note) {
+            note.remove();
+        }
+        return canvas.__ddsChart;
+    };
+
     /* ── Location multi-select (canonical behavior for <x-location-picker>) ─────────
        Checkbox changes are a draft; nothing is emitted until Apply. Closing the menu without
        applying restores the last applied selection. At least one location must stay selected.
@@ -940,6 +1072,7 @@
     // Auto-init any declarative tab bars, location pickers, and every sortable table, on load.
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('[data-dds-tabs]').forEach(function (n) { DDS.tabs.init(n); });
+        document.querySelectorAll('[data-dds-panels]').forEach(function (n) { DDS.tabs.panels(n); });
         DDS.locationPicker.initAll(document);
         DDS.sortableAll(document);
     });

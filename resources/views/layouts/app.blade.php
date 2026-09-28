@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>DDS Manager Multi-Location Dental Engine</title>
+    <title>Marcelo Analytics Multi-Location Dental Engine</title>
+    <link rel="icon" type="image/png" href="{{ asset('public/images/logo-mark.png') }}">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://cdn.tailwindcss.com/3.4.17" rel="stylesheet">
@@ -32,10 +33,9 @@
             <div class="overflow-y-auto flex-1 chunk-scrollbar">
                 <div
                     class="h-16 flex items-center justify-between px-6 border-b border-slate-200 sticky top-0 bg-white z-10">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="bar-chart-big" class="text-blue-600 w-6 h-6"></i>
-                        <span class="font-bold text-lg tracking-tight text-slate-900">DDS Manager</span>
-                    </div>
+                    <a href="{{ route('dashboard') }}" class="flex items-center">
+                        <img src="{{ asset('public/images/logo.png') }}" alt="Marcelo Analytics" class="h-9 w-auto">
+                    </a>
                     <button id="close-menu-btn"
                         class="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 focus:outline-none">
                         <i data-lucide="x" class="w-5 h-5"></i>

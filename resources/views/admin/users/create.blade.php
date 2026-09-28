@@ -54,7 +54,7 @@
                         <label for="email" class="block font-bold text-slate-700 text-xs">
                             Email Address <span class="text-rose-500">*</span>
                         </label>
-                        <input type="email" id="email" name="email" value="{{ old('email') }}" placeholder="jane.doe@dds-manager.local"
+                        <input type="email" id="email" name="email" value="{{ old('email') }}" placeholder="jane.doe@marcelo.local"
                             class="app-input w-full text-xs" required>
                     </div>
 

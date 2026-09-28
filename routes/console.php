@@ -87,6 +87,27 @@ foreach ($schedulerWorkers > 0 ? range(1, $schedulerWorkers) : [] as $worker) {
 }
 
 /*
+| AI Website Builder worker (Growth Engine). Its own queue so a multi-minute page
+| generation never delays OpenDental syncs; exits when the queue is empty. Follows the
+| host mode above: where the scheduler can't keep background workers alive, drain the
+| site-builder queue from the same cron line that runs the sync worker.
+*/
+if ($syncQueue['scheduler_starts_workers'] && config('site_builder.queue.scheduler_starts_worker', true)) {
+    $siteBuilderTimeout = (int) config('site_builder.job_timeout', 960);
+    Schedule::command(sprintf(
+        'queue:work %s --queue=%s --name=site-builder-worker --stop-when-empty --max-time=%d --timeout=%d --tries=2 --sleep=3 --memory=256',
+        config('site_builder.queue.connection', 'site-builder'),
+        config('site_builder.queue.name', 'site-builder'),
+        240,
+        $siteBuilderTimeout,
+    ))
+        ->everyMinute()
+        ->withoutOverlapping((int) ceil((240 + $siteBuilderTimeout) / 60))
+        ->runInBackground()
+        ->onOneServer();
+}
+
+/*
 | Date-range backfills requested from the Sync Manager UI.
 */
 $inBackground(Schedule::command('sync:process-pending')->everyTenMinutes()->withoutOverlapping(20)->onOneServer());

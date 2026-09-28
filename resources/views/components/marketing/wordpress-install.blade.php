@@ -7,18 +7,7 @@
 @props(['siteKey', 'scriptUrl'])
 
 @php
-    $snippet = "<!-- DDS Growth Engine -->\n"
-        ."<script>\n"
-        ."  (function (w, d, k) {\n"
-        ."    w.ddsq = w.ddsq || [];\n"
-        ."    w.dds = w.dds || function () { w.ddsq.push(arguments); };\n"
-        ."    var s = d.createElement('script');\n"
-        ."    s.async = 1;\n"
-        ."    s.src = '{$scriptUrl}';\n"
-        ."    s.dataset.key = k;\n"
-        ."    d.head.appendChild(s);\n"
-        ."  })(window, document, '{$siteKey}');\n"
-        ."</script>";
+    $snippet = \App\Models\MarketingSite::snippetFor($siteKey, $scriptUrl);
 
     $functionsPhp = "add_action('wp_head', function () { ?>\n"
         .$snippet."\n"

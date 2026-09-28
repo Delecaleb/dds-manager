@@ -40,6 +40,31 @@ class MarketingSite extends Model
         return preg_replace('/^www\./', '', $domain) ?? $domain;
     }
 
+    /**
+     * The install snippet for this site: the ONE definition, used by the Tracking Script
+     * page, the WordPress instructions and sites built by the AI Website Builder.
+     */
+    public function trackingSnippet(?string $scriptUrl = null): string
+    {
+        return self::snippetFor($this->site_key, $scriptUrl ?? route('tracking.script'));
+    }
+
+    public static function snippetFor(string $siteKey, string $scriptUrl): string
+    {
+        return "<!-- DDS Growth Engine -->\n"
+            ."<script>\n"
+            ."  (function (w, d, k) {\n"
+            ."    w.ddsq = w.ddsq || [];\n"
+            ."    w.dds = w.dds || function () { w.ddsq.push(arguments); };\n"
+            ."    var s = d.createElement('script');\n"
+            ."    s.async = 1;\n"
+            ."    s.src = '{$scriptUrl}';\n"
+            ."    s.dataset.key = k;\n"
+            ."    d.head.appendChild(s);\n"
+            ."  })(window, document, '{$siteKey}');\n"
+            .'</script>';
+    }
+
     public function isVerified(): bool
     {
         return $this->verified_at !== null;

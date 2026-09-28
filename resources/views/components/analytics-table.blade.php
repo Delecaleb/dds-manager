@@ -23,28 +23,7 @@
 ])
 
 @php
-    if (!function_exists('ops_fmt')) {
-        function ops_fmt($value, string $type): string
-        {
-            if ($value === null) return '—';
-            if ($value === '--') return '--';
-            switch ($type) {
-                case 'money':
-                    $v = (float) $value;
-                    if ($v == 0) return '$ 0';
-                    $abs = number_format(abs($v), 2);
-                    return $v < 0 ? "$ ($abs)" : "$ $abs";
-                case 'percent': return number_format((float) $value, 2) . '%';
-                case 'number_3': return number_format((float) $value, 3);
-                case 'number_2': return number_format((float) $value, 2);
-                case 'number':
-                    $v = (float) $value;
-                    return floor($v) == $v ? number_format($v) : number_format($v, 2);
-                case 'html': return $value;
-                default: return e($value);
-            }
-        }
-    }
+    // ops_fmt() lives in app/Support/helpers.php (Composer-autoloaded) so every view shares it.
     if (!function_exists('ops_heat_class')) {
         function ops_heat_class(array $heat, string $key, $value): string
         {
