@@ -43,18 +43,7 @@
 
         @forelse($sites as $site)
             @php
-                $snippet = "<!-- DDS Growth Engine -->\n"
-                    ."<script>\n"
-                    ."  (function (w, d, k) {\n"
-                    ."    w.ddsq = w.ddsq || [];\n"
-                    ."    w.dds = w.dds || function () { w.ddsq.push(arguments); };\n"
-                    ."    var s = d.createElement('script');\n"
-                    ."    s.async = 1;\n"
-                    ."    s.src = '{$scriptUrl}';\n"
-                    ."    s.dataset.key = k;\n"
-                    ."    d.head.appendChild(s);\n"
-                    ."  })(window, document, '{$site->site_key}');\n"
-                    ."</script>";
+                $snippet = $site->trackingSnippet($scriptUrl);
             @endphp
 
             <x-marketing.panel :title="$site->name" :subtitle="$site->domain" icon="code">

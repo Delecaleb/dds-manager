@@ -155,14 +155,16 @@ class QueueHealthService
 
     /**
      * Every row of the jobs table (all queues, so jobs parked on a queue no
-     * worker reads show up too), oldest first.
+     * worker reads show up too), oldest first. Queues that have a worker of their
+     * own (the AI Website Builder's) are not sync jobs and are left out.
      *
      * @return array{rows: list<array<string, mixed>>, total: int, truncated: bool}
      */
     private function queuedJobs(): array
     {
         $connection = config('queue.connections.'.config('sync.queue.connection'), []);
-        $query = DB::connection($connection['connection'] ?? null)->table($connection['table'] ?? 'jobs');
+        $query = DB::connection($connection['connection'] ?? null)->table($connection['table'] ?? 'jobs')
+            ->whereNotIn('queue', [config('site_builder.queue.name', 'site-builder')]);
 
         $total = (clone $query)->count();
         $rows = [];

@@ -2,6 +2,12 @@
 
 namespace App\Providers;
 
+use Anthropic\Client as AnthropicClient;
+use App\Domain\FrontDesk\FrontDeskSource;
+use App\Domain\SiteBuilder\ClaudeSiteContentGenerator;
+use App\Domain\SiteBuilder\SiteContentGenerator;
+use App\Domain\SiteBuilder\SitePrompts;
+use App\Domain\FrontDesk\FrontDeskSourceResolver;
 use App\Domain\Support\ClinicRegistry;
 use App\Models\User;
 use App\Services\Sync\QueueHealthService;
@@ -23,6 +29,18 @@ class AppServiceProvider extends ServiceProvider
     {
         // Single, request-scoped clinic identity map (multi-office source of truth).
         $this->app->scoped(ClinicRegistry::class);
+
+        // AI Front Desk data source for this request (empty until a call platform is connected).
+        $this->app->bind(FrontDeskSource::class, fn ($app) => $app->make(FrontDeskSourceResolver::class)->forRequest($app['request']));
+
+        // AI Website Builder: site content comes from Claude (config/site_builder.php).
+        $this->app->bind(SiteContentGenerator::class, fn ($app) => new ClaudeSiteContentGenerator(
+            client: new AnthropicClient(apiKey: config('site_builder.api_key') ?: null),
+            prompts: $app->make(SitePrompts::class),
+            model: (string) config('site_builder.model'),
+            maxTokens: (int) config('site_builder.max_tokens'),
+            timeout: (float) config('site_builder.request_timeout'),
+        ));
     }
 
     /**

@@ -11,15 +11,21 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * Growth Engine — the marketing module.
+ * Growth Engine — the hub, plus its Marketing umbrella.
  *
  * Website tracking (Websites, Visitor Journeys, Tracking Script) reads its numbers from
  * WebsiteAnalyticsService; the remaining pages are still page structure awaiting their
- * data sources.
+ * data sources. The AI Front Desk umbrella lives in FrontDeskController.
  */
 class MarketingController extends Controller
 {
+    /** Growth Engine hub: one card per umbrella (Marketing, AI Front Desk). */
     public function index(): View
+    {
+        return view('marketing.hub');
+    }
+
+    public function overview(): View
     {
         return view('marketing.overview');
     }

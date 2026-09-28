@@ -56,6 +56,17 @@ return [
             'after_commit' => false,
         ],
 
+        // AI Website Builder jobs (see config/site_builder.php). One page can take
+        // several minutes, so retry_after must exceed site_builder.job_timeout.
+        'site-builder' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => env('SITE_BUILDER_QUEUE', 'site-builder'),
+            'retry_after' => (int) env('SITE_BUILDER_QUEUE_RETRY_AFTER', 1200),
+            'after_commit' => true,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

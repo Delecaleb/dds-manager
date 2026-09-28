@@ -1,5 +1,5 @@
 /* ============================================================================
-   DDS Manager — shared UI stylesheet (single source of truth for component CSS)
+   Marcelo Analytics — shared UI stylesheet (single source of truth for component CSS)
    Loaded once in layouts/app.blade.php. No build step (served statically).
    Canonical look = the Operations analytics table (teal accent, heatmap, sticky).
    ============================================================================ */

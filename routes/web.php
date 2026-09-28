@@ -7,10 +7,13 @@ use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepositSlipController;
 use App\Http\Controllers\FinancialController;
+use App\Http\Controllers\FrontDeskController;
+use App\Http\Controllers\FrontDeskOfficeController;
 use App\Http\Controllers\FrontOfficeController;
 use App\Http\Controllers\HygieneRecallController;
 use App\Http\Controllers\KpisController;
 use App\Http\Controllers\MarketingController;
+use App\Http\Controllers\SiteBuilderController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\OpenDentalExplorerController;
 use App\Http\Controllers\OperationsController;
@@ -138,6 +141,7 @@ Route::middleware('auth')->group(function () {
     // Marketing Module — "Growth Engine". Runs as its own app: own shell, own nav.
     Route::middleware('module:marketing')->prefix('marketing')->name('marketing.')->group(function () {
         Route::get('/', [MarketingController::class, 'index'])->name('index');
+        Route::get('overview', [MarketingController::class, 'overview'])->name('overview');
         Route::get('funnel', [MarketingController::class, 'funnel'])->name('funnel');
         Route::get('websites', [MarketingController::class, 'websites'])->name('websites');
         Route::get('journeys', [MarketingController::class, 'journeys'])->name('journeys');
@@ -151,6 +155,45 @@ Route::middleware('auth')->group(function () {
         Route::get('alerts', [MarketingController::class, 'alerts'])->name('alerts');
         Route::get('integrations', [MarketingController::class, 'integrations'])->name('integrations');
         Route::get('settings', [MarketingController::class, 'settings'])->name('settings');
+
+        // AI Front Desk umbrella — call answering, booking and intake.
+        // AI Website Builder umbrella — brief in, generated static site out.
+        Route::prefix('site-builder')->name('site-builder.')->controller(SiteBuilderController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('create', 'create')->name('create');
+            Route::post('/', 'store')->name('store');
+            Route::get('{build}', 'show')->name('show');
+            Route::get('{build}/edit', 'edit')->name('edit');
+            Route::put('{build}', 'update')->name('update');
+            Route::delete('{build}', 'destroy')->name('destroy');
+            Route::post('{build}/generate', 'generate')->name('generate');
+
+            Route::scopeBindings()->prefix('{build}/versions/{version}')->group(function () {
+                Route::get('status', 'status')->name('status');
+                Route::get('download', 'download')->name('download');
+                Route::post('pages/regenerate', 'regeneratePage')->name('regenerate-page');
+                Route::get('preview/{file?}', 'preview')->where('file', '.*')->name('preview');
+            });
+        });
+
+        // Organization level (every office) and office level ({location} = ClinicRegistry key).
+        Route::prefix('front-desk')->name('front-desk.')->group(function () {
+            Route::get('/', [FrontDeskController::class, 'index'])->name('index');
+            Route::get('analytics', [FrontDeskController::class, 'analytics'])->name('analytics');
+            Route::get('offices', [FrontDeskController::class, 'offices'])->name('offices');
+
+            Route::prefix('offices/{location}')->name('office.')->where(['location' => '[0-9]+(:[0-9]+)?'])
+                ->controller(FrontDeskOfficeController::class)->group(function () {
+                    Route::get('/', 'home')->name('home');
+                    Route::get('calls', 'calls')->name('calls');
+                    Route::get('messages', 'messages')->name('messages');
+                    Route::get('schedule', 'schedule')->name('schedule');
+                    Route::get('analytics', 'analytics')->name('analytics');
+                    Route::get('workflows', 'workflows')->name('workflows');
+                    Route::get('online-bookings', 'bookings')->name('bookings');
+                    Route::get('settings/{section?}', 'settings')->name('settings');
+                });
+        });
     });
 
     // Provider Portal Module

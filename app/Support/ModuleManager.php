@@ -5,7 +5,7 @@ namespace App\Support;
 class ModuleManager
 {
     /**
-     * System roles available in DDS Manager.
+     * System roles available in Marcelo Analytics.
      */
     public const ROLES = [
         'super_admin' => [
