@@ -18,6 +18,13 @@ abstract class BaseQuerySyncService
 {
     use DetectsConcurrencyErrors;
 
+    /**
+     * MySQL rejects a prepared statement with more than 65,535 placeholders
+     * (error 1390). Wide tables (procedurelog: ~70 columns) exceed it at
+     * 1,000 rows, so a batch is written in chunks that stay well under it.
+     */
+    private const MAX_UPSERT_PLACEHOLDERS = 45000;
+
     protected ?Office $office = null;
 
     protected int $batchSize = 1000;
@@ -670,38 +677,44 @@ abstract class BaseQuerySyncService
             $rowsToUpsert = array_values($preparedRows);
             $updateColumns = array_keys($updateKeys);
 
-            try {
-                // High-performance single multi-row UPSERT query
-                $this->retryOnLockContention(
-                    fn () => DB::table($tableName)->upsert($rowsToUpsert, ['office_id', $pk], $updateColumns)
-                );
-            } catch (QueryException $e) {
-                // Lock contention that outlived its retries is a real failure;
-                // the queue backoff retries the whole batch later.
-                if ($this->causedByConcurrencyError($e)) {
-                    throw $e;
-                }
+            $columnCount = max(1, max(array_map('count', $rowsToUpsert)));
+            $chunkSize = max(1, intdiv(self::MAX_UPSERT_PLACEHOLDERS, $columnCount));
 
-                // Row-level fallback for data a multi-row upsert rejects.
-                // Logged so a recurring data problem is visible, not silent.
-                Log::warning("Bulk upsert failed for {$this->module()}; falling back to per-row writes.", [
-                    'table' => $tableName,
-                    'rows' => count($rowsToUpsert),
-                    'error' => $e->getMessage(),
-                ]);
-
-                $this->retryOnLockContention(fn () => DB::transaction(function () use ($tableName, $rowsToUpsert, $pk, $officeId) {
-                    foreach ($rowsToUpsert as $cleanRow) {
-                        $matchCond = [
-                            'office_id' => $officeId,
-                            $pk => $cleanRow[$pk],
-                        ];
-                        $updateData = $cleanRow;
-                        unset($updateData['office_id'], $updateData[$pk]);
-
-                        DB::table($tableName)->updateOrInsert($matchCond, $updateData);
+            foreach (array_chunk($rowsToUpsert, $chunkSize) as $chunk) {
+                try {
+                    // High-performance multi-row UPSERT query
+                    $this->retryOnLockContention(
+                        fn () => DB::table($tableName)->upsert($chunk, ['office_id', $pk], $updateColumns)
+                    );
+                } catch (QueryException $e) {
+                    // Lock contention that outlived its retries is a real failure;
+                    // the queue backoff retries the whole batch later.
+                    if ($this->causedByConcurrencyError($e)) {
+                        throw $e;
                     }
-                }));
+
+                    // Row-level fallback for data a multi-row upsert rejects.
+                    // Logged so a recurring data problem is visible, not silent.
+                    // The message embeds the full SQL, so it is truncated.
+                    Log::warning("Bulk upsert failed for {$this->module()}; falling back to per-row writes.", [
+                        'table' => $tableName,
+                        'rows' => count($chunk),
+                        'error' => mb_substr($e->getMessage(), 0, 1000),
+                    ]);
+
+                    $this->retryOnLockContention(fn () => DB::transaction(function () use ($tableName, $chunk, $pk, $officeId) {
+                        foreach ($chunk as $cleanRow) {
+                            $matchCond = [
+                                'office_id' => $officeId,
+                                $pk => $cleanRow[$pk],
+                            ];
+                            $updateData = $cleanRow;
+                            unset($updateData['office_id'], $updateData[$pk]);
+
+                            DB::table($tableName)->updateOrInsert($matchCond, $updateData);
+                        }
+                    }));
+                }
             }
 
             $log->increment('total_processed', count($rowsToUpsert));
