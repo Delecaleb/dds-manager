@@ -21,9 +21,9 @@ abstract class BaseQuerySyncService
     /**
      * MySQL rejects a prepared statement with more than 65,535 placeholders
      * (error 1390). Wide tables (procedurelog: ~70 columns) exceed it at
-     * 1,000 rows, so a batch is written in chunks that stay under this.
+     * 1,000 rows, so a batch is written in chunks that stay well under it.
      */
-    private const MAX_UPSERT_PLACEHOLDERS = 60000;
+    private const MAX_UPSERT_PLACEHOLDERS = 45000;
 
     protected ?Office $office = null;
 
