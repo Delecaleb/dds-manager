@@ -158,6 +158,12 @@
                             <span class="text-xs font-bold text-slate-900">{{ auth()->user()->name }}</span>
                             <span class="text-[10px] text-slate-500">{{ auth()->user()->getRoleName() }}</span>
                         </div>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Log Out">
+                                <i data-lucide="log-out" class="w-4 h-4"></i>
+                            </button>
+                        </form>
                     </div>
                 </div>
             </header>
