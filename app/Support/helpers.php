@@ -46,3 +46,29 @@ if (! function_exists('ops_fmt')) {
         }
     }
 }
+
+if (! function_exists('ops_heat_class')) {
+    /**
+     * Heatmap CSS class resolver for analytics tables.
+     */
+    function ops_heat_class(array $heat, string $key, $value): string
+    {
+        if ($value === null || $value === '--' || ! isset($heat[$key])) {
+            return '';
+        }
+        $h = $heat[$key];
+        $v = (float) $value;
+        [$top, $bottom, $mid] = ['dds-heat-top', 'dds-heat-bottom', 'dds-heat-mid'];
+        if ($h['invert']) {
+            [$top, $bottom] = [$bottom, $top];
+        }
+        if ($v >= $h['p80']) {
+            return $top;
+        }
+        if ($v <= $h['p20']) {
+            return $bottom;
+        }
+
+        return $mid;
+    }
+}

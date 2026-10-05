@@ -4,10 +4,10 @@ namespace App\Providers;
 
 use Anthropic\Client as AnthropicClient;
 use App\Domain\FrontDesk\FrontDeskSource;
+use App\Domain\FrontDesk\FrontDeskSourceResolver;
 use App\Domain\SiteBuilder\ClaudeSiteContentGenerator;
 use App\Domain\SiteBuilder\SiteContentGenerator;
 use App\Domain\SiteBuilder\SitePrompts;
-use App\Domain\FrontDesk\FrontDeskSourceResolver;
 use App\Domain\Support\ClinicRegistry;
 use App\Models\User;
 use App\Services\Sync\QueueHealthService;
@@ -27,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        require_once app_path('Support/helpers.php');
+
         // Single, request-scoped clinic identity map (multi-office source of truth).
         $this->app->scoped(ClinicRegistry::class);
 

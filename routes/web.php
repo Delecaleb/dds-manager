@@ -10,10 +10,10 @@ use App\Http\Controllers\FinancialController;
 use App\Http\Controllers\FrontDeskController;
 use App\Http\Controllers\FrontDeskOfficeController;
 use App\Http\Controllers\FrontOfficeController;
+use App\Http\Controllers\GoogleAdsController;
 use App\Http\Controllers\HygieneRecallController;
 use App\Http\Controllers\KpisController;
 use App\Http\Controllers\MarketingController;
-use App\Http\Controllers\SiteBuilderController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\OpenDentalExplorerController;
 use App\Http\Controllers\OperationsController;
@@ -21,6 +21,7 @@ use App\Http\Controllers\PatientController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProviderPortalController;
 use App\Http\Controllers\RcmController;
+use App\Http\Controllers\SiteBuilderController;
 use App\Http\Controllers\SyncManagerController;
 use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\TxMinerController;
@@ -28,7 +29,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return auth()->check()
-        ? redirect()->route('dashboard')
+        ? redirect()->route(auth()->user()->homeRoute())
         : redirect()->route('login');
 });
 
@@ -155,6 +156,14 @@ Route::middleware('auth')->group(function () {
         Route::get('alerts', [MarketingController::class, 'alerts'])->name('alerts');
         Route::get('integrations', [MarketingController::class, 'integrations'])->name('integrations');
         Route::get('settings', [MarketingController::class, 'settings'])->name('settings');
+
+        // Google Ads connection. The callback URL is registered on the Google OAuth client.
+        Route::prefix('integrations/google-ads')->name('google-ads.')->controller(GoogleAdsController::class)->group(function () {
+            Route::get('connect', 'connect')->name('connect');
+            Route::get('callback', 'callback')->name('callback');
+            Route::delete('/', 'disconnect')->name('disconnect');
+            Route::patch('accounts/{account}', 'updateAccount')->name('accounts.update');
+        });
 
         // AI Front Desk umbrella — call answering, booking and intake.
         // AI Website Builder umbrella — brief in, generated static site out.

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Route;
 
 class User extends Authenticatable
 {
@@ -124,6 +125,24 @@ class User extends Authenticatable
         }
 
         return $this->modules()->pluck('module_key')->all();
+    }
+
+    /**
+     * Route name of the user's landing page: the first module they can access, in
+     * ModuleManager order (so Dashboard wins when permitted). Users with no modules
+     * land on their profile, the only page that needs no module permission.
+     */
+    public function homeRoute(): string
+    {
+        $accessible = $this->is_active ? $this->getAccessibleModuleKeys() : [];
+
+        foreach (ModuleManager::all() as $key => $meta) {
+            if (in_array($key, $accessible, true) && Route::has($meta['route'])) {
+                return $meta['route'];
+            }
+        }
+
+        return 'profile.edit';
     }
 
     /**

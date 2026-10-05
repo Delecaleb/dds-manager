@@ -33,7 +33,7 @@
             <div class="overflow-y-auto flex-1 chunk-scrollbar">
                 <div
                     class="h-16 flex items-center justify-between px-6 border-b border-slate-200 sticky top-0 bg-white z-10">
-                    <a href="{{ route('dashboard') }}" class="flex items-center">
+                    <a href="{{ route(auth()->user()->homeRoute()) }}" class="flex items-center">
                         <img src="{{ asset('public/images/logo.png') }}" alt="Marcelo Analytics" class="h-9 w-auto">
                     </a>
                     <button id="close-menu-btn"
