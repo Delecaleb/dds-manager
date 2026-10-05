@@ -4,7 +4,67 @@
 
     <div class="p-6 space-y-6 max-w-[1500px]">
 
-        <x-marketing.panel title="Connections" subtitle="Nothing is connected yet — each row lists what it needs" icon="plug">
+        <x-marketing.flash />
+
+        @php
+            $googleAdsConnected = $googleAds?->isUsable() ?? false;
+        @endphp
+
+        <x-marketing.panel title="Google Ads" subtitle="Read-only: campaigns, spend, clicks and conversions per ad account" icon="search">
+            <div class="flex flex-wrap items-start justify-between gap-4 text-xs text-slate-600">
+                <div class="space-y-2 min-w-0">
+                    <div class="flex items-center gap-2">
+                        @if ($googleAdsConnected && $googleAds->status === \App\Models\MarketingAdConnection::STATUS_ERROR)
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">Needs attention</span>
+                        @elseif ($googleAdsConnected)
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700">Connected</span>
+                        @else
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-500">Not connected</span>
+                        @endif
+
+                        @if ($googleAdsConnected)
+                            <span>{{ $googleAds->accounts_count }} account(s) ·
+                                {{ $googleAds->last_synced_at ? 'last synced '.$googleAds->last_synced_at->diffForHumans() : 'not synced yet' }}</span>
+                        @endif
+                    </div>
+
+                    @if ($googleAds?->last_error)
+                        <p class="text-amber-700">{{ $googleAds->last_error }}</p>
+                    @endif
+
+                    @if ($googleAdsMissing !== [])
+                        <p class="text-amber-700">Set on the server before connecting: <code class="text-[10px]">{{ implode(', ', $googleAdsMissing) }}</code></p>
+                    @endif
+
+                    <p>
+                        OAuth redirect URI to register on the Google Cloud OAuth client:
+                        <code class="text-[10px] break-all select-all">{{ $googleAdsCallbackUrl }}</code>
+                    </p>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                    @if ($googleAdsConnected)
+                        <form method="POST" action="{{ route('marketing.google-ads.disconnect') }}"
+                            onsubmit="return confirm('Disconnect Google Ads? Imported campaign history is kept.');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50">
+                                Disconnect
+                            </button>
+                        </form>
+                    @endif
+
+                    @if ($googleAdsMissing === [])
+                        <a href="{{ route('marketing.google-ads.connect') }}"
+                            class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-[#00bfa5] text-white bg-[#00bfa5] hover:opacity-90">
+                            {{ $googleAdsConnected ? 'Reconnect' : 'Connect' }}
+                        </a>
+                    @endif
+                </div>
+            </div>
+        </x-marketing.panel>
+
+        <x-marketing.panel title="Connections" subtitle="Still to be connected — each row lists what it needs" icon="plug">
             <div class="overflow-x-auto">
                 <table class="dds-table w-full text-left text-xs whitespace-nowrap">
                     <thead>
@@ -18,7 +78,6 @@
                     </thead>
                     <tbody>
                         @foreach ([
-                            ['Google Ads', 'Campaign spend, clicks, and budget changes', 'Read + write, per ad account'],
                             ['Meta Marketing', 'Facebook and Instagram campaigns and lead forms', 'Read + write, per ad account'],
                             ['Google Business Profile', 'Calls, messages and direction requests from the map pack', 'Read'],
                             ['Twilio', 'Tracked numbers, lead texts and calls', 'Messaging + voice, one number per campaign'],

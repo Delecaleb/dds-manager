@@ -157,6 +157,16 @@ $inBackground(Schedule::command('snapshot:daily-schedule --future-days=60')
     ->onOneServer());
 
 /*
+| GOOGLE ADS (Growth Engine) — campaigns and daily stats for the connected ad accounts.
+| Runs outside the OpenDental sync queue so ad reporting never waits on, or delays, a sync.
+| Exits immediately when Google Ads is not connected.
+*/
+$inBackground(Schedule::command('marketing:google-ads-sync')
+    ->everyThreeHours()
+    ->withoutOverlapping(60)
+    ->onOneServer());
+
+/*
 | HARD-DELETE PRUNING — OpenDental hard-deletes rows, which incremental syncs never see.
 | Each entry only queues one PruneOfficeTable job per office × table (see config sync.prune).
 |  - Rolling (last 7 days + next 90): 07:00 on the priority queue so it finishes before the 08:00

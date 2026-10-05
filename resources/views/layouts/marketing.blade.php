@@ -111,7 +111,7 @@
             @endif
 
             <div class="p-3 border-t border-slate-200">
-                <a href="{{ route('dashboard') }}"
+                <a href="{{ route(auth()->user()->homeRoute()) }}"
                     class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
                     <img src="{{ asset('public/images/logo-mark.png') }}" alt="" class="w-5 h-5">
                     <span>Back to Marcelo Analytics</span>

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Marketing\GoogleAds\GoogleAdsOAuth;
 use App\Domain\Marketing\WebsiteAnalyticsService;
+use App\Models\MarketingAdConnection;
 use App\Models\MarketingSite;
 use App\Models\Office;
 use Illuminate\Contracts\View\View;
@@ -143,9 +145,13 @@ class MarketingController extends Controller
         return view('marketing.alerts');
     }
 
-    public function integrations(): View
+    public function integrations(GoogleAdsOAuth $googleAdsOAuth): View
     {
-        return view('marketing.integrations');
+        return view('marketing.integrations', [
+            'googleAds' => MarketingAdConnection::googleAds()?->loadCount('accounts'),
+            'googleAdsMissing' => $googleAdsOAuth->missingSettings(),
+            'googleAdsCallbackUrl' => $googleAdsOAuth->redirectUri(),
+        ]);
     }
 
     public function settings(): View

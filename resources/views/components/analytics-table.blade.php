@@ -23,19 +23,9 @@
 ])
 
 @php
-    // ops_fmt() lives in app/Support/helpers.php (Composer-autoloaded) so every view shares it.
-    if (!function_exists('ops_heat_class')) {
-        function ops_heat_class(array $heat, string $key, $value): string
-        {
-            if ($value === null || $value === '--' || !isset($heat[$key])) return '';
-            $h = $heat[$key];
-            $v = (float) $value;
-            [$top, $bottom, $mid] = ['dds-heat-top', 'dds-heat-bottom', 'dds-heat-mid'];
-            if ($h['invert']) { [$top, $bottom] = [$bottom, $top]; }
-            if ($v >= $h['p80']) return $top;
-            if ($v <= $h['p20']) return $bottom;
-            return $mid;
-        }
+    // ops_fmt() and ops_heat_class() live in app/Support/helpers.php
+    if (! function_exists('ops_fmt')) {
+        require_once app_path('Support/helpers.php');
     }
 
     $columns = $spec['columns'];
