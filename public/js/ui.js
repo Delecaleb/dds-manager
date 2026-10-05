@@ -30,6 +30,21 @@
             var n = parseFloat(v);
             if (isNaN(n)) return '—';
             return Math.floor(n) === n ? n.toLocaleString('en-US') : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        },
+        // Escape free text (names, emails, notes) for use inside a DataTables render / innerHTML.
+        text: function (v) {
+            if (v === null || v === undefined || v === '') return '—';
+            return String(v).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        },
+        // US phone: 10 digits -> (313) 555-0199; anything else is shown as stored, escaped.
+        phone: function (v) {
+            if (v === null || v === undefined || String(v).trim() === '') return '—';
+            var d = String(v).replace(/\D/g, '');
+            if (d.length === 11 && d.charAt(0) === '1') d = d.slice(1);
+            if (d.length === 10) return '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6);
+            return DDS.fmt.text(v);
         }
     };
     // Back-compat aliases for the ~4 copy-pasted globals being retired.

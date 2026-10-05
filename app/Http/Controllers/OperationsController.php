@@ -1599,57 +1599,40 @@ class OperationsController extends Controller
             $totals = ['count' => $totalVisits];
 
         } elseif ($metric === 'npt_visit') {
+            // Same source and columns as Financials > New Patient Visits, so the two breakdowns
+            // (and this table's Npt Visits cell, which also comes from newPatientVisits()) agree.
             $title = 'Npt Visits Breakdown';
             $columns = [
                 ['key' => 'pat_id', 'label' => 'Patient ID', 'type' => 'text'],
-                ['key' => 'patient', 'label' => 'Patient', 'type' => 'text'],
-                ['key' => 'visit_days', 'label' => 'Visit Days', 'type' => 'text'],
-                ['key' => 'count', 'label' => '# of Visit', 'type' => 'number', 'agg' => 'sum'],
+                ['key' => 'patient', 'label' => 'Patient Name', 'type' => 'text'],
+                ['key' => 'first_visit', 'label' => 'First Visit Date', 'type' => 'text'],
+                ['key' => 'service_codes', 'label' => 'Service Code', 'type' => 'text'],
+                ['key' => 'production', 'label' => 'Production', 'type' => 'money', 'agg' => 'sum'],
+                ['key' => 'phone', 'label' => 'Phone Number', 'type' => 'text'],
+                ['key' => 'email', 'label' => 'Email Address', 'type' => 'text'],
             ];
 
-            $firstVisitSubQ = $this->patients->firstVisitCohort($officeId);
+            $clinicNums = ($clinicNum !== null) ? [$clinicNum] : [];
+            $provNums = $provNum ? [(int) $provNum] : [];
+            $nptVisits = $this->patientVisits->newPatientVisits($start, $end, $clinicNums, $provNums, $officeId);
 
-            $logsQuery = DB::table('od_procedure_logs as pl')
-                ->joinSub($firstVisitSubQ, 'fv', 'pl.PatNum', '=', 'fv.PatNum')
-                ->where('pl.office_id', $officeId)
-                ->select('pl.PatNum', 'pl.ProcDate')
-                ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereRaw('LEFT(pl.ProcDate, 10) = LEFT(fv.first_date, 10)')
-                ->whereBetween('pl.ProcDate', [$start.' 00:00:00', $end.' 23:59:59']);
-
-            if ($provNum) {
-                $logsQuery->where('pl.ProvNum', $provNum);
-            } elseif ($clinicNum !== null) {
-                $logsQuery->where('pl.ClinicNum', $clinicNum);
-            }
-
-            $logs = $logsQuery->get();
-
-            $patMap = $mapPatients($logs->pluck('PatNum')->unique());
-            $patVisits = [];
-
-            foreach ($logs as $log) {
-                $d = date('Y-m-d', strtotime($log->ProcDate));
-                $patVisits[$log->PatNum][$d] = true;
-            }
-
-            $totalVisits = 0;
-            foreach ($patVisits as $patNum => $days) {
-                $count = count($days);
-                $totalVisits += $count;
+            $totalProduction = 0.0;
+            foreach ($nptVisits as $visit) {
+                $totalProduction += (float) $visit['amount'];
                 $rows[] = [
-                    'pat_id' => $patNum,
+                    'pat_id' => $visit['patient_id'],
                     'patient' => [
-                        'label' => $patMap[$patNum] ?? 'Unknown',
+                        'label' => $visit['patient_name'] ?: 'Unknown',
                         'link' => true,
                     ],
-                    'visit_days' => implode(', ', array_map(function ($d) {
-                        return date('M d, Y', strtotime($d));
-                    }, array_keys($days))),
-                    'count' => $count,
+                    'first_visit' => date('M d, Y', strtotime($visit['dates'])),
+                    'service_codes' => $visit['service_codes'],
+                    'production' => $visit['amount'],
+                    'phone' => ops_fmt($visit['phone'], 'phone'),
+                    'email' => $visit['email'] !== '' ? $visit['email'] : '—',
                 ];
             }
-            $totals = ['count' => $totalVisits];
+            $totals = ['production' => $totalProduction];
 
         } elseif ($metric === 'cancellation') {
             $title = 'Cancellation Breakdown';

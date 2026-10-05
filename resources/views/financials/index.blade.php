@@ -2065,6 +2065,16 @@
                 if (type !== 'display') return val;
                 return fmtMoney(val);
               }
+            },
+            {
+              data: 'phone', title: 'Phone Number', render: function (val, type) {
+                return type === 'display' ? DDS.fmt.phone(val) : (val || '');
+              }
+            },
+            {
+              data: 'email', title: 'Email Address', render: function (val, type) {
+                return type === 'display' ? DDS.fmt.text(val) : (val || '');
+              }
             }
           ];
           openDataTableModal(modalId, 'Financial Breakdown - ' + title, columns, data);
