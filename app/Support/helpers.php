@@ -39,6 +39,20 @@ if (! function_exists('ops_fmt')) {
                 $v = (float) $value;
 
                 return floor($v) == $v ? number_format($v) : number_format($v, 2);
+            case 'phone':
+                // Mirrors DDS.fmt.phone: 10 US digits -> (313) 555-0199, otherwise as stored.
+                $raw = trim((string) $value);
+                if ($raw === '') {
+                    return '—';
+                }
+                $d = preg_replace('/\D/', '', $raw);
+                if (strlen($d) === 11 && $d[0] === '1') {
+                    $d = substr($d, 1);
+                }
+
+                return strlen($d) === 10
+                    ? sprintf('(%s) %s-%s', substr($d, 0, 3), substr($d, 3, 3), substr($d, 6))
+                    : $raw;
             case 'html':
                 return $value;
             default:

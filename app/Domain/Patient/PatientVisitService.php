@@ -165,6 +165,9 @@ class PatientVisitService
             'pc.ProcCode',
             'p.LName',
             'p.FName',
+            'p.WirelessPhone',
+            'p.HmPhone',
+            'p.Email',
         ])->get();
 
         $grouped = [];
@@ -179,6 +182,9 @@ class PatientVisitService
                 $grouped[$pn] = [
                     'patient_id' => $pn,
                     'patient_name' => trim(($r->LName ?? '').', '.($r->FName ?? ''), ', '),
+                    // Mobile first, home phone as fallback — the number the front desk would actually call.
+                    'phone' => trim((string) ($r->WirelessPhone ?: $r->HmPhone ?: '')),
+                    'email' => trim((string) ($r->Email ?? '')),
                     'dates' => substr($firstDate, 0, 10),
                     'service_codes_arr' => [],
                     'amount' => 0.0,
@@ -206,6 +212,8 @@ class PatientVisitService
                 'patient_id' => $g['patient_id'],
                 'office_id' => (int) $officeId,
                 'patient_name' => $g['patient_name'],
+                'phone' => $g['phone'],
+                'email' => $g['email'],
                 'dates' => $g['dates'],
                 'service_codes' => implode(', ', $g['service_codes_arr']),
                 'amount' => round($g['amount'], 2),
