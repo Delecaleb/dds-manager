@@ -7,6 +7,7 @@
     $appName = config('app.name');
     $company = config('legal.company');
     $email = config('legal.contact_email');
+    $support = config('legal.support_email');
     $updated = \Carbon\Carbon::parse(config('legal.privacy_updated'))->format('F j, Y');
 @endphp
 
@@ -187,7 +188,8 @@
             </p>
             <p>
                 <strong>{{ $company }}</strong><br>
-                <a href="mailto:{{ $email }}">{{ $email }}</a>
+                Privacy and legal: <a href="mailto:{{ $email }}">{{ $email }}</a><br>
+                Technical support: <a href="mailto:{{ $support }}">{{ $support }}</a>
             </p>
         </article>
 @endsection
