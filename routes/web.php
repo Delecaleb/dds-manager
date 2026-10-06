@@ -25,16 +25,18 @@ use App\Http\Controllers\SiteBuilderController;
 use App\Http\Controllers\SyncManagerController;
 use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\TxMinerController;
+use App\Support\ModuleManager;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return auth()->check()
         ? redirect()->route(auth()->user()->homeRoute())
-        : redirect()->route('login');
+        : redirect()->route('home');
 });
 
-// Public legal pages. Linked from the sign-in page and from the Google OAuth consent screen,
-// so they must stay reachable without authentication.
+// Public pages. The landing page and legal pages are linked from the sign-in page and from the
+// Google OAuth consent screen, so they must stay reachable without authentication.
+Route::get('home', fn () => view('public.home', ['categories' => ModuleManager::getCategories()]))->name('home');
 Route::view('privacy', 'legal.privacy')->name('privacy');
 Route::view('terms', 'legal.terms')->name('terms');
 

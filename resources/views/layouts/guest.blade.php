@@ -54,7 +54,7 @@
         <div class="w-full max-w-[440px]">
             <div class="bg-white rounded-2xl shadow-2xl shadow-black/40 ring-1 ring-white/10">
                 <div class="flex justify-center px-8 pt-8">
-                    <a href="{{ url('/') }}" aria-label="Marcelo Analytics">
+                    <a href="{{ route('home') }}" aria-label="Marcelo Analytics">
                         <img src="{{ asset('public/images/logo.png') }}" alt="Marcelo Analytics" class="h-11 w-auto">
                     </a>
                 </div>
