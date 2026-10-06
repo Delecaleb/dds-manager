@@ -7,6 +7,7 @@
     $appName = config('app.name');
     $company = config('legal.company');
     $email = config('legal.contact_email');
+    $support = config('legal.support_email');
     $updated = \Carbon\Carbon::parse(config('legal.terms_updated'))->format('F j, Y');
 @endphp
 
@@ -35,7 +36,7 @@
             <ul>
                 <li>You are responsible for keeping your credentials confidential and for all activity under your account.</li>
                 <li>Accounts are personal. Do not share your login or let anyone else act under it.</li>
-                <li>Notify us immediately at <a href="mailto:{{ $email }}">{{ $email }}</a> if you suspect unauthorized access.</li>
+                <li>Notify support immediately at <a href="mailto:{{ $support }}">{{ $support }}</a> if you suspect unauthorized access.</li>
                 <li>We may suspend or revoke access at any time, including when employment or engagement ends.</li>
             </ul>
 
@@ -150,7 +151,8 @@
             <p>Questions about these Terms can be sent to:</p>
             <p>
                 <strong>{{ $company }}</strong><br>
-                <a href="mailto:{{ $email }}">{{ $email }}</a>
+                Privacy and legal: <a href="mailto:{{ $email }}">{{ $email }}</a><br>
+                Technical support: <a href="mailto:{{ $support }}">{{ $support }}</a>
             </p>
         </article>
 @endsection

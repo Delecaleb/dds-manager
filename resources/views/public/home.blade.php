@@ -2,6 +2,7 @@
     $appName = config('app.name');
     $company = config('legal.company');
     $email = config('legal.contact_email');
+    $support = config('legal.support_email');
     $moduleCount = collect($categories)->sum(fn ($c) => count($c['modules']));
     $menu = [
         ['#how-it-works', 'How it works'],
@@ -377,7 +378,7 @@
                 ['Does it change anything in Open Dental?', 'No. The sync is read-only. The only writes to Open Dental come from features explicitly built to schedule or confirm appointments, and those are enabled per office by an administrator.'],
                 ['Why does it ask for Google Ads access?', 'To read campaign reporting for the group\'s own ad accounts and compare advertising cost with the new patients and production those campaigns produce. The connection is read-only and can be revoked at any time from the integrations page or from your Google account permissions.'],
                 ['How fresh are the numbers?', 'Open Dental tables sync on a schedule throughout the day, and each office shows when it last synced. Google Ads statistics are pulled daily, and the trailing window is re-pulled because Google restates conversions for several weeks.'],
-                ['How do I get access or report a problem?', 'Ask your office manager or administrator to create or update your account. For anything else, email ' . $email . '.'],
+                ['How do I get access or report a problem?', 'Ask your office manager or administrator to create or update your account. For technical problems or anything else, email support at ' . $support . '.'],
             ] as [$q, $a])
                 <details class="group py-5 reveal">
                     <summary class="flex items-center justify-between gap-4 cursor-pointer text-left">
@@ -403,7 +404,7 @@
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <a href="{{ route('login') }}" class="inline-flex items-center gap-2 rounded-lg bg-white text-navy-700 font-semibold px-6 py-3 shadow-lg shadow-black/20 hover:bg-blue-50">Sign in <i data-lucide="arrow-right" class="w-4 h-4"></i></a>
-                    <a href="mailto:{{ $email }}" class="inline-flex items-center gap-2 rounded-lg bg-white/10 ring-1 ring-white/25 font-semibold px-6 py-3 hover:bg-white/15"><i data-lucide="mail" class="w-4 h-4"></i> Contact us</a>
+                    <a href="mailto:{{ $support }}" class="inline-flex items-center gap-2 rounded-lg bg-white/10 ring-1 ring-white/25 font-semibold px-6 py-3 hover:bg-white/15"><i data-lucide="life-buoy" class="w-4 h-4"></i> Contact support</a>
                 </div>
             </div>
         </div>
@@ -438,7 +439,8 @@
         <div class="md:col-span-3">
             <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Contact</h3>
             <ul class="mt-4 space-y-2 text-sm">
-                <li class="flex items-center gap-2 text-slate-600"><i data-lucide="mail" class="w-4 h-4"></i><a href="mailto:{{ $email }}" class="hover:text-slate-900">{{ $email }}</a></li>
+                <li class="flex items-start gap-2 text-slate-600"><i data-lucide="life-buoy" class="w-4 h-4 mt-0.5"></i><span><span class="block text-xs text-slate-500">Support</span><a href="mailto:{{ $support }}" class="hover:text-slate-900">{{ $support }}</a></span></li>
+                <li class="flex items-start gap-2 text-slate-600"><i data-lucide="mail" class="w-4 h-4 mt-0.5"></i><span><span class="block text-xs text-slate-500">Privacy and legal</span><a href="mailto:{{ $email }}" class="hover:text-slate-900">{{ $email }}</a></span></li>
                 <li class="flex items-center gap-2 text-slate-600"><i data-lucide="log-in" class="w-4 h-4"></i><a href="{{ route('login') }}" class="hover:text-slate-900">Sign in</a></li>
             </ul>
         </div>

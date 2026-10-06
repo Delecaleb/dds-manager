@@ -62,7 +62,10 @@
                     {{ $slot }}
                 </div>
             </div>
-            <p class="mt-6 text-center text-[11px] text-white/50">
+            <p class="mt-6 text-center text-[11px] text-white/60">
+                Need help signing in? Email <a href="mailto:{{ config('legal.support_email') }}" class="text-white/80 hover:text-white underline underline-offset-2">{{ config('legal.support_email') }}</a>
+            </p>
+            <p class="mt-2 text-center text-[11px] text-white/50">
                 &copy; {{ date('Y') }} Marcelo Analytics
                 &middot; <a href="{{ route('privacy') }}" class="hover:text-white/80 underline underline-offset-2">Privacy Policy</a>
                 &middot; <a href="{{ route('terms') }}" class="hover:text-white/80 underline underline-offset-2">Terms of Service</a>
