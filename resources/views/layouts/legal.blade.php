@@ -1,5 +1,5 @@
 {{--
-    Shell for the public legal pages (/privacy, /terms). Standalone on purpose: these pages
+    Shell for the public pages (/home, /privacy, /terms). Standalone on purpose: these pages
     are reached from the Google OAuth consent screen and the sign-in page, so they must not
     depend on the authenticated app layout.
 --}}
@@ -16,6 +16,7 @@
     <meta name="description" content="@yield('description')">
     <link rel="icon" type="image/png" href="{{ asset('public/images/logo-mark.png') }}">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         .legal h2 { font-size: 1.125rem; font-weight: 700; color: #0f172a; margin-top: 2.25rem; margin-bottom: .75rem; }
         .legal h3 { font-size: 1rem; font-weight: 600; color: #0f172a; margin-top: 1.5rem; margin-bottom: .5rem; }
@@ -31,7 +32,7 @@
 <body class="min-h-screen bg-slate-50 font-sans antialiased text-slate-700">
     <header class="bg-[#0f2a5a] text-white">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between">
-            <a href="{{ url('/') }}" class="flex items-center gap-3" aria-label="{{ $appName }}">
+            <a href="{{ route('home') }}" class="flex items-center gap-3" aria-label="{{ $appName }}">
                 <img src="{{ asset('public/images/logo-mark.png') }}" alt="" class="h-9 w-9">
                 <span class="font-semibold tracking-tight">{{ $appName }}</span>
             </a>
@@ -39,15 +40,17 @@
         </div>
     </header>
 
-    <main class="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+    <main class="@yield('width', 'max-w-3xl') mx-auto px-4 sm:px-6 py-10">
         @yield('content')
 
         <nav class="mt-6 flex justify-center gap-4 text-xs text-slate-500">
+            <a href="{{ route('home') }}" class="hover:text-slate-800 underline underline-offset-2">Home</a>
             <a href="{{ route('privacy') }}" class="hover:text-slate-800 underline underline-offset-2">Privacy Policy</a>
             <a href="{{ route('terms') }}" class="hover:text-slate-800 underline underline-offset-2">Terms of Service</a>
         </nav>
 
         <p class="mt-6 text-center text-xs text-slate-400">&copy; {{ date('Y') }} {{ $company }} &middot; {{ $appName }}</p>
     </main>
+    <script>lucide.createIcons();</script>
 </body>
 </html>
