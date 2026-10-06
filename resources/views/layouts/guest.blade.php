@@ -62,7 +62,11 @@
                     {{ $slot }}
                 </div>
             </div>
-            <p class="mt-6 text-center text-[11px] text-white/50">&copy; {{ date('Y') }} Marcelo Analytics</p>
+            <p class="mt-6 text-center text-[11px] text-white/50">
+                &copy; {{ date('Y') }} Marcelo Analytics
+                &middot; <a href="{{ route('privacy') }}" class="hover:text-white/80 underline underline-offset-2">Privacy Policy</a>
+                &middot; <a href="{{ route('terms') }}" class="hover:text-white/80 underline underline-offset-2">Terms of Service</a>
+            </p>
         </div>
     </main>
 

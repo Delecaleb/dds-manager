@@ -33,6 +33,11 @@ Route::get('/', function () {
         : redirect()->route('login');
 });
 
+// Public legal pages. Linked from the sign-in page and from the Google OAuth consent screen,
+// so they must stay reachable without authentication.
+Route::view('privacy', 'legal.privacy')->name('privacy');
+Route::view('terms', 'legal.terms')->name('terms');
+
 /*
  * Public web tracking. Called by visitors' browsers on tracked third-party sites, so these
  * two routes are deliberately outside auth: the site key in the payload says which site is
