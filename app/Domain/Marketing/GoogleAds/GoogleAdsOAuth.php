@@ -89,10 +89,8 @@ class GoogleAdsOAuth
             throw new GoogleAdsException('Google did not return a refresh token. Remove this app under the Google account\'s third-party access and connect again.');
         }
 
-        if (($accessToken = (string) $response->json('access_token', '')) !== '') {
-            $this->remember(MarketingAdConnection::PROVIDER_GOOGLE_ADS, $accessToken, (int) $response->json('expires_in', 3600));
-        }
-
+        // The access token that came with it is not kept: the connection it belongs to does
+        // not exist yet, and the first API call mints one from the refresh token anyway.
         return $refreshToken;
     }
 
@@ -103,7 +101,7 @@ class GoogleAdsOAuth
      */
     public function accessToken(MarketingAdConnection $connection): string
     {
-        $cached = Cache::get($this->cacheKey($connection->provider));
+        $cached = Cache::get($this->cacheKey($connection));
 
         if (is_string($cached) && $cached !== '') {
             return $cached;
@@ -135,7 +133,7 @@ class GoogleAdsOAuth
         }
 
         $accessToken = (string) $response->json('access_token');
-        $this->remember($connection->provider, $accessToken, (int) $response->json('expires_in', 3600));
+        $this->remember($connection, $accessToken, (int) $response->json('expires_in', 3600));
 
         return $accessToken;
     }
@@ -147,18 +145,19 @@ class GoogleAdsOAuth
             Http::asForm()->timeout($this->timeout())->post(self::REVOKE_URL, ['token' => $connection->refresh_token]);
         }
 
-        Cache::forget($this->cacheKey($connection->provider));
+        Cache::forget($this->cacheKey($connection));
     }
 
-    private function remember(string $provider, string $accessToken, int $expiresIn): void
+    private function remember(MarketingAdConnection $connection, string $accessToken, int $expiresIn): void
     {
         // Expire a minute early so a token is never used in its last seconds.
-        Cache::put($this->cacheKey($provider), $accessToken, max(60, $expiresIn - 60));
+        Cache::put($this->cacheKey($connection), $accessToken, max(60, $expiresIn - 60));
     }
 
-    private function cacheKey(string $provider): string
+    /** One cached token per connection: every location holds its own grant. */
+    private function cacheKey(MarketingAdConnection $connection): string
     {
-        return "marketing:{$provider}:access_token";
+        return "marketing:{$connection->provider}:{$connection->getKey()}:access_token";
     }
 
     private function timeout(): int

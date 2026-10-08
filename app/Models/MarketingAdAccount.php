@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasMarketingLocation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,9 +13,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class MarketingAdAccount extends Model
 {
+    use HasMarketingLocation;
+
     protected $fillable = [
         'connection_id', 'external_id', 'login_customer_id', 'name', 'currency_code', 'time_zone',
-        'is_manager', 'status', 'office_id', 'is_enabled', 'last_synced_at', 'last_error',
+        'is_manager', 'status', 'office_id', 'clinic_num', 'is_enabled', 'last_synced_at', 'last_error',
     ];
 
     protected function casts(): array

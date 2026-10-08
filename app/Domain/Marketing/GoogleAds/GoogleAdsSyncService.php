@@ -73,10 +73,14 @@ class GoogleAdsSyncService
         }
 
         foreach ($found as $externalId => $attributes) {
-            MarketingAdAccount::updateOrCreate(
-                ['connection_id' => $connection->id, 'external_id' => (string) $externalId],
-                $attributes
-            );
+            $account = MarketingAdAccount::firstOrNew(['connection_id' => $connection->id, 'external_id' => (string) $externalId]);
+
+            if (! $account->exists) {
+                // Credited to the location that connected it, until someone re-maps it.
+                $account->inheritLocationFrom($connection);
+            }
+
+            $account->fill($attributes)->save();
         }
 
         return count($found);
