@@ -3,6 +3,7 @@
 namespace App\View\Components;
 
 use App\Domain\FrontDesk\FrontDeskSource;
+use App\Domain\Marketing\MarketingFilter;
 use App\Domain\Support\ClinicRegistry;
 use Illuminate\View\Component;
 use Illuminate\View\View;
@@ -11,10 +12,15 @@ use Illuminate\View\View;
  * The Growth Engine shell: the marketing module runs as its own app inside Marcelo Analytics,
  * with a persistent left nav of its own instead of the analytics overlay menu.
  *
- * The Growth Engine holds two umbrellas — Marketing (demand: websites, attribution,
- * campaigns, leads) and AI Front Desk (conversion: calls, booking, intake). Each has its
- * own nav; the hub at marketing.index links to both. The umbrella is resolved from the
- * route name, so pages never declare it themselves.
+ * The Growth Engine holds three umbrellas — Marketing (website tracking, attribution, ad
+ * campaigns, leads, alerts), AI Front Desk (calls, booking, intake) and AI Website
+ * Builder. Each has its own nav; the hub at marketing.index links to all of them. The
+ * umbrella is resolved from the route name, so pages never declare it themselves.
+ *
+ * Offices: a Growth Engine "office" is a reporting location exactly as the analytics
+ * shell defines one (ClinicRegistry — an office, or one clinic of a multi-clinic office).
+ * The header carries the same location picker, and the choice is shared through the
+ * session, so switching office here switches it everywhere.
  */
 class MarketingLayout extends Component
 {
@@ -30,8 +36,8 @@ class MarketingLayout extends Component
             'short' => 'Marketing',
             'icon' => 'megaphone',
             'home' => 'marketing.overview',
-            'description' => 'Bring patients in: website traffic, attribution, campaigns and leads, traced through to completed production.',
-            'highlights' => ['Websites', 'Attribution Funnel', 'Channels', 'Campaigns', 'Leads', 'Automations'],
+            'description' => 'Per office: website traffic and signups, where they came from, Google Ads spend and campaigns, the leads it produced, and what needs attention.',
+            'highlights' => ['Websites', 'Attribution Funnel', 'Channels', 'Campaigns', 'Leads', 'Alerts'],
             'status' => null,
             'nav' => [
                 [
@@ -49,7 +55,6 @@ class MarketingLayout extends Component
                     'label' => 'Act',
                     'items' => [
                         ['route' => 'marketing.leads', 'icon' => 'users', 'label' => 'Leads'],
-                        ['route' => 'marketing.automations', 'icon' => 'workflow', 'label' => 'Automations'],
                         ['route' => 'marketing.alerts', 'icon' => 'bell-ring', 'label' => 'Alerts'],
                     ],
                 ],
@@ -58,7 +63,6 @@ class MarketingLayout extends Component
                     'items' => [
                         ['route' => 'marketing.tracking', 'icon' => 'code', 'label' => 'Tracking Script'],
                         ['route' => 'marketing.integrations', 'icon' => 'plug', 'label' => 'Integrations'],
-                        ['route' => 'marketing.settings', 'icon' => 'sliders', 'label' => 'Settings'],
                     ],
                 ],
             ],
@@ -119,6 +123,9 @@ class MarketingLayout extends Component
         ['route' => 'marketing.front-desk.office.settings', 'icon' => 'settings', 'label' => 'Settings'],
     ];
 
+    /** Marketing pages that are configuration, not a report: no period applies. */
+    private const PAGES_WITHOUT_PERIOD = ['marketing.tracking', 'marketing.integrations'];
+
     /** Active umbrella key, or null on the Growth Engine hub. */
     public ?string $umbrella;
 
@@ -138,9 +145,9 @@ class MarketingLayout extends Component
         $office = null;
         $offices = [];
         $source = null;
+        $clinics = app(ClinicRegistry::class);
 
         if ($this->umbrella === 'front-desk') {
-            $clinics = app(ClinicRegistry::class);
             $offices = $clinics->locations();
             $key = request()->route('location');
             $office = is_string($key) ? ($offices[$key] ?? null) : null;
@@ -154,6 +161,12 @@ class MarketingLayout extends Component
             }
         }
 
+        // The shared location picker: on every Marketing page and the Front Desk
+        // organization pages. Inside one Front Desk office the office switcher takes over.
+        $withLocations = $this->umbrella === 'marketing' || ($this->umbrella === 'front-desk' && $office === null);
+        $withPeriod = $this->umbrella === 'marketing' && ! request()->routeIs(...self::PAGES_WITHOUT_PERIOD);
+        $filter = $withLocations ? MarketingFilter::fromRequest(request(), $clinics, persist: false) : null;
+
         return view('layouts.marketing', [
             'umbrellas' => self::UMBRELLAS,
             'umbrellaKey' => $this->umbrella,
@@ -161,6 +174,13 @@ class MarketingLayout extends Component
             'office' => $office,
             'offices' => $offices,
             'frontDeskSource' => $source,
+            'locations' => $withLocations ? $clinics->locations() : [],
+            'filter' => $filter,
+            'withLocations' => $withLocations,
+            'withPeriod' => $withPeriod,
+            // Nav links carry the period so moving between report pages keeps the dates;
+            // the location choice is already in the session.
+            'navQuery' => $withPeriod ? ['start_date' => $filter->start, 'end_date' => $filter->end] : [],
         ]);
     }
 }

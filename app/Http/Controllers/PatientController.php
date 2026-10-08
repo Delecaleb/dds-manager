@@ -28,13 +28,14 @@ class PatientController extends Controller
     public function index(ClinicRegistry $clinicRegistry)
     {
         $exportColumns = self::getExportableColumns();
+        $codeExportColumns = self::getCodeExportableColumns();
         $locations = $clinicRegistry->locations();
         $selectedLocations = $clinicRegistry->select(request('locations'))->keys();
         $officeId = Office::getActiveOfficeId();
         $clinics = $clinicRegistry->all($officeId);
         $activeClinicNum = $clinicRegistry->getActiveClinicNum($officeId);
 
-        return view('patients.index', compact('exportColumns', 'clinics', 'activeClinicNum', 'locations', 'selectedLocations'));
+        return view('patients.index', compact('exportColumns', 'codeExportColumns', 'clinics', 'activeClinicNum', 'locations', 'selectedLocations'));
     }
 
     public function data(Request $request, ClinicRegistry $clinicRegistry)
@@ -845,6 +846,32 @@ class PatientController extends Controller
         ];
     }
 
+    public static function getCodeExportableColumns(): array
+    {
+        return [
+            'patient_id' => ['label' => 'Patient ID', 'default' => true],
+            'first_name' => ['label' => 'First Name', 'default' => true],
+            'last_name' => ['label' => 'Last Name', 'default' => true],
+            'age' => ['label' => 'Age', 'default' => true],
+            'dob' => ['label' => 'DOB', 'default' => true],
+            'gender' => ['label' => 'Gender', 'default' => true],
+            'phone_number' => ['label' => 'Phone Number', 'default' => true],
+            'email' => ['label' => 'Email', 'default' => true],
+            'mobile_phone' => ['label' => 'Mobile Phone', 'default' => false],
+            'home_phone' => ['label' => 'Home Phone', 'default' => false],
+            'work_phone' => ['label' => 'Work Phone', 'default' => false],
+            'zip_code' => ['label' => 'Zip Code', 'default' => true],
+            'city' => ['label' => 'City', 'default' => true],
+            'insurance' => ['label' => 'Insurance', 'default' => true],
+            'provider_state' => ['label' => 'Provider State', 'default' => true],
+            'clinic_name' => ['label' => 'Clinic', 'default' => true],
+            'procedure_code' => ['label' => 'Procedure Code', 'default' => true],
+            'procedure_date' => ['label' => 'Procedure Date', 'default' => true],
+            'procedure_fee' => ['label' => 'Procedure Fee', 'default' => false],
+            'procedure_status' => ['label' => 'Procedure Status', 'default' => false],
+        ];
+    }
+
     protected function buildExportQuery(Request $request, ?ClinicRegistry $clinicRegistry = null)
     {
         $clinicRegistry = $clinicRegistry ?? app(ClinicRegistry::class);
@@ -1123,6 +1150,366 @@ class PatientController extends Controller
         }
 
         return $result;
+    }
+
+    public function codeExportData(Request $request, ClinicRegistry $clinicRegistry)
+    {
+        $query = $this->buildCodeExportQuery($request, $clinicRegistry);
+        $total = (clone $query)->count('pl.id');
+        $uniquePatients = (clone $query)->distinct()->count('pl.PatNum');
+
+        // Selected Columns
+        $selectedCols = $request->get('columns', []);
+        if (is_string($selectedCols)) {
+            $selectedCols = explode(',', $selectedCols);
+        }
+        $selectedCols = array_filter((array) $selectedCols);
+        if (empty($selectedCols)) {
+            $allCols = self::getCodeExportableColumns();
+            $selectedCols = array_keys(array_filter($allCols, fn ($c) => $c['default']));
+        }
+
+        $page = max(1, intval($request->get('page', 1)));
+        $perPage = max(10, min(100, intval($request->get('per_page', 20))));
+
+        $records = $query->orderBy('pl.ProcDate', 'desc')
+            ->orderBy('pl.id', 'desc')
+            ->select([
+                'pl.id', 'pl.ProcNum', 'pl.office_id', 'pl.PatNum', 'p.FName', 'p.LName', 'p.Birthdate',
+                'p.Gender', 'p.WirelessPhone', 'p.HmPhone', 'p.WkPhone', 'p.Email',
+                'p.Zip', 'p.City', 'p.State as pat_state',
+                'pr.StateWhereLicensed', 'pr.StateLicense', 'cl.Description as clinic_name',
+                'pl.ClinicNum', 'proc.ProcCode', 'pl.ProcDate', 'pl.ProcFee', 'pl.ProcStatus',
+            ])
+            ->skip(($page - 1) * $perPage)
+            ->take($perPage)
+            ->get();
+
+        $insuranceMap = $this->resolveInsuranceMapForRecords($records);
+
+        $rows = [];
+        foreach ($records as $r) {
+            $rows[] = $this->formatCodeExportRow($r, $selectedCols, $insuranceMap);
+        }
+
+        return response()->json([
+            'total' => $total,
+            'unique_patients' => $uniquePatients,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total_pages' => ceil($total / $perPage),
+            'selected_columns' => $selectedCols,
+            'data' => $rows,
+        ]);
+    }
+
+    public function codeExportDownload(Request $request, ClinicRegistry $clinicRegistry)
+    {
+        $query = $this->buildCodeExportQuery($request, $clinicRegistry);
+
+        // Selected Columns
+        $selectedCols = $request->get('columns', []);
+        if (is_string($selectedCols)) {
+            $selectedCols = explode(',', $selectedCols);
+        }
+        $selectedCols = array_filter((array) $selectedCols);
+        $allColsConfig = self::getCodeExportableColumns();
+
+        if (empty($selectedCols)) {
+            $selectedCols = array_keys(array_filter($allColsConfig, fn ($c) => $c['default']));
+        }
+
+        $customName = $request->get('filename', 'procedure_code_export');
+        $cleanFilename = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $customName) ?: 'procedure_code_export';
+        $filename = $cleanFilename.'_'.date('Y-m-d_His').'.csv';
+
+        return response()->streamDownload(function () use ($query, $selectedCols, $allColsConfig) {
+            $handle = fopen('php://output', 'w');
+
+            // UTF-8 BOM for Excel compatibility
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            // Header Row
+            $headerRow = [];
+            foreach ($selectedCols as $colKey) {
+                $headerRow[] = $allColsConfig[$colKey]['label'] ?? ucfirst(str_replace('_', ' ', $colKey));
+            }
+            fputcsv($handle, $headerRow);
+
+            // Stream chunks of 500 rows
+            $query->orderBy('pl.ProcDate', 'desc')
+                ->orderBy('pl.id', 'desc')
+                ->select([
+                    'pl.id', 'pl.ProcNum', 'pl.office_id', 'pl.PatNum', 'p.FName', 'p.LName', 'p.Birthdate',
+                    'p.Gender', 'p.WirelessPhone', 'p.HmPhone', 'p.WkPhone', 'p.Email',
+                    'p.Zip', 'p.City', 'p.State as pat_state',
+                    'pr.StateWhereLicensed', 'pr.StateLicense', 'cl.Description as clinic_name',
+                    'pl.ClinicNum', 'proc.ProcCode', 'pl.ProcDate', 'pl.ProcFee', 'pl.ProcStatus',
+                ])
+                ->chunk(500, function ($records) use ($handle, $selectedCols) {
+                    $insuranceMap = $this->resolveInsuranceMapForRecords($records);
+
+                    foreach ($records as $record) {
+                        $formatted = $this->formatCodeExportRow($record, $selectedCols, $insuranceMap);
+                        fputcsv($handle, array_values($formatted));
+                    }
+                });
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Cache-Control' => 'no-store, no-cache',
+        ]);
+    }
+
+    protected function buildCodeExportQuery(Request $request, ?ClinicRegistry $clinicRegistry = null)
+    {
+        $clinicRegistry = $clinicRegistry ?? app(ClinicRegistry::class);
+        $selection = $this->resolveLocations($request, $clinicRegistry);
+        $scopes = $selection->scopes();
+
+        if (empty($scopes)) {
+            return DB::table('od_procedure_logs as pl')->whereRaw('1 = 0');
+        }
+
+        $query = DB::table('od_procedure_logs as pl')
+            ->join('od_procedures as proc', function ($join) {
+                $join->on('proc.CodeNum', '=', 'pl.CodeNum')
+                    ->on('proc.office_id', '=', 'pl.office_id');
+            })
+            ->join('od_patients as p', function ($join) {
+                $join->on('p.PatNum', '=', 'pl.PatNum')
+                    ->on('p.office_id', '=', 'pl.office_id');
+            })
+            ->leftJoin('od_providers as pr', function ($join) {
+                $join->on('pr.ProvNum', '=', 'pl.ProvNum')
+                    ->on('pr.office_id', '=', 'pl.office_id');
+            })
+            ->leftJoin('od_clinics as cl', function ($join) {
+                $join->on('cl.ClinicNum', '=', 'pl.ClinicNum')
+                    ->on('cl.office_id', '=', 'pl.office_id');
+            });
+
+        // Apply location scoping
+        $this->applyLocationScopes($query, $selection, 'pl');
+
+        // Specific clinic filter if provided
+        $clinicInput = $request->input('clinic_id') ?? $request->input('clinic_num') ?? $request->input('clinic');
+        if ($clinicInput !== null && $clinicInput !== '' && $clinicInput !== 'all') {
+            $query->where('pl.ClinicNum', (int) $clinicInput);
+        }
+
+        // Procedure Codes filter (comma-separated or array)
+        $rawCodes = $request->input('codes', '8080, 8090');
+        if (is_array($rawCodes)) {
+            $codes = array_values(array_filter(array_map('trim', $rawCodes)));
+        } else {
+            $codes = array_values(array_filter(array_map('trim', explode(',', (string) $rawCodes))));
+        }
+
+        if (! empty($codes)) {
+            $query->where(function ($q) use ($codes) {
+                foreach ($codes as $code) {
+                    $cleanCode = ltrim($code, 'D');
+                    $dCode = 'D'.$cleanCode;
+                    $q->orWhere('proc.ProcCode', '=', $code)
+                        ->orWhere('proc.ProcCode', '=', $dCode)
+                        ->orWhere('proc.ProcCode', '=', $cleanCode)
+                        ->orWhere('proc.ProcCode', 'like', '%'.$cleanCode);
+                }
+            });
+        }
+
+        // Date Range
+        $dateMode = $request->input('date_mode', 'last_6_months');
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+
+        if ($dateMode === 'custom') {
+            // Keep explicit dateFrom and dateTo
+        } elseif ($dateMode === 'last_6_months') {
+            $dateFrom = $dateFrom ?: Carbon::now()->subMonths(6)->format('Y-m-d');
+            $dateTo = $dateTo ?: Carbon::now()->format('Y-m-d');
+        } elseif ($dateMode === 'last_30_days') {
+            $dateFrom = Carbon::now()->subDays(30)->format('Y-m-d');
+            $dateTo = Carbon::now()->format('Y-m-d');
+        } elseif ($dateMode === 'last_3_months') {
+            $dateFrom = Carbon::now()->subMonths(3)->format('Y-m-d');
+            $dateTo = Carbon::now()->format('Y-m-d');
+        } elseif ($dateMode === 'last_12_months') {
+            $dateFrom = Carbon::now()->subMonths(12)->format('Y-m-d');
+            $dateTo = Carbon::now()->format('Y-m-d');
+        } elseif ($dateMode === 'this_year') {
+            $dateFrom = Carbon::now()->startOfYear()->format('Y-m-d');
+            $dateTo = Carbon::now()->format('Y-m-d');
+        } elseif ($dateMode === 'all') {
+            $dateFrom = null;
+            $dateTo = null;
+        }
+
+        if (! empty($dateFrom)) {
+            $query->whereNotNull('pl.ProcDate')
+                ->where('pl.ProcDate', '!=', '0001-01-01')
+                ->where('pl.ProcDate', '>=', $dateFrom);
+        }
+        if (! empty($dateTo)) {
+            $query->whereNotNull('pl.ProcDate')
+                ->where('pl.ProcDate', '!=', '0001-01-01')
+                ->where('pl.ProcDate', '<=', $dateTo);
+        }
+
+        // Procedure Status filter
+        $procStatus = $request->input('proc_status', 'all');
+        if ($procStatus === 'completed') {
+            $query->whereIn('pl.ProcStatus', ProcStatus::completed());
+        } elseif ($procStatus === 'treatment_planned') {
+            $query->whereIn('pl.ProcStatus', ProcStatus::treatmentPlanned());
+        }
+
+        return $query;
+    }
+
+    protected function formatCodeExportRow($row, array $selectedCols, array $insuranceMap): array
+    {
+        $dobStr = $row->Birthdate ?? null;
+        $age = 'N/A';
+        $dobFormatted = '';
+        if ($dobStr && $dobStr !== '0001-01-01' && $dobStr !== '1880-01-01' && date_create($dobStr)) {
+            $dob = new \DateTime($dobStr);
+            $age = $dob->diff(new \DateTime)->y;
+            $dobFormatted = $dob->format('Y-m-d');
+        }
+
+        $genderMap = ['0' => 'Male', '1' => 'Female', '2' => 'Unknown', 0 => 'Male', 1 => 'Female', 2 => 'Unknown'];
+        $genderRaw = $row->Gender ?? '';
+        $gender = $genderMap[$genderRaw] ?? ($genderRaw ?: 'Unknown');
+
+        $status = match ((string) ($row->ProcStatus ?? '')) {
+            '2', 'C', 'Complete', 'complete' => 'Completed',
+            '1', 'TP', 'TreatmentPlanned', 'treatmentplanned' => 'Treatment Planned',
+            '3', 'EC' => 'Existing Current',
+            '4', 'EO' => 'Existing Other',
+            '5', 'R', 'Referred' => 'Referred Out',
+            '6', 'D', 'Deleted' => 'Deleted',
+            '7', 'Cn', 'Condition' => 'Condition',
+            default => (string) ($row->ProcStatus ?? ''),
+        };
+
+        $providerState = trim((string) ($row->StateWhereLicensed ?? $row->StateLicense ?? ''));
+        if ($providerState === '' && ! empty($row->pat_state)) {
+            $providerState = $row->pat_state;
+        }
+
+        $phone = $row->WirelessPhone ?: ($row->HmPhone ?: ($row->WkPhone ?: ''));
+
+        $allValues = [
+            'patient_id' => $row->PatNum ?? '',
+            'first_name' => $row->FName ?? '',
+            'last_name' => $row->LName ?? '',
+            'age' => $age,
+            'dob' => $dobFormatted,
+            'gender' => $gender,
+            'phone_number' => $phone,
+            'email' => $row->Email ?? '',
+            'mobile_phone' => $row->WirelessPhone ?? '',
+            'home_phone' => $row->HmPhone ?? '',
+            'work_phone' => $row->WkPhone ?? '',
+            'zip_code' => $row->Zip ?? '',
+            'city' => $row->City ?? '',
+            'insurance' => $insuranceMap[(int) ($row->PatNum ?? 0)] ?? 'No Insurance',
+            'provider_state' => $providerState,
+            'clinic_name' => $row->clinic_name ?: 'Unassigned / HQ',
+            'procedure_code' => $row->ProcCode ?? '',
+            'procedure_date' => ! empty($row->ProcDate) && $row->ProcDate !== '0001-01-01' ? date('Y-m-d', strtotime($row->ProcDate)) : '',
+            'procedure_fee' => number_format((float) ($row->ProcFee ?? 0), 2),
+            'procedure_status' => $status,
+        ];
+
+        $result = [];
+        foreach ($selectedCols as $col) {
+            $result[$col] = $allValues[$col] ?? '';
+        }
+
+        return $result;
+    }
+
+    protected function resolveInsuranceMapForRecords($records): array
+    {
+        $patNums = array_values(array_unique(array_filter(array_map('intval', $records->pluck('PatNum')->all()))));
+        $officeIds = array_values(array_unique(array_filter(array_map('intval', $records->pluck('office_id')->all()))));
+
+        $insuranceMap = [];
+        if (empty($patNums)) {
+            return $insuranceMap;
+        }
+
+        $claimProcs = DB::table('od_claim_procs')
+            ->whereIn('office_id', $officeIds)
+            ->whereIn('PatNum', $patNums)
+            ->where('PlanNum', '>', 0)
+            ->select('PatNum', 'PlanNum', 'ClaimProcNum')
+            ->orderBy('ClaimProcNum', 'asc')
+            ->get();
+
+        $patPlanMap = [];
+        foreach ($claimProcs as $cp) {
+            $patPlanMap[(int) $cp->PatNum] = (int) $cp->PlanNum;
+        }
+
+        $missingPats = array_diff($patNums, array_keys($patPlanMap));
+        if (! empty($missingPats)) {
+            $appts = DB::table('od_appointments')
+                ->whereIn('office_id', $officeIds)
+                ->whereIn('PatNum', $missingPats)
+                ->whereNotNull('InsPlan1')
+                ->where('InsPlan1', '>', 0)
+                ->select('PatNum', 'InsPlan1', 'AptDateTime')
+                ->orderBy('AptDateTime', 'asc')
+                ->get();
+            foreach ($appts as $a) {
+                $patPlanMap[(int) $a->PatNum] = (int) $a->InsPlan1;
+            }
+        }
+
+        $planNums = array_values(array_unique(array_filter($patPlanMap)));
+        if (! empty($planNums)) {
+            $plans = DB::table('od_insplans')
+                ->whereIn('office_id', $officeIds)
+                ->whereIn('PlanNum', $planNums)
+                ->select('PlanNum', 'CarrierNum', 'GroupName')
+                ->get();
+
+            $planCarrierMap = [];
+            $planGroupMap = [];
+            foreach ($plans as $p) {
+                $planCarrierMap[(int) $p->PlanNum] = (int) $p->CarrierNum;
+                $planGroupMap[(int) $p->PlanNum] = $p->GroupName ?? '';
+            }
+
+            $carrierNums = array_values(array_unique(array_filter($planCarrierMap)));
+            $carrierMap = [];
+            if (! empty($carrierNums)) {
+                $carrierMap = DB::table('od_carriers')
+                    ->whereIn('office_id', $officeIds)
+                    ->whereIn('CarrierNum', $carrierNums)
+                    ->pluck('CarrierName', 'CarrierNum')
+                    ->toArray();
+            }
+
+            foreach ($patPlanMap as $patNum => $planNum) {
+                $cNum = $planCarrierMap[$planNum] ?? 0;
+                if ($cNum > 0 && ! empty($carrierMap[$cNum])) {
+                    $insuranceMap[$patNum] = $carrierMap[$cNum];
+                } elseif (! empty($planGroupMap[$planNum])) {
+                    $insuranceMap[$patNum] = $planGroupMap[$planNum];
+                } else {
+                    $insuranceMap[$patNum] = 'Plan #'.$planNum;
+                }
+            }
+        }
+
+        return $insuranceMap;
     }
 
     private function resolveLocations(Request $request, ClinicRegistry $clinicRegistry): LocationSelection

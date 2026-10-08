@@ -70,7 +70,7 @@
                             <div class="space-y-0.5">
                                 @foreach($group['items'] as $item)
                                     @php $active = request()->routeIs(...(array) ($item['active'] ?? $item['route'])); @endphp
-                                    <a href="{{ route($item['route'], $item['params'] ?? []) }}"
+                                    <a href="{{ route($item['route'], ($item['params'] ?? []) + $navQuery) }}"
                                         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-colors {{ $active ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
                                         @if($active) aria-current="page" @endif>
                                         <i data-lucide="{{ $item['icon'] }}" class="w-4 h-4"></i>
@@ -130,6 +130,15 @@
                 </div>
 
                 <div class="flex items-center gap-3">
+                    @if($withLocations)
+                        {{-- The same location picker as the analytics shell; the choice is shared via the session. --}}
+                        <x-location-picker id="geLocations" :locations="$locations" :selected="$filter->keys()" />
+                    @endif
+                    @if($withPeriod)
+                        <script>if (window.DDS && DDS.date) DDS.date.setRange(@json($filter->start), @json($filter->end));</script>
+                        <x-daterange-picker id="geRange" />
+                    @endif
+
                     {{ $toolbar ?? '' }}
 
                     @if($frontDeskSource)
@@ -144,10 +153,6 @@
                                 {{ $previewing ? 'Exit preview' : 'Preview with sample data' }}
                             </a>
                         @endunless
-                    @else
-                        <span class="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-[11px] font-semibold">
-                            <i data-lucide="flask-conical" class="w-3.5 h-3.5"></i> Template — no live data yet
-                        </span>
                     @endif
 
                     <div class="flex items-center gap-2 pl-3 border-l border-slate-200">
@@ -176,6 +181,18 @@
 
     <script>
         lucide.createIcons();
+
+        // Office or period changed in the header: reload this page for the new choice.
+        (function () {
+            function reload(params) {
+                var url = new URL(window.location.href);
+                Object.keys(params).forEach(function (key) { url.searchParams.set(key, params[key]); });
+                window.location.href = url.toString();
+            }
+            if (!window.DDS) return;
+            if (DDS.onLocations) DDS.onLocations('geLocations', function (keys) { reload({ locations: keys.join(',') }); });
+            if (DDS.onDateRange) DDS.onDateRange('geRange', function (range) { reload({ start_date: range.start, end_date: range.end }); });
+        })();
     </script>
     <script src="https://cdn.datatables.net/2.0.8/js/dataTables.js"></script>
     <script src="https://cdn.datatables.net/2.0.8/js/dataTables.tailwind.js"></script>

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasMarketingLocation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,8 +10,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** One campaign in an ad account. office_id, when set, overrides the account's location. */
 class MarketingAdCampaign extends Model
 {
+    use HasMarketingLocation;
+
     protected $fillable = [
-        'account_id', 'external_id', 'name', 'status', 'channel_type', 'daily_budget_micros', 'office_id',
+        'account_id', 'external_id', 'name', 'status', 'channel_type', 'daily_budget_micros', 'office_id', 'clinic_num',
     ];
 
     protected function casts(): array

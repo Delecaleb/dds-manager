@@ -1,6 +1,6 @@
 <x-marketing-layout>
     <x-slot:title>Visitor Journeys</x-slot:title>
-    <x-slot:subtitle>One visitor, first visit to signup</x-slot:subtitle>
+    <x-slot:subtitle>{{ $filter->locationLabel() }} · one visitor, first visit to signup</x-slot:subtitle>
 
     <div class="p-6 space-y-6 max-w-[1500px]">
 
@@ -8,12 +8,14 @@
             <form method="GET" class="flex flex-wrap items-center gap-2">
                 <input type="search" name="q" value="{{ $search }}" placeholder="patient@example.com, 313 555 0142, or a visitor id"
                     class="flex-1 min-w-[260px] text-xs rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:border-emerald-500">
+                <input type="hidden" name="start_date" value="{{ $filter->start }}">
+                <input type="hidden" name="end_date" value="{{ $filter->end }}">
                 <button type="submit"
                     class="px-3 py-2 text-[11px] font-bold rounded-lg border border-emerald-500 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer">
                     Search
                 </button>
                 @if($search !== '')
-                    <a href="{{ route('marketing.journeys') }}" class="text-[11px] font-bold text-slate-500 hover:text-slate-800">Clear</a>
+                    <a href="{{ route('marketing.journeys', $filter->query()) }}" class="text-[11px] font-bold text-slate-500 hover:text-slate-800">Clear</a>
                 @endif
             </form>
             <p class="mt-2 text-[11px] text-slate-500">
@@ -27,11 +29,12 @@
             <x-marketing.panel :title="$v['name'] ?: ($v['email'] ?: ($v['phone'] ?: 'Anonymous visitor'))"
                 :subtitle="$v['site'] . ' · first seen ' . $v['first_seen_at']" icon="route">
                 <x-slot:actions>
-                    <a href="{{ route('marketing.journeys', ['q' => $search]) }}" class="text-[11px] font-bold text-slate-500 hover:text-slate-800">Close</a>
+                    <a href="{{ route('marketing.journeys', $filter->query(['q' => $search])) }}" class="text-[11px] font-bold text-slate-500 hover:text-slate-800">Close</a>
                 </x-slot:actions>
 
                 <dl class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                     @foreach ([
+                        ['Location', $v['location'] ?: 'Not assigned'],
                         ['First touch', $v['first_source']],
                         ['Campaign', $v['first_campaign'] ?: '—'],
                         ['Landed on', $v['first_landing_path'] ?: '—'],
@@ -72,7 +75,7 @@
 
         <x-marketing.panel
             :title="$search !== '' ? 'Search results' : 'Recent journeys'"
-            :subtitle="$search !== '' ? 'Matching ' . $search : $start . ' → ' . $end . ', newest first'"
+            :subtitle="$search !== '' ? 'Matching ' . $search : $filter->start . ' → ' . $filter->end . ', newest first'"
             icon="route">
             <div class="overflow-x-auto">
                 <table class="dds-table w-full text-left text-xs whitespace-nowrap">
@@ -106,7 +109,7 @@
                                 <td class="py-3 px-4 text-slate-500">{{ $row['first_seen'] }}</td>
                                 <td class="py-3 px-4 text-slate-500">{{ $row['last_seen'] }}</td>
                                 <td class="py-3 px-4 text-right">
-                                    <a href="{{ route('marketing.journeys', ['visitor' => $row['id'], 'q' => $search]) }}"
+                                    <a href="{{ route('marketing.journeys', $filter->query(['visitor' => $row['id'], 'q' => $search])) }}"
                                         class="text-[11px] font-bold text-emerald-700 hover:text-emerald-800">Timeline →</a>
                                 </td>
                             </tr>
@@ -125,7 +128,7 @@
             </div>
         </x-marketing.panel>
 
-        <x-marketing.panel title="How a visitor becomes a patient record" subtitle="The identity chain, and where it can break" icon="link">
+        <x-marketing.panel title="How a visitor is identified" subtitle="What ties the events of one journey together, and where that can break" icon="link">
             <div class="overflow-x-auto">
                 <table class="dds-table w-full text-left text-xs whitespace-nowrap">
                     <thead>
@@ -133,27 +136,17 @@
                             <th class="py-2.5 px-4 font-bold text-gray-900">Stage</th>
                             <th class="py-2.5 px-4 font-bold text-gray-900">Identified by</th>
                             <th class="py-2.5 px-4 font-bold text-gray-900">Breaks when</th>
-                            <th class="py-2.5 px-4 font-bold text-gray-900">Built?</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ([
-                            ['Anonymous visitor', 'First-party id in browser storage + site key', 'Storage cleared, or a different device or browser', true],
-                            ['Known lead', 'Email or phone given at signup', 'Typo in the details, or a shared family phone', true],
-                            ['Patient', 'Match to the OpenDental patient record', 'Name differs, or a family member books instead', false],
-                            ['Production', 'Completed procedures for that patient', 'Treatment falls outside the attribution window', false],
-                        ] as [$stage, $by, $breaks, $done])
+                            ['Anonymous visitor', 'First-party id in browser storage + site key', 'Storage cleared, or a different device or browser'],
+                            ['Known lead', 'Email or phone given at signup', 'Typo in the details, or a shared family phone'],
+                        ] as [$stage, $by, $breaks])
                             <tr>
                                 <td class="py-3 px-4 font-semibold text-slate-800">{{ $stage }}</td>
                                 <td class="py-3 px-4 text-slate-600">{{ $by }}</td>
                                 <td class="py-3 px-4 text-slate-600">{{ $breaks }}</td>
-                                <td class="py-3 px-4">
-                                    @if($done)
-                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700">Working</span>
-                                    @else
-                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">Next</span>
-                                    @endif
-                                </td>
                             </tr>
                         @endforeach
                     </tbody>

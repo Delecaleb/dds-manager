@@ -14,11 +14,14 @@ use Illuminate\Http\Request;
  */
 class FrontDeskController extends Controller
 {
-    public function __construct(private readonly FrontDeskSource $source) {}
+    public function __construct(
+        private readonly FrontDeskSource $source,
+        private readonly ClinicRegistry $clinics,
+    ) {}
 
     public function index(Request $request): View
     {
-        $filter = FrontDeskFilter::fromRequest($request);
+        $filter = FrontDeskFilter::fromRequest($request, $this->selectedKeys($request));
 
         return view('marketing.front-desk.overview', [
             'filter' => $filter,
@@ -27,26 +30,35 @@ class FrontDeskController extends Controller
         ]);
     }
 
-    public function analytics(Request $request, ClinicRegistry $clinics): View
+    public function analytics(Request $request): View
     {
-        $all = $clinics->locations();
-        $office = (string) $request->query('office', '');
-        $filter = FrontDeskFilter::fromRequest($request, isset($all[$office]) ? [$office] : []);
+        $filter = FrontDeskFilter::fromRequest($request, $this->selectedKeys($request));
 
         return view('marketing.front-desk.analytics', [
             'filter' => $filter,
             'analytics' => $this->source->analytics($filter),
-            'locations' => $all,
-            'office' => isset($all[$office]) ? $office : null,
         ]);
     }
 
     public function offices(Request $request): View
     {
-        $filter = FrontDeskFilter::fromRequest($request);
+        $filter = FrontDeskFilter::fromRequest($request, $this->selectedKeys($request));
 
         return view('marketing.front-desk.offices', [
             'offices' => $this->source->offices($filter),
         ]);
+    }
+
+    /**
+     * The locations picked in the shared picker (session-persisted, like the analytics
+     * shell). Every location selected = no filter, so unassigned data is never hidden.
+     *
+     * @return list<string>
+     */
+    private function selectedKeys(Request $request): array
+    {
+        $selection = $this->clinics->select($request->input('locations'));
+
+        return count($selection->locations()) >= count($this->clinics->locations()) ? [] : $selection->keys();
     }
 }

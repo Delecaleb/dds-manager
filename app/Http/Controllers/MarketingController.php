@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Marketing\AdCampaignReportService;
 use App\Domain\Marketing\GoogleAds\GoogleAdsOAuth;
+use App\Domain\Marketing\MarketingAlertService;
+use App\Domain\Marketing\MarketingFilter;
+use App\Domain\Marketing\MarketingOverviewService;
 use App\Domain\Marketing\WebsiteAnalyticsService;
+use App\Domain\Support\ClinicRegistry;
 use App\Models\MarketingAdConnection;
 use App\Models\MarketingSite;
-use App\Models\Office;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,76 +19,126 @@ use Illuminate\Validation\Rule;
 /**
  * Growth Engine — the hub, plus its Marketing umbrella.
  *
- * Website tracking (Websites, Visitor Journeys, Tracking Script) reads its numbers from
- * WebsiteAnalyticsService; the remaining pages are still page structure awaiting their
- * data sources. The AI Front Desk umbrella lives in FrontDeskController.
+ * Every page reads for the locations the user picked (the same picker and session choice
+ * as the analytics shell) and the period: MarketingFilter carries both into the domain
+ * services. The AI Front Desk umbrella lives in FrontDeskController; the AI Website
+ * Builder in SiteBuilderController.
  */
 class MarketingController extends Controller
 {
-    /** Growth Engine hub: one card per umbrella (Marketing, AI Front Desk). */
+    public function __construct(private readonly ClinicRegistry $clinics) {}
+
+    /** Growth Engine hub: one card per umbrella. */
     public function index(): View
     {
         return view('marketing.hub');
     }
 
-    public function overview(): View
+    public function overview(Request $request, MarketingOverviewService $overview): View
     {
-        return view('marketing.overview');
+        $filter = $this->filter($request);
+
+        return view('marketing.overview', ['filter' => $filter, 'data' => $overview->overview($filter)]);
     }
 
-    public function funnel(): View
+    public function funnel(Request $request, MarketingOverviewService $overview): View
     {
-        return view('marketing.funnel');
+        $filter = $this->filter($request);
+
+        return view('marketing.funnel', ['filter' => $filter, 'funnel' => $overview->funnel($filter)]);
     }
 
-    /** Traffic, signups and sources — for one tracked site, or all of them. */
+    public function channels(Request $request, MarketingOverviewService $overview): View
+    {
+        $filter = $this->filter($request);
+
+        return view('marketing.channels', ['filter' => $filter, 'channels' => $overview->channels($filter)]);
+    }
+
+    /** Traffic, signups and sources — for the selected locations, or one of their sites. */
     public function websites(Request $request, WebsiteAnalyticsService $analytics): View
     {
-        [$start, $end] = $this->period($request);
+        $filter = $this->filter($request);
 
-        $sites = $analytics->siteSummaries($start, $end);
-        $selected = $this->selectedSite($request, $sites);
-        $siteId = $selected['id'] ?? null;
+        // The site list and the sites table always show every site in the locations; the
+        // site dropdown narrows only the numbers.
+        $sites = $analytics->siteSummaries($filter->withSite(null));
+        $selected = collect($sites)->firstWhere('id', $filter->siteId);
+        $filter = $filter->withSite($selected['id'] ?? null);
 
         return view('marketing.websites', [
+            'filter' => $filter,
             'sites' => $sites,
             'selected' => $selected,
-            'start' => $start,
-            'end' => $end,
-            'summary' => $analytics->summary($siteId, $start, $end),
-            'trafficSources' => $analytics->trafficSources($siteId, $start, $end),
-            'adSources' => $analytics->adSources($siteId, $start, $end),
-            'topPages' => $analytics->topPages($siteId, $start, $end),
+            'summary' => $analytics->summary($filter),
+            'trafficSources' => $analytics->trafficSources($filter),
+            'adSources' => $analytics->adSources($filter),
+            'topPages' => $analytics->topPages($filter),
         ]);
     }
 
     /** Visitor timelines: search, recent journeys, and one visitor in full. */
     public function journeys(Request $request, WebsiteAnalyticsService $analytics): View
     {
-        [$start, $end] = $this->period($request);
+        $filter = $this->filter($request);
         $search = trim((string) $request->input('q', ''));
-
-        $journeys = $search !== ''
-            ? $analytics->search($search)
-            : $analytics->recentJourneys(null, $start, $end);
-
         $visitorId = $request->filled('visitor') ? (int) $request->input('visitor') : null;
 
         return view('marketing.journeys', [
-            'start' => $start,
-            'end' => $end,
+            'filter' => $filter,
             'search' => $search,
-            'journeys' => $journeys,
+            'journeys' => $search !== '' ? $analytics->search($search, $filter) : $analytics->recentJourneys($filter),
             'journey' => $visitorId !== null ? $analytics->journey($visitorId) : null,
         ]);
     }
 
-    /** The install snippet, per site, plus whether the site has reported yet. */
-    public function tracking(): View
+    /** Synced ad campaigns, as the platform reports them. */
+    public function campaigns(Request $request, AdCampaignReportService $report): View
     {
+        $filter = $this->filter($request);
+        $rows = $report->campaignRows($filter);
+        $connections = MarketingAdConnection::query()->googleAds()->within($filter)->get()->filter(fn ($c) => $c->isUsable());
+
+        return view('marketing.campaigns', [
+            'filter' => $filter,
+            'rows' => $rows,
+            'summary' => $report->summarize($rows),
+            'connected' => $connections->isNotEmpty(),
+            'lastSynced' => $connections->max('last_synced_at'),
+        ]);
+    }
+
+    /** Everyone who gave contact details on a tracked site. */
+    public function leads(Request $request, WebsiteAnalyticsService $analytics): View
+    {
+        $filter = $this->filter($request);
+
+        return view('marketing.leads', [
+            'filter' => $filter,
+            'summary' => $analytics->leadSummary($filter),
+            'leads' => $analytics->leads($filter),
+        ]);
+    }
+
+    public function alerts(Request $request, MarketingAlertService $alerts): View
+    {
+        $filter = $this->filter($request);
+
+        return view('marketing.alerts', ['filter' => $filter, 'alerts' => $alerts->alerts($filter)]);
+    }
+
+    /** The install snippet per site, and which location each site belongs to. */
+    public function tracking(WebsiteAnalyticsService $analytics): View
+    {
+        $locations = $this->clinics->locations();
+
         return view('marketing.tracking', [
-            'sites' => MarketingSite::orderBy('name')->get(),
-            'offices' => Office::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'sites' => MarketingSite::orderBy('name')->get()->map(fn (MarketingSite $site) => [
+                'model' => $site,
+                'location_key' => $site->locationKey(),
+                'location' => $site->office_id !== null ? $this->clinics->labelFor((int) $site->office_id, $site->clinic_num) : null,
+            ]),
+            'locations' => $locations,
             'scriptUrl' => route('tracking.script'),
         ]);
     }
@@ -92,23 +146,42 @@ class MarketingController extends Controller
     /** Add a tracked site. Its key is generated here and never supplied by the user. */
     public function storeSite(Request $request): RedirectResponse
     {
+        $locations = $this->clinics->locations();
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'domain' => ['required', 'string', 'max:255'],
-            'office_id' => ['nullable', 'integer', Rule::exists('offices', 'id')],
+            'location' => ['nullable', 'string', Rule::in(array_keys($locations))],
         ]);
 
-        $site = MarketingSite::create([
+        $site = (new MarketingSite([
             'site_key' => MarketingSite::generateKey(),
             'name' => $data['name'],
             'domain' => MarketingSite::normalizeDomain($data['domain']),
-            'office_id' => $data['office_id'] ?? null,
             'is_active' => true,
-        ]);
+        ]))->assignLocation($locations[$data['location'] ?? ''] ?? null);
+        $site->save();
 
         return redirect()
             ->route('marketing.tracking', ['site' => $site->id])
             ->with('status', "Site added. Install the snippet on {$site->domain} to start tracking.");
+    }
+
+    /** Move a site to another location (or to none). */
+    public function updateSite(Request $request, MarketingSite $site): RedirectResponse
+    {
+        $locations = $this->clinics->locations();
+
+        $data = $request->validate([
+            'location' => ['nullable', 'string', Rule::in(array_keys($locations))],
+        ]);
+
+        $site->assignLocation($locations[$data['location'] ?? ''] ?? null)->save();
+
+        return redirect()->route('marketing.tracking')
+            ->with('status', $site->office_id === null
+                ? "{$site->name} is no longer assigned to a location."
+                : "{$site->name} now belongs to ".$this->clinics->labelFor((int) $site->office_id, $site->clinic_num).'.');
     }
 
     /** Pause or resume a site: a paused key is rejected by the collector. */
@@ -120,72 +193,22 @@ class MarketingController extends Controller
             ->with('status', $site->is_active ? "Tracking resumed for {$site->domain}." : "Tracking paused for {$site->domain}.");
     }
 
-    public function channels(): View
+    /** Per selected location: its Google Ads connection and the accounts under it. */
+    public function integrations(Request $request, GoogleAdsOAuth $googleAdsOAuth, AdCampaignReportService $report): View
     {
-        return view('marketing.channels');
-    }
+        $filter = $this->filter($request);
 
-    public function campaigns(): View
-    {
-        return view('marketing.campaigns');
-    }
-
-    public function leads(): View
-    {
-        return view('marketing.leads');
-    }
-
-    public function automations(): View
-    {
-        return view('marketing.automations');
-    }
-
-    public function alerts(): View
-    {
-        return view('marketing.alerts');
-    }
-
-    public function integrations(GoogleAdsOAuth $googleAdsOAuth): View
-    {
         return view('marketing.integrations', [
-            'googleAds' => MarketingAdConnection::googleAds()?->loadCount('accounts'),
+            'filter' => $filter,
+            'googleAds' => $report->connectionsByLocation($filter),
             'googleAdsMissing' => $googleAdsOAuth->missingSettings(),
             'googleAdsCallbackUrl' => $googleAdsOAuth->redirectUri(),
+            'locations' => $this->clinics->locations(),
         ]);
     }
 
-    public function settings(): View
+    private function filter(Request $request): MarketingFilter
     {
-        return view('marketing.settings');
-    }
-
-    /** @return array{0: string, 1: string} start, end */
-    private function period(Request $request): array
-    {
-        return [
-            (string) $request->input('start_date', now()->subDays(29)->toDateString()),
-            (string) $request->input('end_date', now()->toDateString()),
-        ];
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $sites
-     * @return array<string, mixed>|null
-     */
-    private function selectedSite(Request $request, array $sites): ?array
-    {
-        if (! $request->filled('site')) {
-            return null;
-        }
-
-        $id = (int) $request->input('site');
-
-        foreach ($sites as $site) {
-            if ($site['id'] === $id) {
-                return $site;
-            }
-        }
-
-        return null;
+        return MarketingFilter::fromRequest($request, $this->clinics);
     }
 }

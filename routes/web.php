@@ -112,6 +112,8 @@ Route::middleware('auth')->group(function () {
         Route::get('patients/data', [PatientController::class, 'data'])->name('patients.data');
         Route::get('patients/export-data', [PatientController::class, 'exportData'])->name('patients.export-data');
         Route::get('patients/export-download', [PatientController::class, 'exportDownload'])->name('patients.export-download');
+        Route::get('patients/code-export-data', [PatientController::class, 'codeExportData'])->name('patients.code-export-data');
+        Route::get('patients/code-export-download', [PatientController::class, 'codeExportDownload'])->name('patients.code-export-download');
         Route::get('patients/{id}', [PatientController::class, 'show'])->name('patients.show');
         Route::get('patients/{id}/treatment-plans', [PatientController::class, 'showTreatment']);
         Route::get('patients/{id}/ar', [PatientController::class, 'showArLive']);
@@ -153,23 +155,23 @@ Route::middleware('auth')->group(function () {
         Route::get('funnel', [MarketingController::class, 'funnel'])->name('funnel');
         Route::get('websites', [MarketingController::class, 'websites'])->name('websites');
         Route::get('journeys', [MarketingController::class, 'journeys'])->name('journeys');
-        Route::get('tracking', [MarketingController::class, 'tracking'])->name('tracking');
-        Route::post('sites', [MarketingController::class, 'storeSite'])->name('sites.store');
-        Route::patch('sites/{site}/toggle', [MarketingController::class, 'toggleSite'])->name('sites.toggle');
         Route::get('channels', [MarketingController::class, 'channels'])->name('channels');
         Route::get('campaigns', [MarketingController::class, 'campaigns'])->name('campaigns');
         Route::get('leads', [MarketingController::class, 'leads'])->name('leads');
-        Route::get('automations', [MarketingController::class, 'automations'])->name('automations');
         Route::get('alerts', [MarketingController::class, 'alerts'])->name('alerts');
+        Route::get('tracking', [MarketingController::class, 'tracking'])->name('tracking');
+        Route::post('sites', [MarketingController::class, 'storeSite'])->name('sites.store');
+        Route::patch('sites/{site}', [MarketingController::class, 'updateSite'])->name('sites.update');
+        Route::patch('sites/{site}/toggle', [MarketingController::class, 'toggleSite'])->name('sites.toggle');
         Route::get('integrations', [MarketingController::class, 'integrations'])->name('integrations');
-        Route::get('settings', [MarketingController::class, 'settings'])->name('settings');
 
         // Google Ads connection. The callback URL is registered on the Google OAuth client.
         Route::prefix('integrations/google-ads')->name('google-ads.')->controller(GoogleAdsController::class)->group(function () {
             Route::get('connect', 'connect')->name('connect');
             Route::get('callback', 'callback')->name('callback');
-            Route::delete('/', 'disconnect')->name('disconnect');
             Route::patch('accounts/{account}', 'updateAccount')->name('accounts.update');
+            Route::patch('{connection}', 'updateConnection')->name('update');
+            Route::delete('{connection}', 'disconnect')->name('disconnect');
         });
 
         // AI Front Desk umbrella — call answering, booking and intake.

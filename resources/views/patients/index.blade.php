@@ -77,6 +77,10 @@
                     class="portal-tab-btn border-b-2 border-transparent text-slate-500 hover:text-slate-800 pb-3 flex items-center gap-2 cursor-pointer transition-all">
                     <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i> Export Data
                 </button>
+                <button type="button" id="tabCodeExportBtn"
+                    class="portal-tab-btn border-b-2 border-transparent text-slate-500 hover:text-slate-800 pb-3 flex items-center gap-2 cursor-pointer transition-all">
+                    <i data-lucide="tag" class="w-4 h-4 text-blue-600"></i> Code Export
+                </button>
                 <button type="button" id="tabRemindersBtn"
                     class="portal-tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-600 pb-3 cursor-pointer">
                     Reminders
@@ -549,6 +553,205 @@
         </div>
 
         <!-- ========================================== -->
+        <!-- TAB 3: CODE EXPORT TAB CONTENT             -->
+        <!-- ========================================== -->
+        <div id="codeExportTabContent" class="hidden flex flex-col flex-1 px-8 py-6 space-y-6 max-w-[1600px] w-full mx-auto">
+
+            <!-- Section 1: Filter Parameters -->
+            <div class="bg-white border border-slate-200 rounded-lg shadow-sm p-6">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2.5">
+                        <div class="p-2 bg-blue-50 text-blue-600 rounded-md">
+                            <i data-lucide="filter" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900">1. Filter Parameters</h2>
+                            <p class="text-xs text-slate-500">Filter procedure records by code types, date range, clinic, and procedure status</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="codeExpResetFiltersBtn"
+                            class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-300 hover:bg-slate-50 rounded-md transition-colors cursor-pointer flex items-center gap-1.5">
+                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset
+                        </button>
+                        <button type="button" id="codeExpApplyFiltersBtn"
+                            class="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors cursor-pointer flex items-center gap-1.5">
+                            <i data-lucide="search" class="w-3.5 h-3.5"></i> Apply Filters
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+                    <!-- Filter 1: Procedure Codes -->
+                    <div>
+                        <label for="codeExpCodes" class="block text-xs font-bold text-slate-700 mb-1.5">
+                            Code Types / Procedure Codes
+                        </label>
+                        <input type="text" id="codeExpCodes" value="8080, 8090" placeholder="e.g. 8080, 8090, D8080, D8090"
+                            class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            <span class="text-[11px] text-slate-400">Presets:</span>
+                            <button type="button" class="code-preset-chip text-[11px] px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded cursor-pointer transition-colors" data-code="8080, 8090">8080, 8090</button>
+                            <button type="button" class="code-preset-chip text-[11px] px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded cursor-pointer transition-colors" data-code="D8080, D8090">D8080, D8090</button>
+                            <button type="button" class="code-preset-chip text-[11px] px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded cursor-pointer transition-colors" data-code="D0120, D0150, D1110">D0120, D0150</button>
+                        </div>
+                    </div>
+
+                    <!-- Filter 2: Reusable Date Range Selector -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                            Date Range
+                        </label>
+                        <x-daterange-picker id="codeExpDateRange" />
+                    </div>
+
+                    <!-- Filter 3: Clinic -->
+                    <div>
+                        <label for="codeExpClinic" class="block text-xs font-bold text-slate-700 mb-1.5">Clinic</label>
+                        <select id="codeExpClinic"
+                            class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer">
+                            <option value="all">All Clinics</option>
+                            @foreach($clinics as $cNum => $cName)
+                                <option value="{{ $cNum }}">{{ $cName }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Filter 4: Procedure Status -->
+                    <div>
+                        <label for="codeExpStatus" class="block text-xs font-bold text-slate-700 mb-1.5">Procedure Status</label>
+                        <select id="codeExpStatus"
+                            class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer">
+                            <option value="all">All Statuses</option>
+                            <option value="completed">Completed Only</option>
+                            <option value="treatment_planned">Treatment Planned</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Match Status Indicator -->
+                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-2 text-blue-900 bg-blue-50/80 border border-blue-200 px-3 py-1.5 rounded-md font-medium">
+                        <i data-lucide="check-circle" class="w-4 h-4 text-blue-600"></i>
+                        <span><strong id="codeExpMatchCount" class="font-bold text-blue-900">0</strong> procedures (<strong id="codeExpPatientCount" class="font-bold text-blue-900">0</strong> unique patients) match your selected criteria.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2: Selected Columns to Export -->
+            <div class="bg-white border border-slate-200 rounded-lg shadow-sm p-6">
+                <div class="flex flex-wrap items-center justify-between mb-4 pb-3 border-b border-slate-100 gap-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="p-2 bg-blue-50 text-blue-600 rounded-md">
+                            <i data-lucide="columns-3" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900">2. Select Export Columns</h2>
+                            <p class="text-xs text-slate-500">Choose data columns to include in your table and CSV export (<span id="codeExpSelectedBadge" class="font-bold text-blue-600">13 selected</span>)</p>
+                        </div>
+                    </div>
+
+                    <!-- Column Presets -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-xs font-bold text-slate-500 mr-1">Presets:</span>
+                        <button type="button" class="code-exp-preset-btn px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded transition-colors cursor-pointer" data-preset="all">
+                            Select All
+                        </button>
+                        <button type="button" class="code-exp-preset-btn px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded transition-colors cursor-pointer" data-preset="none">
+                            Deselect All
+                        </button>
+                        <button type="button" class="code-exp-preset-btn px-2.5 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold rounded transition-colors cursor-pointer" data-preset="default">
+                            Default Columns
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    @php
+                        $codeCols = $codeExportColumns ?? \App\Http\Controllers\PatientController::getCodeExportableColumns();
+                    @endphp
+                    @foreach($codeCols as $colKey => $colDef)
+                        <label class="flex items-center gap-2.5 text-xs text-slate-800 bg-slate-50/80 hover:bg-slate-100 border border-slate-200 p-2.5 rounded-md cursor-pointer select-none transition-colors">
+                            <input type="checkbox" value="{{ $colKey }}" class="code-exp-col-chk w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500" @checked($colDef['default'])>
+                            <span class="font-medium text-slate-700">{{ $colDef['label'] }}</span>
+                        </label>
+                    @endforeach
+                </div>
+            </div>
+
+            <!-- Section 3: Data Table & CSV Export Studio -->
+            <div class="bg-white border border-slate-200 rounded-lg shadow-sm p-6 space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2.5">
+                        <div class="p-2 bg-blue-50 text-blue-600 rounded-md">
+                            <i data-lucide="table-properties" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900">3. Visualize & Export Data</h2>
+                            <p class="text-xs text-slate-500">Live preview of filtered procedure records and instant CSV download</p>
+                        </div>
+                    </div>
+
+                    <!-- CSV Export Bar -->
+                    <div class="flex items-center gap-3">
+                        <div class="relative flex items-center">
+                            <input type="text" id="codeExpFilenameInput" value="patient_code_8080_8090_export"
+                                placeholder="Export filename"
+                                class="pl-3 pr-14 py-1.5 border border-slate-300 rounded text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 w-60">
+                            <span class="absolute right-2.5 text-[11px] font-semibold text-slate-400 pointer-events-none">.csv</span>
+                        </div>
+
+                        <button type="button" id="codeExpDownloadCsvBtn"
+                            class="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-sm transition-colors cursor-pointer flex items-center gap-1.5">
+                            <i data-lucide="download" class="w-4 h-4"></i> Export to CSV
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Preview Table Container -->
+                <div class="relative overflow-x-auto border border-slate-200 rounded-lg max-h-[500px]">
+                    <div id="codeExpLoadingOverlay" class="hidden absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 flex items-center justify-center">
+                        <div class="flex items-center gap-2 text-xs font-bold text-blue-700 bg-white px-4 py-2 rounded-full shadow-md border border-slate-200">
+                            <svg class="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Loading Procedure Data...
+                        </div>
+                    </div>
+
+                    <table id="codeExpPreviewTable" class="w-full text-left border-collapse table-auto text-xs">
+                        <thead id="codeExpPreviewThead" class="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 sticky top-0 z-10">
+                        </thead>
+                        <tbody id="codeExpPreviewTbody" class="divide-y divide-slate-100 text-slate-700 bg-white">
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Preview Pagination & Info Bar -->
+                <div class="flex flex-wrap items-center justify-between text-xs text-slate-600 pt-2">
+                    <div id="codeExpPaginationInfo" class="font-medium">
+                        Showing 0 of 0 procedures
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="codeExpPrevPageBtn" disabled
+                            class="px-3 py-1.5 bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors cursor-pointer">
+                            Previous
+                        </button>
+                        <span id="codeExpPageIndicator" class="px-2 font-bold text-slate-800">Page 1 of 1</span>
+                        <button type="button" id="codeExpNextPageBtn" disabled
+                            class="px-3 py-1.5 bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors cursor-pointer">
+                            Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================== -->
         <!-- POPUP & MODALS                             -->
         <!-- ========================================== -->
         <div id="exportModal"
@@ -631,21 +834,35 @@
         $(document).ready(function () {
             // Tab Switching Engine
             $('#tabPatientsBtn').on('click', function () {
-                $('.portal-tab-btn').removeClass('border-emerald-500 text-slate-900 font-bold').addClass('border-transparent text-slate-500 font-medium');
+                $('.portal-tab-btn').removeClass('border-emerald-500 border-blue-500 text-slate-900 font-bold').addClass('border-transparent text-slate-500 font-medium');
                 $(this).addClass('border-emerald-500 text-slate-900 font-bold').removeClass('border-transparent text-slate-500 font-medium');
 
                 $('#exportDataTabContent').addClass('hidden');
+                $('#codeExportTabContent').addClass('hidden');
                 $('#patientsListTabContent').removeClass('hidden');
             });
 
             $('#tabExportDataBtn').on('click', function () {
-                $('.portal-tab-btn').removeClass('border-emerald-500 text-slate-900 font-bold').addClass('border-transparent text-slate-500 font-medium');
+                $('.portal-tab-btn').removeClass('border-emerald-500 border-blue-500 text-slate-900 font-bold').addClass('border-transparent text-slate-500 font-medium');
                 $(this).addClass('border-emerald-500 text-slate-900 font-bold').removeClass('border-transparent text-slate-500 font-medium');
 
                 $('#patientsListTabContent').addClass('hidden');
+                $('#codeExportTabContent').addClass('hidden');
                 $('#exportDataTabContent').removeClass('hidden');
 
                 fetchExportPreview();
+            });
+
+            $('#tabCodeExportBtn').on('click', function () {
+                $('.portal-tab-btn').removeClass('border-emerald-500 border-blue-500 text-slate-900 font-bold').addClass('border-transparent text-slate-500 font-medium');
+                $(this).addClass('border-blue-500 text-slate-900 font-bold').removeClass('border-transparent text-slate-500 font-medium');
+
+                $('#patientsListTabContent').addClass('hidden');
+                $('#exportDataTabContent').addClass('hidden');
+                $('#codeExportTabContent').removeClass('hidden');
+
+                ensureCodeExpDateRangeInit();
+                fetchCodeExportData(1);
             });
 
             function showPatientsLoading() {
@@ -1070,6 +1287,240 @@
                 window.location.href = "{{ route('patients.export-download') }}?" + params;
             });
 
+            // ========================================================
+            // CODE EXPORT TAB ENGINE
+            // ========================================================
+            let codeExpCurrentPage = 1;
+            let codeExpTotalPages = 1;
+            const codeExpColLabels = {
+                'patient_id': 'Patient ID',
+                'first_name': 'First Name',
+                'last_name': 'Last Name',
+                'age': 'Age',
+                'dob': 'DOB',
+                'gender': 'Gender',
+                'phone_number': 'Phone Number',
+                'email': 'Email',
+                'mobile_phone': 'Mobile Phone',
+                'home_phone': 'Home Phone',
+                'work_phone': 'Work Phone',
+                'zip_code': 'Zip Code',
+                'city': 'City',
+                'insurance': 'Insurance',
+                'provider_state': 'Provider State',
+                'clinic_name': 'Clinic',
+                'procedure_code': 'Procedure Code',
+                'procedure_date': 'Procedure Date',
+                'procedure_fee': 'Procedure Fee',
+                'procedure_status': 'Procedure Status'
+            };
+
+            function getSelectedCodeExportCols() {
+                let cols = [];
+                $('.code-exp-col-chk:checked').each(function () {
+                    cols.push($(this).val());
+                });
+                return cols;
+            }
+
+            function updateSelectedCodeCountBadge() {
+                let count = $('.code-exp-col-chk:checked').length;
+                $('#codeExpSelectedBadge').text(count + ' selected');
+            }
+
+            updateSelectedCodeCountBadge();
+
+            function getCodeExpDates() {
+                let drp = $('#codeExpDateRange').data('daterangepicker');
+                if (drp && drp.startDate && drp.endDate) {
+                    return {
+                        from: drp.startDate.format('YYYY-MM-DD'),
+                        to: drp.endDate.format('YYYY-MM-DD')
+                    };
+                }
+                return {
+                    from: moment().subtract(6, 'months').format('YYYY-MM-DD'),
+                    to: moment().format('YYYY-MM-DD')
+                };
+            }
+
+            function ensureCodeExpDateRangeInit() {
+                let drp = $('#codeExpDateRange').data('daterangepicker');
+                if (drp) {
+                    drp.setStartDate(moment().subtract(6, 'months'));
+                    drp.setEndDate(moment());
+                }
+            }
+
+            document.addEventListener('daterange:changed', function (e) {
+                if (e.detail && e.detail.id === 'codeExpDateRange') {
+                    fetchCodeExportData(1);
+                }
+            });
+
+            // Presets for codes
+            $('.code-preset-chip').on('click', function () {
+                let code = $(this).data('code');
+                $('#codeExpCodes').val(code);
+                fetchCodeExportData(1);
+            });
+
+            // Column checkbox change
+            $(document).on('change', '.code-exp-col-chk', function () {
+                updateSelectedCodeCountBadge();
+                fetchCodeExportData(1);
+            });
+
+            // Column Presets
+            $('.code-exp-preset-btn').on('click', function () {
+                let preset = $(this).data('preset');
+                if (preset === 'all') {
+                    $('.code-exp-col-chk').prop('checked', true);
+                } else if (preset === 'none') {
+                    $('.code-exp-col-chk').prop('checked', false);
+                } else if (preset === 'default') {
+                    const nonDefaults = ['procedure_fee', 'procedure_status', 'mobile_phone', 'home_phone', 'work_phone'];
+                    $('.code-exp-col-chk').each(function () {
+                        let v = $(this).val();
+                        $(this).prop('checked', nonDefaults.indexOf(v) === -1);
+                    });
+                }
+                updateSelectedCodeCountBadge();
+                fetchCodeExportData(1);
+            });
+
+            // Apply Filters
+            $('#codeExpApplyFiltersBtn').on('click', function () {
+                fetchCodeExportData(1);
+            });
+
+            $('#codeExpCodes').on('keypress', function (e) {
+                if (e.which == 13) { fetchCodeExportData(1); }
+            });
+
+            // Reset Filters
+            $('#codeExpResetFiltersBtn').on('click', function () {
+                $('#codeExpCodes').val('8080, 8090');
+                ensureCodeExpDateRangeInit();
+                $('#codeExpClinic').val('all');
+                $('#codeExpStatus').val('all');
+                fetchCodeExportData(1);
+            });
+
+            // Pagination
+            $('#codeExpPrevPageBtn').on('click', function () {
+                if (codeExpCurrentPage > 1) {
+                    fetchCodeExportData(codeExpCurrentPage - 1);
+                }
+            });
+
+            $('#codeExpNextPageBtn').on('click', function () {
+                if (codeExpCurrentPage < codeExpTotalPages) {
+                    fetchCodeExportData(codeExpCurrentPage + 1);
+                }
+            });
+
+            // Fetch Preview Data
+            function fetchCodeExportData(page = 1) {
+                codeExpCurrentPage = page;
+                $('#codeExpLoadingOverlay').removeClass('hidden');
+
+                let cols = getSelectedCodeExportCols();
+                if (cols.length === 0) {
+                    cols = ['patient_id', 'first_name', 'last_name', 'procedure_code', 'procedure_date'];
+                }
+
+                let loc = document.getElementById('patientSingleLocation')?.value || '';
+                let dates = getCodeExpDates();
+
+                let params = {
+                    locations: loc ? [loc] : [],
+                    codes: $('#codeExpCodes').val(),
+                    date_mode: 'custom',
+                    date_from: dates.from,
+                    date_to: dates.to,
+                    clinic: $('#codeExpClinic').val(),
+                    proc_status: $('#codeExpStatus').val(),
+                    columns: cols,
+                    page: codeExpCurrentPage,
+                    per_page: 20
+                };
+
+                $.get("{{ route('patients.code-export-data') }}", params, function (res) {
+                    $('#codeExpLoadingOverlay').addClass('hidden');
+
+                    let total = res.total || 0;
+                    let uniquePatients = res.unique_patients || 0;
+                    codeExpTotalPages = res.total_pages || 1;
+
+                    $('#codeExpMatchCount').text(total.toLocaleString());
+                    $('#codeExpPatientCount').text(uniquePatients.toLocaleString());
+                    $('#codeExpPaginationInfo').text(`Showing ${res.data.length} of ${total.toLocaleString()} matching procedure records`);
+                    $('#codeExpPageIndicator').text(`Page ${codeExpCurrentPage} of ${Math.max(1, codeExpTotalPages)}`);
+
+                    $('#codeExpPrevPageBtn').prop('disabled', codeExpCurrentPage <= 1);
+                    $('#codeExpNextPageBtn').prop('disabled', codeExpCurrentPage >= codeExpTotalPages);
+
+                    // Build Thead
+                    let theadHtml = '<tr>';
+                    cols.forEach(col => {
+                        theadHtml += `<th class="py-3 px-3.5 border-r border-slate-200 whitespace-nowrap">${codeExpColLabels[col] || col}</th>`;
+                    });
+                    theadHtml += '</tr>';
+                    $('#codeExpPreviewThead').html(theadHtml);
+
+                    // Build Tbody
+                    let tbodyHtml = '';
+                    if (res.data && res.data.length > 0) {
+                        res.data.forEach(row => {
+                            tbodyHtml += '<tr class="hover:bg-slate-50/80 transition-colors">';
+                            cols.forEach(col => {
+                                let val = row[col] !== undefined && row[col] !== null ? row[col] : '';
+                                if (col === 'procedure_fee' && typeof val === 'number') {
+                                    val = '$ ' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                }
+                                tbodyHtml += `<td class="py-2.5 px-3.5 border-r border-slate-100 whitespace-nowrap">${val || '—'}</td>`;
+                            });
+                            tbodyHtml += '</tr>';
+                        });
+                    } else {
+                        tbodyHtml = `<tr><td colspan="${cols.length}" class="py-12 text-center text-slate-400 font-medium">No procedure records found matching your selected filters.</td></tr>`;
+                    }
+                    $('#codeExpPreviewTbody').html(tbodyHtml);
+
+                    lucide.createIcons();
+                }).fail(function () {
+                    $('#codeExpLoadingOverlay').addClass('hidden');
+                });
+            }
+
+            // CSV Download Action
+            $('#codeExpDownloadCsvBtn').on('click', function () {
+                let cols = getSelectedCodeExportCols();
+                if (cols.length === 0) {
+                    alert('Please select at least one column to export.');
+                    return;
+                }
+
+                let filename = $('#codeExpFilenameInput').val() || 'procedure_code_export';
+                let loc = document.getElementById('patientSingleLocation')?.value || '';
+                let dates = getCodeExpDates();
+
+                let params = $.param({
+                    locations: loc ? [loc] : [],
+                    codes: $('#codeExpCodes').val(),
+                    date_mode: 'custom',
+                    date_from: dates.from,
+                    date_to: dates.to,
+                    clinic: $('#codeExpClinic').val(),
+                    proc_status: $('#codeExpStatus').val(),
+                    columns: cols,
+                    filename: filename
+                });
+
+                window.location.href = "{{ route('patients.code-export-download') }}?" + params;
+            });
+
             // Auto-open patient modal if open_patient_id is in query params
             const urlParams = new URLSearchParams(window.location.search);
             const openPatientId = urlParams.get('open_patient_id');
@@ -1078,11 +1529,24 @@
             }
         });
 
+        $('#patientSingleLocation').on('change', function () {
+            if (!$('#patientsListTabContent').hasClass('hidden')) {
+                showPatientsLoading();
+                table.ajax.reload();
+            } else if (!$('#exportDataTabContent').hasClass('hidden')) {
+                fetchExportPreview(1);
+            } else if (!$('#codeExportTabContent').hasClass('hidden')) {
+                fetchCodeExportData(1);
+            }
+        });
+
         $("#refreshPatients").click(function () {
             if (!$('#patientsListTabContent').hasClass('hidden')) {
                 table.ajax.reload();
-            } else {
+            } else if (!$('#exportDataTabContent').hasClass('hidden')) {
                 fetchExportPreview(1);
+            } else if (!$('#codeExportTabContent').hasClass('hidden')) {
+                fetchCodeExportData(1);
             }
         });
     </script>

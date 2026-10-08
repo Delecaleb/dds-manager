@@ -164,7 +164,7 @@ class ModuleManager
                 'modules' => [
                     'marketing' => [
                         'name' => 'Growth Engine',
-                        'description' => 'Marketing attribution, campaigns, lead nurturing and automations',
+                        'description' => 'Per-office website tracking, attribution, Google Ads campaigns, leads and alerts; AI Front Desk; AI Website Builder',
                         'icon' => 'trending-up',
                         'route' => 'marketing.index',
                     ],

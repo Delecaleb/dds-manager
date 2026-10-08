@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasMarketingLocation;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,8 +15,9 @@ use Illuminate\Support\Str;
 class MarketingSite extends Model
 {
     use HasFactory;
+    use HasMarketingLocation;
 
-    protected $fillable = ['site_key', 'name', 'domain', 'office_id', 'is_active', 'verified_at'];
+    protected $fillable = ['site_key', 'name', 'domain', 'office_id', 'clinic_num', 'is_active', 'verified_at'];
 
     protected function casts(): array
     {

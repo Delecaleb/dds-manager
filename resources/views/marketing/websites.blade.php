@@ -1,6 +1,6 @@
 <x-marketing-layout>
     <x-slot:title>Websites</x-slot:title>
-    <x-slot:subtitle>{{ $selected['name'] ?? 'All sites' }} · {{ $start }} → {{ $end }}</x-slot:subtitle>
+    <x-slot:subtitle>{{ $filter->locationLabel() }} · {{ $selected['name'] ?? 'all sites' }} · {{ $filter->start }} → {{ $filter->end }}</x-slot:subtitle>
 
     <x-slot:toolbar>
         <form method="GET" class="flex items-center gap-2">
@@ -11,10 +11,8 @@
                     <option value="{{ $site['id'] }}" @selected(($selected['id'] ?? null) === $site['id'])>{{ $site['name'] }}</option>
                 @endforeach
             </select>
-            <input type="date" name="start_date" value="{{ $start }}" onchange="this.form.submit()"
-                class="text-xs rounded-lg border border-slate-200 px-2 py-1.5 bg-white">
-            <input type="date" name="end_date" value="{{ $end }}" onchange="this.form.submit()"
-                class="text-xs rounded-lg border border-slate-200 px-2 py-1.5 bg-white">
+            <input type="hidden" name="start_date" value="{{ $filter->start }}">
+            <input type="hidden" name="end_date" value="{{ $filter->end }}">
         </form>
     </x-slot:toolbar>
 
@@ -30,7 +28,7 @@
                 hint="First visit → signup" />
         </div>
 
-        <x-marketing.panel title="Tracked sites" subtitle="Each site reports under its own key" icon="globe">
+        <x-marketing.panel title="Tracked sites" subtitle="Every site in the selected locations; each reports under its own key" icon="globe">
             <x-slot:actions>
                 <a href="{{ route('marketing.tracking') }}"
                     class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-lg border border-emerald-500 text-emerald-700 hover:bg-emerald-50">
@@ -44,6 +42,7 @@
                         <tr>
                             <th class="py-2.5 px-4 font-bold text-gray-900">Site</th>
                             <th class="py-2.5 px-4 font-bold text-gray-900">Domain</th>
+                            <th class="py-2.5 px-4 font-bold text-gray-900">Location</th>
                             <th class="py-2.5 px-4 font-bold text-gray-900">Status</th>
                             <th class="py-2.5 px-4 font-bold text-gray-900 text-right">Visitors</th>
                             <th class="py-2.5 px-4 font-bold text-gray-900 text-right">Sessions</th>
@@ -56,10 +55,11 @@
                         @forelse($sites as $site)
                             <tr>
                                 <td class="py-3 px-4 font-semibold text-slate-800">
-                                    <a href="{{ route('marketing.websites', ['site' => $site['id'], 'start_date' => $start, 'end_date' => $end]) }}"
+                                    <a href="{{ route('marketing.websites', $filter->query(['site' => $site['id']])) }}"
                                         class="hover:text-emerald-700">{{ $site['name'] }}</a>
                                 </td>
                                 <td class="py-3 px-4 text-slate-600">{{ $site['domain'] }}</td>
+                                <td class="py-3 px-4 {{ $site['location'] ? 'text-slate-600' : 'text-amber-700' }}">{{ $site['location'] ?? 'Not assigned' }}</td>
                                 <td class="py-3 px-4">
                                     @if(! $site['is_active'])
                                         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-500">Paused</span>
@@ -77,11 +77,11 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-0">
+                                <td colspan="9" class="px-0">
                                     <x-marketing.empty
                                         icon="globe"
-                                        title="No sites tracked yet"
-                                        message="Add a site and install its snippet — visitors appear here as soon as the first page loads." />
+                                        title="No tracked sites in these locations"
+                                        message="Add a site on the Tracking Script page and assign it to a location — visitors appear here as soon as the first page loads." />
                                 </td>
                             </tr>
                         @endforelse

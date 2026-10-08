@@ -1,6 +1,6 @@
 <x-marketing-layout>
     <x-slot:title>Tracking Script</x-slot:title>
-    <x-slot:subtitle>Add a site, install its snippet, watch it verify</x-slot:subtitle>
+    <x-slot:subtitle>Add a site, assign it to a location, install its snippet, watch it verify</x-slot:subtitle>
 
     <div class="p-6 space-y-6 max-w-[1100px]">
 
@@ -27,12 +27,13 @@
                 </div>
                 <div>
                     <label class="block text-[11px] font-bold text-slate-700 mb-1.5">Location</label>
-                    <select name="office_id" class="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 bg-white">
-                        <option value="">Not set</option>
-                        @foreach($offices as $office)
-                            <option value="{{ $office->id }}">{{ $office->name }}</option>
+                    <select name="location" class="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 bg-white">
+                        <option value="">Not assigned</option>
+                        @foreach($locations as $key => $location)
+                            <option value="{{ $key }}" @selected(old('location') === $key)>{{ $location->name }}</option>
                         @endforeach
                     </select>
+                    @error('location') <p class="text-[10px] text-rose-600 mt-1">{{ $message }}</p> @enderror
                 </div>
                 <button type="submit"
                     class="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded-lg border border-emerald-500 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer">
@@ -41,13 +42,26 @@
             </form>
         </x-marketing.panel>
 
-        @forelse($sites as $site)
+        @forelse($sites as $row)
             @php
+                $site = $row['model'];
                 $snippet = $site->trackingSnippet($scriptUrl);
             @endphp
 
-            <x-marketing.panel :title="$site->name" :subtitle="$site->domain" icon="code">
+            <x-marketing.panel :title="$site->name" :subtitle="$site->domain . ' · ' . ($row['location'] ?? 'Not assigned to a location')" icon="code">
                 <x-slot:actions>
+                    {{-- Which office this site's traffic and leads belong to. --}}
+                    <form method="POST" action="{{ route('marketing.sites.update', $site) }}" class="flex items-center gap-1.5">
+                        @csrf @method('PATCH')
+                        <select name="location" aria-label="Location" onchange="this.form.submit()"
+                            class="text-[11px] rounded-lg border {{ $row['location_key'] === null ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white' }} px-2 py-1 cursor-pointer">
+                            <option value="">Not assigned</option>
+                            @foreach($locations as $key => $location)
+                                <option value="{{ $key }}" @selected($row['location_key'] === $key)>{{ $location->name }}</option>
+                            @endforeach
+                        </select>
+                    </form>
+
                     @if(! $site->is_active)
                         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-500">Paused</span>
                     @elseif($site->isVerified())
@@ -58,7 +72,7 @@
                         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">Awaiting first event</span>
                     @endif
 
-                    <a href="{{ route('marketing.websites', ['site' => $site->id]) }}"
+                    <a href="{{ route('marketing.websites', ['site' => $site->id, 'locations' => $row['location_key'] ?? 'all']) }}"
                         class="text-[11px] font-bold text-emerald-700 hover:text-emerald-800">Traffic →</a>
 
                     <form method="POST" action="{{ route('marketing.sites.toggle', $site) }}">

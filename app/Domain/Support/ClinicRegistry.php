@@ -177,6 +177,27 @@ class ClinicRegistry
     }
 
     /**
+     * Display name for a row stored as office_id + clinic_num (Growth Engine tables).
+     * A null clinic on a multi-clinic office is the office as a whole.
+     */
+    public function labelFor(int $officeId, ?int $clinicNum): string
+    {
+        $all = $this->locations();
+
+        if ($clinicNum !== null && isset($all[Location::keyFor($officeId, $clinicNum)])) {
+            return $all[Location::keyFor($officeId, $clinicNum)]->name;
+        }
+
+        if (isset($all[(string) $officeId])) {
+            return $all[(string) $officeId]->name;
+        }
+
+        $office = Office::find($officeId)?->name ?? "Office {$officeId}";
+
+        return $clinicNum === null ? "{$office} (all clinics)" : "{$office} - ".$this->name($clinicNum, $officeId);
+    }
+
+    /**
      * Resolve a comma-separated list of location keys (the `locations` request param).
      * Unknown keys are dropped. "all" selects every location. Missing or fully invalid
      * input falls back to the persisted session selection, or the active office.
