@@ -243,20 +243,11 @@ class CalendarController extends Controller
 
         $operatoryMap = [];
         if (Schema::hasTable('od_operatories')) {
-            $operatoryQuery = DB::table('od_operatories')
-                ->where(function ($q) use ($scopes) {
-                    foreach ($scopes as $officeId => $clinics) {
-                        $q->orWhere(function ($sub) use ($officeId, $clinics) {
-                            $sub->where('office_id', $officeId);
-                            if (! empty($clinics) && Schema::hasColumn('od_operatories', 'ClinicNum')) {
-                                $sub->where(function ($c) use ($clinics) {
-                                    $c->whereIn('ClinicNum', $clinics)->orWhere('ClinicNum', 0);
-                                });
-                            }
-                        });
-                    }
-                });
-            $ops = $operatoryQuery->get(['office_id', 'OperatoryNum', 'OpName']);
+            // A name lookup keyed by office + operatory, so not narrowed to the selected clinics:
+            // an appointment can be booked into a chair of another clinic in the same database.
+            $ops = DB::table('od_operatories')
+                ->whereIn('office_id', array_keys($scopes))
+                ->get(['office_id', 'OperatoryNum', 'OpName']);
             foreach ($ops as $op) {
                 $operatoryMap[$op->office_id.':'.$op->OperatoryNum] = $op->OpName;
             }

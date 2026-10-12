@@ -65,6 +65,9 @@ class HardDeleteSyncService
         'od_statements' => ['date_cols' => ['DateSent'], 'is_datetime' => false],
         'od_histappointments' => ['date_cols' => ['HistDate', 'AptDateTime'], 'is_datetime' => false],
         'od_insplans' => ['date_cols' => ['SecDateTEdit'], 'is_datetime' => false],
+        // No business date: windowed runs check operatories created locally in the window; the
+        // weekly full scan checks every one (a few dozen rows per office).
+        'od_operatories' => ['date_cols' => [], 'is_datetime' => false],
     ];
 
     public function __construct(

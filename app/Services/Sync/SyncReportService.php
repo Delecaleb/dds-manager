@@ -165,6 +165,13 @@ class SyncReportService
                 'service_class' => ClinicSyncService::class,
                 'icon' => 'map-pin',
             ],
+            'operatories' => [
+                'label' => 'Operatories',
+                'table' => 'od_operatories',
+                'service_class' => OperatorySyncService::class,
+                'log_module' => 'operatory',
+                'icon' => 'armchair',
+            ],
             'definitions' => [
                 'label' => 'Definitions',
                 'table' => 'od_definitions',

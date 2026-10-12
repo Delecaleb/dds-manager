@@ -1017,7 +1017,7 @@
                 height: 'auto',
                 expandRows: false,
                 allDaySlot: false,
-                resourceOrder: 'title',
+                resourceOrder: 'order,title', // OpenDental's chair order (CalendarResourceTransformer)
 
                 // ── Resources (provider columns) ──────────────────────────
                 resources: function (info, success, fail) {

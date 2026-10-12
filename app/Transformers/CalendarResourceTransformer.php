@@ -2,72 +2,84 @@
 
 namespace App\Transformers;
 
+use App\Models\OdOperatory;
 use App\Models\Office;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * The Appointments Calendar's columns: one per operatory (chair) the selected location uses.
+ *
+ * - The location's own visible operatories (od_operatories), in OpenDental's ItemOrder.
+ *   A clinic sees only its own chairs; a single-clinic office sees all of them.
+ * - Plus every operatory an appointment in view is booked into, even if hidden, belonging
+ *   to another clinic, or not synced yet — FullCalendar silently drops an event whose
+ *   column does not exist, so no appointment may ever be left without one.
+ * - Appointments with no operatory get an "Unassigned" column.
+ */
 class CalendarResourceTransformer
 {
-    /**
-     * Map the required 10 operatories in order, optionally filtering only active ones.
-     */
+    /** Columns sort by `order`: synced chairs by position, then unsynced chairs by number, then Unassigned. */
+    private const UNSYNCED_ORDER = 1_000_000;
+
+    private const UNASSIGNED_ORDER = 2_000_000_000;
+
     public static function transform(Collection $appointments, bool $activeOnly = false, int|string|null $clinicId = null, ?int $officeId = null): array
     {
-        $officeId = $officeId ?? Office::getActiveOfficeId();
+        $officeId ??= Office::getActiveOfficeId();
+        $clinic = ($clinicId !== null && $clinicId !== '' && $clinicId !== 'all') ? (int) $clinicId : null;
 
-        $dbOps = collect();
-        if (Schema::hasTable('od_operatories')) {
-            $query = DB::table('od_operatories')
+        $usedOps = $appointments->map(fn ($apt) => (int) ($apt->Op ?? 0))->unique()->values();
+        $bookedOps = $usedOps->filter(fn (int $op) => $op > 0)->values()->all();
+
+        $operatories = Schema::hasTable('od_operatories')
+            ? OdOperatory::withoutGlobalScopes()
                 ->where('office_id', $officeId)
-                ->where(function ($q) {
-                    $q->whereNull('IsHidden')->orWhereIn('IsHidden', ['false', '0', 0, false]);
-                });
-
-            if ($clinicId !== null && $clinicId !== '' && $clinicId !== 'all' && Schema::hasColumn('od_operatories', 'ClinicNum')) {
-                $query->where(function ($q) use ($clinicId) {
-                    $q->where('ClinicNum', (int) $clinicId)->orWhere('ClinicNum', 0)->orWhereNull('ClinicNum');
-                });
-            }
-
-            $dbOps = $query->orderBy('ItemOrder')->get();
-        }
+                ->where(function ($query) use ($clinic, $bookedOps) {
+                    $query->where(function ($own) use ($clinic) {
+                        $own->visible();
+                        if ($clinic !== null) {
+                            $own->where('ClinicNum', $clinic);
+                        }
+                    });
+                    if ($bookedOps !== []) {
+                        $query->orWhereIn('OperatoryNum', $bookedOps);
+                    }
+                })
+                ->orderBy('ItemOrder')
+                ->orderBy('OperatoryNum')
+                ->get()
+            : collect();
 
         $resources = [];
-        if ($dbOps->isNotEmpty()) {
-            foreach ($dbOps as $op) {
-                $resources[] = [
-                    'id' => 'op-'.$op->OperatoryNum,
-                    'title' => $op->OpName ?: ('Op '.$op->OperatoryNum),
-                    'op_num' => (string) $op->OperatoryNum,
-                ];
-            }
-        } else {
-            $staticOpsOrder = ['2', '3', '4', '6', '7', '1', '5', '8', '9', '10'];
-            $staticOps = [
-                '2' => ['id' => 'op-2', 'title' => 'DR-2', 'op_num' => '2'],
-                '3' => ['id' => 'op-3', 'title' => 'DR-3', 'op_num' => '3'],
-                '4' => ['id' => 'op-4', 'title' => 'DR-4', 'op_num' => '4'],
-                '6' => ['id' => 'op-6', 'title' => 'Unassigned 6', 'op_num' => '6'],
-                '7' => ['id' => 'op-7', 'title' => 'Unassigned 7', 'op_num' => '7'],
-                '1' => ['id' => 'op-1', 'title' => 'DR-1', 'op_num' => '1'],
-                '5' => ['id' => 'op-5', 'title' => 'DR-5', 'op_num' => '5'],
-                '8' => ['id' => 'op-8', 'title' => 'Unassigned 8', 'op_num' => '8'],
-                '9' => ['id' => 'op-9', 'title' => 'Unassigned 9', 'op_num' => '9'],
-                '10' => ['id' => 'op-10', 'title' => 'Unassigned 10', 'op_num' => '10'],
-            ];
-            foreach ($staticOpsOrder as $opKey) {
-                $resources[] = $staticOps[$opKey];
-            }
+        foreach ($operatories as $position => $operatory) {
+            $resources[(int) $operatory->OperatoryNum] = self::column((int) $operatory->OperatoryNum, $operatory->label(), $position);
+        }
+
+        // Booked into an operatory we have no row for (not synced yet): still give it a column.
+        foreach ($bookedOps as $op) {
+            $resources[$op] ??= self::column($op, 'Op '.$op, self::UNSYNCED_ORDER + $op);
+        }
+
+        if ($usedOps->contains(0)) {
+            $resources[0] = self::column(0, 'Unassigned', self::UNASSIGNED_ORDER);
         }
 
         if ($activeOnly) {
-            $activeOps = $appointments->pluck('Op')->unique()->map(fn ($val) => (string) $val)->toArray();
-            $filtered = array_values(array_filter($resources, fn ($r) => in_array($r['op_num'], $activeOps)));
+            $active = array_intersect_key($resources, array_flip($usedOps->all()));
 
-            return empty($filtered) ? array_values($resources) : $filtered;
+            // Nothing booked: show the location's chairs rather than an empty grid.
+            if ($active !== []) {
+                $resources = $active;
+            }
         }
 
         return array_values($resources);
+    }
+
+    /** @return array{id: string, title: string, op_num: string, order: int} */
+    private static function column(int $op, string $title, int $order): array
+    {
+        return ['id' => 'op-'.$op, 'title' => $title, 'op_num' => (string) $op, 'order' => $order];
     }
 }

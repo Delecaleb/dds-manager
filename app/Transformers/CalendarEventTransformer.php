@@ -32,7 +32,7 @@ class CalendarEventTransformer
 
         // Match operatory tracking
         $opKey = 'op-'.($appointment->Op ?? '0');
-        $opTitle = $appointment->operatory?->OpName ?: ($appointment->Op ? 'Op '.$appointment->Op : 'Unassigned');
+        $opTitle = $appointment->operatory?->label() ?? ($appointment->Op ? 'Op '.$appointment->Op : 'Unassigned');
 
         $procedure = trim($appointment->ProcDescript ?? '');
         $note = trim($appointment->Note ?? '');
