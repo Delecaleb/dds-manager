@@ -9,6 +9,7 @@ use App\Domain\SiteBuilder\ClaudeSiteContentGenerator;
 use App\Domain\SiteBuilder\SiteContentGenerator;
 use App\Domain\SiteBuilder\SitePrompts;
 use App\Domain\Support\ClinicRegistry;
+use App\Http\Middleware\AuthenticateApiKey;
 use App\Models\User;
 use App\Services\Sync\QueueHealthService;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -87,6 +88,20 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute((int) config('marketing.tracking.rate_limit', 120))
                 ->by($request->ip())
                 ->response(fn () => response()->json(['ok' => false], 429));
+        });
+
+        // Developer API: each key has its own per-minute allowance, set when it is issued.
+        // Runs after AuthenticateApiKey, so the key is always on the request here.
+        RateLimiter::for('developer-api', function (Request $request) {
+            $key = $request->attributes->get(AuthenticateApiKey::ATTRIBUTE);
+
+            return Limit::perMinute((int) ($key?->rate_limit_per_minute ?: config('developer_api.default_rate_limit')))
+                ->by('api-key:'.($key?->id ?? $request->ip()))
+                ->response(fn (Request $request, array $headers) => response()->json(
+                    ['message' => 'Too many requests for this API key. Retry after '.($headers['Retry-After'] ?? 60).' seconds.'],
+                    429,
+                    $headers,
+                ));
         });
     }
 }

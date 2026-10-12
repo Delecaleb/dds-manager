@@ -32,13 +32,15 @@ class GoogleAdsSyncService
      *
      * @return int accounts found
      *
-     * @throws GoogleAdsException when Google cannot be asked at all
+     * @throws GoogleAdsException when Google cannot be asked at all, or refuses every account
      */
     public function discoverAccounts(MarketingAdConnection $connection): int
     {
         $found = [];
+        $rootIds = $this->client->accessibleCustomerIds($connection);
+        $rejections = [];
 
-        foreach ($this->client->accessibleCustomerIds($connection) as $rootId) {
+        foreach ($rootIds as $rootId) {
             try {
                 // A manager lists itself and its whole tree; a plain account lists only itself.
                 $rows = $this->client->search($connection, $rootId, '
@@ -49,6 +51,7 @@ class GoogleAdsSyncService
             } catch (GoogleAdsException $e) {
                 // Typically a cancelled or not-yet-enabled account; the others are still usable.
                 Log::warning("Google Ads account {$rootId} could not be read during discovery.", ['error' => $e->getMessage()]);
+                $rejections[] = $e->getMessage();
 
                 continue;
             }
@@ -70,6 +73,15 @@ class GoogleAdsSyncService
                     'status' => $client['status'] ?? null,
                 ];
             }
+        }
+
+        // Every account refused is an access problem (e.g. a test-level developer token), not
+        // an empty login — surface Google's reason instead of reporting "0 accounts".
+        if ($rootIds !== [] && count($rejections) === count($rootIds)) {
+            $reasons = array_values(array_unique($rejections));
+            $detail = count($reasons) === 1 ? $reasons[0] : $reasons[0].' (other accounts failed differently; see the log)';
+
+            throw new GoogleAdsException('Google refused all '.count($rootIds).' ad account(s) this login can see. '.$detail);
         }
 
         foreach ($found as $externalId => $attributes) {

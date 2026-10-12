@@ -28,6 +28,11 @@ class ModuleManager
             'badge_color' => 'bg-cyan-100 text-cyan-700 border-cyan-200',
             'description' => 'Clinical and provider-specific portal and patient access.',
         ],
+        'developer' => [
+            'name' => 'Developer',
+            'badge_color' => 'bg-indigo-100 text-indigo-700 border-indigo-200',
+            'description' => 'In-house developer: creates and manages read-only API keys in the Developer Portal.',
+        ],
         'staff' => [
             'name' => 'Front Desk / Staff',
             'badge_color' => 'bg-slate-100 text-slate-700 border-slate-200',
@@ -196,6 +201,12 @@ class ModuleManager
                         'description' => 'Server provisioning and database configuration',
                         'icon' => 'server-cog',
                         'route' => 'provisioner.index',
+                    ],
+                    'developer-portal' => [
+                        'name' => 'Developer Portal',
+                        'description' => 'Create and manage read-only API keys for the bookings API',
+                        'icon' => 'code-2',
+                        'route' => 'developer.index',
                     ],
                 ],
             ],

@@ -14,6 +14,33 @@ enum AppointmentStatus: int
     case PtNoteCompleted = 8;
     case WaitingList = 9;
 
+    /** Stable machine name, as the Developer API reports and filters statuses. */
+    public function slug(): string
+    {
+        return match ($this) {
+            self::Scheduled => 'scheduled',
+            self::Complete => 'complete',
+            self::Unscheduled => 'unscheduled',
+            self::ASAP => 'asap',
+            self::Broken => 'broken',
+            self::Planned => 'planned',
+            self::PtNote => 'patient_note',
+            self::PtNoteCompleted => 'patient_note_completed',
+            self::WaitingList => 'waiting_list',
+        };
+    }
+
+    public static function fromSlug(string $slug): ?self
+    {
+        foreach (self::cases() as $case) {
+            if ($case->slug() === $slug) {
+                return $case;
+            }
+        }
+
+        return null;
+    }
+
     public function text(): string
     {
         return match ($this) {

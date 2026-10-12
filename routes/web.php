@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\Admin\DeveloperApiController;
 use App\Http\Controllers\AgingController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepositSlipController;
+use App\Http\Controllers\DeveloperPortalController;
 use App\Http\Controllers\FinancialController;
 use App\Http\Controllers\FrontDeskController;
 use App\Http\Controllers\FrontDeskOfficeController;
@@ -85,6 +87,26 @@ Route::middleware('auth')->group(function () {
     Route::middleware('super_admin')->prefix('admin')->name('admin.')->group(function () {
         Route::patch('users/{user}/toggle-status', [AdminUserController::class, 'toggleStatus'])->name('users.toggle-status');
         Route::resource('users', AdminUserController::class);
+
+        // Oversight of every Developer API key. Developers create keys in the Developer Portal.
+        Route::prefix('developers')->name('developers.')->controller(DeveloperApiController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('keys/{apiKey}', 'show')->name('keys.show');
+            Route::delete('keys/{apiKey}', 'destroy')->name('keys.destroy');
+        });
+    });
+
+    // Developer Portal — a developer's own read-only API keys. Showing a key again and
+    // regenerating it need the password every time; both are throttled against guessing.
+    Route::middleware('module:developer-portal')->prefix('developer')->name('developer.')->controller(DeveloperPortalController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('keys', 'store')->name('keys.store');
+        Route::get('keys/{apiKey}', 'show')->name('keys.show');
+        Route::delete('keys/{apiKey}', 'destroy')->name('keys.destroy');
+        Route::middleware('throttle:6,1')->group(function () {
+            Route::post('keys/{apiKey}/reveal', 'reveal')->name('keys.reveal');
+            Route::post('keys/{apiKey}/regenerate', 'regenerate')->name('keys.regenerate');
+        });
     });
 
     // Dashboard Module
