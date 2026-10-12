@@ -22,15 +22,17 @@ class AppointmentRepository
         $startDate = substr($start, 0, 10);
         $endDate = substr($end, 0, 10);
 
-        $query = OdAppointment::withoutGlobalScopes()
-            ->with(['patient', 'provider'])
-            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$startDate, $endDate]);
+        $officeId ??= Office::getActiveOfficeId() ?? 1;
 
-        if ($officeId !== null) {
-            $query->where('office_id', $officeId);
-        } else {
-            $query->where('office_id', Office::getActiveOfficeId() ?? 1);
-        }
+        // PatNum / ProvNum / Op are only unique within one office's OpenDental database, so the
+        // related rows are read from the appointments' office — not from the session's active
+        // office (the models' global scope), which may be a different office entirely.
+        $sameOffice = fn ($related) => $related->withoutGlobalScopes()->where('office_id', $officeId);
+
+        $query = OdAppointment::withoutGlobalScopes()
+            ->with(['patient' => $sameOffice, 'provider' => $sameOffice, 'operatory' => $sameOffice])
+            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$startDate, $endDate])
+            ->where('office_id', $officeId);
 
         // Filter out unused status codes to match legacy Calendar logic
         // E.g., skip planned or unscheduled if needed in calendar view, though OpenDental API filtered these dynamically

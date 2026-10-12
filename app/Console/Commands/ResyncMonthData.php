@@ -63,6 +63,7 @@ class ResyncMonthData extends Command
         // ── Master / Catalog ──
         'sync:patients' => ['label' => 'Patients', 'category' => 'catalog', 'table' => 'patient', 'has_sync_col' => true],
         'sync:providers' => ['label' => 'Providers', 'category' => 'catalog', 'table' => 'provider', 'has_sync_col' => false],
+        'sync:operatories' => ['label' => 'Operatories', 'category' => 'catalog', 'table' => 'operatory', 'has_sync_col' => true],
         'sync:procedures' => ['label' => 'Procedure Codes', 'category' => 'catalog', 'table' => 'procedurecode', 'has_sync_col' => false],
         'sync:carriers' => ['label' => 'Insurance Carriers', 'category' => 'catalog', 'table' => 'carrier', 'has_sync_col' => false],
         'sync:insplan' => ['label' => 'Insurance Plans', 'category' => 'catalog', 'table' => 'insplan', 'has_sync_col' => false],

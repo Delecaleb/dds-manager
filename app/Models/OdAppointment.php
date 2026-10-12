@@ -146,6 +146,16 @@ class OdAppointment extends Model
         return $this->belongsTo(OdProvider::class, 'ProvNum', 'ProvNum');
     }
 
+    /**
+     * The chair the appointment is booked into. Like patient() and provider(), the key is only
+     * unique within one office: eager-load it constrained to the appointment's office (see
+     * AppointmentRepository::getAppointmentsByDateRange).
+     */
+    public function operatory()
+    {
+        return $this->belongsTo(OdOperatory::class, 'Op', 'OperatoryNum');
+    }
+
     public function procedureLogs()
     {
         return $this->hasMany(OdProcedureLog::class, 'AptNum', 'AptNum');

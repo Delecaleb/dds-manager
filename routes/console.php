@@ -134,6 +134,10 @@ Schedule::command('sync:dispatch schedules')->cron('25,55 * * * *')->onOneServer
 | LOW FREQUENCY (daily) — reference tables and historical data (off-peak hours).
 */
 Schedule::command('sync:dispatch providers procedures recall_types carriers insplan')->dailyAt('01:00')->onOneServer();
+
+// Operatories (calendar columns): small and incremental, so hourly costs one tiny query per
+// office and a new or renamed chair shows on the Appointments Calendar the same morning.
+Schedule::command('sync:dispatch operatories')->hourlyAt(40)->onOneServer();
 Schedule::command('sync:dispatch histappointments')->dailyAt('02:00')->onOneServer();
 
 /*
