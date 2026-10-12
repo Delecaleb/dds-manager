@@ -29,7 +29,7 @@
 @php $chartId = 'fd-chart-'.\Illuminate\Support\Str::random(8); @endphp
 
 <section {{ $attributes->merge(['class' => 'bg-white border border-slate-200 rounded-xl shadow-sm p-4']) }}>
-    <div class="flex items-start justify-between gap-4">
+    <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div class="min-w-0">
             <h3 class="text-[13px] font-semibold text-slate-800">{{ $title }}</h3>
             @if($subtitle)

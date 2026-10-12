@@ -76,6 +76,14 @@
                             </a>
                         @endif
 
+                        @if(auth()->user()->hasModuleAccess('developer-portal'))
+                            <a href="{{ route('developer.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('developer.*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('developer.*')) aria-current="page" @endif>
+                                <i data-lucide="code-2" class="w-4 h-4 text-indigo-600"></i> Developer Portal
+                            </a>
+                        @endif
+
                         @if(auth()->user()->hasModuleAccess('eod'))
                             <a href="{{ route('eod.index') }}"
                                 class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('eod.index') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
@@ -224,6 +232,11 @@
                                 class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('admin.users.*') ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
                                 @if(request()->routeIs('admin.users.*')) aria-current="page" @endif>
                                 <i data-lucide="shield-check" class="w-4 h-4 text-purple-600"></i> User & Access
+                            </a>
+                            <a href="{{ route('admin.developers.index') }}"
+                                class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm {{ request()->routeIs('admin.developers.*') ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium' }}"
+                                @if(request()->routeIs('admin.developers.*')) aria-current="page" @endif>
+                                <i data-lucide="key-round" class="w-4 h-4 text-purple-600"></i> Developer API
                             </a>
                         @endif
                     </nav>

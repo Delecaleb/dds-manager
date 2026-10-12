@@ -566,7 +566,7 @@
                         </div>
                         <div>
                             <h2 class="text-base font-bold text-slate-900">1. Filter Parameters</h2>
-                            <p class="text-xs text-slate-500">Filter procedure records by code types, date range, clinic, and procedure status</p>
+                            <p class="text-xs text-slate-500">Filter procedure records by code types, date range, and procedure status</p>
                         </div>
                     </div>
 
@@ -582,7 +582,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                     <!-- Filter 1: Procedure Codes -->
                     <div>
                         <label for="codeExpCodes" class="block text-xs font-bold text-slate-700 mb-1.5">
@@ -606,19 +606,7 @@
                         <x-daterange-picker id="codeExpDateRange" />
                     </div>
 
-                    <!-- Filter 3: Clinic -->
-                    <div>
-                        <label for="codeExpClinic" class="block text-xs font-bold text-slate-700 mb-1.5">Clinic</label>
-                        <select id="codeExpClinic"
-                            class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer">
-                            <option value="all">All Clinics</option>
-                            @foreach($clinics as $cNum => $cName)
-                                <option value="{{ $cNum }}">{{ $cName }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Filter 4: Procedure Status -->
+                    <!-- Filter 3: Procedure Status -->
                     <div>
                         <label for="codeExpStatus" class="block text-xs font-bold text-slate-700 mb-1.5">Procedure Status</label>
                         <select id="codeExpStatus"
@@ -1402,7 +1390,6 @@
             $('#codeExpResetFiltersBtn').on('click', function () {
                 $('#codeExpCodes').val('8080, 8090');
                 ensureCodeExpDateRangeInit();
-                $('#codeExpClinic').val('all');
                 $('#codeExpStatus').val('all');
                 fetchCodeExportData(1);
             });
@@ -1439,7 +1426,6 @@
                     date_mode: 'custom',
                     date_from: dates.from,
                     date_to: dates.to,
-                    clinic: $('#codeExpClinic').val(),
                     proc_status: $('#codeExpStatus').val(),
                     columns: cols,
                     page: codeExpCurrentPage,
@@ -1512,7 +1498,6 @@
                     date_mode: 'custom',
                     date_from: dates.from,
                     date_to: dates.to,
-                    clinic: $('#codeExpClinic').val(),
                     proc_status: $('#codeExpStatus').val(),
                     columns: cols,
                     filename: filename
