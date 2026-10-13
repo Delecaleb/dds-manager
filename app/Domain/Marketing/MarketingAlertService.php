@@ -4,6 +4,7 @@ namespace App\Domain\Marketing;
 
 use App\Domain\Support\ClinicRegistry;
 use App\Models\MarketingAdAccount;
+use App\Models\MarketingAdCampaign;
 use App\Models\MarketingAdConnection;
 use App\Models\MarketingSite;
 use Carbon\CarbonImmutable;
@@ -119,12 +120,20 @@ class MarketingAlertService
     {
         $out = [];
 
-        foreach (MarketingAdConnection::query()->googleAds()->within($filter)->get() as $connection) {
-            if (! $connection->isUsable()) {
+        // Logins serve the whole organization, so their health shows whatever is selected.
+        foreach (MarketingAdConnection::query()->googleAds()->get() as $connection) {
+            $where = $connection->label();
+
+            if ($connection->hasUnreadableToken()) {
+                $out[] = $this->item('critical', "Google Ads needs reconnecting ({$where})",
+                    'Its stored credentials cannot be read on this server (saved under a different app key).', 'marketing.integrations', 'organization');
+
                 continue;
             }
 
-            $where = $connection->office_id !== null ? $this->clinics->labelFor((int) $connection->office_id, $connection->clinic_num) : 'unassigned connection';
+            if (! $connection->isUsable()) {
+                continue;
+            }
 
             if ($connection->status === MarketingAdConnection::STATUS_ERROR) {
                 $out[] = $this->item('critical', "Google Ads needs reconnecting ({$where})",
@@ -155,17 +164,21 @@ class MarketingAlertService
                 'Its traffic only appears when every location is selected. Assign it on the Tracking Script page.', 'marketing.tracking', 'organization');
         }
 
-        $connections = MarketingAdConnection::query()->googleAds()->whereNull('office_id')->get()->filter(fn ($c) => $c->isUsable())->count();
-        if ($connections > 0) {
-            $out[] = $this->item('warning', $connections === 1 ? 'A Google Ads connection is not assigned to a location' : "{$connections} Google Ads connections are not assigned to a location",
-                'It was connected before locations existed. Assign it on the Integrations page so its campaigns report per office.', 'marketing.integrations', 'organization');
+        $waiting = MarketingAdAccount::query()->advertising()->whereDoesntHave('locations')->count();
+        if ($waiting > 0) {
+            $out[] = $this->item('warning', $waiting === 1 ? 'A Google Ads account is waiting for a location' : "{$waiting} Google Ads accounts are waiting for a location",
+                'It is not synced or reported until it is assigned to a location on the Integrations page. Leave accounts of other businesses unassigned.', 'marketing.integrations', 'organization');
         }
 
-        $accounts = MarketingAdAccount::where('is_manager', false)->where('is_enabled', true)->whereNull('office_id')
-            ->whereHas('connection', fn ($q) => $q->whereNull('office_id'))->count();
-        if ($accounts > 0) {
-            $out[] = $this->item('warning', $accounts === 1 ? 'A Google Ads account is not assigned to a location' : "{$accounts} Google Ads accounts are not assigned to a location",
-                'Its campaigns only appear when every location is selected. Assign it on the Integrations page.', 'marketing.integrations', 'organization');
+        // Accounts shared by several locations: a campaign with no location counts nowhere.
+        $unassigned = MarketingAdCampaign::query()
+            ->whereNull('office_id')
+            ->where('status', '<>', 'REMOVED')
+            ->whereHas('account', fn ($q) => $q->advertising()->has('locations', '>', 1))
+            ->count();
+        if ($unassigned > 0) {
+            $out[] = $this->item('warning', $unassigned === 1 ? 'A Google Ads campaign is not credited to any location' : "{$unassigned} Google Ads campaigns are not credited to any location",
+                'They belong to accounts shared by several locations, and are left out of every report until each is assigned. Assign them from the account on the Integrations page.', 'marketing.integrations', 'organization');
         }
 
         return $out;

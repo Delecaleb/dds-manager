@@ -37,13 +37,13 @@
             @if(! $connected)
                 <x-marketing.empty
                     icon="plug"
-                    title="Google Ads is not connected for {{ strtolower($filter->locationLabel()) === 'all locations' ? 'any location' : $filter->locationLabel() }}"
-                    message="Each location connects its own Google Ads account under Integrations. Campaigns and their daily spend, impressions, clicks and conversions are then synced every three hours." />
+                    title="Google Ads is not connected"
+                    message="Connect a Google login under Integrations, then assign each ad account to its locations. Campaigns and their daily spend, impressions, clicks and conversions are then synced every three hours." />
             @elseif($rows === [])
                 <x-marketing.empty
                     icon="megaphone"
-                    title="No campaign activity in this period"
-                    message="{{ $lastSynced ? 'No campaign credited to these locations had spend or impressions between these dates.' : 'The first sync has not run yet. Campaigns appear here once it does.' }}" />
+                    title="No campaign activity for {{ $filter->locationLabel() }} in this period"
+                    message="{{ $lastSynced ? 'No campaign credited to these locations had spend or impressions between these dates. An ad account counts for a location only once it is assigned to it under Integrations.' : 'The first sync has not run yet. Campaigns appear here once it does.' }}" />
             @else
                 <x-data-table id="mkCampaigns" min-width="1200px">
                     <x-slot:head>

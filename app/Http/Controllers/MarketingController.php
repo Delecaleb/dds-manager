@@ -97,7 +97,7 @@ class MarketingController extends Controller
     {
         $filter = $this->filter($request);
         $rows = $report->campaignRows($filter);
-        $connections = MarketingAdConnection::query()->googleAds()->within($filter)->get()->filter(fn ($c) => $c->isUsable());
+        $connections = MarketingAdConnection::query()->googleAds()->get()->filter(fn ($c) => $c->isUsable());
 
         return view('marketing.campaigns', [
             'filter' => $filter,
@@ -193,14 +193,15 @@ class MarketingController extends Controller
             ->with('status', $site->is_active ? "Tracking resumed for {$site->domain}." : "Tracking paused for {$site->domain}.");
     }
 
-    /** Per selected location: its Google Ads connection and the accounts under it. */
+    /** The connected Google logins, and every ad account once, with the locations it is assigned to. */
     public function integrations(Request $request, GoogleAdsOAuth $googleAdsOAuth, AdCampaignReportService $report): View
     {
         $filter = $this->filter($request);
 
         return view('marketing.integrations', [
             'filter' => $filter,
-            'googleAds' => $report->connectionsByLocation($filter),
+            'connections' => $report->connections(),
+            'accounts' => $report->accounts(),
             'googleAdsMissing' => $googleAdsOAuth->missingSettings(),
             'googleAdsCallbackUrl' => $googleAdsOAuth->redirectUri(),
             'locations' => $this->clinics->locations(),

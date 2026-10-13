@@ -17,6 +17,9 @@ class GoogleAdsOAuth
 {
     public const SCOPE = 'https://www.googleapis.com/auth/adwords';
 
+    /** Also asked for, so a connection can be named and recognised by its Google login. */
+    private const IDENTITY_SCOPES = 'openid email';
+
     private const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 
     private const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -56,7 +59,7 @@ class GoogleAdsOAuth
             'client_id' => config('marketing.google_ads.client_id'),
             'redirect_uri' => $this->redirectUri(),
             'response_type' => 'code',
-            'scope' => self::SCOPE,
+            'scope' => self::SCOPE.' '.self::IDENTITY_SCOPES,
             // offline + consent: without both Google omits the refresh token on a repeat grant.
             'access_type' => 'offline',
             'prompt' => 'consent',
@@ -65,11 +68,14 @@ class GoogleAdsOAuth
     }
 
     /**
-     * Trade the authorisation code from the callback for a refresh token.
+     * Trade the authorisation code from the callback for a refresh token, and the email of
+     * the Google login that granted it (null if Google did not share it).
+     *
+     * @return array{refresh_token: string, email: ?string}
      *
      * @throws GoogleAdsException
      */
-    public function exchangeCode(string $code): string
+    public function exchangeCode(string $code): array
     {
         $response = Http::asForm()->timeout($this->timeout())->post(self::TOKEN_URL, [
             'code' => $code,
@@ -91,7 +97,25 @@ class GoogleAdsOAuth
 
         // The access token that came with it is not kept: the connection it belongs to does
         // not exist yet, and the first API call mints one from the refresh token anyway.
-        return $refreshToken;
+        return ['refresh_token' => $refreshToken, 'email' => $this->emailFromIdToken((string) $response->json('id_token', ''))];
+    }
+
+    /**
+     * The email claim of the ID token. The token came straight from Google's token endpoint
+     * over TLS in answer to our own request, so its payload is read without re-verifying the
+     * signature; it is only used to name and recognise the connection, never to authorise.
+     */
+    private function emailFromIdToken(string $idToken): ?string
+    {
+        $parts = explode('.', $idToken);
+        if (count($parts) !== 3) {
+            return null;
+        }
+
+        $claims = json_decode((string) base64_decode(strtr($parts[1], '-_', '+/'), true), true);
+        $email = is_array($claims) ? ($claims['email'] ?? null) : null;
+
+        return is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL) ? strtolower($email) : null;
     }
 
     /**
@@ -114,7 +138,7 @@ class GoogleAdsOAuth
         $response = Http::asForm()->timeout($this->timeout())->post(self::TOKEN_URL, [
             'client_id' => config('marketing.google_ads.client_id'),
             'client_secret' => config('marketing.google_ads.client_secret'),
-            'refresh_token' => $connection->refresh_token,
+            'refresh_token' => $connection->refreshToken(),
             'grant_type' => 'refresh_token',
         ]);
 
@@ -141,8 +165,8 @@ class GoogleAdsOAuth
     /** Withdraw the grant at Google. Best effort: a failure still leaves the local token removable. */
     public function revoke(MarketingAdConnection $connection): void
     {
-        if (filled($connection->refresh_token)) {
-            Http::asForm()->timeout($this->timeout())->post(self::REVOKE_URL, ['token' => $connection->refresh_token]);
+        if (filled($connection->refreshToken())) {
+            Http::asForm()->timeout($this->timeout())->post(self::REVOKE_URL, ['token' => $connection->refreshToken()]);
         }
 
         Cache::forget($this->cacheKey($connection));
