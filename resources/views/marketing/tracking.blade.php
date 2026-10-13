@@ -2,7 +2,7 @@
     <x-slot:title>Tracking Script</x-slot:title>
     <x-slot:subtitle>Add a site, assign it to a location, install its snippet, watch it verify</x-slot:subtitle>
 
-    <div class="p-6 space-y-6 max-w-[1100px]">
+    <div class="p-4 sm:p-6 space-y-6 max-w-[1100px]">
 
         @if(session('status'))
             <p class="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">

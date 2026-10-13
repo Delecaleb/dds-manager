@@ -6,7 +6,7 @@
         $short = fn (?string $t) => $t ? \Carbon\CarbonImmutable::parse($t)->format('M j \a\t g:i A') : '—';
     @endphp
 
-    <div class="p-6 max-w-[1600px]">
+    <div class="p-4 sm:p-6 max-w-[1600px]">
         <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4 items-start">
             <x-marketing.panel title="Bookings" icon="calendar-check">
                 <x-data-table id="fdBookings" min-width="640px" max-height="640px">

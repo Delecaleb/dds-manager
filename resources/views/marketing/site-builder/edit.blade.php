@@ -2,7 +2,7 @@
     <x-slot:title>Edit Brief</x-slot:title>
     <x-slot:subtitle>{{ $build->name }} · changes apply the next time the site is regenerated</x-slot:subtitle>
 
-    <form method="POST" action="{{ route('marketing.site-builder.update', $build) }}" enctype="multipart/form-data" class="p-6 space-y-5 max-w-[1100px]">
+    <form method="POST" action="{{ route('marketing.site-builder.update', $build) }}" enctype="multipart/form-data" class="p-4 sm:p-6 space-y-5 max-w-[1100px]">
         @csrf
         @method('PUT')
         @include('marketing.site-builder._form')

@@ -11,7 +11,7 @@
         $volume['series'] = array_slice($volume['series'], 0, 1); // Overview shows total calls only.
     @endphp
 
-    <div class="p-6 space-y-4 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-4 max-w-[1500px]">
         <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
             <x-front-desk.kpi label="Total Offices" :value="$s['offices_live'].'/'.$s['offices_total']"
                 hint="Offices with the AI front desk live, of all offices.">

@@ -20,10 +20,10 @@
         };
     @endphp
 
-    {{-- Chats. --}}
-    <div data-dds-panel-for="tab" data-dds-panel="chats" class="h-[calc(100vh-4rem)] flex">
+    {{-- Chats. Phones/tablets show the list, or the open conversation with a way back. --}}
+    <div data-dds-panel-for="tab" data-dds-panel="chats" class="h-full min-h-[480px] flex">
         {{-- Thread list. --}}
-        <aside class="w-[340px] shrink-0 border-r border-slate-200 bg-white flex flex-col">
+        <aside class="w-full lg:w-[340px] shrink-0 border-r border-slate-200 bg-white flex-col {{ $selected ? 'hidden lg:flex' : 'flex' }}">
             <div class="p-3 border-b border-slate-100">
                 <label class="relative block">
                     <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
@@ -64,15 +64,15 @@
         </aside>
 
         {{-- Conversation. --}}
-        <section class="flex-1 min-w-0 flex flex-col bg-slate-50">
+        <section class="flex-1 min-w-0 flex-col bg-slate-50 {{ $selected ? 'flex' : 'hidden lg:flex' }}">
             @if(! $selected)
                 <div class="flex-1 flex items-center justify-center">
                     <x-marketing.empty icon="messages-square" title="Select a conversation"
                         message="Texts between patients and the SMS agent show here, including when the agent hands a conversation to staff." />
                 </div>
             @else
-                <header class="h-14 shrink-0 flex items-center justify-between px-5 bg-white border-b border-slate-200">
-                    <h2 class="text-[14px] font-semibold text-slate-900 tabular-nums">{{ $selected['name'] ?? $selected['phone'] }}</h2>
+                <header class="h-14 shrink-0 flex items-center justify-between gap-3 px-4 sm:px-5 bg-white border-b border-slate-200">
+                    <h2 class="flex items-center min-w-0 text-[14px] font-semibold text-slate-900 tabular-nums"><a href="{{ request()->fullUrlWithQuery(['thread' => null]) }}" class="lg:hidden -ml-1 mr-1 p-1.5 rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Back to conversations"><i data-lucide="arrow-left" class="w-4 h-4"></i></a><span class="truncate">{{ $selected['name'] ?? $selected['phone'] }}</span></h2>
                     <label class="inline-flex items-center gap-2 text-[12px] text-slate-700" title="Toggling the agent arrives with the SMS integration">
                         <input type="checkbox" class="sr-only peer" disabled @checked($selected['agent_on'])>
                         <span class="w-9 h-5 rounded-full bg-slate-200 peer-checked:bg-blue-600 relative after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-4"></span>
@@ -111,7 +111,7 @@
     </div>
 
     {{-- Actions: follow-ups the SMS agent handed to staff. --}}
-    <div data-dds-panel-for="tab" data-dds-panel="actions" hidden class="p-6 max-w-[1200px]">
+    <div data-dds-panel-for="tab" data-dds-panel="actions" hidden class="p-4 sm:p-6 max-w-[1200px]">
         <x-marketing.panel title="Actions" subtitle="Conversations the SMS agent handed to staff" icon="list-todo">
             @forelse($actions as $action)
                 <a href="{{ request()->fullUrlWithQuery(['tab' => 'chats', 'thread' => $action['thread']]) }}"

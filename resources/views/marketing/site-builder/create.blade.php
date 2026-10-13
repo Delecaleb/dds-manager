@@ -2,7 +2,7 @@
     <x-slot:title>New Website</x-slot:title>
     <x-slot:subtitle>Describe the business; the AI writes the site</x-slot:subtitle>
 
-    <form method="POST" action="{{ route('marketing.site-builder.store') }}" enctype="multipart/form-data" class="p-6 space-y-5 max-w-[1100px]">
+    <form method="POST" action="{{ route('marketing.site-builder.store') }}" enctype="multipart/form-data" class="p-4 sm:p-6 space-y-5 max-w-[1100px]">
         @csrf
         @include('marketing.site-builder._form')
 

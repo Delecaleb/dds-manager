@@ -12,7 +12,7 @@
         };
     @endphp
 
-    <div class="p-6 space-y-6 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
         {{-- Headline numbers: exactly what the ad platform reports for the period. --}}
         <div class="grid grid-cols-2 lg:grid-cols-6 gap-3">

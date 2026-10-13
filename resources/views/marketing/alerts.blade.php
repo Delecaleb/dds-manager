@@ -6,9 +6,9 @@
         $svc = \App\Domain\Marketing\MarketingAlertService::class;
     @endphp
 
-    <div class="p-6 space-y-6 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <x-marketing.stat label="Critical" icon="octagon-alert" tone="rose" :value="number_format($alerts['critical'])" hint="Data has stopped or money is being wasted" />
             <x-marketing.stat label="Warning" icon="triangle-alert" tone="amber" :value="number_format($alerts['warning'])" hint="Worth a look" />
             <x-marketing.stat label="Open Alerts" icon="bell-ring" :value="number_format(count($alerts['items']))" />

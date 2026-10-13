@@ -14,7 +14,7 @@
         $volume = $analytics['callVolume'];
     @endphp
 
-    <div class="p-6 space-y-4 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-4 max-w-[1500px]">
         <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
             <x-front-desk.kpi label="Total Calls" :value="ops_fmt($s['calls'], 'number')" :change="$s['calls_change']" />
             <x-front-desk.kpi label="Appointments Booked" :value="ops_fmt($s['booked'], 'number')" :change="$s['booked_change']"

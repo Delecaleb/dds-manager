@@ -2,12 +2,12 @@
     <x-slot:title>Visitor Journeys</x-slot:title>
     <x-slot:subtitle>{{ $filter->locationLabel() }} · one visitor, first visit to signup</x-slot:subtitle>
 
-    <div class="p-6 space-y-6 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
         <x-marketing.panel title="Find a journey" subtitle="Search by email, phone, name or visitor id" icon="search">
             <form method="GET" class="flex flex-wrap items-center gap-2">
                 <input type="search" name="q" value="{{ $search }}" placeholder="patient@example.com, 313 555 0142, or a visitor id"
-                    class="flex-1 min-w-[260px] text-xs rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:border-emerald-500">
+                    class="flex-1 min-w-0 w-full sm:w-auto sm:min-w-[260px] text-xs rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:border-emerald-500">
                 <input type="hidden" name="start_date" value="{{ $filter->start }}">
                 <input type="hidden" name="end_date" value="{{ $filter->end }}">
                 <button type="submit"

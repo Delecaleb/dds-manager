@@ -2,7 +2,7 @@
     <x-slot:title>Attribution Funnel</x-slot:title>
     <x-slot:subtitle>{{ $filter->locationLabel() }} · {{ $filter->start }} → {{ $filter->end }}</x-slot:subtitle>
 
-    <div class="p-6 space-y-6 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
             @foreach ([

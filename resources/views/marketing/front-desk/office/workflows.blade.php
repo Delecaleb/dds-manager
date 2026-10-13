@@ -11,9 +11,10 @@
         ];
     @endphp
 
-    <div class="h-[calc(100vh-4rem)] flex">
+    <div class="h-full min-h-[480px] flex">
         {{-- Workflow list. --}}
-        <aside class="w-[340px] shrink-0 border-r border-slate-200 bg-white flex flex-col">
+        {{-- Phones/tablets show the list, or the open workflow with a way back. --}}
+        <aside class="w-full lg:w-[340px] shrink-0 border-r border-slate-200 bg-white flex-col {{ $selected ? 'hidden lg:flex' : 'flex' }}">
             <div class="p-3 border-b border-slate-100">
                 <label class="relative block">
                     <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
@@ -36,9 +37,9 @@
             </ul>
         </aside>
 
-        <section class="flex-1 min-w-0 overflow-y-auto">
+        <section class="flex-1 min-w-0 overflow-y-auto {{ $selected || count($workflows) === 0 ? 'block' : 'hidden lg:block' }}">
             @if(! $selected)
-                <div class="p-6">
+                <div class="p-4 sm:p-6">
                     <x-marketing.panel title="Workflows" icon="workflow">
                         <x-marketing.empty icon="workflow" title="No workflows yet"
                             message="Confirmation and reactivation workflows text patients on a schedule, in plain-language instructions you write."
@@ -46,9 +47,9 @@
                     </x-marketing.panel>
                 </div>
             @else
-                <div class="p-6 space-y-4 max-w-[1200px]">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-[20px] font-semibold text-slate-900">{{ $selected['name'] }}</h2>
+                <div class="p-4 sm:p-6 space-y-4 max-w-[1200px]">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <h2 class="flex items-center min-w-0 text-[18px] sm:text-[20px] font-semibold text-slate-900"><a href="{{ request()->fullUrlWithQuery(['workflow' => null]) }}" class="lg:hidden -ml-1 mr-1 p-1.5 rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Back to workflows"><i data-lucide="arrow-left" class="w-4 h-4"></i></a><span class="truncate">{{ $selected['name'] }}</span></h2>
                         <label class="inline-flex items-center gap-2 text-[13px] text-slate-700" title="Switching workflows on/off arrives with the SMS integration">
                             {{ $selected['enabled'] ? 'Enabled' : 'Disabled' }}
                             <input type="checkbox" class="sr-only peer" disabled @checked($selected['enabled'])>

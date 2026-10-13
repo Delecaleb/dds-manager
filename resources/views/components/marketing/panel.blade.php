@@ -11,7 +11,7 @@
 ])
 
 <section {{ $attributes->merge(['class' => 'bg-white border border-slate-200 rounded-xl shadow-sm']) }}>
-    <header class="flex items-start justify-between gap-4 px-5 py-3.5 border-b border-slate-100">
+    <header class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 sm:px-5 py-3.5 border-b border-slate-100">
         <div class="min-w-0">
             <h2 class="text-[13px] font-bold text-slate-900 flex items-center gap-2">
                 @if($icon)
@@ -24,7 +24,7 @@
             @endif
         </div>
         @isset($actions)
-            <div class="flex items-center gap-2 shrink-0">{{ $actions }}</div>
+            <div class="flex flex-wrap items-center gap-2 shrink-0 max-w-full">{{ $actions }}</div>
         @endisset
     </header>
 

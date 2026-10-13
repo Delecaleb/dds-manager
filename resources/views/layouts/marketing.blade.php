@@ -19,12 +19,16 @@
 
 <body class="bg-slate-50 text-slate-800 font-sans antialiased">
 
-    <div class="flex h-screen overflow-hidden">
+    <div class="flex h-screen h-[100dvh] overflow-hidden">
+
+        {{-- Phones/tablets: the nav is a drawer opened from the header's menu button. --}}
+        <div data-ge-nav-backdrop class="fixed inset-0 z-40 bg-slate-900/40 hidden lg:hidden" aria-hidden="true"></div>
 
         {{-- Persistent module nav — the analytics shell uses an overlay menu; inside the
              Growth Engine the nav stays put, because the work here is multi-step.
              $umbrellas / $current come from App\View\Components\MarketingLayout. --}}
-        <aside class="w-60 shrink-0 bg-white border-r border-slate-200 text-slate-600 flex flex-col">
+        <aside id="geNav" data-ge-nav
+            class="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] -translate-x-full transition-transform duration-200 lg:static lg:z-auto lg:w-60 lg:max-w-none lg:translate-x-0 shrink-0 bg-white border-r border-slate-200 text-slate-600 flex flex-col">
             <a href="{{ route('marketing.index') }}" class="h-16 flex items-center gap-2.5 px-5 border-b border-slate-200 hover:bg-slate-50 transition-colors">
                 <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
                     <i data-lucide="trending-up" class="w-4.5 h-4.5"></i>
@@ -119,17 +123,24 @@
             </div>
         </aside>
 
-        <div class="flex flex-col flex-1 overflow-hidden">
+        <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
 
-            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-30">
-                <div class="min-w-0">
+            {{-- One row on large screens; on phones the filters drop to a second, full-width row. --}}
+            <header class="bg-white border-b border-slate-200 flex flex-wrap lg:flex-nowrap items-center gap-x-3 gap-y-2 px-4 sm:px-6 py-2 lg:py-0 lg:h-16 shrink-0 z-30">
+                <button type="button" data-ge-nav-open aria-controls="geNav" aria-expanded="false" aria-label="Open menu"
+                    class="lg:hidden -ml-1 p-2 rounded-lg text-slate-600 hover:bg-slate-100">
+                    <i data-lucide="menu" class="w-5 h-5"></i>
+                </button>
+                <div class="min-w-0 flex-1">
                     <h1 class="text-sm font-bold text-slate-900 truncate">{{ $title ?? 'Overview' }}</h1>
                     @isset($subtitle)
                         <p class="text-[11px] text-slate-500 truncate">{{ $subtitle }}</p>
                     @endisset
                 </div>
 
-                <div class="flex items-center gap-3">
+                @php $hasFilters = $withLocations || $withPeriod || (isset($toolbar) && trim((string) $toolbar) !== '') || ($frontDeskSource && ! $frontDeskSource->isLive()); @endphp
+                @if($hasFilters)
+                <div class="order-last lg:order-none w-full lg:w-auto flex flex-wrap items-center gap-2 lg:gap-3">
                     @if($withLocations)
                         {{-- The same location picker as the analytics shell; the choice is shared via the session. --}}
                         <x-location-picker id="geLocations" :locations="$locations" :selected="$filter->keys()" />
@@ -154,22 +165,23 @@
                             </a>
                         @endunless
                     @endif
+                </div>
+                @endif
 
-                    <div class="flex items-center gap-2 pl-3 border-l border-slate-200">
-                        <div class="w-7 h-7 rounded-full bg-[#0b1220] text-emerald-400 text-xs font-bold flex items-center justify-center shrink-0">
-                            {{ strtoupper(substr(auth()->user()->name, 0, 2)) }}
-                        </div>
-                        <div class="hidden sm:flex flex-col text-left leading-tight">
-                            <span class="text-xs font-bold text-slate-900">{{ auth()->user()->name }}</span>
-                            <span class="text-[10px] text-slate-500">{{ auth()->user()->getRoleName() }}</span>
-                        </div>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Log Out">
-                                <i data-lucide="log-out" class="w-4 h-4"></i>
-                            </button>
-                        </form>
+                <div class="flex items-center gap-2 pl-3 border-l border-slate-200 shrink-0">
+                    <div class="w-7 h-7 rounded-full bg-[#0b1220] text-emerald-400 text-xs font-bold flex items-center justify-center shrink-0">
+                        {{ strtoupper(substr(auth()->user()->name, 0, 2)) }}
                     </div>
+                    <div class="hidden sm:flex flex-col text-left leading-tight">
+                        <span class="text-xs font-bold text-slate-900">{{ auth()->user()->name }}</span>
+                        <span class="text-[10px] text-slate-500">{{ auth()->user()->getRoleName() }}</span>
+                    </div>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Log Out" aria-label="Log out">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                        </button>
+                    </form>
                 </div>
             </header>
 
@@ -181,6 +193,25 @@
 
     <script>
         lucide.createIcons();
+
+        // Nav drawer below lg: menu button opens it; backdrop, Escape or a link closes it.
+        (function () {
+            var nav = document.querySelector('[data-ge-nav]');
+            var backdrop = document.querySelector('[data-ge-nav-backdrop]');
+            var button = document.querySelector('[data-ge-nav-open]');
+            if (!nav || !backdrop || !button) return;
+            function set(open) {
+                nav.classList.toggle('-translate-x-full', !open);
+                backdrop.classList.toggle('hidden', !open);
+                button.setAttribute('aria-expanded', open ? 'true' : 'false');
+                document.body.style.overflow = open ? 'hidden' : '';
+            }
+            button.addEventListener('click', function () { set(true); });
+            backdrop.addEventListener('click', function () { set(false); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') set(false); });
+            nav.addEventListener('click', function (e) { if (e.target.closest('a')) set(false); });
+            window.matchMedia('(min-width: 1024px)').addEventListener('change', function () { set(false); });
+        })();
 
         // Office or period changed in the header: reload this page for the new choice.
         (function () {
