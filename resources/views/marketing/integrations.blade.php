@@ -12,7 +12,7 @@
         $waiting = count(array_filter($accounts, fn ($a) => $a['state'] === 'waiting'));
     @endphp
 
-    <div class="p-6 space-y-6 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
         <x-marketing.flash />
 

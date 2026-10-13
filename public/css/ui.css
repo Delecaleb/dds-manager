@@ -745,3 +745,44 @@ ul.border-b.flex li {
         margin: 0.35rem 0 !important;
     }
 }
+/* ── Date range picker on phones (< 640px) ──────────────────────────────────────
+   The picker shows its preset list beside two calendars, wider than a phone. Pin it to
+   the viewport edges and stack presets (as wrapping chips) above the calendars. */
+@media (max-width: 639.98px) {
+    .daterangepicker {
+        left: 8px !important;
+        right: 8px !important;
+        width: auto !important;
+        max-height: calc(100dvh - 120px);
+        overflow-y: auto;
+    }
+    .daterangepicker::before,
+    .daterangepicker::after {
+        display: none !important;
+    }
+    .daterangepicker .ranges {
+        float: none !important;
+        width: 100%;
+    }
+    .daterangepicker .ranges ul {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        width: 100% !important;
+        padding: 6px;
+    }
+    .daterangepicker .ranges li {
+        flex: 1 1 auto;
+        text-align: center;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+    }
+    .daterangepicker .drp-calendar {
+        float: none !important;
+        max-width: none !important;
+        width: 100%;
+    }
+    .daterangepicker .drp-buttons {
+        text-align: center;
+    }
+}

@@ -7,7 +7,7 @@
         $fmtDuration = fn (?int $s) => $s === null ? '—' : sprintf('%02d:%02d', intdiv($s, 60), $s % 60);
     @endphp
 
-    <div class="p-6 space-y-4 max-w-[1600px]">
+    <div class="p-4 sm:p-6 space-y-4 max-w-[1600px]">
         {{-- The AI number this list belongs to. --}}
         <div class="flex items-center gap-2">
             <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[12px] text-slate-700">

@@ -3,7 +3,7 @@
     <x-slot:subtitle>Bring patients in, turn their calls into appointments, and build the sites they land on</x-slot:subtitle>
 
     {{-- One card per umbrella; everything on a card comes from MarketingLayout::UMBRELLAS. --}}
-    <div class="p-6 max-w-[1400px]">
+    <div class="p-4 sm:p-6 max-w-[1400px]">
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             @foreach (\App\View\Components\MarketingLayout::UMBRELLAS as $umbrella)
                 <a href="{{ route($umbrella['home']) }}"

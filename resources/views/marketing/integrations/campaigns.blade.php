@@ -2,7 +2,7 @@
     <x-slot:title>{{ $account->name ?: $account->external_id }}</x-slot:title>
     <x-slot:subtitle>Google Ads account {{ $account->external_id }} · credit each campaign to one of its locations</x-slot:subtitle>
 
-    <div class="p-6 space-y-6 max-w-[1200px]">
+    <div class="p-4 sm:p-6 space-y-6 max-w-[1200px]">
 
         <x-marketing.flash />
 

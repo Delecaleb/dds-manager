@@ -6,7 +6,7 @@
         $when = fn (?string $t) => $t ? \Carbon\CarbonImmutable::parse($t)->format('M j, g:i A') : '—';
     @endphp
 
-    <div class="p-6 space-y-6 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <x-marketing.stat label="Leads" icon="user-plus" tone="emerald" :value="number_format($summary['leads'])" hint="Visitors who gave contact details in the period" />

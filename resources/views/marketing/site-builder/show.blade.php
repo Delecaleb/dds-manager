@@ -23,7 +23,7 @@
         $total = $version ? $version->pages->count() : 0;
     @endphp
 
-    <div class="p-6 space-y-4 max-w-[1600px]">
+    <div class="p-4 sm:p-6 space-y-4 max-w-[1600px]">
         <x-marketing.flash />
 
         @if(! $version)

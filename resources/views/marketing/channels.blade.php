@@ -10,7 +10,7 @@
         $reporting = $channels['verifiedSites'] . ' of ' . $channels['sites'] . ' ' . \Illuminate\Support\Str::plural('site', $channels['sites']) . ' reporting';
     @endphp
 
-    <div class="p-6 space-y-6 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             @foreach ($channels['rows'] as $row)

@@ -11,15 +11,16 @@
         $dayUrl = fn ($d) => request()->fullUrlWithQuery(['date' => $d->toDateString()]);
     @endphp
 
-    <div class="p-6 max-w-[1600px]">
+    <div class="p-4 sm:p-6 max-w-[1600px]">
         <section class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-            <header class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
+            <header class="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-slate-100">
                 <h2 class="flex items-center gap-2 text-[16px] font-semibold text-slate-900">
                     <i data-lucide="calendar" class="w-4 h-4 text-slate-500"></i>{{ $date->format('D, F j') }}
                 </h2>
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2 min-w-0 w-full sm:w-auto">
                     <select aria-label="Appointment type" @disabled($schedule['appointmentTypes'] === [])
-                        class="rounded-lg border border-slate-200 bg-white text-[12px] font-medium text-slate-700 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        style="text-overflow: ellipsis"
+                        class="w-full sm:w-auto max-w-full sm:max-w-xs truncate rounded-lg border border-slate-200 bg-white text-[12px] font-medium text-slate-700 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         @forelse($schedule['appointmentTypes'] as $type)
                             <option>Appointment type: {{ $type }}</option>
                         @empty

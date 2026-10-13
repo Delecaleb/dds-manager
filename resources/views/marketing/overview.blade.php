@@ -11,7 +11,7 @@
         $count = fn ($v) => $adsOn ? number_format($v) : '—';
     @endphp
 
-    <div class="p-6 space-y-6 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
         {{-- Website: what the tracked sites in these locations did. --}}
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">

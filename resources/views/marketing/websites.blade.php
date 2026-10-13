@@ -16,7 +16,7 @@
         </form>
     </x-slot:toolbar>
 
-    <div class="p-6 space-y-6 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <x-marketing.stat label="Visitors" icon="users" :value="number_format($summary['visitors'])" hint="Unique browsers in the period" />

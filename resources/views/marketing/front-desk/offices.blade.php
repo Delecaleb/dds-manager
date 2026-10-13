@@ -2,7 +2,7 @@
     <x-slot:title>Offices</x-slot:title>
     <x-slot:subtitle>Manage and monitor your practice offices</x-slot:subtitle>
 
-    <div class="p-6 space-y-4 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-4 max-w-[1500px]">
         <div class="flex items-center justify-end">
             {{-- List / Map: a URL-driven tab (?view=). --}}
             <div data-dds-panels="view" class="inline-flex items-center p-0.5 rounded-lg border border-slate-200 bg-white">

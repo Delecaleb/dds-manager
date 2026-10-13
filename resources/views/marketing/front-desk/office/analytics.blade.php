@@ -3,7 +3,7 @@
     <x-slot:subtitle>Get insights into your calls, online bookings, and messages</x-slot:subtitle>
 
 
-    <div class="p-6 space-y-4 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-4 max-w-[1500px]">
         <div class="flex flex-wrap items-center justify-between gap-2">
             {{-- Calls / Online Bookings / Messages / Workflows: a URL-driven tab (?tab=). --}}
             <div data-dds-panels="tab" class="inline-flex items-center p-0.5 rounded-lg border border-slate-200 bg-white">

@@ -3,7 +3,7 @@
     <x-slot:subtitle>Get insights into your calls and bookings across all offices</x-slot:subtitle>
 
 
-    <div class="p-6 space-y-4 max-w-[1500px]">
+    <div class="p-4 sm:p-6 space-y-4 max-w-[1500px]">
         {{-- Filters: every one is a URL param, so a filtered view can be shared. --}}
         <div class="flex flex-wrap items-center justify-end gap-2">
             <x-front-desk.filter-group param="patients" :options="\App\Domain\FrontDesk\FrontDeskFilter::PATIENTS" :current="$filter->patients" />

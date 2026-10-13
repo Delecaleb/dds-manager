@@ -3,6 +3,43 @@
   Expects $accounts (AdCampaignReportService::accounts rows), $locations (ClinicRegistry) and a unique $id.
   Locations are picked in a small checklist; saving with none unassigns the account.
 --}}
+{{-- Phones: one card per account, with the same actions as the table. --}}
+<ul class="md:hidden divide-y divide-slate-100 -mx-3">
+    @foreach ($accounts as $account)
+        <li class="px-4 py-3 space-y-2 {{ $account['active'] ? '' : 'opacity-60' }}">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <div class="text-[13px] font-semibold text-slate-800">{{ $account['name'] }}</div>
+                    <div class="text-[11px] text-slate-500 tabular-nums break-all">{{ $account['external_id'] }}@if ($account['connection']) · via {{ $account['connection'] }}@endif</div>
+                </div>
+                <div class="shrink-0">
+                    @switch($account['state'])
+                        @case('waiting') <x-front-desk.pill label="Waiting" tone="amber" /> @break
+                        @case('closed') <x-front-desk.pill :label="ucfirst(strtolower((string) $account['status']))" tone="slate" /> @break
+                        @default <x-front-desk.pill label="Syncing" tone="emerald" />
+                    @endswitch
+                </div>
+            </div>
+            @if ($account['last_error'])
+                <div class="text-[11px] text-amber-700">{{ $account['last_error'] }}</div>
+            @endif
+            @include('marketing.integrations._account-locations')
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                <span>{{ $account['campaigns'] }} {{ \Illuminate\Support\Str::plural('campaign', $account['campaigns']) }}</span>
+                @if (count($account['location_keys']) > 1)
+                    <a href="{{ route('marketing.google-ads.accounts.campaigns', $account['id']) }}"
+                        class="font-semibold {{ $account['unassigned_campaigns'] > 0 ? 'text-amber-700' : 'text-slate-600' }} hover:underline">
+                        {{ $account['unassigned_campaigns'] > 0 ? $account['unassigned_campaigns'].' to assign' : 'Assign campaigns' }}
+                    </a>
+                @endif
+                <span>History from {{ $account['history_from'] ?? '—' }}</span>
+                <span>{{ $account['last_synced_at'] ? 'Synced '.\Carbon\CarbonImmutable::parse($account['last_synced_at'])->diffForHumans() : 'Not synced yet' }}</span>
+            </div>
+        </li>
+    @endforeach
+</ul>
+
+<div class="hidden md:block">
 <x-data-table :id="$id" min-width="1000px" data-mk-accounts>
     <x-slot:head>
         <tr>
@@ -31,30 +68,7 @@
                 @endswitch
             </td>
             <td class="px-4 py-3">
-                @if (! $account['active'])
-                    <span class="text-[11px] text-slate-500">Closed at Google — not synced</span>
-                @else
-                    <details class="relative">
-                        <summary class="cursor-pointer list-none text-[11px] rounded-lg border {{ $account['location_keys'] === [] ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-700' }} px-2 py-1 inline-flex items-center gap-1.5">
-                            {{ $account['locations'] === [] ? 'Assign locations…' : implode(', ', $account['locations']) }}
-                            <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i>
-                        </summary>
-                        <form method="POST" action="{{ route('marketing.google-ads.accounts.update', $account['id']) }}"
-                            class="absolute z-20 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg p-3 space-y-2">
-                            @csrf @method('PATCH')
-                            <div class="max-h-56 overflow-y-auto space-y-1">
-                                @foreach ($locations as $key => $location)
-                                    <label class="flex items-center gap-2 text-[12px] text-slate-700 cursor-pointer">
-                                        <input type="checkbox" name="locations[]" value="{{ $key }}" @checked(in_array((string) $key, $account['location_keys'], true)) class="accent-emerald-600">
-                                        {{ $location->name }}
-                                    </label>
-                                @endforeach
-                            </div>
-                            <button type="submit" class="w-full px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[#001f3f] text-white hover:bg-[#002b57]">Save locations</button>
-                            <p class="text-[10px] text-slate-500">None ticked = not synced or reported.</p>
-                        </form>
-                    </details>
-                @endif
+                @include('marketing.integrations._account-locations')
             </td>
             <td class="px-4 py-3 text-right tabular-nums">
                 {{ $account['campaigns'] }}
@@ -72,3 +86,4 @@
         </tr>
     @endforeach
 </x-data-table>
+</div>
