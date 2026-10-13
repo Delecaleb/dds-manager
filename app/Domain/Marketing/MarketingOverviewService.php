@@ -40,7 +40,7 @@ class MarketingOverviewService
             'ads' => $this->ads->summarize($campaigns),
             'sites' => $sites,
             'byLocation' => $this->byLocation($filter, $sites, $campaigns),
-            'googleAdsConnected' => MarketingAdConnection::googleAdsUsableWithin($filter),
+            'googleAdsConnected' => MarketingAdConnection::googleAdsConnected(),
         ];
     }
 
@@ -100,7 +100,7 @@ class MarketingOverviewService
 
         return [
             'rows' => $rows,
-            'googleAdsConnected' => MarketingAdConnection::googleAdsUsableWithin($filter),
+            'googleAdsConnected' => MarketingAdConnection::googleAdsConnected(),
             'sites' => $sites->count(),
             'verifiedSites' => $sites->filter(fn ($s) => $s->isVerified())->count(),
         ];

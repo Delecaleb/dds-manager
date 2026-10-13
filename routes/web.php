@@ -192,7 +192,8 @@ Route::middleware('auth')->group(function () {
             Route::get('connect', 'connect')->name('connect');
             Route::get('callback', 'callback')->name('callback');
             Route::patch('accounts/{account}', 'updateAccount')->name('accounts.update');
-            Route::patch('{connection}', 'updateConnection')->name('update');
+            Route::get('accounts/{account}/campaigns', 'campaigns')->name('accounts.campaigns');
+            Route::patch('campaigns/{campaign}', 'updateCampaign')->name('campaigns.update');
             Route::delete('{connection}', 'disconnect')->name('disconnect');
         });
 

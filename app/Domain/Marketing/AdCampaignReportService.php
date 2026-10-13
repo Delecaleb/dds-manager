@@ -3,34 +3,44 @@
 namespace App\Domain\Marketing;
 
 use App\Domain\Support\ClinicRegistry;
-use App\Domain\Support\Location;
 use App\Models\MarketingAdAccount;
+use App\Models\MarketingAdAccountLocation;
+use App\Models\MarketingAdCampaign;
 use App\Models\MarketingAdConnection;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Campaign numbers as the ad platforms report them: spend, impressions, clicks and the
  * platform's own conversion count, per campaign, for the filter's period and locations.
  *
- * A campaign is credited to its own location when it has one, otherwise to its ad
- * account's, otherwise to the location that made the connection. Leads, booked
- * appointments and production are deliberately not here: they depend on matching an ad
- * click to a patient, and that rule has not been defined.
+ * The single rule for which location a campaign's numbers count for:
+ *  - the location assigned to the campaign itself, if any (always one of its account's);
+ *  - else the account's location, when the account is assigned to exactly one;
+ *  - else none — a campaign in an account shared by several locations counts nowhere until
+ *    it is assigned, and an account with no location is not reported (or synced) at all.
+ * Nothing is guessed from which login found the account.
+ *
+ * Leads, booked appointments and production are deliberately not here: they depend on
+ * matching an ad click to a patient, and that rule has not been defined.
  */
 class AdCampaignReportService
 {
     private const MICROS = 1_000_000;
 
-    /** The location a campaign is credited to: its own, else its account's, else its connection's. */
-    private const OFFICE_EXPR = 'CASE WHEN c.office_id IS NOT NULL THEN c.office_id WHEN a.office_id IS NOT NULL THEN a.office_id ELSE n.office_id END';
+    private const OFFICE_EXPR = 'CASE WHEN c.office_id IS NOT NULL THEN c.office_id WHEN al.locations = 1 THEN al.office_id END';
 
-    private const CLINIC_EXPR = 'CASE WHEN c.office_id IS NOT NULL THEN c.clinic_num WHEN a.office_id IS NOT NULL THEN a.clinic_num ELSE n.clinic_num END';
+    private const CLINIC_EXPR = 'CASE WHEN c.office_id IS NOT NULL THEN c.clinic_num WHEN al.locations = 1 THEN al.clinic_num END';
+
+    /** Days of spend shown beside each campaign on the assignment page. */
+    public const ASSIGNMENT_SPEND_DAYS = 30;
 
     public function __construct(private readonly ClinicRegistry $clinics) {}
 
     /**
-     * One row per campaign with its totals for the period. Campaigns that were removed
-     * and did nothing in the period are left out.
+     * One row per campaign credited to a selected location, with its totals for the period.
+     * Campaigns that were removed and did nothing in the period are left out.
      *
      * @return list<array<string, mixed>>
      */
@@ -38,24 +48,24 @@ class AdCampaignReportService
     {
         $query = DB::table('marketing_ad_campaigns as c')
             ->join('marketing_ad_accounts as a', 'a.id', '=', 'c.account_id')
-            ->join('marketing_ad_connections as n', 'n.id', '=', 'a.connection_id')
+            ->joinSub($this->accountLocations(), 'al', 'al.account_id', '=', 'a.id')
             ->leftJoin('marketing_ad_campaign_stats as s', function ($join) use ($filter) {
                 $join->on('s.campaign_id', '=', 'c.id')->whereBetween('s.date', [$filter->start, $filter->end]);
             })
-            ->groupBy('c.id', 'c.name', 'c.status', 'c.channel_type', 'c.daily_budget_micros', 'n.provider',
-                'a.name', 'a.external_id', 'a.currency_code', 'c.office_id', 'c.clinic_num', 'a.office_id', 'a.clinic_num', 'n.office_id', 'n.clinic_num')
+            ->whereRaw('('.self::OFFICE_EXPR.') IS NOT NULL')
+            ->groupBy('c.id', 'c.name', 'c.status', 'c.channel_type', 'c.daily_budget_micros', 'a.provider',
+                'a.name', 'a.external_id', 'a.currency_code', 'c.office_id', 'c.clinic_num', 'al.locations', 'al.office_id', 'al.clinic_num')
             ->havingRaw("(c.status <> 'REMOVED' OR COALESCE(SUM(s.cost_micros), 0) > 0 OR COALESCE(SUM(s.impressions), 0) > 0)")
             ->orderByRaw('COALESCE(SUM(s.cost_micros), 0) DESC')
             ->orderBy('c.name');
 
-        LocationScope::apply($query, $filter, self::OFFICE_EXPR, self::CLINIC_EXPR);
+        LocationScope::apply($query, $filter, '('.self::OFFICE_EXPR.')', '('.self::CLINIC_EXPR.')');
 
         $rows = $query->get([
-            'c.id', 'c.name', 'c.status', 'c.channel_type', 'c.daily_budget_micros', 'n.provider',
+            'c.id', 'c.name', 'c.status', 'c.channel_type', 'c.daily_budget_micros', 'a.provider',
             'a.name as account_name', 'a.external_id as account_external_id', 'a.currency_code',
-            'c.office_id as campaign_office_id', 'c.clinic_num as campaign_clinic_num',
-            'a.office_id as account_office_id', 'a.clinic_num as account_clinic_num',
-            'n.office_id as connection_office_id', 'n.clinic_num as connection_clinic_num',
+            DB::raw('('.self::OFFICE_EXPR.') as credited_office_id'),
+            DB::raw('('.self::CLINIC_EXPR.') as credited_clinic_num'),
             DB::raw('COALESCE(SUM(s.impressions), 0) as impressions'),
             DB::raw('COALESCE(SUM(s.clicks), 0) as clicks'),
             DB::raw('COALESCE(SUM(s.cost_micros), 0) as cost_micros'),
@@ -68,14 +78,8 @@ class AdCampaignReportService
             $clicks = (int) $row->clicks;
             $impressions = (int) $row->impressions;
             $conversions = (float) $row->conversions;
-
-            [$officeId, $clinicNum] = match (true) {
-                $row->campaign_office_id !== null => [$row->campaign_office_id, $row->campaign_clinic_num],
-                $row->account_office_id !== null => [$row->account_office_id, $row->account_clinic_num],
-                default => [$row->connection_office_id, $row->connection_clinic_num],
-            };
-            $officeId = $officeId === null ? null : (int) $officeId;
-            $clinicNum = $clinicNum === null ? null : (int) $clinicNum;
+            $officeId = (int) $row->credited_office_id;
+            $clinicNum = $row->credited_clinic_num === null ? null : (int) $row->credited_clinic_num;
 
             return [
                 'id' => (int) $row->id,
@@ -88,7 +92,7 @@ class AdCampaignReportService
                 'currency_code' => $row->currency_code,
                 'office_id' => $officeId,
                 'clinic_num' => $clinicNum,
-                'location' => $officeId !== null ? $this->clinics->labelFor($officeId, $clinicNum) : null,
+                'location' => $this->clinics->labelFor($officeId, $clinicNum),
                 'daily_budget' => $row->daily_budget_micros !== null ? (int) $row->daily_budget_micros / self::MICROS : null,
                 'impressions' => $impressions,
                 'clicks' => $clicks,
@@ -126,42 +130,18 @@ class AdCampaignReportService
     }
 
     /**
-     * The Integrations page, per selected location: that location's Google Ads connection
-     * (if any) and the accounts under it. Connections made before locations existed come
-     * back under 'unassigned' so they can be assigned.
+     * Google logins that have been connected, newest first.
      *
-     * @return array{locations: list<array{location: Location, connection: ?MarketingAdConnection, accounts: list<array<string, mixed>>}>, unassigned: list<array{connection: MarketingAdConnection, accounts: list<array<string, mixed>>}>}
+     * @return list<MarketingAdConnection>
      */
-    public function connectionsByLocation(MarketingFilter $filter): array
+    public function connections(): array
     {
-        $connections = MarketingAdConnection::query()->googleAds()->within($filter)->get();
-        $accounts = collect($this->accounts())->groupBy('connection_id');
-
-        $rows = [];
-        foreach ($filter->locations() as $location) {
-            // Exactly this location first; else a connection made for the whole office.
-            $connection = $connections->first(fn (MarketingAdConnection $c) => (int) $c->office_id === $location->officeId && $c->clinic_num === $location->clinicNum)
-                ?? $connections->first(fn (MarketingAdConnection $c) => (int) $c->office_id === $location->officeId && $c->clinic_num === null);
-
-            $rows[] = [
-                'location' => $location,
-                'connection' => $connection,
-                'accounts' => $connection !== null ? $accounts->get($connection->id, collect())->values()->all() : [],
-            ];
-        }
-
-        $unassigned = $connections
-            ->filter(fn (MarketingAdConnection $c) => $c->office_id === null)
-            ->map(fn (MarketingAdConnection $c) => ['connection' => $c, 'accounts' => $accounts->get($c->id, collect())->values()->all()])
-            ->values()
-            ->all();
-
-        return ['locations' => $rows, 'unassigned' => $unassigned];
+        return MarketingAdConnection::query()->googleAds()->withCount('accounts')->latest('connected_at')->get()->all();
     }
 
     /**
-     * Every synced ad account that can hold campaigns, with the location it is credited
-     * to — the rows the Integrations page lets the user map.
+     * Every ad account that can hold campaigns, each once, with the locations it is assigned
+     * to and where it stands — the rows the Integrations page lets an admin assign.
      *
      * @return list<array<string, mixed>>
      */
@@ -169,22 +149,73 @@ class AdCampaignReportService
     {
         return MarketingAdAccount::query()
             ->where('is_manager', false)
-            ->withCount('campaigns')
+            ->with(['locations', 'connection'])
+            ->withCount([
+                'campaigns',
+                'campaigns as unassigned_campaigns_count' => fn ($q) => $q->whereNull('office_id'),
+            ])
+            ->orderByRaw("CASE WHEN status IS NULL OR status = 'ENABLED' THEN 0 ELSE 1 END")
             ->orderBy('name')
             ->get()
-            ->map(fn (MarketingAdAccount $account) => [
-                'id' => $account->id,
-                'connection_id' => $account->connection_id,
-                'name' => $account->name ?: $account->external_id,
-                'external_id' => $account->external_id,
-                'currency_code' => $account->currency_code,
-                'status' => $account->status,
-                'is_enabled' => $account->is_enabled,
-                'campaigns' => (int) $account->campaigns_count,
-                'location_key' => $account->locationKey(),
-                'location' => $account->office_id !== null ? $this->clinics->labelFor((int) $account->office_id, $account->clinic_num) : null,
-                'last_synced_at' => $account->last_synced_at?->toDateTimeString(),
-                'last_error' => $account->last_error,
+            ->map(function (MarketingAdAccount $account) {
+                $locations = $account->locations;
+                $active = $account->status === null || $account->status === 'ENABLED';
+
+                return [
+                    'id' => $account->id,
+                    'name' => $account->name ?: $account->external_id,
+                    'external_id' => $account->external_id,
+                    'currency_code' => $account->currency_code,
+                    'status' => $account->status,
+                    'active' => $active,
+                    'connection' => $account->connection?->label(),
+                    'campaigns' => (int) $account->campaigns_count,
+                    'location_keys' => $account->locationKeys(),
+                    'locations' => $locations->map(fn (MarketingAdAccountLocation $l) => $this->clinics->labelFor((int) $l->office_id, $l->clinic_num))->all(),
+                    // Only meaningful when the account is shared: then these count for no location.
+                    'unassigned_campaigns' => $locations->count() > 1 ? (int) $account->unassigned_campaigns_count : 0,
+                    'state' => match (true) {
+                        ! $active => 'closed',
+                        $locations->isEmpty() => 'waiting',
+                        default => 'assigned',
+                    },
+                    'history_from' => $account->history_from?->toDateString(),
+                    'last_synced_at' => $account->last_synced_at?->toDateTimeString(),
+                    'last_error' => $account->last_error,
+                ];
+            })->all();
+    }
+
+    /**
+     * An account's campaigns for the assignment page, with recent spend to help decide.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function campaignsForAssignment(MarketingAdAccount $account): array
+    {
+        $since = CarbonImmutable::today()->subDays(self::ASSIGNMENT_SPEND_DAYS - 1)->toDateString();
+
+        return MarketingAdCampaign::query()
+            ->where('account_id', $account->id)
+            ->withSum(['stats as recent_cost_micros' => fn ($q) => $q->where('date', '>=', $since)], 'cost_micros')
+            ->orderByRaw("CASE WHEN status = 'REMOVED' THEN 1 ELSE 0 END")
+            ->orderBy('name')
+            ->get()
+            ->map(fn (MarketingAdCampaign $campaign) => [
+                'id' => $campaign->id,
+                'name' => $campaign->name,
+                'status' => $campaign->status,
+                'channel_type' => $campaign->channel_type,
+                'location_key' => $campaign->locationKey(),
+                'recent_spend' => round((int) $campaign->recent_cost_micros / self::MICROS, 2),
             ])->all();
+    }
+
+    /** Per account: how many locations it has, and the single one when there is one. */
+    private function accountLocations(): Builder
+    {
+        return DB::table('marketing_ad_account_locations')
+            ->selectRaw('account_id, COUNT(*) as locations, MIN(office_id) as office_id, MIN(clinic_num) as clinic_num')
+            ->groupBy('account_id');
     }
 }

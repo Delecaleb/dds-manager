@@ -43,8 +43,9 @@ return [
         // Google retires each version about a year after release; bump when notified.
         'api_version' => env('GOOGLE_ADS_API_VERSION', 'v25'),
 
-        // History pulled the first time an account syncs.
-        'backfill_days' => (int) env('GOOGLE_ADS_BACKFILL_DAYS', 365),
+        // How far back an account's history goes: this many days before it was first
+        // connected. Older data is never pulled.
+        'history_days' => (int) env('GOOGLE_ADS_HISTORY_DAYS', 90),
 
         // Trailing window re-pulled on every later run: Google keeps restating
         // conversions for clicks up to 30 days old.

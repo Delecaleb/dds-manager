@@ -1,13 +1,15 @@
 <x-marketing-layout>
     <x-slot:title>Integrations</x-slot:title>
-    <x-slot:subtitle>{{ $filter->locationLabel() }} · each location connects its own ad accounts</x-slot:subtitle>
+    <x-slot:subtitle>Connect Google Ads once, then assign each ad account to the locations it serves</x-slot:subtitle>
 
     @php
-        $pill = fn (?\App\Models\MarketingAdConnection $c) => match (true) {
-            $c === null || ! $c->isUsable() => ['Not connected', 'slate'],
+        $pill = fn (\App\Models\MarketingAdConnection $c) => match (true) {
+            $c->hasUnreadableToken() => ['Needs reconnecting', 'amber'],
+            ! $c->isUsable() => ['Disconnected', 'slate'],
             $c->status === \App\Models\MarketingAdConnection::STATUS_ERROR => ['Needs attention', 'amber'],
             default => ['Connected', 'emerald'],
         };
+        $waiting = count(array_filter($accounts, fn ($a) => $a['state'] === 'waiting'));
     @endphp
 
     <div class="p-6 space-y-6 max-w-[1500px]">
@@ -17,104 +19,83 @@
         <div class="text-[11px] text-slate-500 space-y-1">
             @if ($googleAdsMissing !== [])
                 <p class="text-amber-700">Google Ads cannot be connected until these are set on the server: <code class="text-[10px]">{{ implode(', ', $googleAdsMissing) }}</code></p>
-                @endif
-                <p>OAuth redirect URI to register on the Google Cloud OAuth client: <code class="text-[10px] break-all select-all">{{ $googleAdsCallbackUrl }}</code></p>
+            @endif
+            <p>OAuth redirect URI to register on the Google Cloud OAuth client: <code class="text-[10px] break-all select-all">{{ $googleAdsCallbackUrl }}</code></p>
         </div>
 
-        @if ($googleAds['locations'] === [] && $googleAds['unassigned'] === [])
-            <x-marketing.panel title="Google Ads" icon="search">
-                <x-marketing.empty icon="map-pin" title="No locations configured"
-                    message="Add an office under Offices / Locations in the analytics app, then connect its Google Ads account here." />
-            </x-marketing.panel>
-        @endif
-
-        {{-- One card per selected location: its connection, then the accounts under it. --}}
-        @foreach ($googleAds['locations'] as $row)
-            @php [$label, $tone] = $pill($row['connection']); $c = $row['connection']; @endphp
-            <x-marketing.panel :title="$row['location']->name" subtitle="Google Ads — read-only: campaigns, spend, clicks and conversions" icon="search">
-                <x-slot:actions>
-                    <x-front-desk.pill :label="$label" :tone="$tone" />
-                    @if ($c !== null && $c->isUsable())
-                        <form method="POST" action="{{ route('marketing.google-ads.disconnect', $c) }}"
-                            onsubmit="return confirm('Disconnect Google Ads for {{ $row['location']->name }}? Imported campaign history is kept.');">
-                            @csrf @method('DELETE')
-                            <button type="submit" class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50">Disconnect</button>
-                        </form>
-                    @endif
-                    @if ($googleAdsMissing === [])
-                        <a href="{{ route('marketing.google-ads.connect', ['location' => $row['location']->key()]) }}"
-                            class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-[#00bfa5] text-white bg-[#00bfa5] hover:opacity-90">
-                            {{ $c !== null && $c->isUsable() ? 'Reconnect' : 'Connect Google Ads' }}
-                        </a>
-                    @endif
-                </x-slot:actions>
-
-                @if ($c === null || ! $c->isUsable())
-                    <p class="text-xs text-slate-500">
-                        Not connected. Connect with the Google account that owns this location's ad account; its campaigns then report under {{ $row['location']->name }}.
-                    </p>
-                @else
-                    <p class="text-xs text-slate-600">
-                        {{ count($row['accounts']) }} {{ \Illuminate\Support\Str::plural('account', count($row['accounts'])) }} ·
-                        {{ $c->last_synced_at ? 'last synced '.$c->last_synced_at->diffForHumans() : 'not synced yet' }}
-                        @if ($c->connected_at) · connected {{ $c->connected_at->diffForHumans() }} @endif
-                    </p>
-                    @if ($c->last_error)
-                        <p class="mt-1 text-xs text-amber-700">{{ $c->last_error }}</p>
-                    @endif
-
-                    @if ($row['accounts'] !== [])
-                        <div class="mt-4">
-                            @include('marketing.integrations._accounts', ['accounts' => $row['accounts'], 'id' => 'mkAccounts'.$loop->index])
-                        </div>
-                    @endif
+        {{-- Google logins: they only give access; they belong to no location. --}}
+        <x-marketing.panel title="Google Ads logins" subtitle="Read-only access to campaigns, spend, clicks and conversions. A login belongs to no location." icon="search">
+            <x-slot:actions>
+                @if ($googleAdsMissing === [])
+                    <a href="{{ route('marketing.google-ads.connect') }}"
+                        class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-[#00bfa5] text-white bg-[#00bfa5] hover:opacity-90">Connect Google Ads</a>
                 @endif
-            </x-marketing.panel>
-        @endforeach
+            </x-slot:actions>
 
-        {{-- Connections made before locations existed: assign them, or they only count org-wide. --}}
-        @foreach ($googleAds['unassigned'] as $row)
-            @php [$label, $tone] = $pill($row['connection']); $c = $row['connection']; @endphp
-            <x-marketing.panel title="Not assigned to a location" subtitle="A Google Ads connection made before locations existed" icon="triangle-alert" class="border-amber-200">
-                <x-slot:actions>
-                    <x-front-desk.pill :label="$label" :tone="$tone" />
-                    <form method="POST" action="{{ route('marketing.google-ads.update', $c) }}" class="flex items-center gap-1.5">
-                        @csrf @method('PATCH')
-                        <select name="location" aria-label="Location" onchange="this.form.submit()"
-                            class="text-[11px] rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 cursor-pointer">
-                            <option value="">Assign to a location…</option>
-                            @foreach($locations as $key => $location)
-                                <option value="{{ $key }}">{{ $location->name }}</option>
-                            @endforeach
-                        </select>
-                    </form>
-                    @if ($c->isUsable())
-                        <form method="POST" action="{{ route('marketing.google-ads.disconnect', $c) }}"
-                            onsubmit="return confirm('Disconnect this Google Ads connection? Imported campaign history is kept.');">
-                            @csrf @method('DELETE')
-                            <button type="submit" class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50">Disconnect</button>
-                        </form>
-                    @endif
-                </x-slot:actions>
+            @if ($connections === [])
+                <x-marketing.empty icon="plug" title="No Google Ads login connected"
+                    message="Connect with a Google login that can see your ad accounts. Every account it can see is listed below, once, for you to assign." />
+            @else
+                <ul class="divide-y divide-slate-100">
+                    @foreach ($connections as $c)
+                        @php [$label, $tone] = $pill($c); @endphp
+                        <li class="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[13px] font-semibold text-slate-800 truncate">{{ $c->label() }}</span>
+                                    <x-front-desk.pill :label="$label" :tone="$tone" />
+                                </div>
+                                <p class="text-[11px] text-slate-500 mt-0.5">
+                                    {{ $c->accounts_count }} {{ \Illuminate\Support\Str::plural('account', $c->accounts_count) }} read through this login ·
+                                    {{ $c->last_synced_at ? 'last synced '.$c->last_synced_at->diffForHumans() : 'not synced yet' }}
+                                    @if ($c->connected_at) · connected {{ $c->connected_at->diffForHumans() }} @endif
+                                </p>
+                                @if ($c->hasUnreadableToken())
+                                    <p class="mt-1 text-xs text-amber-700">Its stored Google credentials cannot be read on this server (they were saved under a different app key). Reconnect this login.</p>
+                                @elseif ($c->last_error)
+                                    <p class="mt-1 text-xs text-amber-700">{{ $c->last_error }}</p>
+                                @endif
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                @if ($googleAdsMissing === [])
+                                    <a href="{{ route('marketing.google-ads.connect') }}" class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50">Reconnect</a>
+                                @endif
+                                @if ($c->isUsable())
+                                    <form method="POST" action="{{ route('marketing.google-ads.disconnect', $c) }}"
+                                        onsubmit="return confirm(@js('Disconnect '.$c->label().'? Imported campaign history is kept.'));">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50">Disconnect</button>
+                                    </form>
+                                @endif
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </x-marketing.panel>
 
-                <p class="text-xs text-slate-600">
-                    {{ count($row['accounts']) }} {{ \Illuminate\Support\Str::plural('account', count($row['accounts'])) }} ·
-                    {{ $c->last_synced_at ? 'last synced '.$c->last_synced_at->diffForHumans() : 'not synced yet' }}.
-                    Its campaigns appear only when every location is selected until it is assigned.
+        {{-- Every ad account once. Nothing is synced or reported until it has a location. --}}
+        <x-marketing.panel title="Ad accounts"
+            :subtitle="$waiting > 0 ? $waiting.' waiting for a location — not synced until assigned. Leave other businesses\' accounts unassigned.' : 'Each account is synced and reported for the locations it is assigned to.'"
+            icon="briefcase">
+            @if ($accounts === [])
+                <x-marketing.empty icon="briefcase" title="No ad accounts yet" message="Accounts appear here once a Google Ads login is connected." />
+            @else
+                <div class="p-3">
+                    @include('marketing.integrations._accounts', ['accounts' => $accounts, 'locations' => $locations, 'id' => 'mkAccounts'])
+                </div>
+                <p class="px-5 pb-4 text-[11px] text-slate-500">
+                    One location: every campaign counts for it. Several locations: assign each campaign to one of them — until then it counts for none.
+                    History is pulled from 90 days before an account was first connected.
                 </p>
-                @if ($row['accounts'] !== [])
-                    <div class="mt-4">
-                        @include('marketing.integrations._accounts', ['accounts' => $row['accounts'], 'id' => 'mkUnassigned'.$loop->index])
-                    </div>
-                @endif
-            </x-marketing.panel>
-        @endforeach
+            @endif
+        </x-marketing.panel>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('[data-mk-accounts]').forEach(function (table) {
-                DDS.dataTable(table, { paging: false, info: false, searching: false });
+                DDS.dataTable(table, { paging: false, info: false, searching: true });
             });
         });
     </script>

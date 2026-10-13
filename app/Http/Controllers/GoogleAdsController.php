@@ -2,50 +2,44 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Marketing\AdCampaignReportService;
 use App\Domain\Marketing\GoogleAds\GoogleAdsException;
 use App\Domain\Marketing\GoogleAds\GoogleAdsOAuth;
 use App\Domain\Marketing\GoogleAds\GoogleAdsSyncService;
 use App\Domain\Support\ClinicRegistry;
 use App\Models\MarketingAdAccount;
+use App\Models\MarketingAdCampaign;
 use App\Models\MarketingAdConnection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 /**
- * Connecting Google Ads to one location of the Growth Engine: the OAuth round trip (which
- * carries the location through the session), disconnecting, and re-mapping an account or
- * a connection to a location. Campaign data itself is pulled by `marketing:google-ads-sync`,
- * never during a web request.
+ * Google Ads in the Growth Engine: connecting a Google login (no location involved), assigning
+ * each ad account to the locations it serves, and — for accounts shared by several locations —
+ * assigning each campaign. Campaign data is pulled by `marketing:google-ads-sync`, never
+ * during a web request, and only for accounts that have a location.
  */
 class GoogleAdsController extends Controller
 {
     private const STATE_KEY = 'google_ads_oauth_state';
 
-    private const LOCATION_KEY = 'google_ads_oauth_location';
-
     public function __construct(private readonly ClinicRegistry $clinics) {}
 
-    /** Send the user to Google's consent screen, remembering which location is connecting. */
+    /** Send the user to Google's consent screen. */
     public function connect(Request $request, GoogleAdsOAuth $oauth): RedirectResponse
     {
         if (! $oauth->isConfigured()) {
             return $this->back()->with('error', 'Google Ads is not configured. Missing on the server: '.implode(', ', $oauth->missingSettings()).'.');
         }
 
-        $locations = $this->clinics->locations();
-        $key = (string) $request->query('location', '');
-
-        if (! isset($locations[$key])) {
-            return $this->back()->with('error', 'Choose which location is connecting its Google Ads account.');
-        }
-
         // Ties the callback to this browser session, so a forged callback is rejected.
         $state = Str::random(40);
         $request->session()->put(self::STATE_KEY, $state);
-        $request->session()->put(self::LOCATION_KEY, $key);
 
         return redirect()->away($oauth->authorizationUrl($state));
     }
@@ -54,7 +48,6 @@ class GoogleAdsController extends Controller
     public function callback(Request $request, GoogleAdsOAuth $oauth, GoogleAdsSyncService $sync): RedirectResponse
     {
         $expectedState = (string) $request->session()->pull(self::STATE_KEY, '');
-        $locationKey = (string) $request->session()->pull(self::LOCATION_KEY, '');
 
         if ($request->filled('error')) {
             return $this->back()->with('error', 'Google Ads was not connected: '.$request->input('error').'.');
@@ -64,25 +57,23 @@ class GoogleAdsController extends Controller
             return $this->back()->with('error', 'The Google Ads sign-in could not be verified. Please try connecting again.');
         }
 
-        $location = $this->clinics->locations()[$locationKey] ?? null;
-        if ($location === null) {
-            return $this->back()->with('error', 'The location this connection was started for no longer exists. Please try connecting again.');
-        }
-
         if (! $request->filled('code')) {
             return $this->back()->with('error', 'Google did not return an authorisation code.');
         }
 
         try {
-            $refreshToken = $oauth->exchangeCode((string) $request->input('code'));
+            ['refresh_token' => $refreshToken, 'email' => $email] = $oauth->exchangeCode((string) $request->input('code'));
         } catch (GoogleAdsException $e) {
             return $this->back()->with('error', $e->getMessage());
         }
 
-        $connection = MarketingAdConnection::forLocation(MarketingAdConnection::PROVIDER_GOOGLE_ADS, $location)
-            ?? (new MarketingAdConnection(['provider' => MarketingAdConnection::PROVIDER_GOOGLE_ADS]))->assignLocation($location);
+        // The same Google login connecting again refreshes its connection rather than adding one.
+        $connection = ($email !== null
+            ? MarketingAdConnection::query()->googleAds()->where('account_email', $email)->first()
+            : null) ?? new MarketingAdConnection(['provider' => MarketingAdConnection::PROVIDER_GOOGLE_ADS]);
 
         $connection->forceFill([
+            'account_email' => $email,
             'status' => MarketingAdConnection::STATUS_CONNECTED,
             'refresh_token' => $refreshToken,
             'connected_by' => $request->user()->id,
@@ -90,20 +81,22 @@ class GoogleAdsController extends Controller
             'last_error' => null,
         ])->save();
 
+        $who = $connection->label();
+
         // The connection is saved either way; a discovery failure is reported, not fatal.
         try {
-            $accounts = $sync->discoverAccounts($connection);
+            $found = $sync->discoverAccounts($connection);
         } catch (GoogleAdsException $e) {
-            Log::warning('Google Ads connected but account discovery failed.', ['location' => $locationKey, 'error' => $e->getMessage()]);
+            Log::warning('Google Ads connected but account discovery failed.', ['connection' => $connection->id, 'error' => $e->getMessage()]);
             $connection->forceFill(['last_error' => $e->getMessage()])->save();
 
-            return $this->back()->with('error', "Google Ads connected for {$location->name}, but its accounts could not be listed: ".$e->getMessage());
+            return $this->back()->with('error', "Google Ads connected ({$who}), but its accounts could not be listed: ".$e->getMessage());
         }
 
-        return $this->back()->with('status', "Google Ads connected for {$location->name}. {$accounts} account(s) found; campaign data arrives with the next sync.");
+        return $this->back()->with('status', "Google Ads connected ({$who}). {$found} account(s) found. Assign each account to its location below; an account is synced only once it has one.");
     }
 
-    /** Withdraw one location's access. Imported campaigns and stats are kept for reporting. */
+    /** Withdraw a login's access. Its accounts, campaigns and history are kept. */
     public function disconnect(MarketingAdConnection $connection, GoogleAdsOAuth $oauth): RedirectResponse
     {
         $oauth->revoke($connection);
@@ -114,45 +107,61 @@ class GoogleAdsController extends Controller
             'last_error' => null,
         ])->save();
 
-        return $this->back()->with('status', 'Google Ads disconnected. Imported campaign history has been kept.');
+        return $this->back()->with('status', 'Google Ads disconnected ('.$connection->label().'). Imported campaign history has been kept.');
     }
 
-    /** Assign a connection made before locations existed to a location. */
-    public function updateConnection(Request $request, MarketingAdConnection $connection): RedirectResponse
-    {
-        $locations = $this->clinics->locations();
-
-        $data = $request->validate([
-            'location' => ['nullable', 'string', Rule::in(array_keys($locations))],
-        ]);
-
-        $location = $locations[$data['location'] ?? ''] ?? null;
-        $connection->assignLocation($location)->save();
-
-        // Accounts that were never mapped on their own follow the connection.
-        $connection->accounts()->whereNull('office_id')->update([
-            'office_id' => $location?->officeId,
-            'clinic_num' => $location?->clinicNum,
-        ]);
-
-        return $this->back()->with('status', $location === null ? 'Connection is no longer assigned to a location.' : "Connection assigned to {$location->name}.");
-    }
-
-    /** Map an ad account to a location (a ClinicRegistry key), or stop syncing it. */
+    /** Assign an ad account to the locations it serves (none = stop syncing and reporting it). */
     public function updateAccount(Request $request, MarketingAdAccount $account): RedirectResponse
     {
         $locations = $this->clinics->locations();
 
         $data = $request->validate([
-            'location' => ['nullable', 'string', Rule::in(array_keys($locations))],
-            'is_enabled' => ['sometimes', 'boolean'],
+            'locations' => ['nullable', 'array'],
+            'locations.*' => ['string', Rule::in(array_keys($locations))],
         ]);
 
-        $account->assignLocation($locations[$data['location'] ?? ''] ?? null);
-        $account->is_enabled = (bool) ($data['is_enabled'] ?? $account->is_enabled);
-        $account->save();
+        $chosen = array_values(array_intersect_key($locations, array_flip(array_unique($data['locations'] ?? []))));
 
-        return $this->back()->with('status', "Updated {$account->name}.");
+        DB::transaction(fn () => $account->assignLocations($chosen));
+
+        $message = match (count($chosen)) {
+            0 => "{$account->name} is no longer assigned to a location; it will not be synced or reported.",
+            1 => "{$account->name} assigned to {$chosen[0]->name}. Its campaigns count there.",
+            default => "{$account->name} assigned to ".count($chosen).' locations. Assign each campaign to one of them; unassigned campaigns count for no location.',
+        };
+
+        return $this->back()->with('status', $message);
+    }
+
+    /** The campaigns of an account shared by several locations, to assign each one. */
+    public function campaigns(MarketingAdAccount $account, AdCampaignReportService $report): View
+    {
+        $account->load('locations');
+        $all = $this->clinics->locations();
+
+        return view('marketing.integrations.campaigns', [
+            'account' => $account,
+            'accountLocations' => array_intersect_key($all, array_flip($account->locationKeys())),
+            'campaigns' => $report->campaignsForAssignment($account),
+            'spendDays' => AdCampaignReportService::ASSIGNMENT_SPEND_DAYS,
+        ]);
+    }
+
+    /** Credit one campaign to one of its account's locations, or to none. */
+    public function updateCampaign(Request $request, MarketingAdCampaign $campaign): RedirectResponse
+    {
+        $account = $campaign->account()->with('locations')->firstOrFail();
+        $allowed = $account->locationKeys();
+
+        $data = $request->validate([
+            'location' => ['nullable', 'string', Rule::in($allowed)],
+        ]);
+
+        $location = filled($data['location'] ?? null) ? $this->clinics->locations()[$data['location']] ?? null : null;
+        $campaign->assignLocation($location)->save();
+
+        return redirect()->route('marketing.google-ads.accounts.campaigns', $account)
+            ->with('status', $location === null ? "{$campaign->name} is not credited to any location." : "{$campaign->name} credited to {$location->name}.");
     }
 
     private function back(): RedirectResponse

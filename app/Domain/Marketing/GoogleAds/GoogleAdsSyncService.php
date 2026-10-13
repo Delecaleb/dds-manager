@@ -85,11 +85,24 @@ class GoogleAdsSyncService
         }
 
         foreach ($found as $externalId => $attributes) {
-            $account = MarketingAdAccount::firstOrNew(['connection_id' => $connection->id, 'external_id' => (string) $externalId]);
+            $account = MarketingAdAccount::firstOrNew([
+                'provider' => MarketingAdConnection::PROVIDER_GOOGLE_ADS,
+                'external_id' => (string) $externalId,
+            ]);
 
             if (! $account->exists) {
-                // Credited to the location that connected it, until someone re-maps it.
-                $account->inheritLocationFrom($connection);
+                // New accounts get no location: an admin assigns one before anything syncs.
+                $account->forceFill([
+                    'connection_id' => $connection->id,
+                    'history_from' => CarbonImmutable::today()->subDays($this->historyDays())->toDateString(),
+                ]);
+            } elseif ((int) $account->connection_id !== $connection->id) {
+                // Another login already reads this account: keep it unless that login is gone.
+                $current = $account->connection;
+                if ($current !== null && $current->isUsable()) {
+                    continue;
+                }
+                $account->connection_id = $connection->id;
             }
 
             $account->fill($attributes)->save();
@@ -98,21 +111,26 @@ class GoogleAdsSyncService
         return count($found);
     }
 
+    /** How far before an account was first connected its history is pulled. */
+    private function historyDays(): int
+    {
+        return max(1, (int) config('marketing.google_ads.history_days', 90));
+    }
+
     /**
-     * Sync every enabled, non-manager account. One account failing never stops the others.
+     * Sync every account read through this login that is assigned to a location. Accounts
+     * still waiting for a location are left alone. One account failing never stops the others.
      *
      * @param  int|null  $days  trailing days to pull; null picks backfill or refresh per account
-     * @return array{synced: int, failed: int, errors: array<string, string>}
+     * @return array{synced: int, failed: int, waiting: int, errors: array<string, string>}
      */
     public function syncAll(MarketingAdConnection $connection, ?int $days = null): array
     {
-        $result = ['synced' => 0, 'failed' => 0, 'errors' => []];
+        $result = ['synced' => 0, 'failed' => 0, 'waiting' => 0, 'errors' => []];
 
-        $accounts = $connection->accounts()
-            ->where('is_enabled', true)
-            ->where('is_manager', false)
-            ->where(fn ($query) => $query->whereNull('status')->orWhere('status', 'ENABLED'))
-            ->get();
+        $advertising = $connection->accounts()->advertising();
+        $result['waiting'] = (clone $advertising)->whereDoesntHave('locations')->count();
+        $accounts = $advertising->assigned()->get();
 
         foreach ($accounts as $account) {
             try {
@@ -135,21 +153,23 @@ class GoogleAdsSyncService
     }
 
     /**
-     * Sync one account's campaigns and daily stats.
+     * Sync one account's campaigns and daily stats. Never earlier than the account's
+     * history_from (90 days before it was first connected).
      *
-     * @param  int|null  $days  trailing days to pull. Null: the full backfill on the first run,
-     *                          then the refresh window (Google restates recent conversions).
+     * @param  int|null  $days  trailing days to pull. Null: everything since history_from on the
+     *                          first run, then the refresh window (Google restates recent conversions).
      *
      * @throws GoogleAdsException
      */
     public function syncAccount(MarketingAdConnection $connection, MarketingAdAccount $account, ?int $days = null): void
     {
-        $days ??= $account->last_synced_at === null
-            ? (int) config('marketing.google_ads.backfill_days', 365)
-            : (int) config('marketing.google_ads.refresh_days', 30);
-
         $end = CarbonImmutable::today();
-        $start = $end->subDays(max(1, $days) - 1);
+        $floor = $account->history_from !== null
+            ? CarbonImmutable::parse($account->history_from)
+            : $end->subDays($this->historyDays());
+
+        $days ??= $account->last_synced_at === null ? null : (int) config('marketing.google_ads.refresh_days', 30);
+        $start = $days === null ? $floor : $end->subDays(max(1, $days) - 1)->max($floor);
 
         $this->syncCampaigns($connection, $account);
 

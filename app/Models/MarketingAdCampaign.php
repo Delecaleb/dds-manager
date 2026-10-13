@@ -7,7 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/** One campaign in an ad account. office_id, when set, overrides the account's location. */
+/**
+ * One campaign in an ad account. office_id/clinic_num is the location it is credited to,
+ * always one of its account's locations. Unset: it counts for the account's location when
+ * the account has exactly one, and for no location otherwise.
+ */
 class MarketingAdCampaign extends Model
 {
     use HasMarketingLocation;
