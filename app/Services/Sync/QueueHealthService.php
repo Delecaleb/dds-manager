@@ -313,18 +313,9 @@ class QueueHealthService
      */
     private function failedJobs(): array
     {
-        return DB::table('failed_jobs')
-            ->orderByDesc('id')
-            ->limit(10)
-            ->get(['id', 'queue', 'payload', 'exception', 'failed_at'])
-            ->map(fn ($row) => [
-                'id' => (int) $row->id,
-                'queue' => (string) $row->queue,
-                'job' => class_basename((string) (json_decode((string) $row->payload, true)['displayName'] ?? 'Unknown')),
-                'error' => mb_substr(strtok((string) $row->exception, "\n") ?: '', 0, 300),
-                'failed_at' => (string) $row->failed_at,
-            ])
-            ->all();
+        // Resolved here, not injected: this service is also built on every queued job (worker
+        // heartbeat), which must stay cheap.
+        return app(FailedSyncJobReport::class)->recent();
     }
 
     private function failedSince(Carbon $since): int
