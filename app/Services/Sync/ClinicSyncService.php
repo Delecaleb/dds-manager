@@ -21,8 +21,14 @@ class ClinicSyncService extends BaseQuerySyncService
         return 'ClinicNum';
     }
 
+    /**
+     * None: OpenDental's `clinic` table has no change timestamp (no SecDateTEdit, no
+     * DateTStamp), so filtering on one is rejected ("Unknown column 'SecDateTEdit'").
+     * The table holds a handful of rows, so every run simply re-reads all of it, like
+     * recall types.
+     */
     protected function syncColumn(): ?string
     {
-        return 'SecDateTEdit';
+        return null;
     }
 }

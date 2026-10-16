@@ -55,7 +55,7 @@
             <div class="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs flex items-center gap-3">
                 <span class="text-xl">🔴</span>
                 <div>
-                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Stuck</div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Failed / stuck</div>
                     <div class="text-lg font-bold text-rose-700" id="gsr-stat-stuck">-</div>
                 </div>
             </div>

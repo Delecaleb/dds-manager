@@ -435,10 +435,12 @@ class SyncReportService
             }
         }
 
+        // A failed run ended with an error (shown in the row's tooltip); it is not frozen, so it
+        // is labelled Failed. It still counts with stuck runs as "needs attention".
         if ($rawStatus === 'failed') {
             return [
                 'status_type' => 'stuck',
-                'status_label' => '🔴 Stuck',
+                'status_label' => '🔴 Failed',
                 'status_icon' => '🔴',
                 'badge_class' => 'bg-rose-50 text-rose-700 border-rose-200',
                 'heartbeat_human' => $heartbeatHuman,

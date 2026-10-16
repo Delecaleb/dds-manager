@@ -3,6 +3,7 @@
 namespace App\Services\Sync;
 
 use App\Models\Office;
+use App\Services\Sync\Concerns\RetriesLockContention;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -15,6 +16,11 @@ use Throwable;
  */
 class PatientBalanceSyncService
 {
+    use RetriesLockContention;
+
+    /** The balance columns a rollup writes; a row is rewritten only when one of them changed. */
+    private const BALANCE_COLUMNS = ['Bal_0_30', 'Bal_31_60', 'Bal_61_90', 'BalOver90', 'Total', 'InsEst'];
+
     protected ?Office $office = null;
 
     public function forOffice(?Office $office): static
@@ -48,14 +54,19 @@ class PatientBalanceSyncService
         }
 
         try {
-            $rows = $this->guarantorRollups($officeId);
+            $rows = $this->changedRows($this->guarantorRollups($officeId), (int) $officeId);
+
+            // Every office's job runs at the same moment against this shared table. Writing in
+            // PatNum order makes concurrent jobs take index locks in the same order, and the
+            // retry absorbs the occasional deadlock MySQL still reports.
+            usort($rows, fn (array $a, array $b) => (int) $a['PatNum'] <=> (int) $b['PatNum']);
 
             foreach (array_chunk($rows, 500) as $batch) {
-                DB::table('od_patient_balances')->upsert(
+                $this->retryOnLockContention(fn () => DB::table('od_patient_balances')->upsert(
                     $batch,
                     ['office_id', 'PatNum'],
-                    ['Bal_0_30', 'Bal_31_60', 'Bal_61_90', 'BalOver90', 'Total', 'InsEst', 'updated_at']
-                );
+                    [...self::BALANCE_COLUMNS, 'updated_at']
+                ));
             }
 
             $lease->complete([
@@ -69,6 +80,36 @@ class PatientBalanceSyncService
 
             throw $e;
         }
+    }
+
+    /**
+     * Drop rollups whose stored balance is already identical, so a run only writes (and locks)
+     * the guarantors whose balance actually moved since the last run.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    protected function changedRows(array $rows, int $officeId): array
+    {
+        $stored = DB::table('od_patient_balances')
+            ->where('office_id', $officeId)
+            ->get(['PatNum', ...self::BALANCE_COLUMNS])
+            ->mapWithKeys(fn ($row) => [(string) $row->PatNum => $this->fingerprint((array) $row)])
+            ->all();
+
+        return array_values(array_filter(
+            $rows,
+            fn (array $row) => ($stored[(string) $row['PatNum']] ?? null) !== $this->fingerprint($row)
+        ));
+    }
+
+    /** The balance values as fixed 2-decimal text, so "12.5", 12.50 and "12.50" compare equal. */
+    private function fingerprint(array $row): string
+    {
+        return implode('|', array_map(
+            fn (string $column) => number_format((float) ($row[$column] ?? 0), 2, '.', ''),
+            self::BALANCE_COLUMNS
+        ));
     }
 
     protected function guarantorRollups(?int $officeId = null): array
