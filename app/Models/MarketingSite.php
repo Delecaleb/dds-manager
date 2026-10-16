@@ -67,6 +67,28 @@ class MarketingSite extends Model
             .'</script>';
     }
 
+    /** The call a site makes when a contact form is submitted (the example shown on the page). */
+    public const SIGNUP_EXAMPLE = "dds('signup', { email: 'patient@example.com', phone: '(313) 555-0142', name: 'Jane Doe', form: 'book-consult' });";
+
+    /**
+     * Plain-text install instructions for whoever maintains the website, with this site's real
+     * snippet in it — what the "Copy instructions for your developer" button copies.
+     */
+    public function installInstructions(?string $scriptUrl = null): string
+    {
+        return "Website tracking for {$this->domain} ({$this->name})\n\n"
+            ."1. Paste this snippet just before </head> on every page of {$this->domain}:\n\n"
+            .$this->trackingSnippet($scriptUrl)."\n\n"
+            ."2. When a contact or booking form is submitted successfully, call:\n\n"
+            .self::SIGNUP_EXAMPLE."\n\n"
+            ."   Pass the form's real email, phone and name values, and a short form name.\n\n"
+            ."Notes:\n"
+            ."- WordPress: use a header plugin such as WPCode (Header & Footer -> Header), not a single page.\n"
+            ."- Clear any page cache (WP Rocket, LiteSpeed, Cloudflare) after installing.\n"
+            ."- It collects page views, traffic sources and what the form passes at signup; never keystrokes, health details or IP addresses.\n"
+            ."- Once installed, the site shows as Verified in the Growth Engine within a minute of the first visit.\n";
+    }
+
     public function isVerified(): bool
     {
         return $this->verified_at !== null;

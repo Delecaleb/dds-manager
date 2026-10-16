@@ -128,11 +128,16 @@ class MarketingController extends Controller
     }
 
     /** The install snippet per site, and which location each site belongs to. */
-    public function tracking(WebsiteAnalyticsService $analytics): View
+    public function tracking(Request $request, WebsiteAnalyticsService $analytics): View
     {
         $locations = $this->clinics->locations();
+        $selected = $this->clinics->getSelectedLocationKeys();
 
         return view('marketing.tracking', [
+            // The site just added (or linked to) opens with its code showing.
+            'openSiteId' => $request->integer('site') ?: null,
+            // Working in one location: the add form starts with it chosen.
+            'defaultLocation' => count($selected) === 1 && isset($locations[$selected[0]]) ? (string) $selected[0] : null,
             'sites' => MarketingSite::orderBy('name')->get()->map(fn (MarketingSite $site) => [
                 'model' => $site,
                 'location_key' => $site->locationKey(),
@@ -149,22 +154,25 @@ class MarketingController extends Controller
         $locations = $this->clinics->locations();
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
             'domain' => ['required', 'string', 'max:255'],
             'location' => ['nullable', 'string', Rule::in(array_keys($locations))],
         ]);
 
+        $domain = MarketingSite::normalizeDomain($data['domain']);
+
         $site = (new MarketingSite([
             'site_key' => MarketingSite::generateKey(),
-            'name' => $data['name'],
-            'domain' => MarketingSite::normalizeDomain($data['domain']),
+            // The name is optional: the domain is a fine label until someone renames it.
+            'name' => filled($data['name'] ?? null) ? trim($data['name']) : $domain,
+            'domain' => $domain,
             'is_active' => true,
         ]))->assignLocation($locations[$data['location'] ?? ''] ?? null);
         $site->save();
 
         return redirect()
             ->route('marketing.tracking', ['site' => $site->id])
-            ->with('status', "Site added. Install the snippet on {$site->domain} to start tracking.");
+            ->with('status', "{$site->domain} added. Copy its code below and paste it into the website.");
     }
 
     /** Move a site to another location (or to none). */
