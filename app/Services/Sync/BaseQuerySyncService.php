@@ -6,7 +6,7 @@ use App\Models\Office;
 use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
 use Exception;
-use Illuminate\Database\DetectsConcurrencyErrors;
+use App\Services\Sync\Concerns\RetriesLockContention;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +16,7 @@ use Throwable;
 
 abstract class BaseQuerySyncService
 {
-    use DetectsConcurrencyErrors;
+    use RetriesLockContention;
 
     /**
      * MySQL rejects a prepared statement with more than 65,535 placeholders
@@ -723,31 +723,6 @@ abstract class BaseQuerySyncService
         return [$lastSync, $lastId];
     }
 
-    /**
-     * Run a write, retrying MySQL deadlocks / lock wait timeouts with jitter.
-     * Offices share tables, so concurrent upserts can briefly contend.
-     *
-     * @template T
-     *
-     * @param  callable(): T  $callback
-     * @return T
-     */
-    protected function retryOnLockContention(callable $callback): mixed
-    {
-        $maxAttempts = max(1, (int) config('sync.db_lock_attempts', 3));
-
-        for ($attempt = 1; ; $attempt++) {
-            try {
-                return $callback();
-            } catch (QueryException $e) {
-                if ($attempt >= $maxAttempts || ! $this->causedByConcurrencyError($e)) {
-                    throw $e;
-                }
-
-                usleep(random_int(100, 400) * 1000 * $attempt);
-            }
-        }
-    }
 
     /**
      * Call the OpenDental API with a few quick retries for transient failures.
