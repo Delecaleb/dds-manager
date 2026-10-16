@@ -28,14 +28,30 @@
         'rows' => array_map(fn (array $group) => array_merge($group, ['read_by_worker' => $group['read_by_worker'] ? 'Yes' : 'NO']), $health['jobs_by_type']),
     ];
 
+    // One row per location + problem (FailedSyncJobReport); every value is escaped before it
+    // reaches an html cell.
     $failedSpec = [
         'columns' => [
-            ['key' => 'id', 'label' => 'ID', 'type' => 'text'],
-            ['key' => 'job', 'label' => 'Job', 'type' => 'text'],
-            ['key' => 'failed_at', 'label' => 'Failed at', 'type' => 'text'],
-            ['key' => 'error', 'label' => 'Error', 'type' => 'text', 'class' => 'whitespace-normal max-w-xl'],
+            ['key' => 'when', 'label' => 'Last failed', 'type' => 'html', 'class' => 'align-top'],
+            ['key' => 'location', 'label' => 'Location', 'type' => 'text', 'class' => 'align-top font-semibold'],
+            ['key' => 'error_on', 'label' => 'Error on', 'type' => 'html', 'class' => 'whitespace-normal min-w-[12rem] max-w-xs align-top'],
+            ['key' => 'what', 'label' => 'What went wrong', 'type' => 'html', 'class' => 'whitespace-normal min-w-[22rem] max-w-xl align-top'],
         ],
-        'rows' => $health['failed_jobs'],
+        'rows' => array_map(fn (array $failed) => [
+            'when' => e(\App\Services\Sync\FailedSyncJobReport::when($failed['last_failed_at']))
+                .($failed['times'] > 1
+                    ? '<div class="text-[11px] font-normal text-slate-500">'.e($failed['times'].' times since '.\App\Services\Sync\FailedSyncJobReport::when($failed['first_failed_at'])).'</div>'
+                    : ''),
+            'location' => $failed['location'],
+            'error_on' => '<ul class="space-y-0.5">'.implode('', array_map(
+                fn (array $on) => '<li>'.e($on['label']).($on['times'] > 1 ? ' <span class="text-[11px] text-slate-500">× '.e($on['times']).'</span>' : '').'</li>',
+                $failed['error_on']
+            )).'</ul>',
+            'what' => '<div class="font-semibold text-slate-900">'.e($failed['problem']).'</div>'
+                .'<div class="mt-1 text-slate-600"><span class="font-semibold">What to do:</span> '.e($failed['action']).'</div>'
+                .'<details class="mt-1"><summary class="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600">Technical details</summary>'
+                .'<div class="mt-1 font-mono text-[11px] text-slate-500 break-all">'.e($failed['technical']).'</div></details>',
+        ], $health['failed_jobs']),
     ];
 @endphp
 

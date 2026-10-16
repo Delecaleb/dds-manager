@@ -77,8 +77,11 @@ class SyncHealth extends Command
 
         if ($snapshot['failed_jobs'] !== []) {
             $this->table(
-                ['ID', 'Job', 'Failed at', 'Error'],
-                array_map(fn (array $failed) => [$failed['id'], $failed['job'], $failed['failed_at'], mb_substr($failed['error'], 0, 120)], $snapshot['failed_jobs'])
+                ['Last failed', 'Times', 'Location', 'Error on', 'Problem', 'Technical'],
+                array_map(fn (array $failed) => [
+                    $failed['last_failed_at'], $failed['times'], $failed['location'], mb_substr($failed['error_on_text'], 0, 60),
+                    mb_substr($failed['problem'], 0, 70), mb_substr($failed['technical'], 0, 80),
+                ], $snapshot['failed_jobs'])
             );
         }
 
