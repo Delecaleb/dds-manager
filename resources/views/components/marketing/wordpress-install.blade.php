@@ -14,6 +14,57 @@
         ."<?php }, 1);";
 @endphp
 
+@php
+    // Form plugin examples: fire the signup when each plugin reports a successful submit.
+    $formExamples = [
+        'Contact Form 7' => <<<'JS'
+<script>
+document.addEventListener('wpcf7mailsent', function (e) {
+  var f = {};
+  (e.detail.inputs || []).forEach(function (i) { f[i.name] = i.value; });
+  dds('signup', {
+    email: f['your-email'],
+    phone: f['your-phone'],
+    name:  f['your-name'],
+    form:  'cf7-' + e.detail.contactFormId
+  });
+});
+</script>
+JS,
+        'WPForms' => <<<'JS'
+<script>
+jQuery(document).on('wpformsAjaxSubmitSuccess', function (e) {
+  var $f = jQuery(e.target);
+  dds('signup', {
+    email: $f.find('input[type=email]').val(),
+    phone: $f.find('input[type=tel]').val(),
+    form:  'wpforms-' + $f.data('formid')
+  });
+});
+</script>
+JS,
+        'Gravity Forms' => <<<'JS'
+<script>
+jQuery(document).on('gform_confirmation_loaded', function (e, formId) {
+  dds('signup', { form: 'gravity-' + formId });
+});
+</script>
+JS,
+        'Elementor Forms' => <<<'JS'
+<script>
+jQuery(document).on('submit_success', function (e) {
+  var $f = jQuery(e.target);
+  dds('signup', {
+    email: $f.find('input[type=email]').val(),
+    phone: $f.find('input[type=tel]').val(),
+    form:  'elementor'
+  });
+});
+</script>
+JS,
+    ];
+@endphp
+
 <details class="mt-4 border border-slate-200 rounded-xl overflow-hidden group">
     <summary class="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 cursor-pointer select-none">
         <span class="flex items-center gap-2 text-[12px] font-bold text-slate-800">
@@ -38,7 +89,7 @@
 
         <div>
             <h4 class="text-[12px] font-bold text-slate-900">Option 2 — child theme <code class="text-[10px] bg-slate-100 px-1 py-0.5 rounded">functions.php</code></h4>
-            <pre class="mt-1.5 text-[11px] leading-relaxed bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto"><code>{{ $functionsPhp }}</code></pre>
+            <x-marketing.code-block :code="$functionsPhp" class="mt-1.5" />
         </div>
 
         <div>
@@ -57,52 +108,10 @@
                 Field names differ per form, so check them in the form editor first.
             </p>
 
-            <p class="text-[11px] font-bold text-slate-700 mt-3 mb-1">Contact Form 7</p>
-@verbatim
-            <pre class="text-[11px] leading-relaxed bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto"><code>&lt;script&gt;
-document.addEventListener('wpcf7mailsent', function (e) {
-  var f = {};
-  (e.detail.inputs || []).forEach(function (i) { f[i.name] = i.value; });
-  dds('signup', {
-    email: f['your-email'],
-    phone: f['your-phone'],
-    name:  f['your-name'],
-    form:  'cf7-' + e.detail.contactFormId
-  });
-});
-&lt;/script&gt;</code></pre>
-
-            <p class="text-[11px] font-bold text-slate-700 mt-3 mb-1">WPForms</p>
-            <pre class="text-[11px] leading-relaxed bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto"><code>&lt;script&gt;
-jQuery(document).on('wpformsAjaxSubmitSuccess', function (e) {
-  var $f = jQuery(e.target);
-  dds('signup', {
-    email: $f.find('input[type=email]').val(),
-    phone: $f.find('input[type=tel]').val(),
-    form:  'wpforms-' + $f.data('formid')
-  });
-});
-&lt;/script&gt;</code></pre>
-
-            <p class="text-[11px] font-bold text-slate-700 mt-3 mb-1">Gravity Forms</p>
-            <pre class="text-[11px] leading-relaxed bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto"><code>&lt;script&gt;
-jQuery(document).on('gform_confirmation_loaded', function (e, formId) {
-  dds('signup', { form: 'gravity-' + formId });
-});
-&lt;/script&gt;</code></pre>
-
-            <p class="text-[11px] font-bold text-slate-700 mt-3 mb-1">Elementor Forms</p>
-            <pre class="text-[11px] leading-relaxed bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto"><code>&lt;script&gt;
-jQuery(document).on('submit_success', function (e) {
-  var $f = jQuery(e.target);
-  dds('signup', {
-    email: $f.find('input[type=email]').val(),
-    phone: $f.find('input[type=tel]').val(),
-    form:  'elementor'
-  });
-});
-&lt;/script&gt;</code></pre>
-@endverbatim
+            @foreach ($formExamples as $plugin => $code)
+                <p class="text-[11px] font-bold text-slate-700 mt-3 mb-1">{{ $plugin }}</p>
+                <x-marketing.code-block :code="$code" />
+            @endforeach
         </div>
 
         <ul class="text-[11px] text-slate-600 space-y-1.5 list-disc pl-4 leading-relaxed border-t border-slate-100 pt-4">

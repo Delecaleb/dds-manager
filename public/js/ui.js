@@ -1084,6 +1084,66 @@
         });
     };
 
+    /* ── Copy to clipboard (the one implementation) ─────────────────────────────
+       DDS.copy(text, button?) copies text and briefly relabels the button ("Copied").
+       Declarative: any element with data-dds-copy="#id" copies that element's text;
+       data-dds-copy-text="…" copies the literal value.
+       navigator.clipboard needs a secure context (HTTPS or localhost); over plain HTTP this
+       falls back to a hidden textarea + execCommand, and if even that is blocked it says
+       "Press Ctrl+C" and selects the source so the user can copy by hand. */
+    DDS.copy = function (text, button, source) {
+        function flash(message) {
+            if (!button) return;
+            if (!button.dataset.ddsCopyLabel) button.dataset.ddsCopyLabel = button.innerHTML;
+            button.textContent = message;
+            clearTimeout(button.__ddsCopyTimer);
+            button.__ddsCopyTimer = setTimeout(function () { button.innerHTML = button.dataset.ddsCopyLabel; }, 1500);
+        }
+
+        function selectSource() {
+            if (!source) return;
+            var range = document.createRange();
+            range.selectNodeContents(source);
+            var selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+
+        function legacy() {
+            var area = document.createElement('textarea');
+            area.value = text;
+            area.setAttribute('readonly', '');
+            area.style.position = 'fixed';
+            area.style.top = '-1000px';
+            document.body.appendChild(area);
+            area.select();
+            area.setSelectionRange(0, text.length);
+            var ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+            document.body.removeChild(area);
+            flash(ok ? 'Copied' : 'Press Ctrl+C');
+            if (!ok) selectSource();
+        }
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(function () { flash('Copied'); }, legacy);
+        } else {
+            legacy();
+        }
+    };
+
+    document.addEventListener('click', function (e) {
+        var button = e.target.closest('[data-dds-copy], [data-dds-copy-text]');
+        if (!button) return;
+        e.preventDefault();
+        if (button.hasAttribute('data-dds-copy-text')) {
+            DDS.copy(button.getAttribute('data-dds-copy-text'), button);
+            return;
+        }
+        var source = document.querySelector(button.getAttribute('data-dds-copy'));
+        if (source) DDS.copy(source.innerText, button, source);
+    });
+
     // Auto-init any declarative tab bars, location pickers, and every sortable table, on load.
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('[data-dds-tabs]').forEach(function (n) { DDS.tabs.init(n); });

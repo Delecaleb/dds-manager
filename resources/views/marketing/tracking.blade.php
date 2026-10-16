@@ -1,6 +1,6 @@
 <x-marketing-layout>
     <x-slot:title>Tracking Script</x-slot:title>
-    <x-slot:subtitle>Add a site, assign it to a location, install its snippet, watch it verify</x-slot:subtitle>
+    <x-slot:subtitle>Add a website, copy its code, paste it into the site — it verifies itself</x-slot:subtitle>
 
     <div class="p-4 sm:p-6 space-y-6 max-w-[1100px]">
 
@@ -10,106 +10,103 @@
             </p>
         @endif
 
-        <x-marketing.panel title="Add a site" subtitle="Each site gets its own key, so its traffic stays separate" icon="globe">
-            <form method="POST" action="{{ route('marketing.sites.store') }}" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+        {{-- 1. Add: only the address is required; the name defaults to it. --}}
+        <x-marketing.panel title="Add a website" subtitle="Each website gets its own code, so its traffic stays separate" icon="globe">
+            <form method="POST" action="{{ route('marketing.sites.store') }}" class="grid grid-cols-1 md:grid-cols-[1.3fr_1fr_1fr_auto] gap-3 items-end">
                 @csrf
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-700 mb-1.5">Site name</label>
-                    <input type="text" name="name" required maxlength="255" placeholder="Plymouth Implants"
-                        class="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:border-emerald-500">
-                    @error('name') <p class="text-[10px] text-rose-600 mt-1">{{ $message }}</p> @enderror
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-700 mb-1.5">Domain</label>
-                    <input type="text" name="domain" required maxlength="255" placeholder="plymouthdental.com"
+                    <label for="siteDomain" class="block text-[11px] font-bold text-slate-700 mb-1.5">Website address</label>
+                    <input id="siteDomain" type="text" name="domain" required maxlength="255" value="{{ old('domain') }}" placeholder="plymouthdental.com" autocomplete="off"
                         class="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:border-emerald-500">
                     @error('domain') <p class="text-[10px] text-rose-600 mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-700 mb-1.5">Location</label>
-                    <select name="location" class="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 bg-white">
+                    <label for="siteLocation" class="block text-[11px] font-bold text-slate-700 mb-1.5">Location</label>
+                    <select id="siteLocation" name="location" class="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 bg-white">
                         <option value="">Not assigned</option>
                         @foreach($locations as $key => $location)
-                            <option value="{{ $key }}" @selected(old('location') === $key)>{{ $location->name }}</option>
+                            <option value="{{ $key }}" @selected((string) old('location', $defaultLocation) === (string) $key)>{{ $location->name }}</option>
                         @endforeach
                     </select>
                     @error('location') <p class="text-[10px] text-rose-600 mt-1">{{ $message }}</p> @enderror
                 </div>
+                <div>
+                    <label for="siteName" class="block text-[11px] font-bold text-slate-700 mb-1.5">Name <span class="font-normal text-slate-400">(optional)</span></label>
+                    <input id="siteName" type="text" name="name" maxlength="255" value="{{ old('name') }}" placeholder="Same as the address"
+                        class="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:border-emerald-500">
+                    @error('name') <p class="text-[10px] text-rose-600 mt-1">{{ $message }}</p> @enderror
+                </div>
                 <button type="submit"
-                    class="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded-lg border border-emerald-500 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer">
-                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add site
+                    class="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-[12px] font-bold rounded-lg border border-emerald-500 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add &amp; get code
                 </button>
             </form>
         </x-marketing.panel>
 
-        @forelse($sites as $row)
-            @php
-                $site = $row['model'];
-                $snippet = $site->trackingSnippet($scriptUrl);
-            @endphp
-
-            <x-marketing.panel :title="$site->name" :subtitle="$site->domain . ' · ' . ($row['location'] ?? 'Not assigned to a location')" icon="code">
-                <x-slot:actions>
-                    {{-- Which office this site's traffic and leads belong to. --}}
-                    <form method="POST" action="{{ route('marketing.sites.update', $site) }}" class="flex items-center gap-1.5">
-                        @csrf @method('PATCH')
-                        <select name="location" aria-label="Location" onchange="this.form.submit()"
-                            class="text-[11px] rounded-lg border {{ $row['location_key'] === null ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white' }} px-2 py-1 cursor-pointer">
-                            <option value="">Not assigned</option>
-                            @foreach($locations as $key => $location)
-                                <option value="{{ $key }}" @selected($row['location_key'] === $key)>{{ $location->name }}</option>
-                            @endforeach
-                        </select>
-                    </form>
-
-                    @if(! $site->is_active)
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-500">Paused</span>
-                    @elseif($site->isVerified())
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700">
-                            Verified {{ $site->verified_at->diffForHumans() }}
-                        </span>
-                    @else
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">Awaiting first event</span>
-                    @endif
-
-                    <a href="{{ route('marketing.websites', ['site' => $site->id, 'locations' => $row['location_key'] ?? 'all']) }}"
-                        class="text-[11px] font-bold text-emerald-700 hover:text-emerald-800">Traffic →</a>
-
-                    <form method="POST" action="{{ route('marketing.sites.toggle', $site) }}">
-                        @csrf @method('PATCH')
-                        <button type="submit" class="text-[11px] font-bold text-slate-500 hover:text-slate-800 cursor-pointer">
-                            {{ $site->is_active ? 'Pause' : 'Resume' }}
-                        </button>
-                    </form>
-                </x-slot:actions>
-
-                <p class="text-[11px] font-bold text-slate-700 mb-1.5">1. Paste before &lt;/head&gt; on every page</p>
-                <div class="relative">
-                    <pre id="snippet-{{ $site->id }}" class="text-[11px] leading-relaxed bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto"><code>{{ $snippet }}</code></pre>
-                    <button type="button" onclick="copySnippet('snippet-{{ $site->id }}', this)"
-                        class="absolute top-2.5 right-2.5 px-2 py-1 text-[10px] font-bold rounded border border-white/20 text-slate-200 hover:bg-white/10 cursor-pointer">
-                        Copy
-                    </button>
-                </div>
-
-                <p class="text-[11px] font-bold text-slate-700 mt-4 mb-1.5">2. Call this when a form is submitted</p>
-                <pre class="text-[11px] leading-relaxed bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto"><code>dds('signup', { email: 'patient@example.com', phone: '(313) 555-0142', name: 'Jane Doe', form: 'book-consult' });</code></pre>
-
-                <x-marketing.wordpress-install :site-key="$site->site_key" :script-url="$scriptUrl" />
-
-                <p class="mt-3 text-[11px] text-slate-500 leading-relaxed">
-                    Site key <code class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">{{ $site->site_key }}</code> —
-                    public by design: it names the site and carries no access of its own.
-                </p>
-            </x-marketing.panel>
-        @empty
-            <x-marketing.panel title="No sites yet" icon="globe">
+        {{-- 2. Every website in one table; the eye opens its code and settings in a modal. --}}
+        <x-marketing.panel title="Websites" :subtitle="count($sites).' '.\Illuminate\Support\Str::plural('website', count($sites)).' · open one to copy its code'" icon="code">
+            @if (count($sites) === 0)
                 <x-marketing.empty
                     icon="globe"
-                    title="Add your first site above"
-                    message="You'll get a snippet to paste into that site's pages. The moment the first page loads, the site verifies itself and traffic starts appearing under Websites." />
-            </x-marketing.panel>
-        @endforelse
+                    title="Add your first website above"
+                    message="Type the website's address and press Add & get code. You'll get one piece of code to paste into the site; the first page view verifies it and traffic starts appearing under Websites." />
+            @else
+                <div class="p-3">
+                    <x-data-table id="mkSites" min-width="760px" data-mk-sites>
+                        <x-slot:head>
+                            <tr>
+                                <th class="px-4 py-3">Website</th>
+                                <th class="px-4 py-3">Location</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3">Added</th>
+                                <th class="px-4 py-3 text-right">Actions</th>
+                            </tr>
+                        </x-slot:head>
+                        @foreach($sites as $row)
+                            @php $site = $row['model']; @endphp
+                            <tr class="hover:bg-slate-50 {{ $openSiteId === $site->id ? 'bg-emerald-50/60' : '' }}">
+                                <td class="px-4 py-3">
+                                    <div class="text-[13px] font-semibold text-slate-800">{{ $site->name }}</div>
+                                    @if ($site->name !== $site->domain)
+                                        <div class="text-[11px] text-slate-500">{{ $site->domain }}</div>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-[12px] {{ $row['location'] === null ? 'text-amber-700' : 'text-slate-700' }}">{{ $row['location'] ?? 'Not assigned' }}</td>
+                                <td class="px-4 py-3" data-order="{{ ! $site->is_active ? 2 : ($site->isVerified() ? 1 : 0) }}">
+                                    @if(! $site->is_active)
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-500">Paused</span>
+                                    @elseif($site->isVerified())
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700" title="Verified {{ $site->verified_at->format('M j, Y g:i A') }}">Verified</span>
+                                    @else
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">Not installed yet</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-[12px] text-slate-500" data-order="{{ $site->created_at?->timestamp }}">{{ $site->created_at?->format('M j, Y') }}</td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                        <button type="button" data-site-open="{{ $site->id }}" title="View code and settings" aria-label="View code and settings for {{ $site->name }}"
+                                            class="p-1.5 rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:text-emerald-700 cursor-pointer">
+                                            <i data-lucide="eye" class="w-4 h-4"></i>
+                                        </button>
+                                        <a href="{{ route('marketing.websites', ['site' => $site->id, 'locations' => $row['location_key'] ?? 'all']) }}" title="See traffic" aria-label="See traffic for {{ $site->name }}"
+                                            class="p-1.5 rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:text-emerald-700">
+                                            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </x-data-table>
+                </div>
+
+                {{-- Each site's details, opened by its eye button through DDS.modal. --}}
+                @foreach($sites as $row)
+                    <template id="site-details-{{ $row['model']->id }}">
+                        @include('marketing.tracking._site-details', ['row' => $row, 'isNew' => $openSiteId === $row['model']->id])
+                    </template>
+                @endforeach
+            @endif
+        </x-marketing.panel>
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <x-marketing.panel title="What it collects" subtitle="Deliberately limited" icon="eye">
@@ -136,54 +133,25 @@
             </x-marketing.panel>
         </div>
     </div>
-
     <script>
-        /* navigator.clipboard exists only in a secure context (HTTPS or localhost), so over
-           plain HTTP this falls back to a hidden textarea + execCommand, and tells the user
-           when neither worked rather than failing silently. */
-        function copySnippet(id, btn) {
-            var el = document.getElementById(id);
-            if (!el) return;
+        document.addEventListener('DOMContentLoaded', function () {
+            var table = document.querySelector('[data-mk-sites]');
+            if (table) DDS.dataTable(table, { paging: false, info: false, searching: true, order: [[0, 'asc']] });
 
-            var text = el.innerText;
-
-            function flash(message) {
-                var original = btn.dataset.label || btn.textContent;
-                btn.dataset.label = original;
-                btn.textContent = message;
-                setTimeout(function () { btn.textContent = btn.dataset.label; }, 1400);
+            function openSite(id) {
+                var template = document.getElementById('site-details-' + id);
+                if (template) DDS.modal.openHtml(template.innerHTML);
             }
 
-            function legacyCopy() {
-                var area = document.createElement('textarea');
-                area.value = text;
-                area.setAttribute('readonly', '');
-                area.style.position = 'fixed';
-                area.style.top = '-1000px';
-                document.body.appendChild(area);
-                area.select();
-                area.setSelectionRange(0, text.length);
-                var ok = false;
-                try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-                document.body.removeChild(area);
-                flash(ok ? 'Copied' : 'Press Ctrl+C');
-                if (!ok) selectSnippet(el);
-            }
+            document.addEventListener('click', function (e) {
+                var button = e.target.closest('[data-site-open]');
+                if (button) openSite(button.getAttribute('data-site-open'));
+            });
 
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(function () { flash('Copied'); }, legacyCopy);
-            } else {
-                legacyCopy();
-            }
-        }
-
-        /* If copying is blocked entirely, select the snippet so Ctrl+C still works. */
-        function selectSnippet(el) {
-            var range = document.createRange();
-            range.selectNodeContents(el);
-            var selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
-        }
+            // A website just added opens straight to its code.
+            @if ($openSiteId)
+                openSite(@json($openSiteId));
+            @endif
+        });
     </script>
 </x-marketing-layout>
