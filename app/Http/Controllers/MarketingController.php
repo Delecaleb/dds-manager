@@ -135,6 +135,7 @@ class MarketingController extends Controller
     {
         $locations = $this->clinics->locations();
         $selected = $this->clinics->getSelectedLocationKeys();
+        $history = $analytics->historyCounts();
 
         return view('marketing.tracking', [
             // The site just added (or linked to) opens with its code showing.
@@ -154,6 +155,8 @@ class MarketingController extends Controller
                     'paths' => implode(', ', $l->path_prefixes ?? []),
                 ])->all(),
                 'form_codes' => $resolver->formCodes($site),
+                // What deleting the site would erase, shown in its confirm box.
+                'history' => $history[$site->id] ?? ['visits' => 0, 'leads' => 0],
             ]),
             'locations' => $locations,
             'scriptUrl' => route('tracking.script'),
@@ -229,6 +232,25 @@ class MarketingController extends Controller
             ->with('status', $label === null
                 ? "{$site->name} is no longer assigned to a location."
                 : "{$site->name} now serves {$label}.".($site->isShared() ? ' Past visits are being re-credited by these rules.' : ''));
+    }
+
+    /**
+     * Delete a site and all it tracked. Irreversible, so the domain must be typed to confirm;
+     * pausing is the way to stop tracking while keeping the history.
+     */
+    public function destroySite(Request $request, MarketingSite $site): RedirectResponse
+    {
+        $request->validate([
+            'confirm_domain' => ['required', 'string', Rule::in([$site->domain])],
+        ], [
+            'confirm_domain.in' => "Type {$site->domain} exactly to delete this website.",
+        ]);
+
+        $domain = $site->domain;
+        $site->purge();
+
+        return redirect()->route('marketing.tracking')
+            ->with('status', "{$domain} and its tracking history were deleted.");
     }
 
     /** Pause or resume a site: a paused key is rejected by the collector. */

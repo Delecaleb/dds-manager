@@ -97,6 +97,10 @@
                                             class="p-1.5 rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:text-emerald-700">
                                             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
                                         </a>
+                                        <button type="button" data-site-delete="{{ $site->id }}" title="Delete website" aria-label="Delete {{ $site->name }}"
+                                            class="p-1.5 rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 cursor-pointer">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -108,6 +112,9 @@
                 @foreach($sites as $row)
                     <template id="site-details-{{ $row['model']->id }}">
                         @include('marketing.tracking._site-details', ['row' => $row, 'isNew' => $openSiteId === $row['model']->id])
+                    </template>
+                    <template id="site-delete-{{ $row['model']->id }}">
+                        @include('marketing.tracking._site-delete', ['row' => $row])
                     </template>
                 @endforeach
             @endif
@@ -143,15 +150,24 @@
             var table = document.querySelector('[data-mk-sites]');
             if (table) DDS.dataTable(table, { paging: false, info: false, searching: true, order: [[0, 'asc']] });
 
-            function openSite(id) {
-                var template = document.getElementById('site-details-' + id);
+            function openTemplate(id) {
+                var template = document.getElementById(id);
                 if (template) DDS.modal.openHtml(template.innerHTML);
             }
+            function openSite(id) { openTemplate('site-details-' + id); }
 
             document.addEventListener('click', function (e) {
                 var button = e.target.closest('[data-site-open]');
                 if (button) openSite(button.getAttribute('data-site-open'));
+
+                var remove = e.target.closest('[data-site-delete]');
+                if (remove) openTemplate('site-delete-' + remove.getAttribute('data-site-delete'));
             });
+
+            // A mistyped confirmation comes back with the delete box open and the error showing.
+            @if ($errors->has('confirm_domain') && old('site_id'))
+                openTemplate('site-delete-' + @json((int) old('site_id')));
+            @endif
 
             // A website just added opens straight to its code.
             @if ($openSiteId)

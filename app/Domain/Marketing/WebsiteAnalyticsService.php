@@ -531,6 +531,26 @@ class WebsiteAnalyticsService
             ])->all();
     }
 
+    /**
+     * All-time visits and leads per site, whatever the period or location — what deleting a
+     * site would erase.
+     *
+     * @return array<int, array{visits: int, leads: int}>
+     */
+    public function historyCounts(): array
+    {
+        $visits = DB::table('marketing_sessions')->selectRaw('site_id, COUNT(*) as total')->groupBy('site_id')->pluck('total', 'site_id');
+        $leads = DB::table('marketing_visitors')->whereNotNull('identified_at')
+            ->selectRaw('site_id, COUNT(*) as total')->groupBy('site_id')->pluck('total', 'site_id');
+
+        $out = [];
+        foreach ($visits->keys()->merge($leads->keys())->unique() as $siteId) {
+            $out[(int) $siteId] = ['visits' => (int) ($visits[$siteId] ?? 0), 'leads' => (int) ($leads[$siteId] ?? 0)];
+        }
+
+        return $out;
+    }
+
     /** "Grand Rapids", "Grand Rapids, Ann Arbor", or null when the site serves no location. */
     public function siteLocationLabel(MarketingSite $site): ?string
     {

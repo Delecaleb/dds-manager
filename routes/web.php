@@ -185,6 +185,7 @@ Route::middleware('auth')->group(function () {
         Route::post('sites', [MarketingController::class, 'storeSite'])->name('sites.store');
         Route::patch('sites/{site}', [MarketingController::class, 'updateSite'])->name('sites.update');
         Route::patch('sites/{site}/toggle', [MarketingController::class, 'toggleSite'])->name('sites.toggle');
+        Route::delete('sites/{site}', [MarketingController::class, 'destroySite'])->name('sites.destroy');
         Route::get('integrations', [MarketingController::class, 'integrations'])->name('integrations');
 
         // Google Ads connection. The callback URL is registered on the Google OAuth client.
