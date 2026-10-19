@@ -34,7 +34,7 @@
 
                 <dl class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                     @foreach ([
-                        ['Location', $v['location'] ?: 'Not assigned'],
+                        ['Location', $v['location'] ?: 'Location not known'],
                         ['First touch', $v['first_source']],
                         ['Campaign', $v['first_campaign'] ?: '—'],
                         ['Landed on', $v['first_landing_path'] ?: '—'],

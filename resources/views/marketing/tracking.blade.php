@@ -71,7 +71,12 @@
                                         <div class="text-[11px] text-slate-500">{{ $site->domain }}</div>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 text-[12px] {{ $row['location'] === null ? 'text-amber-700' : 'text-slate-700' }}">{{ $row['location'] ?? 'Not assigned' }}</td>
+                                <td class="px-4 py-3 text-[12px] {{ $row['location'] === null ? 'text-amber-700' : 'text-slate-700' }}">
+                                    {{ $row['location'] ?? 'Not assigned' }}
+                                    @if ($row['shared'])
+                                        <span class="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-sky-200 bg-sky-50 text-sky-700" title="One script; each visit is credited to the location it belongs to">Shared</span>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-3" data-order="{{ ! $site->is_active ? 2 : ($site->isVerified() ? 1 : 0) }}">
                                     @if(! $site->is_active)
                                         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-500">Paused</span>
@@ -88,7 +93,7 @@
                                             class="p-1.5 rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:text-emerald-700 cursor-pointer">
                                             <i data-lucide="eye" class="w-4 h-4"></i>
                                         </button>
-                                        <a href="{{ route('marketing.websites', ['site' => $site->id, 'locations' => $row['location_key'] ?? 'all']) }}" title="See traffic" aria-label="See traffic for {{ $site->name }}"
+                                        <a href="{{ route('marketing.websites', ['site' => $site->id, 'locations' => $row['location_keys'] === [] ? 'all' : implode(',', $row['location_keys'])]) }}" title="See traffic" aria-label="See traffic for {{ $site->name }}"
                                             class="p-1.5 rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:text-emerald-700">
                                             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
                                         </a>

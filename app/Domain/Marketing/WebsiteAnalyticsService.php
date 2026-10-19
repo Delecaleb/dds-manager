@@ -13,9 +13,11 @@ use Illuminate\Support\Facades\DB;
  * Channels pages read from here and nowhere else, so a definition — what counts as a
  * signup, how a source is grouped into a channel — is changed in one place.
  *
- * Every method takes a MarketingFilter: the period and the selected locations. A tracked
- * site belongs to one location (office_id + clinic_num), and sessions, visitors and
- * events belong to a site, so scoping is always "sites in the selected locations".
+ * Every method takes a MarketingFilter: the period and the selected locations. A site
+ * serves one or more locations, and every visit and visitor carries the location it is
+ * credited to (VisitLocationResolver), so scoping is always "visits credited to the
+ * selected locations". On a website several locations share, a visit nobody could place
+ * yet counts only when every location is selected.
  *
  * Reads only; TrackingIngestService is the writer.
  */
@@ -42,9 +44,6 @@ class WebsiteAnalyticsService
 
     private const PAID_SOCIAL_CLICKS = ['meta', 'tiktok'];
 
-    /** @var array<string, list<int>> site ids per filter signature, so one page's queries share one lookup */
-    private array $siteIds = [];
-
     public function __construct(private readonly ClinicRegistry $clinics) {}
 
     /**
@@ -54,8 +53,14 @@ class WebsiteAnalyticsService
      */
     public function sites(MarketingFilter $filter): Collection
     {
-        $query = MarketingSite::query()->orderBy('name');
-        LocationScope::apply($query, $filter, 'office_id', 'clinic_num');
+        $query = MarketingSite::query()->with('locations')->orderBy('name');
+        $query->where(function ($q) use ($filter) {
+            $q->whereHas('locations', fn ($l) => LocationScope::apply($l, $filter, 'office_id', 'clinic_num'));
+
+            if ($filter->allLocations) {
+                $q->orWhereDoesntHave('locations');
+            }
+        });
 
         if ($filter->siteId !== null) {
             $query->where('id', $filter->siteId);
@@ -81,8 +86,8 @@ class WebsiteAnalyticsService
         $visitors = $this->countBySite('visitor_id', $filter, $ids, true);
         $sessions = $this->countBySite('*', $filter, $ids);
         $signups = $this->signupsBySite($filter, $ids);
-        $lastSeen = DB::table('marketing_events')->whereIn('site_id', $ids)
-            ->select('site_id', DB::raw('MAX(occurred_at) as last_seen'))
+        $lastSeen = DB::table('marketing_sessions')->whereIn('site_id', $ids)
+            ->select('site_id', DB::raw('MAX(last_event_at) as last_seen'))
             ->groupBy('site_id')->pluck('last_seen', 'site_id');
 
         return $sites->map(function (MarketingSite $site) use ($visitors, $sessions, $signups, $lastSeen) {
@@ -94,10 +99,9 @@ class WebsiteAnalyticsService
                 'name' => $site->name,
                 'domain' => $site->domain,
                 'site_key' => $site->site_key,
-                'office_id' => $site->office_id,
-                'clinic_num' => $site->clinic_num,
-                'location_key' => $site->locationKey(),
-                'location' => $site->office_id !== null ? $this->clinics->labelFor((int) $site->office_id, $site->clinic_num) : null,
+                'location_keys' => $site->locationKeys(),
+                'location' => $this->siteLocationLabel($site),
+                'shared' => $site->isShared(),
                 'is_active' => $site->is_active,
                 'verified' => $site->isVerified(),
                 'created_at' => $site->created_at?->toDateTimeString(),
@@ -125,8 +129,7 @@ class WebsiteAnalyticsService
 
         // Time from the visitor's very first visit to the moment they signed up, which is
         // the number that says how long a decision actually takes.
-        $timeToSignup = DB::table('marketing_visitors as v')
-            ->whereIn('v.site_id', $this->siteIds($filter))
+        $timeToSignup = $this->visitorQuery($filter)
             ->whereNotNull('v.identified_at')
             ->whereBetween('v.identified_at', $this->range($filter))
             ->get(['v.first_seen_at', 'v.identified_at'])
@@ -279,12 +282,16 @@ class WebsiteAnalyticsService
             ->groupBy('landing_path')
             ->pluck('landings', 'landing_path');
 
-        return DB::table('marketing_events')
-            ->where('type', MarketingEvent::TYPE_PAGEVIEW)
-            ->whereIn('site_id', $this->siteIds($filter))
-            ->whereBetween('occurred_at', $this->range($filter))
-            ->selectRaw('path, COUNT(*) as views, COUNT(DISTINCT visitor_id) as visitors')
-            ->groupBy('path')
+        // A page view counts for the location its visit is credited to.
+        $views = DB::table('marketing_events as e')
+            ->join('marketing_sessions as ms', 'ms.id', '=', 'e.session_id')
+            ->where('e.type', MarketingEvent::TYPE_PAGEVIEW)
+            ->whereBetween('e.occurred_at', $this->range($filter));
+        $this->scope($views, $filter, 'ms');
+
+        return $views
+            ->selectRaw('e.path as path, COUNT(*) as views, COUNT(DISTINCT e.visitor_id) as visitors')
+            ->groupBy('e.path')
             ->orderByDesc('views')
             ->limit($limit)
             ->get()
@@ -303,12 +310,11 @@ class WebsiteAnalyticsService
      */
     public function recentJourneys(MarketingFilter $filter, int $limit = 25): array
     {
-        $ids = DB::table('marketing_visitors')
-            ->whereIn('site_id', $this->siteIds($filter))
-            ->whereBetween('last_seen_at', $this->range($filter))
-            ->orderByDesc('last_seen_at')
+        $ids = $this->visitorQuery($filter)
+            ->whereBetween('v.last_seen_at', $this->range($filter))
+            ->orderByDesc('v.last_seen_at')
             ->limit($limit)
-            ->pluck('id');
+            ->pluck('v.id');
 
         return $this->journeyRows($ids->all());
     }
@@ -328,20 +334,19 @@ class WebsiteAnalyticsService
 
         $digits = preg_replace('/\D+/', '', $term) ?? '';
 
-        $ids = DB::table('marketing_visitors')
-            ->whereIn('site_id', $this->siteIds($filter))
+        $ids = $this->visitorQuery($filter)
             ->where(function ($q) use ($term, $digits) {
-                $q->where('email', 'like', "%{$term}%")
-                    ->orWhere('name', 'like', "%{$term}%")
-                    ->orWhere('visitor_uid', $term);
+                $q->where('v.email', 'like', "%{$term}%")
+                    ->orWhere('v.name', 'like', "%{$term}%")
+                    ->orWhere('v.visitor_uid', $term);
 
                 if (strlen($digits) >= 7) {
-                    $q->orWhere('phone', 'like', "%{$digits}%");
+                    $q->orWhere('v.phone', 'like', "%{$digits}%");
                 }
             })
-            ->orderByDesc('last_seen_at')
+            ->orderByDesc('v.last_seen_at')
             ->limit($limit)
-            ->pluck('id');
+            ->pluck('v.id');
 
         return $this->journeyRows($ids->all());
     }
@@ -356,7 +361,7 @@ class WebsiteAnalyticsService
         $visitor = DB::table('marketing_visitors as v')
             ->leftJoin('marketing_sites as s', 's.id', '=', 'v.site_id')
             ->where('v.id', $visitorId)
-            ->select('v.*', 's.name as site_name', 's.office_id as site_office_id', 's.clinic_num as site_clinic_num')
+            ->select('v.*', 's.name as site_name')
             ->first();
 
         if ($visitor === null) {
@@ -386,9 +391,8 @@ class WebsiteAnalyticsService
             'visitor' => [
                 'id' => (int) $visitor->id,
                 'site' => $visitor->site_name,
-                'location' => $visitor->site_office_id !== null
-                    ? $this->clinics->labelFor((int) $visitor->site_office_id, $visitor->site_clinic_num === null ? null : (int) $visitor->site_clinic_num)
-                    : null,
+                'location' => $this->locationLabel($visitor->office_id, $visitor->clinic_num),
+                'location_source' => $visitor->location_source,
                 'visitor_uid' => $visitor->visitor_uid,
                 'name' => $visitor->name,
                 'email' => $visitor->email,
@@ -414,14 +418,13 @@ class WebsiteAnalyticsService
      */
     public function leads(MarketingFilter $filter, int $limit = 500): array
     {
-        return DB::table('marketing_visitors as v')
+        return $this->visitorQuery($filter)
             ->join('marketing_sites as s', 's.id', '=', 'v.site_id')
-            ->whereIn('v.site_id', $this->siteIds($filter))
             ->whereNotNull('v.identified_at')
             ->whereBetween('v.identified_at', $this->range($filter))
             ->selectRaw('v.id, v.name, v.email, v.phone, v.identified_at, v.first_seen_at, v.last_seen_at')
             ->selectRaw('v.first_source, v.first_medium, v.first_campaign, v.first_click_source, v.first_landing_path')
-            ->selectRaw('s.name as site_name, s.office_id, s.clinic_num')
+            ->selectRaw('v.office_id, v.clinic_num, v.location_source, s.name as site_name')
             ->selectRaw('(SELECT COUNT(*) FROM marketing_sessions ms WHERE ms.visitor_id = v.id) as sessions')
             ->orderByDesc('v.identified_at')
             ->limit($limit)
@@ -433,9 +436,8 @@ class WebsiteAnalyticsService
                 'email' => $row->email,
                 'phone' => $row->phone,
                 'site' => $row->site_name,
-                'location' => $row->office_id !== null
-                    ? $this->clinics->labelFor((int) $row->office_id, $row->clinic_num === null ? null : (int) $row->clinic_num)
-                    : null,
+                'location' => $this->locationLabel($row->office_id, $row->clinic_num),
+                'location_source' => $row->location_source,
                 'source' => trim(($row->first_source ?? 'direct').' / '.($row->first_medium ?? 'none')),
                 'channel' => self::CHANNELS[$this->channelOf($row->first_medium, $row->first_click_source)],
                 'campaign' => $row->first_campaign,
@@ -455,8 +457,7 @@ class WebsiteAnalyticsService
      */
     public function leadSummary(MarketingFilter $filter): array
     {
-        $row = DB::table('marketing_visitors as v')
-            ->whereIn('v.site_id', $this->siteIds($filter))
+        $row = $this->visitorQuery($filter)
             ->whereNotNull('v.identified_at')
             ->whereBetween('v.identified_at', $this->range($filter))
             ->selectRaw('COUNT(*) as leads')
@@ -473,14 +474,6 @@ class WebsiteAnalyticsService
             'paid' => (int) ($row->paid ?? 0),
             'returning' => (int) ($row->returning_visitors ?? 0),
         ];
-    }
-
-    /** @return list<int> ids of the sites the filter covers */
-    public function siteIds(MarketingFilter $filter): array
-    {
-        $key = md5(json_encode([$filter->scopes(), $filter->allLocations, $filter->siteId]));
-
-        return $this->siteIds[$key] ??= $this->sites($filter)->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 
     /**
@@ -517,11 +510,65 @@ class WebsiteAnalyticsService
             ])->all();
     }
 
+    /**
+     * Traffic per credited location (office_id + clinic_num; a NULL office = not placed yet),
+     * for the Overview's By-location table.
+     *
+     * @return list<array{office_id: ?int, clinic_num: ?int, visitors: int, sessions: int, signups: int}>
+     */
+    public function byLocation(MarketingFilter $filter): array
+    {
+        return $this->sessionQuery($filter)
+            ->selectRaw('office_id, clinic_num, COUNT(DISTINCT visitor_id) as visitors, COUNT(*) as sessions, SUM(CASE WHEN has_signup = 1 THEN 1 ELSE 0 END) as signups')
+            ->groupBy('office_id', 'clinic_num')
+            ->get()
+            ->map(fn ($row) => [
+                'office_id' => $row->office_id === null ? null : (int) $row->office_id,
+                'clinic_num' => $row->clinic_num === null ? null : (int) $row->clinic_num,
+                'visitors' => (int) $row->visitors,
+                'sessions' => (int) $row->sessions,
+                'signups' => (int) $row->signups,
+            ])->all();
+    }
+
+    /** "Grand Rapids", "Grand Rapids, Ann Arbor", or null when the site serves no location. */
+    public function siteLocationLabel(MarketingSite $site): ?string
+    {
+        $names = $site->locations
+            ->map(fn ($l) => $this->locationLabel($l->office_id, $l->clinic_num))
+            ->all();
+
+        return $names === [] ? null : implode(', ', $names);
+    }
+
+    /** Visits credited to the filter's locations (and the one site, when the filter names one). */
     private function sessionQuery(MarketingFilter $filter)
     {
-        return DB::table('marketing_sessions')
-            ->whereIn('site_id', $this->siteIds($filter))
-            ->whereBetween('started_at', $this->range($filter));
+        $query = DB::table('marketing_sessions')->whereBetween('started_at', $this->range($filter));
+        $this->scope($query, $filter);
+
+        return $query;
+    }
+
+    /** Visitors credited to the filter's locations, aliased `v`. */
+    private function visitorQuery(MarketingFilter $filter)
+    {
+        $query = DB::table('marketing_visitors as v');
+        $this->scope($query, $filter, 'v');
+
+        return $query;
+    }
+
+    /** The location constraint on a visit or visitor table, plus the filter's one site. */
+    private function scope($query, MarketingFilter $filter, ?string $alias = null): void
+    {
+        $column = fn (string $name) => $alias === null ? $name : "{$alias}.{$name}";
+
+        LocationScope::apply($query, $filter, $column('office_id'), $column('clinic_num'));
+
+        if ($filter->siteId !== null) {
+            $query->where($column('site_id'), $filter->siteId);
+        }
     }
 
     /** @param list<int> $ids */
@@ -529,9 +576,8 @@ class WebsiteAnalyticsService
     {
         $expression = $column === '*' ? 'COUNT(*)' : ($distinct ? "COUNT(DISTINCT {$column})" : "COUNT({$column})");
 
-        return DB::table('marketing_sessions')
+        return $this->sessionQuery($filter)
             ->whereIn('site_id', $ids)
-            ->whereBetween('started_at', $this->range($filter))
             ->selectRaw("site_id, {$expression} as total")
             ->groupBy('site_id')
             ->pluck('total', 'site_id');
@@ -540,13 +586,17 @@ class WebsiteAnalyticsService
     /** @param list<int> $ids */
     private function signupsBySite(MarketingFilter $filter, array $ids)
     {
-        return DB::table('marketing_sessions')
+        return $this->sessionQuery($filter)
             ->whereIn('site_id', $ids)
             ->where('has_signup', true)
-            ->whereBetween('started_at', $this->range($filter))
             ->selectRaw('site_id, COUNT(*) as total')
             ->groupBy('site_id')
             ->pluck('total', 'site_id');
+    }
+
+    private function locationLabel(mixed $officeId, mixed $clinicNum): ?string
+    {
+        return $officeId === null ? null : $this->clinics->labelFor((int) $officeId, $clinicNum === null ? null : (int) $clinicNum);
     }
 
     /** @return array{0: string, 1: string} */

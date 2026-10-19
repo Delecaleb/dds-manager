@@ -50,7 +50,7 @@
                                 @if($lead['email'])<div>{{ $lead['email'] }}</div>@endif
                                 @if($lead['phone'])<div class="tabular-nums">{{ ops_fmt($lead['phone'], 'phone') }}</div>@endif
                             </td>
-                            <td class="px-4 py-3 {{ $lead['location'] ? 'text-slate-600' : 'text-amber-700' }}">{{ $lead['location'] ?? 'Not assigned' }}</td>
+                            <td class="px-4 py-3 {{ $lead['location'] ? 'text-slate-600' : 'text-amber-700' }}">{{ $lead['location'] ?? 'Location not known' }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ $lead['site'] }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ $lead['channel'] }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ $lead['source'] }}</td>

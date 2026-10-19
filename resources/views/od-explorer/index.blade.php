@@ -11,12 +11,20 @@
           Realtime database querying, API synchronization, and data reconciliation for <span class="font-semibold text-slate-800">{{ $currentOffice->name ?? 'Active Location' }}</span>
         </p>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-          <i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-600"></i>
-          Location: {{ $currentOffice->name ?? 'Default Office' }} (Office #{{ $currentOffice->id ?? 1 }})
-        </span>
-      </div>
+      {{-- Every action on this page runs against one office's OpenDental connection: pick it here. --}}
+      <form method="POST" action="{{ route('offices.switch') }}" class="flex items-center gap-2">
+        @csrf
+        <label for="odExplorerOffice" class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
+          <i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-600"></i> Office
+        </label>
+        <select id="odExplorerOffice" name="office_id" onchange="this.form.submit()"
+          class="h-[34px] text-xs font-semibold rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 px-2.5 pr-8 cursor-pointer">
+          @foreach ($offices as $office)
+            <option value="{{ $office->id }}" @selected($currentOffice?->id === $office->id)>{{ $office->name }} (Office #{{ $office->id }})</option>
+          @endforeach
+        </select>
+        <noscript><button type="submit" class="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white">Switch</button></noscript>
+      </form>
     </div>
 
     <!-- Top Action Card: Mode Selector & Contextual Filters -->

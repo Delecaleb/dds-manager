@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasMarketingLocation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,11 +10,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** One visit: the events a visitor produced before going idle for the session timeout. */
 class MarketingSession extends Model
 {
+    use HasMarketingLocation;
+
     /** A visit ends after this many minutes without an event. */
     public const TIMEOUT_MINUTES = 30;
 
     protected $fillable = [
-        'site_id', 'visitor_id', 'session_uid', 'started_at', 'last_event_at',
+        'site_id', 'office_id', 'clinic_num', 'location_source', 'visitor_id', 'session_uid', 'started_at', 'last_event_at',
         'source', 'medium', 'campaign', 'term', 'content', 'referrer', 'landing_path',
         'click_id', 'click_source', 'device', 'browser', 'pageviews', 'has_signup',
     ];
