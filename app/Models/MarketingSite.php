@@ -6,6 +6,7 @@ use App\Domain\Support\Location;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -167,6 +168,23 @@ class MarketingSite extends Model
 
         $this->locations()->whereNotIn('id', $keep === [] ? [0] : $keep)->delete();
         $this->unsetRelation('locations');
+    }
+
+    /**
+     * Delete the site with everything it tracked. Children go first in small batches, so a
+     * busy site never becomes one long cascading delete that locks the tracking tables.
+     * AI-built sites linked to it stay, unlinked (site_builds.marketing_site_id is set null).
+     */
+    public function purge(int $batch = 1000): void
+    {
+        foreach (['marketing_events', 'marketing_sessions', 'marketing_visitors'] as $table) {
+            do {
+                $ids = DB::table($table)->where('site_id', $this->id)->limit($batch)->pluck('id');
+                DB::table($table)->whereIn('id', $ids)->delete();
+            } while ($ids->count() === $batch);
+        }
+
+        $this->delete();
     }
 
     public function visitors(): HasMany
