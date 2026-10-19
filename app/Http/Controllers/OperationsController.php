@@ -393,6 +393,18 @@ class OperationsController extends Controller
             })->toArray();
         };
 
+        // Contact details per patient, picked the way the Npt Visits breakdown picks them
+        // (PatientVisitService): mobile first, else home phone.
+        $mapContacts = function ($patNums) use ($officeId) {
+            return OdPatient::where('office_id', $officeId)->whereIn('PatNum', $patNums)
+                ->get(['PatNum', 'WirelessPhone', 'HmPhone', 'Email'])
+                ->mapWithKeys(fn ($p) => [$p->PatNum => [
+                    'phone' => ops_fmt(trim((string) ($p->WirelessPhone ?: $p->HmPhone ?: '')), 'phone'),
+                    'email' => trim((string) $p->Email) !== '' ? trim((string) $p->Email) : '—',
+                ]])
+                ->toArray();
+        };
+
         $formatProv = function ($pNum) use ($providers, $provMap) {
             if (! $pNum) {
                 return ['id' => '—', 'name' => ['label' => 'Unknown', 'link' => false, 'prov_num' => 0]];
@@ -1646,6 +1658,8 @@ class OperationsController extends Controller
                 ['key' => 'note', 'label' => 'Note', 'type' => 'text'],
                 ['key' => 'type', 'label' => 'Type', 'type' => 'text'],
                 ['key' => 'amount', 'label' => 'Amount', 'type' => 'money', 'agg' => 'sum'],
+                ['key' => 'phone', 'label' => 'Phone Number', 'type' => 'text'],
+                ['key' => 'email', 'label' => 'Email Address', 'type' => 'text'],
             ];
 
             $query = DB::table('od_appointments as a')
@@ -1670,6 +1684,7 @@ class OperationsController extends Controller
             $appts = $query->get()->unique('AptNum');
 
             $patMap = $mapPatients($appts->pluck('PatNum')->unique());
+            $contacts = $mapContacts($appts->pluck('PatNum')->unique());
 
             $providers = OdProvider::where('office_id', $officeId)->whereIn('ProvNum', $appts->pluck('ProvNum')->unique())
                 ->get()
@@ -1717,6 +1732,8 @@ class OperationsController extends Controller
                     'note' => $noteText,
                     'type' => 'Cancellation',
                     'amount' => $amt,
+                    'phone' => $contacts[$apt->PatNum]['phone'] ?? '—',
+                    'email' => $contacts[$apt->PatNum]['email'] ?? '—',
                 ];
             }
 
