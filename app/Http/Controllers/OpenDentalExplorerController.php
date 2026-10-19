@@ -39,7 +39,9 @@ class OpenDentalExplorerController extends Controller
     public function index(): View
     {
         return view('od-explorer.index', [
-            'currentOffice' => Office::getActiveOffice() ?? Office::first(),
+            'currentOffice' => $this->activeOffice(),
+            // The header's office dropdown: every action on the page runs against the chosen one.
+            'offices' => Office::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'tables' => $this->catalog->all(),
         ]);
     }

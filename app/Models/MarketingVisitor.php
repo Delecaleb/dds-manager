@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasMarketingLocation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,8 +13,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class MarketingVisitor extends Model
 {
+    use HasMarketingLocation;
+
     protected $fillable = [
-        'site_id', 'visitor_uid', 'first_seen_at', 'last_seen_at',
+        'site_id', 'office_id', 'clinic_num', 'location_source', 'visitor_uid', 'first_seen_at', 'last_seen_at',
         'first_source', 'first_medium', 'first_campaign', 'first_term', 'first_content',
         'first_referrer', 'first_landing_path', 'first_click_id', 'first_click_source',
         'identified_at', 'email', 'phone', 'name',

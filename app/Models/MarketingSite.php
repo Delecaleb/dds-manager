@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\HasMarketingLocation;
+use App\Domain\Support\Location;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,13 +11,15 @@ use Illuminate\Support\Str;
 /**
  * A website reporting to the Growth Engine. Its site_key is public: it says which site an
  * event belongs to and nothing more, so it is safe to sit in page source.
+ *
+ * A site serves one or more locations (marketing_site_locations). One script covers them
+ * all: on a shared site each visit is credited to a location by VisitLocationResolver.
  */
 class MarketingSite extends Model
 {
     use HasFactory;
-    use HasMarketingLocation;
 
-    protected $fillable = ['site_key', 'name', 'domain', 'office_id', 'clinic_num', 'is_active', 'verified_at'];
+    protected $fillable = ['site_key', 'name', 'domain', 'is_active', 'verified_at'];
 
     protected function casts(): array
     {
@@ -70,18 +72,41 @@ class MarketingSite extends Model
     /** The call a site makes when a contact form is submitted (the example shown on the page). */
     public const SIGNUP_EXAMPLE = "dds('signup', { email: 'patient@example.com', phone: '(313) 555-0142', name: 'Jane Doe', form: 'book-consult' });";
 
+    /** The signup call for this site: a shared site also names the location the patient chose. */
+    public function signupExample(?string $locationCode = null): string
+    {
+        if ($locationCode === null) {
+            return self::SIGNUP_EXAMPLE;
+        }
+
+        return str_replace("form: 'book-consult' }", "form: 'book-consult', location: '{$locationCode}' }", self::SIGNUP_EXAMPLE);
+    }
+
     /**
      * Plain-text install instructions for whoever maintains the website, with this site's real
      * snippet in it — what the "Copy instructions for your developer" button copies.
      */
-    public function installInstructions(?string $scriptUrl = null): string
+    /**
+     * @param  array<string, string>  $locationCodes  location name => the code its form sends; two or more = a shared site
+     */
+    public function installInstructions(?string $scriptUrl = null, array $locationCodes = []): string
     {
+        $shared = count($locationCodes) > 1;
+        $codeList = '';
+        foreach ($locationCodes as $name => $code) {
+            $codeList .= "     {$code}  ->  {$name}\n";
+        }
+
         return "Website tracking for {$this->domain} ({$this->name})\n\n"
             ."1. Paste this snippet just before </head> on every page of {$this->domain}:\n\n"
             .$this->trackingSnippet($scriptUrl)."\n\n"
             ."2. When a contact or booking form is submitted successfully, call:\n\n"
-            .self::SIGNUP_EXAMPLE."\n\n"
-            ."   Pass the form's real email, phone and name values, and a short form name.\n\n"
+            .$this->signupExample($shared ? (string) reset($locationCodes) : null)."\n\n"
+            ."   Pass the form's real email, phone and name values, and a short form name.\n"
+            .($shared
+                ? "   This website serves several locations: set location to the one the patient chose:\n".$codeList
+                : '')
+            ."\n"
             ."Notes:\n"
             ."- WordPress: use a header plugin such as WPCode (Header & Footer -> Header), not a single page.\n"
             ."- Clear any page cache (WP Rocket, LiteSpeed, Cloudflare) after installing.\n"
@@ -92,6 +117,56 @@ class MarketingSite extends Model
     public function isVerified(): bool
     {
         return $this->verified_at !== null;
+    }
+
+    public function locations(): HasMany
+    {
+        return $this->hasMany(MarketingSiteLocation::class, 'site_id')->orderBy('id');
+    }
+
+    /** Several locations share this website, so each visit's location is worked out per visit. */
+    public function isShared(): bool
+    {
+        return $this->locations->count() > 1;
+    }
+
+    /** @return list<string> the location keys this site serves */
+    public function locationKeys(): array
+    {
+        return $this->locations->map(fn (MarketingSiteLocation $l) => $l->locationKey())->values()->all();
+    }
+
+    /**
+     * Replace the locations this site serves, keeping each kept location's code and paths
+     * unless new ones are given. The caller re-credits the site's traffic afterwards
+     * (VisitLocationResolver::restamp), since what a visit belongs to may have changed.
+     *
+     * @param  list<Location>  $locations
+     * @param  array<string, array{code?: ?string, paths?: list<string>}>  $rules  by location key
+     */
+    public function assignLocations(array $locations, array $rules = []): void
+    {
+        $existing = $this->locations()->get()->keyBy(fn (MarketingSiteLocation $l) => $l->locationKey());
+        $keep = [];
+
+        foreach ($locations as $location) {
+            $key = $location->key();
+            $row = $existing[$key] ?? new MarketingSiteLocation(['site_id' => $this->id]);
+            $row->assignLocation($location);
+
+            if (array_key_exists('code', $rules[$key] ?? [])) {
+                $row->code = filled($rules[$key]['code']) ? MarketingSiteLocation::normalizeCode((string) $rules[$key]['code']) : null;
+            }
+            if (array_key_exists('paths', $rules[$key] ?? [])) {
+                $row->path_prefixes = $rules[$key]['paths'] === [] ? null : $rules[$key]['paths'];
+            }
+
+            $row->save();
+            $keep[] = $row->id;
+        }
+
+        $this->locations()->whereNotIn('id', $keep === [] ? [0] : $keep)->delete();
+        $this->unsetRelation('locations');
     }
 
     public function visitors(): HasMany

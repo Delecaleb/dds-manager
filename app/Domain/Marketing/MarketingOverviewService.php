@@ -39,7 +39,7 @@ class MarketingOverviewService
             'paid' => $this->web->paidSummary($filter),
             'ads' => $this->ads->summarize($campaigns),
             'sites' => $sites,
-            'byLocation' => $this->byLocation($filter, $sites, $campaigns),
+            'byLocation' => $this->byLocation($filter, $campaigns),
             'googleAdsConnected' => MarketingAdConnection::googleAdsConnected(),
         ];
     }
@@ -107,34 +107,40 @@ class MarketingOverviewService
     }
 
     /**
-     * Per selected location: its sites' traffic and its campaigns' spend. A site or
-     * campaign assigned to a whole multi-clinic office counts for each of its clinics.
+     * Per selected location: the traffic credited to it and its campaigns' spend. Traffic
+     * or a campaign credited to a whole multi-clinic office counts for each of its clinics.
+     * Visits on a shared site that could not be placed yet get their own row, shown only
+     * when every location is selected.
      *
-     * @param  list<array<string, mixed>>  $sites
      * @param  list<array<string, mixed>>  $campaigns
      * @return list<array<string, mixed>>
      */
-    private function byLocation(MarketingFilter $filter, array $sites, array $campaigns): array
+    private function byLocation(MarketingFilter $filter, array $campaigns): array
     {
         $belongs = fn (?int $officeId, ?int $clinicNum, Location $l) => $officeId === $l->officeId
             && ($clinicNum === null || $clinicNum === $l->clinicNum);
+
+        $traffic = $this->web->byLocation($filter);
+        $sites = $this->web->sites($filter);
 
         $rows = [];
         foreach ($filter->locations() as $location) {
             $rows[] = $this->locationRow(
                 $location->key(),
                 $location->name,
-                array_filter($sites, fn ($s) => $belongs($s['office_id'] === null ? null : (int) $s['office_id'], $s['clinic_num'] === null ? null : (int) $s['clinic_num'], $location)),
+                $sites->filter(fn ($site) => $site->locations->contains(fn ($l) => $belongs((int) $l->office_id, $l->clinic_num === null ? null : (int) $l->clinic_num, $location)))->count(),
+                array_filter($traffic, fn ($t) => $t['office_id'] !== null && $belongs($t['office_id'], $t['clinic_num'], $location)),
                 array_filter($campaigns, fn ($c) => $belongs($c['office_id'], $c['clinic_num'], $location)),
             );
         }
 
         if ($filter->allLocations) {
-            $unassignedSites = array_filter($sites, fn ($s) => $s['office_id'] === null);
+            $unplacedTraffic = array_filter($traffic, fn ($t) => $t['office_id'] === null);
             $unassignedCampaigns = array_filter($campaigns, fn ($c) => $c['office_id'] === null);
+            $unassignedSites = $sites->filter(fn ($site) => $site->locations->isEmpty())->count();
 
-            if ($unassignedSites !== [] || $unassignedCampaigns !== []) {
-                $rows[] = $this->locationRow(null, 'Not assigned to a location', $unassignedSites, $unassignedCampaigns);
+            if ($unplacedTraffic !== [] || $unassignedCampaigns !== [] || $unassignedSites > 0) {
+                $rows[] = $this->locationRow(null, 'Location not known', $unassignedSites, $unplacedTraffic, $unassignedCampaigns);
             }
         }
 
@@ -142,21 +148,21 @@ class MarketingOverviewService
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $sites
+     * @param  array<int, array<string, mixed>>  $traffic  WebsiteAnalyticsService::byLocation rows
      * @param  array<int, array<string, mixed>>  $campaigns
      * @return array<string, mixed>
      */
-    private function locationRow(?string $key, string $name, array $sites, array $campaigns): array
+    private function locationRow(?string $key, string $name, int $sites, array $traffic, array $campaigns): array
     {
-        $sessions = (int) array_sum(array_column($sites, 'sessions'));
-        $signups = (int) array_sum(array_column($sites, 'signups'));
+        $sessions = (int) array_sum(array_column($traffic, 'sessions'));
+        $signups = (int) array_sum(array_column($traffic, 'signups'));
         $ads = $this->ads->summarize(array_values($campaigns));
 
         return [
             'key' => $key,
             'name' => $name,
-            'sites' => count($sites),
-            'visitors' => (int) array_sum(array_column($sites, 'visitors')),
+            'sites' => $sites,
+            'visitors' => (int) array_sum(array_column($traffic, 'visitors')),
             'sessions' => $sessions,
             'signups' => $signups,
             'signup_rate' => $sessions > 0 ? round($signups / $sessions * 100, 1) : 0.0,

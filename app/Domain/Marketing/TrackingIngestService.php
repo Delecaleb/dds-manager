@@ -39,6 +39,8 @@ class TrackingIngestService
     /** Hosts we recognise as social networks. */
     private const SOCIAL_HOSTS = ['facebook', 'instagram', 'linkedin', 'twitter', 'x.com', 'tiktok', 'pinterest', 'youtube', 'reddit'];
 
+    public function __construct(private readonly VisitLocationResolver $locations) {}
+
     /**
      * Record one event.
      *
@@ -80,10 +82,12 @@ class TrackingIngestService
 
             if ($type === MarketingEvent::TYPE_PAGEVIEW) {
                 $session->increment('pageviews');
+                $this->locations->onPageview($site, $visitor, $session, $this->path($url));
             }
 
             if ($type === MarketingEvent::TYPE_SIGNUP) {
                 $this->identify($visitor, $session, $payload, $now);
+                $this->locations->onSignup($site, $visitor, is_array($payload['d'] ?? null) ? ($payload['d']['location'] ?? null) : null);
             }
 
             $visitor->forceFill(['last_seen_at' => $now])->save();
@@ -103,7 +107,7 @@ class TrackingIngestService
             return null;
         }
 
-        return MarketingSite::where('site_key', $key)->where('is_active', true)->first();
+        return MarketingSite::where('site_key', $key)->where('is_active', true)->with('locations')->first();
     }
 
     /** Only known types, or a short custom name; never raw caller input. */
@@ -213,7 +217,7 @@ class TrackingIngestService
 
         // First touch is written once, on creation, and never overwritten: it is the visit
         // that introduced this person, whatever they do later.
-        return MarketingVisitor::create([
+        return MarketingVisitor::create($this->locations->initial($site) + [
             'site_id' => $site->id,
             'visitor_uid' => $visitorUid,
             'first_seen_at' => $now,
@@ -242,7 +246,7 @@ class TrackingIngestService
             return $session;
         }
 
-        return MarketingSession::create([
+        return MarketingSession::create($this->locations->initial($site, $visitor) + [
             'site_id' => $site->id,
             'visitor_id' => $visitor->id,
             'session_uid' => $session === null ? $sessionUid : (string) Str::uuid(),

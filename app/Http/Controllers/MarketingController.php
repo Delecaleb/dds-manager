@@ -7,10 +7,13 @@ use App\Domain\Marketing\GoogleAds\GoogleAdsOAuth;
 use App\Domain\Marketing\MarketingAlertService;
 use App\Domain\Marketing\MarketingFilter;
 use App\Domain\Marketing\MarketingOverviewService;
+use App\Domain\Marketing\VisitLocationResolver;
 use App\Domain\Marketing\WebsiteAnalyticsService;
 use App\Domain\Support\ClinicRegistry;
+use App\Jobs\RestampSiteVisitLocations;
 use App\Models\MarketingAdConnection;
 use App\Models\MarketingSite;
+use App\Models\MarketingSiteLocation;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -127,8 +130,8 @@ class MarketingController extends Controller
         return view('marketing.alerts', ['filter' => $filter, 'alerts' => $alerts->alerts($filter)]);
     }
 
-    /** The install snippet per site, and which location each site belongs to. */
-    public function tracking(Request $request, WebsiteAnalyticsService $analytics): View
+    /** The install snippet per site, and the locations each site serves. */
+    public function tracking(Request $request, WebsiteAnalyticsService $analytics, VisitLocationResolver $resolver): View
     {
         $locations = $this->clinics->locations();
         $selected = $this->clinics->getSelectedLocationKeys();
@@ -138,10 +141,19 @@ class MarketingController extends Controller
             'openSiteId' => $request->integer('site') ?: null,
             // Working in one location: the add form starts with it chosen.
             'defaultLocation' => count($selected) === 1 && isset($locations[$selected[0]]) ? (string) $selected[0] : null,
-            'sites' => MarketingSite::orderBy('name')->get()->map(fn (MarketingSite $site) => [
+            'sites' => MarketingSite::with('locations')->orderBy('name')->get()->map(fn (MarketingSite $site) => [
                 'model' => $site,
-                'location_key' => $site->locationKey(),
-                'location' => $site->office_id !== null ? $this->clinics->labelFor((int) $site->office_id, $site->clinic_num) : null,
+                'location_keys' => $site->locationKeys(),
+                'location' => $analytics->siteLocationLabel($site),
+                'shared' => $site->isShared(),
+                // Per served location: its name, the value its form sends, and its paths.
+                'rules' => $site->locations->map(fn ($l) => [
+                    'key' => $l->locationKey(),
+                    'name' => $resolver->nameOf($l),
+                    'code' => $l->formCode($resolver->nameOf($l)),
+                    'paths' => implode(', ', $l->path_prefixes ?? []),
+                ])->all(),
+                'form_codes' => $resolver->formCodes($site),
             ]),
             'locations' => $locations,
             'scriptUrl' => route('tracking.script'),
@@ -167,29 +179,56 @@ class MarketingController extends Controller
             'name' => filled($data['name'] ?? null) ? trim($data['name']) : $domain,
             'domain' => $domain,
             'is_active' => true,
-        ]))->assignLocation($locations[$data['location'] ?? ''] ?? null);
+        ]));
         $site->save();
+
+        if (isset($locations[$data['location'] ?? ''])) {
+            $site->assignLocations([$locations[$data['location']]]);
+        }
 
         return redirect()
             ->route('marketing.tracking', ['site' => $site->id])
             ->with('status', "{$site->domain} added. Copy its code below and paste it into the website.");
     }
 
-    /** Move a site to another location (or to none). */
-    public function updateSite(Request $request, MarketingSite $site): RedirectResponse
+    /**
+     * Set the locations a site serves, and on a shared site how each location's visits are
+     * recognised (the form value and the URL paths). Past visits are re-credited in the
+     * background by the same rules.
+     */
+    public function updateSite(Request $request, MarketingSite $site, WebsiteAnalyticsService $analytics): RedirectResponse
     {
         $locations = $this->clinics->locations();
 
         $data = $request->validate([
-            'location' => ['nullable', 'string', Rule::in(array_keys($locations))],
+            'locations' => ['nullable', 'array'],
+            'locations.*' => ['string', Rule::in(array_keys($locations))],
+            'codes' => ['nullable', 'array'],
+            'codes.*' => ['nullable', 'string', 'max:64'],
+            'paths' => ['nullable', 'array'],
+            'paths.*' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $site->assignLocation($locations[$data['location'] ?? ''] ?? null)->save();
+        $chosen = array_values(array_unique($data['locations'] ?? []));
+        $rules = [];
+        foreach ($chosen as $key) {
+            if (array_key_exists($key, $data['codes'] ?? [])) {
+                $rules[$key]['code'] = $data['codes'][$key];
+            }
+            if (array_key_exists($key, $data['paths'] ?? [])) {
+                $rules[$key]['paths'] = MarketingSiteLocation::normalizePaths((string) $data['paths'][$key]);
+            }
+        }
 
-        return redirect()->route('marketing.tracking')
-            ->with('status', $site->office_id === null
+        $site->assignLocations(array_map(fn (string $key) => $locations[$key], $chosen), $rules);
+        RestampSiteVisitLocations::dispatch($site->id);
+
+        $label = $analytics->siteLocationLabel($site->load('locations'));
+
+        return redirect()->route('marketing.tracking', ['site' => $site->id])
+            ->with('status', $label === null
                 ? "{$site->name} is no longer assigned to a location."
-                : "{$site->name} now belongs to ".$this->clinics->labelFor((int) $site->office_id, $site->clinic_num).'.');
+                : "{$site->name} now serves {$label}.".($site->isShared() ? ' Past visits are being re-credited by these rules.' : ''));
     }
 
     /** Pause or resume a site: a paused key is rejected by the collector. */

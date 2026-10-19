@@ -158,7 +158,7 @@ class MarketingAlertService
     {
         $out = [];
 
-        $sites = MarketingSite::where('is_active', true)->whereNull('office_id')->count();
+        $sites = MarketingSite::where('is_active', true)->doesntHave('locations')->count();
         if ($sites > 0) {
             $out[] = $this->item('warning', $sites === 1 ? 'A tracked site is not assigned to a location' : "{$sites} tracked sites are not assigned to a location",
                 'Its traffic only appears when every location is selected. Assign it on the Tracking Script page.', 'marketing.tracking', 'organization');

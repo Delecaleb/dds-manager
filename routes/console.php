@@ -171,6 +171,15 @@ $inBackground(Schedule::command('marketing:google-ads-sync')
     ->onOneServer());
 
 /*
+| SHARED-WEBSITE LEADS (Growth Engine) — credit leads from a website several locations share
+| to the location where they are an OpenDental patient. Local tables only; no OpenDental call.
+*/
+$inBackground(Schedule::command('marketing:match-leads')
+    ->hourlyAt(25)
+    ->withoutOverlapping(30)
+    ->onOneServer());
+
+/*
 | HARD-DELETE PRUNING — OpenDental hard-deletes rows, which incremental syncs never see.
 | Each entry only queues one PruneOfficeTable job per office × table (see config sync.prune).
 |  - Rolling (last 7 days + next 90): 07:00 on the priority queue so it finishes before the 08:00
