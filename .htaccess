@@ -1,5 +1,26 @@
+# The project root is the web root (assets are referenced with the public/ prefix),
+# so everything outside public/ must be blocked explicitly: .env, .git, storage/,
+# vendor/, logs, composer files, etc. Only index.php, robots.txt and public/ are served.
+Options -Indexes
+
+# Fallback if mod_rewrite is ever disabled: never serve dotfiles.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # Deny any path segment starting with a dot (.env, .git/, .claude/ ...).
+    RewriteRule (^|/)\. - [F,L]
+
+    # Deny real files outside the whitelist (scheduler.log, composer.json, storage/logs/*, vendor/* ...).
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule !^(index\.php|robots\.txt|public/.+)$ - [F,L]
+
+    # Deny real directories other than the root and public/ (app/, vendor/, storage/ ...).
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule !^(public(/.*)?)?$ - [F,L]
 
     # Pass the Authorization header through to PHP (Apache strips it otherwise),
     # so Bearer keys reach the Developer API.
