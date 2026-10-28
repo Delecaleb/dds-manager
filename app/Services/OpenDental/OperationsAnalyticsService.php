@@ -9,6 +9,7 @@ use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\GoalService;
 use App\Domain\Support\LocationSelection;
+use App\Domain\Support\MetricCache;
 use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
@@ -16,6 +17,7 @@ use App\Helpers\MetricDefinitions;
 use App\Models\OdPatient;
 use App\Models\OdProcedure;
 use App\Models\OdProcedureLog;
+use Closure;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -57,6 +59,7 @@ class OperationsAnalyticsService
         private readonly PatientVisitService $patientVisits,
         private readonly ScheduleSnapshotService $scheduleSnapshots,
         private readonly GoalService $goals,
+        private readonly MetricCache $metricCache,
     ) {
         $this->clinicNames = $this->clinics->all();
     }
@@ -75,15 +78,25 @@ class OperationsAnalyticsService
      * its location. Row keys are prefixed with the location key because ClinicNum, ProvNum and
      * PatNum are only unique within one office.
      *
+     * With $cacheName, each office's rows are cached on their own (MetricCache, keyed by that
+     * office's data version): after one office syncs, only that office is recomputed and every
+     * other office's rows are reused — what keeps an all-locations tab cheap as offices are
+     * added. $cacheParams must hold every input the builder uses besides clinics/office.
+     *
      * @param  callable(int[], int): array<int, array<string, mixed>>  $build  fn(clinics, officeId)
+     * @param  list<mixed>  $cacheParams
      * @return array<int, array<string, mixed>>
      */
-    private function rowsAcross(LocationSelection $locations, callable $build): array
+    private function rowsAcross(LocationSelection $locations, callable $build, ?string $cacheName = null, array $cacheParams = []): array
     {
         $rows = [];
         foreach ($locations->scopes() as $officeId => $clinics) {
             $this->clinicNames = $this->clinics->all($officeId);
-            foreach ($build($clinics, $officeId) as $row) {
+            $officeRows = $cacheName === null
+                ? $build($clinics, $officeId)
+                : $this->metricCache->remember("operations.rows.{$cacheName}", [$officeId], [$clinics, ...$cacheParams], fn () => $build($clinics, $officeId));
+
+            foreach ($officeRows as $row) {
                 $location = $this->clinics->locationFor($officeId, (int) ($row['clinic_num'] ?? 0));
                 $row['office_id'] = $officeId;
                 $row['location_key'] = $location->key();
@@ -96,6 +109,22 @@ class OperationsAnalyticsService
         }
 
         return $rows;
+    }
+
+    /**
+     * One office's share of a tab, cached on its own (MetricCache, keyed by that office's data
+     * version), for tabs that sum per-office pieces outside rowsAcross(). $params must hold
+     * every input the computation uses besides the office.
+     *
+     * @template T
+     *
+     * @param  list<mixed>  $params
+     * @param  Closure(): T  $compute
+     * @return T
+     */
+    private function officeCached(string $name, int $officeId, array $params, Closure $compute): mixed
+    {
+        return $this->metricCache->remember("operations.office.{$name}", [$officeId], $params, $compute);
     }
 
     /** Office goal for one scope; a clinic filter uses its first clinic's goal (existing rule). */
@@ -125,7 +154,7 @@ class OperationsAnalyticsService
     {
         $locations = $this->resolveLocations($locations);
         $rowsFor = fn (string $s, string $e) => $this->rowsAcross($locations,
-            fn (array $clinics, int $officeId) => $this->officeRows($s, $e, $clinics, $officeId));
+            fn (array $clinics, int $officeId) => $this->officeRows($s, $e, $clinics, $officeId), 'offices', [$s, $e]);
         $columns = $this->officeColumns();
         $percentDiff = $subtab === 'percent-diff-last-year';
 
@@ -247,7 +276,7 @@ class OperationsAnalyticsService
     {
         $locations = $this->resolveLocations($locations);
         $rowsFor = fn (string $s, string $e) => $this->sortPayorRows($this->withShareOfTotal(
-            $this->rowsAcross($locations, fn (array $clinics, int $officeId) => $this->payorRows($s, $e, $clinics, $officeId)),
+            $this->rowsAcross($locations, fn (array $clinics, int $officeId) => $this->payorRows($s, $e, $clinics, $officeId), 'payors', [$s, $e]),
             'net', 'pct_ttl'
         ));
         $columns = $this->payorColumns();
@@ -729,7 +758,7 @@ class OperationsAnalyticsService
     {
         $locations = $this->resolveLocations($locations);
         $rowsFor = fn (string $s, string $e) => $this->rowsAcross($locations,
-            fn (array $clinics, int $officeId) => $this->cancellationRows($s, $e, $clinics, $officeId));
+            fn (array $clinics, int $officeId) => $this->cancellationRows($s, $e, $clinics, $officeId), 'cancellations', [$s, $e]);
         $columns = $this->cancellationColumns();
         $percentDiff = $subtab === 'percent-diff-last-year';
 
@@ -763,7 +792,7 @@ class OperationsAnalyticsService
         $dims = array_values(array_intersect(['provider', 'date'], $group));
         $columns = $this->productionDetailColumns($dims);
         $rows = $this->rowsAcross($locations,
-            fn (array $clinics, int $officeId) => $this->productionDetailRows($start, $end, $dims, $clinics, $officeId));
+            fn (array $clinics, int $officeId) => $this->productionDetailRows($start, $end, $dims, $clinics, $officeId), 'production-details', [$start, $end, $dims]);
         usort($rows, fn ($a, $b) => ($b['production'] <=> $a['production']));
 
         return [
@@ -1093,7 +1122,9 @@ class OperationsAnalyticsService
         $daily = [];
         $configuredTotGoal = 0.0;
         foreach ($locations->scopes() as $officeId => $clinics) {
-            foreach ($this->performanceDaily($start, $end, $clinics, $officeId, array_keys($dates)) as $d => $metrics) {
+            $officeDaily = $this->officeCached('performance-daily', $officeId, [$start, $end, $clinics, array_keys($dates)],
+                fn () => $this->performanceDaily($start, $end, $clinics, $officeId, array_keys($dates)));
+            foreach ($officeDaily as $d => $metrics) {
                 foreach ($metrics as $key => $value) {
                     $daily[$d][$key] = ($daily[$d][$key] ?? 0) + $value;
                 }
@@ -1442,7 +1473,7 @@ class OperationsAnalyticsService
         $locations = $this->resolveLocations($locations);
         $rowsFor = function (string $s, string $e) use ($locations) {
             $rows = $this->rowsAcross($locations,
-                fn (array $clinics, int $officeId) => $this->providerRows($s, $e, $clinics, $officeId));
+                fn (array $clinics, int $officeId) => $this->providerRows($s, $e, $clinics, $officeId), 'providers', [$s, $e]);
             // Highest producers first, matching Jarvis default ordering.
             usort($rows, fn ($a, $b) => $b['gross'] <=> $a['gross'] ?: $b['net'] <=> $a['net']);
 
@@ -2465,6 +2496,44 @@ class OperationsAnalyticsService
     }
 
     /**
+     * One office's part of the Services tab summary: completed-procedure counts by code,
+     * new-patient visits (selected range and year to date) and active-patient age brackets.
+     * Cached per office by services(); goals stay outside (app data, read on every call).
+     *
+     * @param  int[]  $clinics
+     * @return array{service_counts: array<string, int>, npt_mtd: int, npt_ytd: int, brackets: array<string, int>}
+     */
+    private function servicesSummaryFor(string $start, string $end, string $ytdStart, array $clinics, int $officeId): array
+    {
+        // 1. Completed procedure counts by code (ranked after all offices are summed)
+        $qSrv = DB::table('od_procedure_logs as pl')
+            ->join('od_procedures as pc', function ($j) use ($officeId) {
+                $j->on('pl.CodeNum', '=', 'pc.CodeNum')->where('pc.office_id', '=', $officeId);
+            })
+            ->where('pl.office_id', $officeId)
+            ->selectRaw('pc.ProcCode, pc.Descript, COUNT(*) as cnt')
+            ->whereIn('pl.ProcStatus', ProcStatus::completed())
+            ->whereBetween('pl.ProcDate', [$start, $end]);
+        if ($clinics) {
+            $qSrv->whereIn('pl.ClinicNum', $clinics);
+        }
+        $serviceCounts = [];
+        foreach ($qSrv->groupBy('pc.ProcCode', 'pc.Descript')->get() as $ts) {
+            $label = $ts->ProcCode.' '.$ts->Descript;
+            $serviceCounts[$label] = ($serviceCounts[$label] ?? 0) + (int) $ts->cnt;
+        }
+
+        return [
+            'service_counts' => $serviceCounts,
+            // 2. New Patient Visit vs Goal (MTD uses the selected range, as before)
+            'npt_mtd' => (int) array_sum(array_column($this->newPatientMetrics($start, $end, $clinics, $officeId), 'npt_visit')),
+            'npt_ytd' => (int) array_sum(array_column($this->newPatientMetrics($ytdStart, $end, $clinics, $officeId), 'npt_visit')),
+            // 3. Age brackets
+            'brackets' => $this->activePatientAgeBrackets($end, $clinics, $officeId),
+        ];
+    }
+
+    /**
      * Services tab payload -> Returns top services, NPT goals, and Age bracket data.
      */
     public function services(string $start, string $end, string $subtab = 'default', ?LocationSelection $locations = null): array
@@ -2481,31 +2550,17 @@ class OperationsAnalyticsService
         $brackets = [];
 
         foreach ($locations->scopes() as $officeId => $clinics) {
-            // 1. Completed procedure counts by code (ranked after all offices are summed)
-            $qSrv = DB::table('od_procedure_logs as pl')
-                ->join('od_procedures as pc', function ($j) use ($officeId) {
-                    $j->on('pl.CodeNum', '=', 'pc.CodeNum')->where('pc.office_id', '=', $officeId);
-                })
-                ->where('pl.office_id', $officeId)
-                ->selectRaw('pc.ProcCode, pc.Descript, COUNT(*) as cnt')
-                ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereBetween('pl.ProcDate', [$start, $end]);
-            if ($clinics) {
-                $qSrv->whereIn('pl.ClinicNum', $clinics);
-            }
-            foreach ($qSrv->groupBy('pc.ProcCode', 'pc.Descript')->get() as $ts) {
-                $label = $ts->ProcCode.' '.$ts->Descript;
-                $serviceCounts[$label] = ($serviceCounts[$label] ?? 0) + (int) $ts->cnt;
-            }
+            $piece = $this->officeCached('services-summary', $officeId, [$start, $end, $ytdStart, $clinics],
+                fn () => $this->servicesSummaryFor($start, $end, $ytdStart, $clinics, $officeId));
 
-            // 2. New Patient Visit vs Goal (MTD uses the selected range, as before)
-            $nptMtdVisits += array_sum(array_column($this->newPatientMetrics($start, $end, $clinics, $officeId), 'npt_visit'));
-            $nptYtdVisits += array_sum(array_column($this->newPatientMetrics($ytdStart, $end, $clinics, $officeId), 'npt_visit'));
+            foreach ($piece['service_counts'] as $label => $count) {
+                $serviceCounts[$label] = ($serviceCounts[$label] ?? 0) + $count;
+            }
+            $nptMtdVisits += $piece['npt_mtd'];
+            $nptYtdVisits += $piece['npt_ytd'];
             $mtdConfiguredGoal += $this->scopeGoal($officeId, $mtdStart, $end, $clinics)['npt_visits'];
             $ytdConfiguredGoal += $this->scopeGoal($officeId, $ytdStart, $end, $clinics)['npt_visits'];
-
-            // 3. Age brackets
-            foreach ($this->activePatientAgeBrackets($end, $clinics, $officeId) as $label => $count) {
+            foreach ($piece['brackets'] as $label => $count) {
                 $brackets[$label] = ($brackets[$label] ?? 0) + $count;
             }
         }
@@ -2533,7 +2588,7 @@ class OperationsAnalyticsService
         $percentDiff = $subtab === 'percent-diff-last-year';
         $rowsFor = function (string $s, string $e) use ($locations) {
             $rows = $this->withShareOfTotal($this->rowsAcross($locations,
-                fn (array $clinics, int $officeId) => $this->serviceRows($s, $e, $clinics, $officeId)), 'fee', 'pct_ttl');
+                fn (array $clinics, int $officeId) => $this->serviceRows($s, $e, $clinics, $officeId), 'services', [$s, $e]), 'fee', 'pct_ttl');
             usort($rows, fn ($a, $b) => $b['count'] <=> $a['count']);
 
             return $rows;
@@ -2962,7 +3017,8 @@ class OperationsAnalyticsService
         }
 
         foreach ($locations->scopes() as $officeId => $clinics) {
-            $data = $this->calculateTrendMetricBuckets($start, $end, $clinics, $metric, $monthKeys, $officeId);
+            $data = $this->officeCached('trend-buckets', $officeId, [$start, $end, $clinics, $metric, $monthKeys],
+                fn () => $this->calculateTrendMetricBuckets($start, $end, $clinics, $metric, $monthKeys, $officeId));
 
             foreach ($data['by_clinic'] as $clinicNum => $values) {
                 $location = $this->clinics->locationFor($officeId, (int) $clinicNum);
@@ -3786,7 +3842,7 @@ class OperationsAnalyticsService
             'groups' => [],
             'columns' => $columns,
             'rows' => $this->rowsAcross($locations,
-                fn (array $clinics, int $officeId) => $this->claimRows($monthStart, $monthEnd, $daysNum, $clinics, $officeId)),
+                fn (array $clinics, int $officeId) => $this->claimRows($monthStart, $monthEnd, $daysNum, $clinics, $officeId), 'claims', [$monthStart, $monthEnd, $daysNum]),
         ];
     }
 
@@ -3872,7 +3928,7 @@ class OperationsAnalyticsService
         $percentDiff = $subtab === 'percent-diff-last-year';
         $locations = $this->resolveLocations($locations);
         $rowsFor = fn (string $s, string $e) => $this->rowsAcross($locations,
-            fn (array $clinics, int $officeId) => $this->complianceRows($s, $e, $clinics, $officeId));
+            fn (array $clinics, int $officeId) => $this->complianceRows($s, $e, $clinics, $officeId), 'compliance', [$s, $e]);
 
         $calculateTotalAndAverage = function (array $tableRows) {
             $t_prod = array_sum(array_column($tableRows, 'total_prod'));
@@ -4241,7 +4297,8 @@ class OperationsAnalyticsService
         $grouped = [];
 
         foreach ($locations->scopes() as $officeId => $clinics) {
-            $scope = $this->marketingScope($start, $end, $clinics, $zip, $officeId, $isAnalysis, $isReferral, $isExisting);
+            $scope = $this->officeCached('marketing-scope', $officeId, [$start, $end, $clinics, $zip, $isAnalysis, $isReferral, $isExisting],
+                fn () => $this->marketingScope($start, $end, $clinics, $zip, $officeId, $isAnalysis, $isReferral, $isExisting));
 
             $allZips = array_merge($allZips, $scope['zips']);
             foreach ($scope['counts'] as $chart => $values) {

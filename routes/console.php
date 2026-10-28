@@ -1,5 +1,7 @@
 <?php
 
+use App\Jobs\RebuildPatientVisitDays;
+use App\Models\Office;
 use App\Services\Sync\QueueHealthService;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Foundation\Inspiring;
@@ -119,6 +121,14 @@ Schedule::command('sync:dispatch appointments procedurelogs adjustments paysplit
     ->everyTenMinutes()
     ->onOneServer();
 
+// Five minutes after each sync dispatch, recompute the report results those syncs
+// invalidated, so the next viewer gets a cached page. Offices that did not change are
+// cache hits, so a quiet run takes seconds.
+$inBackground(Schedule::command('reports:warm')
+    ->cron('5,15,25,35,45,55 * * * *')
+    ->withoutOverlapping(30)
+    ->onOneServer());
+
 /*
 | MEDIUM FREQUENCY (every 30 minutes) — data that changes occasionally.
 | Staggered so each tick only adds a handful of jobs.
@@ -144,6 +154,15 @@ Schedule::command('sync:dispatch histappointments')->dailyAt('02:00')->onOneServ
 | Queue housekeeping: keep failed_jobs from growing forever.
 */
 Schedule::command('queue:prune-failed --hours=168')->dailyAt('03:00')->onOneServer();
+
+// Superseded report results (MetricCache) are never read again; drop them once expired.
+Schedule::command('metrics:prune-cache')->hourlyAt(50)->onOneServer();
+
+// Summary tables are kept current per sync batch; a nightly full rebuild per office is the
+// safety net for anything that bypassed the sync path. Queued, one job per office.
+Schedule::call(fn () => Office::query()->pluck('id')->each(fn ($id) => RebuildPatientVisitDays::dispatch((int) $id)))
+    ->name('summaries:nightly-rebuild')
+    ->dailyAt('04:00')->timezone('America/New_York')->onOneServer();
 
 /*
 | SCHEDULE SNAPSHOTS (8:00 AM EST lock & rolling future forecasts)

@@ -2,12 +2,15 @@
 
 namespace App\Domain\Patient;
 
+use App\Domain\Support\MetricCache;
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
 use App\Models\Office;
 use Carbon\Carbon;
+use Closure;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -15,9 +18,57 @@ class PatientVisitService
 {
     private readonly string $completedIn;
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly PatientVisitDays $visitDays,
+        private readonly MetricCache $metricCache,
+    ) {
         $this->completedIn = ProcStatus::inList(ProcStatus::completed());
+    }
+
+    /**
+     * Range and history lookups read patient_visit_days (flag `completed_not_broken` =
+     * completed status, CodeNum not a broken-appointment code) once the office's summary is
+     * built; otherwise the raw od_procedure_logs queries below. Same rows either way
+     * (`php artisan summaries:parity`).
+     */
+    private function useSummary(int $officeId): bool
+    {
+        return ! $this->rawOnly && $this->visitDays->isReady($officeId);
+    }
+
+    private bool $rawOnly = false;
+
+    /**
+     * Run $compute against the raw tables only — the reference the parity check compares with.
+     *
+     * @template T
+     *
+     * @param  Closure(self): T  $compute
+     * @return T
+     */
+    public function onRawTables(Closure $compute): mixed
+    {
+        $this->rawOnly = true;
+
+        try {
+            return $compute($this);
+        } finally {
+            $this->rawOnly = false;
+        }
+    }
+
+    /** ClinicNum / ProvNum filters on patient_visit_days (NULLs are stored as -1, which no filter matches). */
+    private function summaryScope(Builder $q, array $clinics, array $providers): Builder
+    {
+        return $q->when(! empty($clinics), fn ($q) => $q->whereIn('clinic_num', $clinics))
+            ->when(! empty($providers), fn ($q) => $q->whereIn('prov_num', $providers));
+    }
+
+    private function summaryVisits(int $officeId): Builder
+    {
+        return DB::table('patient_visit_days')
+            ->where('office_id', $officeId)
+            ->where('completed_not_broken', 1);
     }
 
     /**
@@ -35,27 +86,52 @@ class PatientVisitService
     public function newPatientVisits(string $start, string $end, array $clinics = [], array $providers = [], ?int $officeId = null): array
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
+
+        // Every module asks for this per office (Dashboard, Operations, Financials, KPIs), so it
+        // is cached here, per office, until that office's next sync. Parity runs bypass it.
+        if ($this->rawOnly) {
+            return $this->computeNewPatientVisits($start, $end, $clinics, $providers, $officeId);
+        }
+
+        return $this->metricCache->remember(
+            'patients.new-patient-visits', [$officeId], [$start, $end, $clinics, $providers],
+            fn () => $this->computeNewPatientVisits($start, $end, $clinics, $providers, $officeId)
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function computeNewPatientVisits(string $start, string $end, array $clinics, array $providers, int $officeId): array
+    {
         $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
+        $summary = $this->useSummary($officeId);
+
         // Step 1: Find candidate patients with completed procedures in range
-        $candidateQ = DB::table('od_procedure_logs')
-            ->where('office_id', $officeId)
-            ->whereIn('ProcStatus', ProcStatus::completed())
-            ->whereBetween('ProcDate', [$start, $end]);
+        if ($summary) {
+            $candidateQ = $this->summaryScope($this->summaryVisits($officeId), $clinics, $providers)
+                ->whereBetween('visit_date', [$start, $end])
+                ->groupBy('pat_num')
+                ->selectRaw('pat_num AS PatNum, MIN(visit_date) AS first_date');
+        } else {
+            $candidateQ = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->whereBetween('ProcDate', [$start, $end]);
 
-        if (! empty($excludedCodes)) {
-            $candidateQ->whereNotIn('CodeNum', $excludedCodes);
-        }
-        if (! empty($clinics)) {
-            $candidateQ->whereIn('ClinicNum', $clinics);
-        }
-        if (! empty($providers)) {
-            $candidateQ->whereIn('ProvNum', $providers);
+            if (! empty($excludedCodes)) {
+                $candidateQ->whereNotIn('CodeNum', $excludedCodes);
+            }
+            if (! empty($clinics)) {
+                $candidateQ->whereIn('ClinicNum', $clinics);
+            }
+            if (! empty($providers)) {
+                $candidateQ->whereIn('ProvNum', $providers);
+            }
+
+            $candidateQ->groupBy('PatNum')->selectRaw('PatNum, MIN(ProcDate) AS first_date');
         }
 
-        $candidates = $candidateQ->groupBy('PatNum')
-            ->selectRaw('PatNum, MIN(ProcDate) AS first_date')
-            ->get();
+        $candidates = $candidateQ->get();
 
         if ($candidates->isEmpty()) {
             return [];
@@ -65,17 +141,27 @@ class PatientVisitService
         $patFirstDateMap = $candidates->pluck('first_date', 'PatNum')->all();
 
         // Step 2: Eliminate patients who had ANY completed procedure prior to start
-        $priorPatQ = DB::table('od_procedure_logs')
-            ->where('office_id', $officeId)
-            ->whereIn('PatNum', $candidatePatNums)
-            ->whereIn('ProcStatus', ProcStatus::completed())
-            ->where('ProcDate', '<', $start);
+        // (any clinic or provider: "new" means new to the office).
+        if ($summary) {
+            $priorPatNums = $this->summaryVisits($officeId)
+                ->whereIn('pat_num', $candidatePatNums)
+                ->where('visit_date', '<', $start)
+                ->distinct()
+                ->pluck('pat_num')
+                ->all();
+        } else {
+            $priorPatQ = DB::table('od_procedure_logs')
+                ->where('office_id', $officeId)
+                ->whereIn('PatNum', $candidatePatNums)
+                ->whereIn('ProcStatus', ProcStatus::completed())
+                ->where('ProcDate', '<', $start);
 
-        if (! empty($excludedCodes)) {
-            $priorPatQ->whereNotIn('CodeNum', $excludedCodes);
+            if (! empty($excludedCodes)) {
+                $priorPatQ->whereNotIn('CodeNum', $excludedCodes);
+            }
+
+            $priorPatNums = $priorPatQ->distinct()->pluck('PatNum')->all();
         }
-
-        $priorPatNums = $priorPatQ->distinct()->pluck('PatNum')->all();
         $priorSet = array_fill_keys($priorPatNums, true);
 
         $newPatNums = array_values(array_filter($candidatePatNums, fn ($pn) => ! isset($priorSet[$pn])));
@@ -168,7 +254,12 @@ class PatientVisitService
             'p.WirelessPhone',
             'p.HmPhone',
             'p.Email',
-        ])->get();
+        ])
+            // The first-visit clinic/provider is taken from the last row of that day, so the
+            // row order must be fixed: by id (sync order), which is what the query returned
+            // before 2026-10-27, when an index change made the unordered result vary.
+            ->orderBy('pl.id')
+            ->get();
 
         $grouped = [];
         foreach ($procRows as $r) {
@@ -255,6 +346,17 @@ class PatientVisitService
             $officeId = $officeId ?? Office::getActiveOfficeId();
         }
 
+        if ($this->useSummary($officeId)) {
+            $visitKey = DB::connection()->getDriverName() === 'sqlite'
+                ? "pat_num || '|' || visit_date"
+                : 'pat_num, visit_date';
+
+            return (int) ($this->summaryScope($this->summaryVisits($officeId), $clinics, $providers)
+                ->whereBetween('visit_date', [$startDate, $endDate])
+                ->selectRaw("COUNT(DISTINCT {$visitKey}) AS cnt")
+                ->value('cnt') ?? 0);
+        }
+
         $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
         $q = DB::table('od_procedure_logs as pl')
@@ -333,24 +435,33 @@ class PatientVisitService
     public function dailyStats(string $start, string $end, array $clinics = [], array $providers = [], ?int $officeId = null): array
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
-        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
-        $q = DB::table('od_procedure_logs as pl')
-            ->where('pl.office_id', $officeId)
-            ->whereIn('pl.ProcStatus', ProcStatus::completed())
-            ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('pl.CodeNum', $excludedCodes))
-            ->whereBetween('pl.ProcDate', [$start, $end]);
+        if ($this->useSummary($officeId)) {
+            $dailyVisits = $this->summaryScope($this->summaryVisits($officeId), $clinics, $providers)
+                ->whereBetween('visit_date', [$start, $end])
+                ->selectRaw('visit_date as date, COUNT(DISTINCT pat_num) as cnt')
+                ->groupBy('visit_date')
+                ->pluck('cnt', 'date');
+        } else {
+            $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
-        if (! empty($clinics)) {
-            $q->whereIn('pl.ClinicNum', $clinics);
+            $q = DB::table('od_procedure_logs as pl')
+                ->where('pl.office_id', $officeId)
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('pl.CodeNum', $excludedCodes))
+                ->whereBetween('pl.ProcDate', [$start, $end]);
+
+            if (! empty($clinics)) {
+                $q->whereIn('pl.ClinicNum', $clinics);
+            }
+            if (! empty($providers)) {
+                $q->whereIn('pl.ProvNum', $providers);
+            }
+
+            $dailyVisits = $q->selectRaw('DATE(pl.ProcDate) as date, COUNT(DISTINCT pl.PatNum) as cnt')
+                ->groupByRaw('DATE(pl.ProcDate)')
+                ->pluck('cnt', 'date');
         }
-        if (! empty($providers)) {
-            $q->whereIn('pl.ProvNum', $providers);
-        }
-
-        $dailyVisits = $q->selectRaw('DATE(pl.ProcDate) as date, COUNT(DISTINCT pl.PatNum) as cnt')
-            ->groupByRaw('DATE(pl.ProcDate)')
-            ->pluck('cnt', 'date');
 
         $dailyNewVisits = collect($this->newPatientVisits($start, $end, $clinics, $providers, $officeId))
             ->groupBy('dates')
@@ -372,14 +483,23 @@ class PatientVisitService
         $endLastYear = Carbon::parse($end)->subYear()->toDateString();
         $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
-        $getStats = function ($s, $e) use ($officeId, $excludedCodes) {
-            $patientVisits = DB::table('od_procedure_logs')
-                ->where('office_id', $officeId)
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('CodeNum', $excludedCodes))
-                ->whereBetween('ProcDate', [$s, $e])
-                ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::patientVisits('val'))
-                ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+        $summary = $this->useSummary($officeId);
+        $summaryVisitKey = DB::connection()->getDriverName() === 'sqlite' ? "pat_num || '|' || visit_date" : 'pat_num, visit_date';
+
+        $getStats = function ($s, $e) use ($officeId, $excludedCodes, $summary, $summaryVisitKey) {
+            $patientVisits = ($summary
+                // NULL ClinicNum (stored -1) groups as 0, like COALESCE(ClinicNum + 0, 0).
+                ? $this->summaryVisits($officeId)
+                    ->whereBetween('visit_date', [$s, $e])
+                    ->selectRaw("CASE WHEN clinic_num = -1 THEN 0 ELSE clinic_num END as ClinicNum, COUNT(DISTINCT {$summaryVisitKey}) as val")
+                    ->groupBy(DB::raw('CASE WHEN clinic_num = -1 THEN 0 ELSE clinic_num END'))
+                : DB::table('od_procedure_logs')
+                    ->where('office_id', $officeId)
+                    ->whereIn('ProcStatus', ProcStatus::completed())
+                    ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('CodeNum', $excludedCodes))
+                    ->whereBetween('ProcDate', [$s, $e])
+                    ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::patientVisits('val'))
+                    ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)')))
                 ->pluck('val', 'ClinicNum')
                 ->mapWithKeys(fn ($val, $k) => [(int) $k => (int) $val]);
 

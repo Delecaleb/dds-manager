@@ -12,6 +12,7 @@ use App\Models\OdProcedureLog;
 use App\Models\OdRecall;
 use App\Models\Office;
 use Carbon\Carbon;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\Facades\DataTables;
@@ -107,10 +108,18 @@ class FrontOfficeController extends Controller
         $startOfWeekDate = $startOfWeek->format('Y-m-d');
         $endOfWeekDate = $startOfWeek->copy()->addDays(4)->format('Y-m-d');
 
-        $visits = OdAppointment::with('patient')
+        $visits = OdAppointment::query()
             ->whereBetween('AptDateTime', [$startOfWeekDate.' 00:00:00', $endOfWeekDate.' 23:59:59'])
             ->whereIn('AptStatus', [1, 2]) // Schedule / Complete
             ->get();
+
+        // Appointment count per patient, in one query rather than one per appointment.
+        $weekPatNums = $visits->pluck('PatNum')->filter()->unique()->values()->all();
+        $aptCounts = $weekPatNums === [] ? collect() : OdAppointment::whereIn('PatNum', $weekPatNums)
+            ->toBase()
+            ->selectRaw('PatNum, COUNT(*) AS cnt')
+            ->groupBy('PatNum')
+            ->pluck('cnt', 'PatNum');
 
         $dailyNew = [0, 0, 0, 0, 0];
         $dailyExisting = [0, 0, 0, 0, 0];
@@ -121,7 +130,7 @@ class FrontOfficeController extends Controller
                 // If patient has 'IsNewPatient' field, use it. Otherwise, simple naive check via Appointments count
                 $isNew = false;
                 if (! empty($apt->PatNum)) {
-                    $count = OdAppointment::where('PatNum', $apt->PatNum)->count();
+                    $count = (int) ($aptCounts[$apt->PatNum] ?? 0);
                     if ($count <= 1) {
                         $isNew = true;
                     }
@@ -186,56 +195,56 @@ class FrontOfficeController extends Controller
         $hygUnscheduled = $hygTotal - $hygScheduled;
         $hygReapptRate = $hygTotal > 0 ? round(($hygScheduled / $hygTotal) * 100, 2) : 0;
 
+        // Age buckets (0-3, 3-6, 6-9, 9-12, 12+ months before month end). The bucket depends
+        // only on the date, so rows are grouped per date in SQL and each date is bucketed once —
+        // instead of loading every recall / treatment-planned procedure ever as a model.
+        $monthEndDate = Carbon::parse($endOfMonth);
+        $bucketOf = function (string $date) use ($monthEndDate): int {
+            $monthsPast = Carbon::parse($date)->diffInMonths($monthEndDate);
+
+            return match (true) {
+                $monthsPast <= 3 => 0,
+                $monthsPast <= 6 => 1,
+                $monthsPast <= 9 => 2,
+                $monthsPast <= 12 => 3,
+                default => 4,
+            };
+        };
+
         // 3. Hygiene Recall Due
-        $recalls = OdRecall::whereNotNull('DateDue')
+        $recallsByDate = OdRecall::whereNotNull('DateDue')
             ->where('DateDue', '<=', $endOfMonth)
             ->where('DateDue', '>=', '1900-01-01')
+            ->toBase()
+            ->selectRaw('DateDue AS date, COUNT(*) AS cnt')
+            ->groupBy('DateDue')
             ->get();
 
         $recallBuckets = [0, 0, 0, 0, 0];
-        foreach ($recalls as $r) {
-            $monthsPast = Carbon::parse($r->DateDue)->diffInMonths(Carbon::parse($endOfMonth));
-            if ($monthsPast <= 3) {
-                $recallBuckets[0]++;
-            } elseif ($monthsPast <= 6) {
-                $recallBuckets[1]++;
-            } elseif ($monthsPast <= 9) {
-                $recallBuckets[2]++;
-            } elseif ($monthsPast <= 12) {
-                $recallBuckets[3]++;
-            } else {
-                $recallBuckets[4]++;
-            }
+        foreach ($recallsByDate as $r) {
+            $recallBuckets[$bucketOf($r->date)] += (int) $r->cnt;
         }
 
         // 4. Unscheduled TX
-        $tpProcs = OdProcedureLog::whereIn('ProcStatus', ProcStatus::treatmentPlanned()) // Treatment Planned
+        $tpByDate = OdProcedureLog::whereIn('ProcStatus', ProcStatus::treatmentPlanned()) // Treatment Planned
             ->where('ProvNum', '>', 0)
             ->whereNotNull('DateTP')
             ->where('DateTP', '<=', $endOfMonth)
             ->where('DateTP', '>=', '1900-01-01')
-            ->get(); // Note: some databases could use larger memory here depending on historical scale, pagination/streaming usually ideal in production
+            ->toBase()
+            ->selectRaw('DateTP AS date, COUNT(*) AS cnt, COALESCE(SUM(ProcFee), 0) AS amount')
+            ->groupBy('DateTP')
+            ->get();
 
         $txBuckets = [
             'count' => [0, 0, 0, 0, 0],
             'amount' => [0, 0, 0, 0, 0],
         ];
 
-        foreach ($tpProcs as $tp) {
-            $monthsPast = Carbon::parse($tp->DateTP)->diffInMonths(Carbon::parse($endOfMonth));
-            $idx = 4;
-            if ($monthsPast <= 3) {
-                $idx = 0;
-            } elseif ($monthsPast <= 6) {
-                $idx = 1;
-            } elseif ($monthsPast <= 9) {
-                $idx = 2;
-            } elseif ($monthsPast <= 12) {
-                $idx = 3;
-            }
-
-            $txBuckets['count'][$idx]++;
-            $txBuckets['amount'][$idx] += (float) $tp->ProcFee;
+        foreach ($tpByDate as $tp) {
+            $idx = $bucketOf($tp->date);
+            $txBuckets['count'][$idx] += (int) $tp->cnt;
+            $txBuckets['amount'][$idx] += (float) $tp->amount;
         }
 
         return response()->json([
@@ -896,32 +905,32 @@ class FrontOfficeController extends Controller
 
         // Subtab 4: Collections (from fr-off-collection-tab.html)
         if ($subtab === 'collections') {
-            $grossByDate = DB::table('od_procedure_logs')
+            $grossByDate = $this->activeOfficeTable('od_procedure_logs')
                 ->selectRaw('DATE(ProcDate) as d_date, SUM(ProcFee) as val')
                 ->whereIn('ProcStatus', ProcStatus::completed())
                 ->whereBetween('ProcDate', [$startDateStr, $endDateStr])
                 ->groupBy(DB::raw('DATE(ProcDate)'))
                 ->pluck('val', 'd_date');
 
-            $adjByDate = DB::table('od_adjustments')
+            $adjByDate = $this->activeOfficeTable('od_adjustments')
                 ->selectRaw('DATE(AdjDate) as d_date, SUM(AdjAmt) as val')
                 ->whereBetween('AdjDate', [$startDateStr, $endDateStr])
                 ->groupBy(DB::raw('DATE(AdjDate)'))
                 ->pluck('val', 'd_date');
 
-            $woByDate = DB::table('od_claim_procs')
+            $woByDate = $this->activeOfficeTable('od_claim_procs')
                 ->selectRaw('DATE(ProcDate) as d_date, SUM(WriteOff) as val')
                 ->whereBetween('ProcDate', [$startDateStr, $endDateStr])
                 ->groupBy(DB::raw('DATE(ProcDate)'))
                 ->pluck('val', 'd_date');
 
-            $collPatByDate = DB::table('od_pay_splits')
+            $collPatByDate = $this->activeOfficeTable('od_pay_splits')
                 ->selectRaw('DATE(DatePay) as d_date, SUM(SplitAmt) as val')
                 ->whereBetween('DatePay', [$startDateStr, $endDateStr])
                 ->groupBy(DB::raw('DATE(DatePay)'))
                 ->pluck('val', 'd_date');
 
-            $collInsByDate = DB::table('od_claim_procs')
+            $collInsByDate = $this->activeOfficeTable('od_claim_procs')
                 ->selectRaw('DATE(DateCP) as d_date, SUM(InsPayAmt) as val')
                 ->whereBetween('DateCP', [$startDateStr, $endDateStr])
                 ->where('Status', '!=', 0)
@@ -942,7 +951,8 @@ class FrontOfficeController extends Controller
                 $gross = (float) ($grossByDate[$d] ?? 0);
                 $adj = (float) ($adjByDate[$d] ?? 0);
                 $wo = (float) ($woByDate[$d] ?? 0);
-                $net = $gross + $adj + $wo;
+                // Canonical net (D3): gross + adjustments - writeoffs.
+                $net = $this->production->netFrom($gross, $adj, $wo);
                 $coll = (float) ($collPatByDate[$d] ?? 0) + (float) ($collInsByDate[$d] ?? 0);
                 $pct = $net > 0 ? round(($coll / $net) * 100, 2) : ($coll > 0 ? 100.0 : 0.0);
 
@@ -982,18 +992,18 @@ class FrontOfficeController extends Controller
 
         // 1. Patient vs Insurance Collections within selected month
         // Patient Payments (from od_pay_splits on DatePay)
-        $pts_collection = (float) DB::table('od_pay_splits')
+        $pts_collection = (float) $this->activeOfficeTable('od_pay_splits')
             ->whereBetween('DatePay', [$startDateStr, $endDateStr])
             ->sum('SplitAmt');
 
         // Insurance Payments (from od_claim_procs on DateCP or od_claim_payments)
-        $ins_collection = (float) DB::table('od_claim_procs')
+        $ins_collection = (float) $this->activeOfficeTable('od_claim_procs')
             ->whereBetween('DateCP', [$startDateStr, $endDateStr])
             ->where('Status', '!=', 0)
             ->sum('InsPayAmt');
 
         if ($ins_collection <= 0) {
-            $ins_collection = (float) DB::table('od_claim_payments')
+            $ins_collection = (float) $this->activeOfficeTable('od_claim_payments')
                 ->whereBetween('CheckDate', [$startDateStr, $endDateStr])
                 ->sum('CheckAmt');
         }
@@ -1001,20 +1011,21 @@ class FrontOfficeController extends Controller
         $total_collection = $pts_collection + $ins_collection;
 
         // 2. Adjustments and Gross/Net Production within selected month
-        $gross_production = (float) DB::table('od_procedure_logs')
+        $gross_production = (float) $this->activeOfficeTable('od_procedure_logs')
             ->whereIn('ProcStatus', ProcStatus::completed())
             ->whereBetween('ProcDate', [$startDateStr, $endDateStr])
             ->sum('ProcFee');
 
-        $total_adjustments = (float) DB::table('od_adjustments')
+        $total_adjustments = (float) $this->activeOfficeTable('od_adjustments')
             ->whereBetween('AdjDate', [$startDateStr, $endDateStr])
             ->sum('AdjAmt');
 
-        $total_writeoffs = (float) DB::table('od_claim_procs')
+        $total_writeoffs = (float) $this->activeOfficeTable('od_claim_procs')
             ->whereBetween('ProcDate', [$startDateStr, $endDateStr])
             ->sum('WriteOff');
 
-        $net_production = $gross_production + $total_adjustments + $total_writeoffs;
+        // Canonical net (D3): gross + adjustments - writeoffs.
+        $net_production = $this->production->netFrom($gross_production, $total_adjustments, $total_writeoffs);
         $adj_percent = $gross_production > 0 ? round((abs($total_adjustments) / $gross_production) * 100, 2) : 0.0;
 
         return response()->json([
@@ -1038,6 +1049,19 @@ class FrontOfficeController extends Controller
                 'percent' => $adj_percent,
             ],
         ]);
+    }
+
+    /**
+     * A query on an od_* table limited to the active office: the same rule as the OfficeScope
+     * the Eloquent models apply (no active office = no filter), for tables queried without a
+     * model. Without it the Collections figures summed every office while the balances beside
+     * them (OdPatient, scoped) covered the active office only.
+     */
+    private function activeOfficeTable(string $table): Builder
+    {
+        $officeId = Office::getActiveOfficeId();
+
+        return DB::table($table)->when($officeId !== null, fn ($q) => $q->where("{$table}.office_id", $officeId));
     }
 
     public function kpis(Request $request)

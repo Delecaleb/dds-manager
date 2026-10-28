@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Patient\PatientService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\DateRange;
 use App\Models\OdAdjustment;
 use App\Models\OdAppointment;
 use App\Models\OdProcedureLog;
@@ -67,9 +68,8 @@ class CalendarController extends Controller
      *  scheduled_production  — $ SCHEDULED that day: the booked fee value of
      *                          appointments in Scheduled status for the day.
      *
-     * ProcFee is stored as text, so it is CAST for summing. Date columns may be
-     * raw ISO strings (with a 'T') or normalized dates/datetimes, so both are
-     * matched via DATE(REPLACE(...)) which is correct either way.
+     * ProcFee is stored as text, so it is CAST for summing. Date ranges go through
+     * DateRange::within(), which keeps the predicate index-friendly on MySQL.
      */
     public function stats(Request $request)
     {
@@ -82,7 +82,7 @@ class CalendarController extends Controller
         $grossQuery = OdProcedureLog::query()
             ->where('office_id', $officeId)
             ->whereIn('ProcStatus', ['C', '2'])
-            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('ProcDate', $start, $end));
         if ($clinicNum !== null) {
             $grossQuery->where('ClinicNum', $clinicNum);
         }
@@ -92,7 +92,7 @@ class CalendarController extends Controller
 
         $adjQuery = OdAdjustment::query()
             ->where('office_id', $officeId)
-            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('AdjDate', $start, $end));
         if ($clinicNum !== null) {
             $adjQuery->where('ClinicNum', $clinicNum);
         }
@@ -102,7 +102,7 @@ class CalendarController extends Controller
 
         $woQuery = DB::table('od_claim_procs as c')
             ->where('c.office_id', $officeId)
-            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('c.ProcDate', $start, $end));
         if ($clinicNum !== null && Schema::hasColumn('od_claim_procs', 'ClinicNum')) {
             $woQuery->where('c.ClinicNum', $clinicNum);
         }
@@ -119,7 +119,7 @@ class CalendarController extends Controller
             })
             ->where('od_appointments.office_id', $officeId)
             ->where('od_appointments.AptStatus', '1')
-            ->whereRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('od_appointments.AptDateTime', $start, $end));
         if ($clinicNum !== null) {
             $schedQuery->where('od_appointments.ClinicNum', $clinicNum);
         }
@@ -132,7 +132,7 @@ class CalendarController extends Controller
             ->with('provider')
             ->where('od_appointments.office_id', $officeId)
             ->whereIn('AptStatus', [1, 2, '1', '2'])
-            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('AptDateTime', $start, $end));
         if ($clinicNum !== null) {
             $appointmentsQuery->where('ClinicNum', $clinicNum);
         }
@@ -862,7 +862,7 @@ class CalendarController extends Controller
             ->with(['patient', 'provider', 'procedureLogs'])
             ->where('od_appointments.office_id', $officeId)
             ->whereIn('AptStatus', [1, 2, '1', '2'])
-            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('AptDateTime', $start, $end));
 
         if ($clinicNum !== null) {
             $query->where('ClinicNum', $clinicNum);
@@ -954,7 +954,7 @@ class CalendarController extends Controller
         $grossQuery = OdProcedureLog::query()
             ->where('office_id', $officeId)
             ->whereIn('ProcStatus', ['C', '2'])
-            ->whereRaw("DATE(REPLACE(ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('ProcDate', $start, $end));
         if ($clinicNum !== null) {
             $grossQuery->where('ClinicNum', $clinicNum);
         }
@@ -966,7 +966,7 @@ class CalendarController extends Controller
         // 2. Adjustments per date
         $adjQuery = OdAdjustment::query()
             ->where('office_id', $officeId)
-            ->whereRaw("DATE(REPLACE(AdjDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('AdjDate', $start, $end));
         if ($clinicNum !== null) {
             $adjQuery->where('ClinicNum', $clinicNum);
         }
@@ -978,7 +978,7 @@ class CalendarController extends Controller
         // 3. Writeoffs per date
         $woQuery = DB::table('od_claim_procs as c')
             ->where('c.office_id', $officeId)
-            ->whereRaw("DATE(REPLACE(c.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('c.ProcDate', $start, $end));
         if ($clinicNum !== null && Schema::hasColumn('od_claim_procs', 'ClinicNum')) {
             $woQuery->where('c.ClinicNum', $clinicNum);
         }
@@ -995,7 +995,7 @@ class CalendarController extends Controller
             })
             ->where('od_appointments.office_id', $officeId)
             ->where('od_appointments.AptStatus', '1')
-            ->whereRaw("DATE(REPLACE(od_appointments.AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('od_appointments.AptDateTime', $start, $end));
         if ($clinicNum !== null) {
             $schedQuery->where('od_appointments.ClinicNum', $clinicNum);
         }
@@ -1008,7 +1008,7 @@ class CalendarController extends Controller
         $aptsQuery = OdAppointment::withoutGlobalScopes()
             ->where('od_appointments.office_id', $officeId)
             ->whereIn('AptStatus', [1, 2, 4, 5])
-            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('AptDateTime', $start, $end));
         if ($clinicNum !== null) {
             $aptsQuery->where('ClinicNum', $clinicNum);
         }
@@ -1029,7 +1029,7 @@ class CalendarController extends Controller
             )
             ->whereIn('pl.ProcStatus', ['C', '2'])
             ->whereRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) = DATE(REPLACE(fv.first_date, 'T', ' '))")
-            ->whereRaw("DATE(REPLACE(pl.ProcDate, 'T', ' ')) BETWEEN ? AND ?", [$start, $end]);
+            ->tap(DateRange::within('pl.ProcDate', $start, $end));
         if ($clinicNum !== null) {
             $newPtsQuery->where('pl.ClinicNum', $clinicNum);
         }

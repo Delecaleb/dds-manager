@@ -21,6 +21,9 @@ use Illuminate\Support\Facades\DB;
  */
 class PayorService
 {
+    /** @var array<int, array<int,string>> officeId => planLabelMap() */
+    private array $labelMaps = [];
+
     public function __construct(
         private readonly ProductionService $production,
     ) {}
@@ -116,11 +119,21 @@ class PayorService
             ->all();
     }
 
-    /** @return array<int,string> PlanNum => label, cached for a day. */
+    /**
+     * @return array<int,string> PlanNum => label, cached for a day, and held in memory for the
+     * rest of the request: payorLabel() runs once per raw row, and a cache read per call
+     * (a SQL query on the database store) made the Payors tab issue ~500k queries.
+     */
     public function planLabelMap(?int $officeId = null): array
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
 
+        return $this->labelMaps[$officeId] ??= $this->loadPlanLabelMap($officeId);
+    }
+
+    /** @return array<int,string> */
+    private function loadPlanLabelMap(int $officeId): array
+    {
         return Cache::remember("od_carrier_string_map_office_{$officeId}", 86400, function () use ($officeId) {
             try {
                 $cMap = DB::table('od_carriers')

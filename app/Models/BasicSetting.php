@@ -2,11 +2,22 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\InvalidatesMetricCache;
 use Illuminate\Database\Eloquent\Model;
 
 class BasicSetting extends Model
 {
+    use InvalidatesMetricCache;
+
     protected $table = 'basic_settings';
+
+    /** Report settings (e.g. collection-rate basis) feed cached results; a global row feeds every office. */
+    protected function metricCacheOfficeIds(): array
+    {
+        return $this->office_id === null
+            ? Office::query()->pluck('id')->map(fn ($id) => (int) $id)->all()
+            : [(int) $this->office_id];
+    }
 
     protected $fillable = [
         'office_id',

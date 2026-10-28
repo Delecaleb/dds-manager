@@ -6,6 +6,7 @@ use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Models\Office;
+use Closure;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -22,7 +23,8 @@ use Illuminate\Support\Facades\DB;
 class PatientService
 {
     public function __construct(
-        private readonly ?PatientVisitService $patientVisitService = null
+        private readonly ?PatientVisitService $patientVisitService = null,
+        private readonly ?PatientVisitDays $visitDays = null,
     ) {}
 
     /**
@@ -31,10 +33,25 @@ class PatientService
      *
      * Returns a query builder (columns: PatNum, first_date) for use in:
      *   ->joinSub($patients->firstVisitCohort(), 'fv', 'pl.PatNum', '=', 'fv.PatNum')
+     *
+     * Reads patient_visit_days (flag completed_not_broken: completed, CodeNum not a
+     * broken-appointment code) once the office's summary is built — one row per patient-day
+     * instead of every procedure in the office's history. Same rows (summaries:parity).
      */
     public function firstVisitCohort(?int $officeId = null, int|string|array|null $clinicId = null): Builder
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
+        $clinics = $this->cohortClinics($clinicId);
+
+        if ($this->summaryReady($officeId)) {
+            return DB::table('patient_visit_days')
+                ->select('pat_num AS PatNum', DB::raw('MIN(visit_date) AS first_date'))
+                ->where('office_id', $officeId)
+                ->where('completed_not_broken', 1)
+                ->when($clinics !== [], fn ($q) => $q->whereIn('clinic_num', $clinics))
+                ->groupBy('pat_num');
+        }
+
         $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
         $q = DB::table('od_procedure_logs')
@@ -59,11 +76,24 @@ class PatientService
      * that can't take a query builder (e.g. KpisController's bundled single-scan KPIs).
      * Same definition as firstVisitCohort(); keeps the cohort single-sourced everywhere.
      *
+     * The raw form keeps a procedure with a NULL CodeNum (COALESCE), the summary form drops it,
+     * like firstVisitCohort(). Synced data has no NULL CodeNum (checked 2026-10-27), so both
+     * give the same cohort; summaries:parity would show it if that ever changed.
+     *
      * @param  string  $dateAlias  column alias for the first-visit date (default 'first_date')
      */
     public function firstVisitCohortSql(string $dateAlias = 'first_date', ?int $officeId = null, int|string|array|null $clinicId = null): string
     {
         $officeId = $officeId ?? Office::getActiveOfficeId();
+
+        if ($this->summaryReady($officeId)) {
+            $clinics = $this->cohortClinics($clinicId);
+            $clinicClause = $clinics === [] ? '' : ' AND clinic_num IN ('.implode(',', $clinics).')';
+
+            return "SELECT pat_num AS PatNum, MIN(visit_date) AS {$dateAlias} "
+                ."FROM patient_visit_days WHERE office_id = {$officeId} AND completed_not_broken = 1{$clinicClause} GROUP BY pat_num";
+        }
+
         $completed = ProcStatus::inList(ProcStatus::completed());
         $notBroken = ProcCode::notBrokenAppointmentSql('', $officeId);
 
@@ -80,6 +110,42 @@ class PatientService
 
         return "SELECT PatNum, MIN(ProcDate) AS {$dateAlias} "
             ."FROM od_procedure_logs WHERE office_id = {$officeId} AND ProcStatus IN ({$completed}) AND {$notBroken}{$clinicClause} GROUP BY PatNum";
+    }
+
+    private bool $rawOnly = false;
+
+    /**
+     * Run $compute with the cohort read from the raw tables only (the parity reference).
+     *
+     * @template T
+     *
+     * @param  Closure(self): T  $compute
+     * @return T
+     */
+    public function onRawTables(Closure $compute): mixed
+    {
+        $this->rawOnly = true;
+
+        try {
+            return $compute($this);
+        } finally {
+            $this->rawOnly = false;
+        }
+    }
+
+    private function summaryReady(int $officeId): bool
+    {
+        return ! $this->rawOnly && ($this->visitDays ?? app(PatientVisitDays::class))->isReady($officeId);
+    }
+
+    /** @return list<int> clinic filter of the cohort helpers ([] = whole office) */
+    private function cohortClinics(int|string|array|null $clinicId): array
+    {
+        if ($clinicId === null || $clinicId === 'all' || $clinicId === '') {
+            return [];
+        }
+
+        return array_values(array_map('intval', (array) $clinicId));
     }
 
     /** Patients seen (any completed procedure) in the period. */

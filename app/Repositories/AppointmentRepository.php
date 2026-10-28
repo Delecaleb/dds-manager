@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Domain\Support\DateRange;
 use App\Models\OdAppointment;
 use App\Models\Office;
 use Illuminate\Database\Eloquent\Collection;
@@ -31,7 +32,7 @@ class AppointmentRepository
 
         $query = OdAppointment::withoutGlobalScopes()
             ->with(['patient' => $sameOffice, 'provider' => $sameOffice, 'operatory' => $sameOffice])
-            ->whereRaw("DATE(REPLACE(AptDateTime, 'T', ' ')) BETWEEN ? AND ?", [$startDate, $endDate])
+            ->tap(DateRange::within('AptDateTime', $startDate, $endDate))
             ->where('office_id', $officeId);
 
         // Filter out unused status codes to match legacy Calendar logic

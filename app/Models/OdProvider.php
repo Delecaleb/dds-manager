@@ -13,6 +13,16 @@ class OdProvider extends Model
 
     public $incrementing = false;
 
+    /**
+     * ProvNum became BIGINT (2026-10-27, for indexed joins); it is still read as a string so
+     * pages that compare provider ids as text keep working.
+     */
+    protected $keyType = 'string';
+
+    protected $casts = [
+        'ProvNum' => 'string',
+    ];
+
     protected $fillable = [
         'office_id',
         'ProvNum',
