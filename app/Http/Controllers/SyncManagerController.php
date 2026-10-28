@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\HandlesSyncRequests;
 use App\Models\Office;
 use App\Services\Sync\QueueHealthService;
+use App\Services\Sync\SyncAlertSettings;
 use App\Services\Sync\SyncCheckpointService;
 use App\Services\Sync\SyncRequestRunner;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +19,7 @@ class SyncManagerController extends Controller
     /**
      * Display the standalone Sync Manager page.
      */
-    public function index(SyncCheckpointService $checkpoints, SyncRequestRunner $runner): View
+    public function index(Request $request, SyncCheckpointService $checkpoints, SyncRequestRunner $runner, SyncAlertSettings $alerts): View
     {
         $currentOffice = Office::getActiveOffice() ?? Office::first();
         $offices = Office::where('is_active', true)->orderBy('id')->get();
@@ -31,6 +32,8 @@ class SyncManagerController extends Controller
             'offices' => $offices,
             'modules' => $runner->rangeModules(),
             'resetModules' => $checkpoints->resettableModules(),
+            // Only super admins see and edit the failure alert list.
+            'alertRecipients' => $request->user()?->isSuperAdmin() ? $alerts->recipients() : null,
         ]);
     }
 

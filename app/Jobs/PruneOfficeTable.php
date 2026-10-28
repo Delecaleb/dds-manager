@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Office;
 use App\Services\Sync\HardDeleteSyncService;
 use App\Services\Sync\PruneSafetyException;
+use App\Services\Sync\SyncFailureNotifier;
 use DateTimeInterface;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -101,5 +102,7 @@ class PruneOfficeTable implements ShouldBeUnique, ShouldQueue
         Log::error("Prune job failed for office #{$this->officeId} table [{$this->table}] mode [{$this->mode}].", [
             'exception' => $e,
         ]);
+
+        app(SyncFailureNotifier::class)->jobFailed($this->officeId, null, $this->table, $e, retried: ! $e instanceof PruneSafetyException);
     }
 }

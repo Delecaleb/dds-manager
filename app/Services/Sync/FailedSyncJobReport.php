@@ -24,6 +24,12 @@ class FailedSyncJobReport
     /** Groups shown. */
     private const GROUP_LIMIT = 15;
 
+    /** @var array<string, string>|null module key => label, built on first use */
+    private ?array $moduleLabels = null;
+
+    /** @var array<string, string> local table => label */
+    private array $tableLabels = [];
+
     public function __construct(
         private readonly SyncFailureExplainer $explainer,
         private readonly SyncReportService $modules,
@@ -38,10 +44,6 @@ class FailedSyncJobReport
      */
     public function recent(): array
     {
-        $definitions = $this->modules->getModuleDefinitions();
-        $labels = array_map(fn (array $def) => $def['label'], $definitions);
-        // Local table => the same friendly name the Sync Manager uses (od_claim_procs => "Claim Procedures").
-        $tableLabels = array_column(array_filter($definitions, fn (array $def) => isset($def['table'])), 'label', 'table');
         $groups = [];
 
         $rows = DB::table('failed_jobs')
@@ -50,7 +52,7 @@ class FailedSyncJobReport
             ->get(['payload', 'exception', 'failed_at']);
 
         foreach ($rows as $row) {
-            $job = $this->describeJob((string) $row->payload, $labels, $tableLabels);
+            $job = $this->describeJob((string) $row->payload);
             $error = trim((string) strtok((string) $row->exception, "\n"));
             $explained = $this->explainer->explain($error);
             $key = $job['location']."\0".$explained['problem'];
@@ -94,11 +96,9 @@ class FailedSyncJobReport
     /**
      * Which location and which data a stored job was about.
      *
-     * @param  array<string, string>  $labels  module key => label
-     * @param  array<string, string>  $tableLabels  local table => label
      * @return array{location: string, data: string}
      */
-    private function describeJob(string $payload, array $labels, array $tableLabels): array
+    private function describeJob(string $payload): array
     {
         $decoded = json_decode($payload, true);
         $name = class_basename((string) ($decoded['displayName'] ?? 'Unknown'));
@@ -108,14 +108,36 @@ class FailedSyncJobReport
         $location = $officeId !== null ? $this->clinics->labelFor($officeId, null) : 'All locations';
 
         $data = match (true) {
-            isset($fields['module']) => ($labels[$fields['module']] ?? ucfirst(str_replace('_', ' ', (string) $fields['module']))).' sync',
-            isset($fields['table']) => 'Deleted-record clean-up: '.($tableLabels[$fields['table']] ?? $this->tableLabel((string) $fields['table'])),
+            isset($fields['module']) || isset($fields['table']) => $this->dataLabel(
+                isset($fields['module']) ? (string) $fields['module'] : null,
+                isset($fields['table']) ? (string) $fields['table'] : null,
+            ),
             $name === 'ProcessSyncRequest' => 'Manual sync request',
             $name === 'RepairOpenDentalRows' => 'Data repair',
             default => $name,
         };
 
         return ['location' => $location, 'data' => $data];
+    }
+
+    /**
+     * What a sync or prune job works on, as shown to users: "Appointments sync",
+     * "Deleted-record clean-up: Claim Procs". Shared with the failure alert email.
+     */
+    public function dataLabel(?string $module, ?string $table): string
+    {
+        if ($this->moduleLabels === null) {
+            $definitions = $this->modules->getModuleDefinitions();
+            $this->moduleLabels = array_map(fn (array $def) => $def['label'], $definitions);
+            // Local table => the same friendly name the Sync Manager uses (od_claim_procs => "Claim Procedures").
+            $this->tableLabels = array_column(array_filter($definitions, fn (array $def) => isset($def['table'])), 'label', 'table');
+        }
+
+        if ($module !== null) {
+            return ($this->moduleLabels[$module] ?? ucfirst(str_replace('_', ' ', $module))).' sync';
+        }
+
+        return 'Deleted-record clean-up: '.($this->tableLabels[(string) $table] ?? $this->tableLabel((string) $table));
     }
 
     /**

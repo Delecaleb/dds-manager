@@ -44,6 +44,41 @@
       <div id="smQueueHealth" class="text-sm text-slate-400">Checking cron and the queue worker...</div>
     </div>
 
+    @if($alertRecipients !== null)
+    <!-- Sync Failure Alerts (super admin only) -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">
+      <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+        <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="mail-warning" class="w-5 h-5 text-amber-500"></i>
+          Sync Failure Alerts
+        </h2>
+        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Super admin</span>
+      </div>
+
+      <form id="smAlertForm" onsubmit="saveSyncAlertRecipients(event)" class="space-y-3">
+        <div>
+          <label for="smAlertRecipients" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Email these people</label>
+          <textarea id="smAlertRecipients" rows="3" placeholder="name@example.com, other@example.com" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-amber-500 p-3 font-medium shadow-xs transition">{{ implode(', ', $alertRecipients) }}</textarea>
+          <p class="text-[11px] text-slate-500 mt-1">
+            Separate addresses with commas or new lines. An email goes out when a sync still fails after {{ max(0, (int) config('sync.queue.max_exceptions') - 1) }} automatic retries.
+            The same problem at the same location is emailed at most once every {{ (int) config('sync.alerts.cooldown_minutes') }} minutes. Leave empty to turn alerts off.
+          </p>
+        </div>
+
+        <div id="smAlertNotice" class="hidden p-3 rounded-xl text-xs border"></div>
+
+        <div class="flex items-center justify-end gap-2.5">
+          <button type="button" id="smAlertTestBtn" onclick="sendSyncAlertTest()" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition cursor-pointer">
+            <i data-lucide="send" class="w-4 h-4"></i> Send test email
+          </button>
+          <button type="submit" id="smAlertSaveBtn" class="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-amber-600 rounded-xl hover:bg-amber-700 shadow-md shadow-amber-500/20 transition cursor-pointer">
+            <i data-lucide="save" class="w-4 h-4"></i> Save
+          </button>
+        </div>
+      </form>
+    </div>
+    @endif
+
     <!-- On-Demand Sync Form Card -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-5">
       <div class="border-b border-slate-100 pb-3">
@@ -398,6 +433,52 @@
     function setAllSyncModules(checked) {
       document.querySelectorAll('#smModuleList input[name="sync_modules[]"]').forEach(function (box) { box.checked = checked; });
     }
+
+    @if($alertRecipients !== null)
+    function showSyncAlertNotice(ok, message) {
+      var notice = document.getElementById('smAlertNotice');
+      notice.className = 'p-3 rounded-xl text-xs border ' + (ok
+        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+        : 'bg-red-50 border-red-200 text-red-800');
+      notice.innerText = message;
+    }
+
+    function syncAlertRequest(method, url, body, btn) {
+      btn.disabled = true;
+      return fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: body ? JSON.stringify(body) : null
+      })
+        .then(function (r) { return r.json().then(function (res) { return { ok: r.ok, res: res }; }); })
+        .then(function (out) {
+          var errors = out.res.errors ? Object.values(out.res.errors).flat().join(' ') : null;
+          showSyncAlertNotice(out.ok, errors || out.res.message || (out.ok ? 'Done.' : 'Something went wrong.'));
+          return out;
+        })
+        .catch(function (err) { showSyncAlertNotice(false, 'Network error: ' + err.message); })
+        .finally(function () { btn.disabled = false; });
+    }
+
+    function saveSyncAlertRecipients(e) {
+      e.preventDefault();
+      syncAlertRequest('PUT', '{{ route("admin.sync-alerts.update") }}', {
+        recipients: document.getElementById('smAlertRecipients').value
+      }, document.getElementById('smAlertSaveBtn')).then(function (out) {
+        if (out && out.ok) {
+          document.getElementById('smAlertRecipients').value = out.res.recipients.join(', ');
+        }
+      });
+    }
+
+    function sendSyncAlertTest() {
+      syncAlertRequest('POST', '{{ route("admin.sync-alerts.test") }}', null, document.getElementById('smAlertTestBtn'));
+    }
+    @endif
 
     function setAllSyncOffices(checked) {
       document.querySelectorAll('#smOfficeList input[name="sync_offices[]"]').forEach(function (box) { box.checked = checked; });
