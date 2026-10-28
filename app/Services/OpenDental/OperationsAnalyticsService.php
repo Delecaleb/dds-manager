@@ -661,7 +661,7 @@ class OperationsAnalyticsService
                 'row_key' => $stg['payor'].'|'.$stg['clinic_num'],
                 'payor' => $stg['payor'],
                 'clinic_num' => (int) $stg['clinic_num'],
-                'location' => $this->clinicNames[(int) $stg['clinic_num']] ?? ('Location '.$stg['clinic_num']),
+                'location' => $this->clinics->name((int) $stg['clinic_num'], $officeId),
                 'gross' => round($stg['gross'], 2),
                 'net' => round($net, 2),
                 'pct_ttl' => 0, // share of the combined total, set by payors()
@@ -883,7 +883,7 @@ class OperationsAnalyticsService
             $row = [
                 'row_key' => $key,
                 'clinic_num' => (int) $clinic,
-                'location' => $this->clinicNames[(int) $clinic] ?? ('Location '.$clinic),
+                'location' => $this->clinics->name((int) $clinic, $officeId),
                 'production' => round($net, 2),
                 'adjustment' => round($adjustment, 2),
                 'collection' => round($collection, 2),
@@ -1815,7 +1815,7 @@ class OperationsAnalyticsService
                 'row_key' => $key,
                 'clinic_num' => (int) $clinicNum,
                 'prov_num' => (int) $provNum,
-                'location' => $this->clinicNames[(int) $clinicNum] ?? ('Location '.$clinicNum),
+                'location' => $this->clinics->name((int) $clinicNum, $officeId),
                 'line_of_business' => $lob,
                 'provider' => $name !== '' ? $name : ('Provider '.$provNum),
                 'provider_id' => $provNum.($prov && $prov->Abbr ? ' - '.$prov->Abbr : ''),
@@ -2000,7 +2000,7 @@ class OperationsAnalyticsService
 
             $rows[] = [
                 'clinic_num' => (int) $c,
-                'location' => $this->clinicNames[(int) $c] ?? ('Location '.$c),
+                'location' => $this->clinics->name((int) $c, $officeId),
                 'cancellation' => $cancellation,
                 'cancellation_dollars' => round((float) ($dollars[$c] ?? 0), 2),
                 'cancellation_rescheduled' => null, // rescheduling rule pending
@@ -2112,7 +2112,7 @@ class OperationsAnalyticsService
 
             $rows[] = [
                 'clinic_num' => (int) $c,
-                'location' => $this->clinicNames[(int) $c] ?? ('Location '.$c),
+                'location' => $this->clinics->name((int) $c, $officeId),
                 'gross' => round($gross, 2),
                 'adjustment' => round($adjustment, 2),
                 'adj_pct' => $gross > 0 ? round(abs($adjustment) / $gross * 100, 2) : 0,
@@ -2731,7 +2731,7 @@ class OperationsAnalyticsService
                 'row_key' => $r->ClinicNum.'|'.$r->ProvNum.'|'.$r->ProcCode,
                 'clinic_num' => (int) $r->ClinicNum,
                 'service' => $r->Descript,
-                'location' => $this->clinicNames[(int) $r->ClinicNum] ?? ('Location '.$r->ClinicNum),
+                'location' => $this->clinics->name((int) $r->ClinicNum, $officeId),
                 'provider' => $name,
                 'code' => $r->ProcCode,
                 'type' => $catName,
@@ -3864,7 +3864,7 @@ class OperationsAnalyticsService
             $r = [
                 'row_key' => 'loc_'.$loc,
                 'clinic_num' => $loc,
-                'location' => $this->clinicNames[$loc] ?? ('Location '.$loc),
+                'location' => $this->clinics->name((int) $loc, $officeId),
             ];
             for ($i = 1; $i <= $daysNum; $i++) {
                 $r['d_'.$i] = isset($vals[$i]) ? 'Y' : 'N';
@@ -4211,7 +4211,7 @@ class OperationsAnalyticsService
                 'row_key' => $key,
                 'clinic_num' => (int) $clinicNum,
                 'prov_num' => (int) $provNum,
-                'location' => $this->clinicNames[(int) $clinicNum] ?? ('Location '.$clinicNum),
+                'location' => $this->clinics->name((int) $clinicNum, $officeId),
                 'provider' => $name,
                 'total_prod' => round($net, 2),
                 'total_visits' => $c_visits,
