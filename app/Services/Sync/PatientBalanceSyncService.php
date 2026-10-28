@@ -2,6 +2,7 @@
 
 namespace App\Services\Sync;
 
+use App\Domain\Support\MetricCache;
 use App\Models\Office;
 use App\Services\Sync\Concerns\RetriesLockContention;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +68,8 @@ class PatientBalanceSyncService
                     ['office_id', 'PatNum'],
                     [...self::BALANCE_COLUMNS, 'updated_at']
                 ));
+
+                app(MetricCache::class)->invalidateOffice((int) $officeId);
             }
 
             $lease->complete([

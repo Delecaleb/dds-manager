@@ -6,12 +6,14 @@ use App\Domain\Patient\PatientService;
 use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\MetricCache;
 use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Models\OdPatient;
 use App\Models\OdProvider;
 use App\Models\Office;
 use App\Services\OpenDental\OperationsAnalyticsService;
+use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +25,7 @@ class OperationsController extends Controller
         private readonly PatientService $patients,
         private readonly ClinicRegistry $clinics,
         private readonly PatientVisitService $patientVisits,
+        private readonly MetricCache $metricCache,
     ) {}
 
     /**
@@ -148,10 +151,19 @@ class OperationsController extends Controller
             'activeSubtab' => $subtab,
         ];
 
+        // The service computes all selected offices in one call, so the spec is cached per
+        // selection. Every input it reads comes from the query string (group, metric, lob, zip…).
+        $cached = fn (Closure $compute) => $this->metricCache->remember(
+            "operations.{$tab}.{$subtab}",
+            array_keys($locations->scopes()),
+            [$start, $end, $locations->keys(), $request->except(['locations', 'start_date', 'end_date', '_'])],
+            $compute
+        );
+
         switch ($tab) {
             case 'offices':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->offices($start, $end, $subtab, $locations),
+                    'spec' => $cached(fn () => $service->offices($start, $end, $subtab, $locations)),
                 ]);
 
             case 'production-details':
@@ -159,32 +171,32 @@ class OperationsController extends Controller
 
                 return view('operations.tabs.production-details', $chrome + [
                     'group' => $group,
-                    'spec' => $service->productionDetails($start, $end, $group, $locations),
+                    'spec' => $cached(fn () => $service->productionDetails($start, $end, $group, $locations)),
                 ]);
 
             case 'cancellations':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->cancellations($start, $end, $subtab, $locations),
+                    'spec' => $cached(fn () => $service->cancellations($start, $end, $subtab, $locations)),
                 ]);
 
             case 'payors':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->payors($start, $end, $subtab, $locations),
+                    'spec' => $cached(fn () => $service->payors($start, $end, $subtab, $locations)),
                 ]);
 
             case 'providers':
                 return view('operations.tabs.table', $chrome + [
-                    'spec' => $service->providers($start, $end, $subtab, $locations),
+                    'spec' => $cached(fn () => $service->providers($start, $end, $subtab, $locations)),
                 ]);
 
             case 'performance':
                 return view('operations.tabs.performance', $chrome + [
-                    'spec' => $service->performance($start, $end, $subtab, $locations),
+                    'spec' => $cached(fn () => $service->performance($start, $end, $subtab, $locations)),
                 ]);
 
             case 'services':
                 return view('operations.tabs.services', $chrome + [
-                    'spec' => $service->services($start, $end, $subtab, $locations),
+                    'spec' => $cached(fn () => $service->services($start, $end, $subtab, $locations)),
                 ]);
 
             case 'trends':
@@ -194,29 +206,29 @@ class OperationsController extends Controller
                 return view('operations.tabs.trends', $chrome + [
                     'metric' => $metric,
                     'locationNames' => array_map(fn ($l) => $l->name, $locations->locations()),
-                    'spec' => $service->trends($start, $end, $subtab, $locations, $metric, $lob),
+                    'spec' => $cached(fn () => $service->trends($start, $end, $subtab, $locations, $metric, $lob)),
                 ]);
 
             case 'claims':
                 return view('operations.tabs.claims', $chrome + [
-                    'spec' => $service->claims($start, $end, $subtab, $locations),
+                    'spec' => $cached(fn () => $service->claims($start, $end, $subtab, $locations)),
                 ]);
 
             case 'compliance':
                 return view('operations.tabs.compliance', $chrome + [
-                    'spec' => $service->compliance($start, $end, $subtab, $locations),
+                    'spec' => $cached(fn () => $service->compliance($start, $end, $subtab, $locations)),
                 ]);
 
             case 'marketing':
                 $zip = request('zip', 'ALL');
 
                 return view('operations.tabs.marketing', $chrome + [
-                    'spec' => $service->marketing($start, $end, $subtab, $locations, $zip),
+                    'spec' => $cached(fn () => $service->marketing($start, $end, $subtab, $locations, $zip)),
                 ]);
 
             case 'monthly-practice-scorecards':
                 return view('operations.tabs.monthly-practice-scorecards', $chrome + [
-                    'spec' => $service->monthlyPracticeScorecards($start, $end, $subtab, $locations),
+                    'spec' => $cached(fn () => $service->monthlyPracticeScorecards($start, $end, $subtab, $locations)),
                 ]);
 
             default:

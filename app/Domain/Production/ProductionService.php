@@ -40,24 +40,13 @@ class ProductionService
     /** Adjustments: signed sum (od_adjustments.AdjAmt minus od_claim_procs.WriteOff, matching Jarvis real app). */
     public function adjustments(MetricFilter $filter): float
     {
-        $q = DB::table('od_adjustments as a')->whereBetween('a.AdjDate', [$filter->start, $filter->end]);
-        $this->applyClinicProvider($q, $filter, 'a');
-        $adj = (float) $q->sum('a.AdjAmt');
-
-        $qWo = DB::table('od_claim_procs as c')->whereBetween('c.ProcDate', [$filter->start, $filter->end]);
-        $this->applyClinicProvider($qWo, $filter, 'c');
-        $wo = (float) $qWo->sum('c.WriteOff');
-
-        return round($adj - $wo, 2);
+        return $this->adjustmentsFrom($this->rawAdjustments($filter), $this->rawWriteOffs($filter));
     }
 
     /** Writeoffs: positive magnitude sum (subtracted from gross to reach net). */
     public function writeOffs(MetricFilter $filter): float
     {
-        $q = DB::table('od_claim_procs as c')->whereBetween('c.ProcDate', [$filter->start, $filter->end]);
-        $this->applyClinicProvider($q, $filter, 'c');
-
-        return round((float) $q->sum('c.WriteOff'), 2);
+        return round($this->rawWriteOffs($filter), 2);
     }
 
     /** Net production = gross + adjustments (where adjustments is signed net of writeoffs). */
@@ -165,8 +154,10 @@ class ProductionService
             ->first();
 
         $gross = round((float) ($row->gross ?? 0), 2);
-        $adj = $this->adjustments($filter);
-        $wo = $this->writeOffs($filter);
+        // The writeoff sum feeds both figures; scanning od_claim_procs once halves its cost.
+        $rawWo = $this->rawWriteOffs($filter);
+        $adj = $this->adjustmentsFrom($this->rawAdjustments($filter), $rawWo);
+        $wo = round($rawWo, 2);
         $net = $this->netFrom($gross, $adj, 0.0);
         $coll = $this->collection($filter);
         $visits = (int) ($row->patient_visits ?? 0);
@@ -190,6 +181,30 @@ class ProductionService
     }
 
     // ─────────────── Shared query builders (the only place production SQL lives) ───────────────
+
+    /** Unrounded SUM(AdjAmt) — rounding happens once, in adjustmentsFrom(). */
+    protected function rawAdjustments(MetricFilter $filter): float
+    {
+        $q = DB::table('od_adjustments as a')->whereBetween('a.AdjDate', [$filter->start, $filter->end]);
+        $this->applyClinicProvider($q, $filter, 'a');
+
+        return (float) $q->sum('a.AdjAmt');
+    }
+
+    /** Unrounded SUM(WriteOff) by ProcDate. */
+    protected function rawWriteOffs(MetricFilter $filter): float
+    {
+        $q = DB::table('od_claim_procs as c')->whereBetween('c.ProcDate', [$filter->start, $filter->end]);
+        $this->applyClinicProvider($q, $filter, 'c');
+
+        return (float) $q->sum('c.WriteOff');
+    }
+
+    /** Signed adjustments net of writeoffs, matching Jarvis. */
+    protected function adjustmentsFrom(float $rawAdjustments, float $rawWriteOffs): float
+    {
+        return round($rawAdjustments - $rawWriteOffs, 2);
+    }
 
     /** Completed procedure-log rows for the filter — the base every procedure metric builds on. */
     protected function completedProcedures(MetricFilter $filter): Builder

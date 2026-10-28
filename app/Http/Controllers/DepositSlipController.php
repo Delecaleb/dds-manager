@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\MetricCache;
 use App\Models\OdClaimPayment;
 use App\Models\OdDefinition;
 use App\Models\OdPatient;
@@ -17,6 +18,7 @@ class DepositSlipController extends Controller
 {
     public function __construct(
         private readonly ClinicRegistry $clinics,
+        private readonly MetricCache $metricCache,
     ) {}
 
     /**
@@ -118,6 +120,16 @@ class DepositSlipController extends Controller
             ]);
         }
 
+        // Reused until a sync touches one of the selected offices (MetricCache).
+        return response()->json($this->metricCache->remember(
+            'deposits.data', array_keys($scopes), [$locations->keys(), $start, $end],
+            fn () => $this->depositPayload($start, $end, $scopes)
+        ));
+    }
+
+    /** @param  array<int, int[]>  $scopes */
+    private function depositPayload(string $start, string $end, array $scopes): array
+    {
         $paymentTable = (new OdPayment)->getTable();
         $defTable = (new OdDefinition)->getTable();
         $patientTable = (new OdPatient)->getTable();
@@ -340,12 +352,12 @@ class DepositSlipController extends Controller
             ];
         }
 
-        return response()->json([
+        return [
             'deposits' => $results,
             'details' => $details,
             'summary' => [
                 'total_amount' => $totalAmount,
             ],
-        ]);
+        ];
     }
 }

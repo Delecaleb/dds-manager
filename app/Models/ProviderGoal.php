@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\InvalidatesMetricCache;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProviderGoal extends Model
 {
+    use InvalidatesMetricCache;
+
     protected $table = 'provider_goals';
 
     protected $fillable = [

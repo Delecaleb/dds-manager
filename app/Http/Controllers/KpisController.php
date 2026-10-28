@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Kpi\HygieneKpiDetailService;
+use App\Domain\Patient\PatientActivityService;
 use App\Domain\Patient\PatientService;
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\DateRange;
 use App\Domain\Support\Location;
+use App\Domain\Support\MetricCache;
 use App\Domain\Support\MetricFilter;
-use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use App\Domain\TreatmentAcceptance\TreatmentAcceptanceService;
 use Carbon\Carbon;
@@ -28,6 +30,8 @@ class KpisController extends Controller
         private readonly TreatmentAcceptanceService $txAcceptance,
         private readonly PatientService $patients,
         private readonly ClinicRegistry $clinics,
+        private readonly MetricCache $metricCache,
+        private readonly PatientActivityService $patientActivity,
     ) {
         $this->completedIn = ProcStatus::inList(ProcStatus::completed());
         $this->tpIn = ProcStatus::inList(ProcStatus::treatmentPlanned());
@@ -57,17 +61,17 @@ class KpisController extends Controller
 
     public function hygiene(Request $request): JsonResponse
     {
-        return $this->perLocation($request, fn (MetricFilter $f) => $this->hygieneKpiSet($f));
+        return $this->perLocation($request, 'hygiene', fn (MetricFilter $f) => $this->hygieneKpiSet($f));
     }
 
     public function doctor(Request $request): JsonResponse
     {
-        return $this->perLocation($request, fn (MetricFilter $f) => $this->doctorKpiSet($f));
+        return $this->perLocation($request, 'doctor', fn (MetricFilter $f) => $this->doctorKpiSet($f));
     }
 
     public function office(Request $request): JsonResponse
     {
-        return $this->perLocation($request, fn (MetricFilter $f) => $this->officeKpiSet($f));
+        return $this->perLocation($request, 'office', fn (MetricFilter $f) => $this->officeKpiSet($f));
     }
 
     /**
@@ -91,7 +95,9 @@ class KpisController extends Controller
         $rows = [];
 
         foreach ($scopes as $scope) {
-            foreach ($details->rows($metric, $scope['filter']) as $row) {
+            $locationRows = $this->cachedSet('detail.'.$metric, $scope['filter'], fn (MetricFilter $f) => $details->rows($metric, $f));
+
+            foreach ($locationRows as $row) {
                 $rows[] = $multi ? ['Location' => $scope['location']->name] + $row : $row;
             }
         }
@@ -145,14 +151,15 @@ class KpisController extends Controller
      * selected, and a location-per-row × KPI-per-column table when several are, closed by the
      * Average/Total rows in `footer`.
      *
+     * @param  string  $name  cache name of the card set (see cachedSet())
      * @param  callable(MetricFilter): array{metrics: array<string, mixed>, rates?: array<string, array{0: float, 1: float}>}  $compute
      */
-    private function perLocation(Request $request, callable $compute, ?string $defaultStart = null): JsonResponse
+    private function perLocation(Request $request, string $name, callable $compute, ?string $defaultStart = null): JsonResponse
     {
         $locations = [];
         $sets = [];
         foreach ($this->locationFilters($request, $defaultStart ?? now()->startOfYear()->toDateString()) as $scope) {
-            $set = $compute($scope['filter']);
+            $set = $this->cachedSet($name, $scope['filter'], $compute);
             $sets[] = $set;
             $locations[] = [
                 'key' => $scope['location']->key(),
@@ -165,6 +172,23 @@ class KpisController extends Controller
             'locations' => $locations,
             'footer' => $this->footerFor($sets),
         ]);
+    }
+
+    /**
+     * One location's result, cached until that office's data next changes.
+     *
+     * Cached per location rather than per page, so after a sync an "All locations" view
+     * recomputes only the offices that changed, and every page asking for the same set
+     * (cards, provider-table footers) shares one entry.
+     *
+     * @template T
+     *
+     * @param  callable(MetricFilter): T  $compute
+     * @return T
+     */
+    private function cachedSet(string $name, MetricFilter $filter, callable $compute): mixed
+    {
+        return $this->metricCache->rememberFilter('kpis.'.$name, $filter, fn () => $compute($filter));
     }
 
     /**
@@ -545,6 +569,7 @@ class KpisController extends Controller
         $docVisits = (int) ($doc->visits ?? 0);
 
         // Appointment Time & Count
+        [$aptDateSql, $aptDateBindings] = DateRange::withinSql('a.AptDateTime', $start, $end);
         $apts = DB::selectOne("
             SELECT 
                 COUNT(DISTINCT a.AptNum) AS total_apts,
@@ -558,8 +583,8 @@ class KpisController extends Controller
               AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL)
               AND pl.ProcStatus IN ({$this->completedIn})
               AND a.Pattern IS NOT NULL AND a.Pattern != ''
-              AND DATE(a.AptDateTime) BETWEEN ? AND ?{$clinicApt}
-        ", [$officeId, $officeId, $officeId, $start, $end]);
+              AND {$aptDateSql}{$clinicApt}
+        ", [$officeId, $officeId, $officeId, ...$aptDateBindings]);
 
         $docAptCount = (int) ($apts->total_apts ?? 0);
         $avgAptMins = (float) ($apts->avg_mins ?? 0);
@@ -576,8 +601,8 @@ class KpisController extends Controller
             WHERE a.office_id = ?
               AND (a.IsHygiene IN ('false', '0', 0) OR a.IsHygiene IS NULL)
               AND a.AptStatus = 2
-              AND DATE(a.AptDateTime) BETWEEN ? AND ?{$clinicApt}
-        ", [$officeId, $start, $end]);
+              AND {$aptDateSql}{$clinicApt}
+        ", [$officeId, ...$aptDateBindings]);
 
         $examCount = (int) (DB::selectOne("
             SELECT COUNT(DISTINCT pl.ProcNum) AS exam_cnt
@@ -615,10 +640,13 @@ class KpisController extends Controller
                 {$cohortSql}
             ) pt_hist ON pl.PatNum = pt_hist.PatNum
             LEFT JOIN (
+                -- Only days in the period can match pl.ProcDate below, so the date bound
+                -- changes no result; without it this pairs the office's whole history.
                 SELECT DISTINCT c.PatNum, c.ProcDate, 1 AS same_day_completed
                 FROM od_procedure_logs c
                 JOIN od_procedure_logs tp ON c.PatNum = tp.PatNum AND c.ProcDate = tp.DateTP AND tp.office_id = ?
                 WHERE c.office_id = ? AND c.ProcStatus IN ({$this->completedIn}) AND tp.ProcStatus IN ({$this->tpIn})
+                  AND c.ProcDate BETWEEN ? AND ?
             ) tp_same ON pl.PatNum = tp_same.PatNum AND pl.ProcDate = tp_same.ProcDate
             WHERE pl.office_id = ?
               AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL)
@@ -635,6 +663,7 @@ class KpisController extends Controller
             $officeId,
             $officeId,
             $officeId,
+            $start, $end,        // tp_same period bound
             $officeId,
             $start, $end,
         ]);
@@ -709,43 +738,19 @@ class KpisController extends Controller
         $officeId = $filter->officeId;
         $start = $filter->start;
         $end = $filter->end;
-        $clinic = $this->clinicScope($filter);
         $clinicBare = $this->clinicScope($filter, '');
-        $cutoff36m = now()->subMonths(36)->toDateString();
-        $cutoff18m = now()->subMonths(18)->toDateString();
-        $cutoff12m = now()->subMonths(12)->toDateString();
-        $prior12m = date('Y-m-d', strtotime('-12 months', strtotime($start)));
-        $prior18m = date('Y-m-d', strtotime('-18 months', strtotime($start)));
-
-        $patDate = $this->concatPatDate('pl.PatNum', 'pl.ProcDate');
         $patTpDate = $this->concatPatDate('PatNum', 'DateTP');
 
-        // 1 & 10. Patient Retention + Active Patients
-        $retentionData = DB::selectOne("
-            SELECT
-                COUNT(DISTINCT CASE WHEN pl.ProcDate >= ? AND pc.ProcCode NOT IN ('D9986', 'D9987') THEN pl.PatNum END) AS active_18m,
-                COUNT(DISTINCT CASE WHEN pl.ProcDate BETWEEN ? AND ? AND pc.ProcCode NOT IN ('D9986', 'D9987') THEN pl.PatNum END) AS active_36m_prior
-            FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
-            WHERE pl.office_id = ?
-              AND pl.ProcStatus IN ({$this->completedIn}){$clinic}
-        ", [$cutoff18m, $cutoff36m, $cutoff18m, $officeId, $officeId]);
+        // Patient-history counts (retention, active, new, attrition, reactivation, recare)
+        // come from the domain service, which reads the patient_visit_days summary when built.
+        $activity = $this->patientActivity->officeActivity($filter);
 
-        $activePatients = (int) ($retentionData->active_18m ?? 0);
-        $priorActivePatients = (int) ($retentionData->active_36m_prior ?? 0);
+        // 1 & 10. Patient Retention + Active Patients
+        $activePatients = $activity->active18m;
+        $priorActivePatients = $activity->active36mPrior;
 
         // New patients in last 18 months
-        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
-        $newPatientsCount = DB::table('od_procedure_logs as pl')
-            ->where('pl.office_id', $officeId)
-            ->whereIn('pl.ProcStatus', [2, '2', 'C'])
-            ->when($filter->clinics !== [], fn ($q) => $q->whereIn('pl.ClinicNum', $filter->clinics))
-            ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('pl.CodeNum', $excludedCodes))
-            ->selectRaw('pl.PatNum, MIN(pl.ProcDate) as first_date')
-            ->groupBy('pl.PatNum')
-            ->havingRaw('MIN(pl.ProcDate) >= ?', [$cutoff18m.' 00:00:00'])
-            ->pluck('PatNum')
-            ->count();
+        $newPatientsCount = $activity->newPatients18m;
 
         $retainedPatients = max(0, $activePatients - $newPatientsCount);
         $patientRetention = $priorActivePatients > 0 ? round(($retainedPatients / $priorActivePatients) * 100, 2) : 0;
@@ -795,73 +800,29 @@ class KpisController extends Controller
         ", [$officeId, $start, $end])->val ?? 0);
 
         // 5 & 8 & 9. New Patients Fmx % // Attrition // Growth
-        $patientStats = DB::selectOne("
-            SELECT
-                COUNT(DISTINCT CASE WHEN first_visit BETWEEN ? AND ? THEN x.PatNum END) AS new_pts,
-                COUNT(DISTINCT CASE WHEN first_visit BETWEEN ? AND ? AND has_fmx = 1 THEN x.PatNum END) AS new_pts_fmx,
-                COUNT(DISTINCT CASE WHEN last_visit_before >= ? AND last_visit_before < ? AND seen_during = 0 THEN x.PatNum END) AS attrition
-            FROM (
-                SELECT 
-                    pl.PatNum,
-                    MIN(pl.ProcDate) AS first_visit,
-                    MAX(CASE WHEN pl.ProcDate < ? THEN pl.ProcDate ELSE NULL END) AS last_visit_before,
-                    MAX(CASE WHEN pl.ProcDate BETWEEN ? AND ? THEN 1 ELSE 0 END) AS seen_during,
-                    MAX(CASE WHEN pl.ProcDate BETWEEN ? AND ? AND pc.ProcCode IN ('D0210','0210') THEN 1 ELSE 0 END) AS has_fmx
-                FROM od_procedure_logs pl
-                JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
-                WHERE pl.office_id = ?
-                  AND pl.ProcStatus IN ({$this->completedIn}){$clinic}
-                GROUP BY pl.PatNum
-            ) x
-        ", [
-            $start, $end,        // new_pts
-            $start, $end,        // new_pts_fmx
-            $prior18m, $start,   // attrition
-            $start,              // last_visit_before
-            $start, $end,        // seen_during
-            $start, $end,        // has_fmx
-            $officeId,
-            $officeId,
-        ]);
-
-        $newPtFmxPct = ($patientStats->new_pts ?? 0) > 0 ? round(($patientStats->new_pts_fmx / $patientStats->new_pts) * 100, 2) : 0;
-        $attrition = (int) ($patientStats->attrition ?? 0);
-        $growth = (int) ($patientStats->new_pts ?? 0) - $attrition;
+        $newPts = $activity->newPatients;
+        $newPtFmxPct = $newPts > 0 ? round(($activity->newPatientsWithFmx / $newPts) * 100, 2) : 0;
+        $attrition = $activity->attrition;
+        $growth = $newPts - $attrition;
 
         // 7. Reactivations
-        $reactivationList = (int) (DB::selectOne("
-            SELECT COUNT(DISTINCT pl.PatNum) AS cnt
-            FROM od_procedure_logs pl
-            WHERE pl.office_id = ? AND pl.ProcStatus IN ({$this->completedIn}) AND pl.ProcDate < ?{$clinic}
-            GROUP BY pl.PatNum
-            HAVING MAX(pl.ProcDate) < ?
-        ", [$officeId, $start, $prior12m])->cnt ?? 0);
+        $reactivationList = $activity->reactivationList;
 
         // 6. No Show Rate
+        [$aptDateSql, $aptDateBindings] = DateRange::withinSql('AptDateTime', $start, $end);
         $aptStats = DB::selectOne("
             SELECT
                 COUNT(*) AS total,
                 SUM(CASE WHEN AptStatus = 5 THEN 1 ELSE 0 END) AS broken
             FROM od_appointments
             WHERE office_id = ?
-              AND DATE(AptDateTime) BETWEEN ? AND ?
+              AND {$aptDateSql}
               AND AptStatus IN (1, 2, 5){$clinicBare}
-        ", [$officeId, $start, $end]);
+        ", [$officeId, ...$aptDateBindings]);
         $noShowRate = ($aptStats->total ?? 0) > 0 ? round(($aptStats->broken / $aptStats->total) * 100, 2) : 0;
 
         // 11. Active In Recare
-        $inRecare = (int) (DB::selectOne("
-            SELECT COUNT(DISTINCT pl.PatNum) AS cnt
-            FROM od_procedure_logs pl
-            JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
-            WHERE pl.office_id = ?
-              AND pl.ProcStatus IN ({$this->completedIn})
-              AND pl.ProcDate >= ?
-              AND pc.ProcCode IN ('D4910','D1110','D1120'){$clinic}
-              AND pl.PatNum IN (
-                  SELECT DISTINCT p2.PatNum FROM od_procedure_logs p2 WHERE p2.office_id = ? AND p2.ProcStatus='C' AND p2.ProcDate >= ?{$this->clinicScope($filter, 'p2')}
-              )
-        ", [$officeId, $officeId, $cutoff12m, $officeId, $cutoff18m])->cnt ?? 0);
+        $inRecare = $activity->inRecare;
 
         $metrics = [
             'patient_retention' => $patientRetention,
@@ -880,7 +841,7 @@ class KpisController extends Controller
         $rates = [
             'patient_retention' => [(float) $retainedPatients, (float) $priorActivePatients],
             'co_pay_collection' => [$collectedPat, $expectedPatPortion],
-            'new_pt_fmx_pct' => [(float) ($patientStats->new_pts_fmx ?? 0), (float) ($patientStats->new_pts ?? 0)],
+            'new_pt_fmx_pct' => [(float) $activity->newPatientsWithFmx, (float) $newPts],
             'no_show_rate' => [(float) ($aptStats->broken ?? 0), (float) ($aptStats->total ?? 0)],
             'active_in_recare_pct' => [(float) $inRecare, (float) $activePatients],
         ];
@@ -893,7 +854,7 @@ class KpisController extends Controller
     public function endo(Request $request): JsonResponse
     {
         // Endo has no rate cards, so its footer is all means and sums.
-        return $this->perLocation($request, fn (MetricFilter $f) => ['metrics' => $this->getSpecialtyMetrics($f, 2, [
+        return $this->perLocation($request, 'endo', fn (MetricFilter $f) => ['metrics' => $this->getSpecialtyMetrics($f, 2, [
             'total_consults' => ['D9310'],
             'retreats_count' => ['D3346', 'D3347', 'D3348'],
             'rct_count' => ['D3310', 'D3320', 'D3330'],
@@ -904,7 +865,7 @@ class KpisController extends Controller
 
     public function perio(Request $request): JsonResponse
     {
-        return $this->perLocation($request, fn (MetricFilter $f) => $this->perioKpis($f), date('Y-m-01'));
+        return $this->perLocation($request, 'perio', fn (MetricFilter $f) => $this->perioKpis($f), date('Y-m-01'));
     }
 
     private function perioKpis(MetricFilter $filter): array
@@ -956,7 +917,7 @@ class KpisController extends Controller
 
     public function ortho(Request $request): JsonResponse
     {
-        return $this->perLocation($request, fn (MetricFilter $f) => $this->orthoKpis($f), date('Y-m-01'));
+        return $this->perLocation($request, 'ortho', fn (MetricFilter $f) => $this->orthoKpis($f), date('Y-m-01'));
     }
 
     private function orthoKpis(MetricFilter $filter): array
@@ -998,7 +959,7 @@ class KpisController extends Controller
 
     public function os(Request $request): JsonResponse
     {
-        return $this->perLocation($request, fn (MetricFilter $f) => $this->osKpis($f), date('Y-m-01'));
+        return $this->perLocation($request, 'os', fn (MetricFilter $f) => $this->osKpis($f), date('Y-m-01'));
     }
 
     private function osKpis(MetricFilter $filter): array
@@ -1040,7 +1001,7 @@ class KpisController extends Controller
 
     public function pedo(Request $request): JsonResponse
     {
-        return $this->perLocation($request, fn (MetricFilter $f) => $this->pedoKpis($f), date('Y-m-01'));
+        return $this->perLocation($request, 'pedo', fn (MetricFilter $f) => $this->pedoKpis($f), date('Y-m-01'));
     }
 
     private function pedoKpis(MetricFilter $filter): array
@@ -1192,14 +1153,14 @@ class KpisController extends Controller
         foreach ($scopes as $scope) {
             $providersList = array_merge(
                 $providersList,
-                $this->hygieneProviderRows($scope['filter'], $scope['location'])
+                $this->cachedSet('hygiene-providers', $scope['filter'], fn (MetricFilter $f) => $this->hygieneProviderRows($f, $scope['location']))
             );
         }
 
         // One location keeps the office-wide card values in the footer; across locations they
         // cannot be pooled (see perLocation), so the footer summarises the rows on screen.
         $summary = count($scopes) === 1
-            ? array_fill_keys(['avg', 'total'], $this->hygieneKpis($scopes[0]['filter']))
+            ? array_fill_keys(['avg', 'total'], $this->cachedSet('hygiene', $scopes[0]['filter'], fn (MetricFilter $f) => $this->hygieneKpiSet($f))['metrics'])
             : $this->summariseProviderRows($providersList);
 
         return response()->json([
@@ -1395,12 +1356,12 @@ class KpisController extends Controller
         foreach ($scopes as $scope) {
             $providersList = array_merge(
                 $providersList,
-                $this->doctorProviderRows($scope['filter'], $scope['location'])
+                $this->cachedSet('doctor-providers', $scope['filter'], fn (MetricFilter $f) => $this->doctorProviderRows($f, $scope['location']))
             );
         }
 
         $summary = count($scopes) === 1
-            ? array_fill_keys(['avg', 'total'], $this->doctorKpis($scopes[0]['filter']))
+            ? array_fill_keys(['avg', 'total'], $this->cachedSet('doctor', $scopes[0]['filter'], fn (MetricFilter $f) => $this->doctorKpiSet($f))['metrics'])
             : $this->summariseProviderRows($providersList);
 
         return response()->json([
@@ -1456,14 +1417,15 @@ class KpisController extends Controller
             $docVisits = (int) ($doc->visits ?? 0);
 
             // Appointment Time
+            [$aptDateSql, $aptDateBindings] = DateRange::withinSql('a.AptDateTime', $start, $end);
             $apts = DB::selectOne("
                 SELECT COUNT(DISTINCT a.AptNum) AS total_apts, AVG(LENGTH(a.Pattern) * 5) AS avg_mins, SUM(LENGTH(a.Pattern) * 5) / 60 AS total_hours
                 FROM od_appointments a
                 JOIN od_procedure_logs pl ON a.AptNum = pl.AptNum AND pl.office_id = ?
                 JOIN od_procedures pc ON pl.CodeNum = pc.CodeNum AND pc.office_id = ?
                 WHERE a.office_id = ?
-                  AND a.AptStatus = 2 AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL) AND pl.ProcStatus IN ({$this->completedIn}) AND a.Pattern IS NOT NULL AND a.Pattern != '' AND DATE(a.AptDateTime) BETWEEN ? AND ? AND pl.ProvNum = ?{$clinicApt}
-            ", [$officeId, $officeId, $officeId, $start, $end, $pId]);
+                  AND a.AptStatus = 2 AND (pc.IsHygiene IN ('false', '0', 0) OR pc.IsHygiene IS NULL) AND pl.ProcStatus IN ({$this->completedIn}) AND a.Pattern IS NOT NULL AND a.Pattern != '' AND {$aptDateSql} AND pl.ProvNum = ?{$clinicApt}
+            ", [$officeId, $officeId, $officeId, ...$aptDateBindings, $pId]);
             $docAptCount = (int) ($apts->total_apts ?? 0);
             $avgAptMins = (float) ($apts->avg_mins ?? 0);
             $totalHours = (float) ($apts->total_hours ?? 0);
@@ -1476,8 +1438,8 @@ class KpisController extends Controller
                 SELECT COUNT(*) AS total, SUM(CASE WHEN NextAptNum IS NOT NULL AND NextAptNum != '0' THEN 1 ELSE 0 END) AS with_next
                 FROM od_appointments a
                 WHERE a.office_id = ?
-                  AND (IsHygiene IN ('false', '0', 0) OR IsHygiene IS NULL) AND AptStatus = 2 AND DATE(AptDateTime) BETWEEN ? AND ? AND ProvNum = ?{$clinicApt}
-            ", [$officeId, $start, $end, $pId]);
+                  AND (IsHygiene IN ('false', '0', 0) OR IsHygiene IS NULL) AND AptStatus = 2 AND {$aptDateSql} AND ProvNum = ?{$clinicApt}
+            ", [$officeId, ...$aptDateBindings, $pId]);
 
             // Exam count
             $examCount = DB::table('od_procedure_logs as pl')
@@ -1579,16 +1541,20 @@ class KpisController extends Controller
         ?callable $extraCallback = null,
     ): array {
         $providersList = [];
+        // Each specialty endpoint has its own specId and fixed code lists, so the route name
+        // identifies the computation (the extra callback included).
+        $cacheName = 'specialty-providers.'.($request->route()?->getName() ?? $specId);
+
         foreach ($this->locationFilters($request, date('Y-m-01')) as $scope) {
-            $providersList = array_merge($providersList, $this->getSpecialtyProvidersBaseLoop(
-                $scope['filter'],
+            $providersList = array_merge($providersList, $this->cachedSet($cacheName, $scope['filter'], fn (MetricFilter $f) => $this->getSpecialtyProvidersBaseLoop(
+                $f,
                 $scope['location'],
                 $specId,
                 $customCounts,
                 $customSums,
                 $distinctPatNumCounts,
                 $extraCallback,
-            ));
+            )));
         }
 
         $summary = $this->summariseProviderRows($providersList);

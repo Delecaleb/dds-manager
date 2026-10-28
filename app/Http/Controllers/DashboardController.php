@@ -6,6 +6,7 @@ use App\Domain\Patient\PatientService;
 use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\MetricCache;
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
@@ -26,6 +27,7 @@ class DashboardController extends Controller
         private readonly PatientService $patients,
         private readonly ClinicRegistry $clinics,
         private readonly PatientVisitService $patientVisits,
+        private readonly MetricCache $metricCache,
     ) {}
 
     private array $specialtyMap = [
@@ -65,17 +67,29 @@ class DashboardController extends Controller
         $newPatientsScheduled = 0;
 
         foreach ($locations->scopes() as $officeId => $clinics) {
-            $filter = new MetricFilter($start, $end, $clinics, [], null, $officeId);
-            $s = $this->production->summary($filter);
-            $gross += $s->gross;
-            $adjustments += $s->adjustments;
-            $writeoffs += $s->writeOffs;
-            $collections += $s->collection;
+            $office = $this->metricCache->remember('dashboard.data', [$officeId], [$start, $end, $clinics], function () use ($start, $end, $clinics, $officeId) {
+                $s = $this->production->summary(new MetricFilter($start, $end, $clinics, [], null, $officeId));
 
-            $scheduled += (new OdAppointment)->scheduledPatients($start, $end, $officeId, $clinics);
-            $visited += $this->patientVisits->patientVisits($start, $end, $clinics, [], $officeId);
-            $newPatientVisit += $this->patientVisits->newPatientCount($start, $end, $clinics, [], $officeId);
-            $newPatientsScheduled += (new OdAppointment)->newPatientsScheduled($start, $end, $officeId, $clinics);
+                return [
+                    'gross' => $s->gross,
+                    'adjustments' => $s->adjustments,
+                    'writeoffs' => $s->writeOffs,
+                    'collections' => $s->collection,
+                    'scheduled' => (new OdAppointment)->scheduledPatients($start, $end, $officeId, $clinics),
+                    'visited' => $this->patientVisits->patientVisits($start, $end, $clinics, [], $officeId),
+                    'new_patient_visit' => $this->patientVisits->newPatientCount($start, $end, $clinics, [], $officeId),
+                    'new_patients_scheduled' => (new OdAppointment)->newPatientsScheduled($start, $end, $officeId, $clinics),
+                ];
+            });
+
+            $gross += $office['gross'];
+            $adjustments += $office['adjustments'];
+            $writeoffs += $office['writeoffs'];
+            $collections += $office['collections'];
+            $scheduled += $office['scheduled'];
+            $visited += $office['visited'];
+            $newPatientVisit += $office['new_patient_visit'];
+            $newPatientsScheduled += $office['new_patients_scheduled'];
         }
 
         $net = $this->production->netFrom($gross, $adjustments, 0.0);
@@ -110,79 +124,86 @@ class DashboardController extends Controller
         $allRows = collect();
 
         foreach ($locations->scopes() as $officeId => $scopedClinics) {
-            $query = DB::table('od_procedure_logs')
-                ->where('office_id', $officeId)
-                ->selectRaw(
-                    'COALESCE(ClinicNum + 0, 0) as ClinicNum, '.
-                    MetricDefinitions::grossProduction('total_production').', '.
-                    MetricDefinitions::patientVisits('patient_count')
-                )
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->whereBetween('ProcDate', [$start, $end]);
+            $officeRows = $this->metricCache->remember('dashboard.location-stats', [$officeId], [$start, $end, $scopedClinics], function () use ($start, $end, $officeId, $scopedClinics) {
+                $officeRows = [];
+                $query = DB::table('od_procedure_logs')
+                    ->where('office_id', $officeId)
+                    ->selectRaw(
+                        'COALESCE(ClinicNum + 0, 0) as ClinicNum, '.
+                        MetricDefinitions::grossProduction('total_production').', '.
+                        MetricDefinitions::patientVisits('patient_count')
+                    )
+                    ->whereIn('ProcStatus', ProcStatus::completed())
+                    ->whereBetween('ProcDate', [$start, $end]);
 
-            if (! empty($scopedClinics)) {
-                $query->whereIn('ClinicNum', $scopedClinics);
-            }
+                if (! empty($scopedClinics)) {
+                    $query->whereIn('ClinicNum', $scopedClinics);
+                }
 
-            $rows = $query->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
-                ->get();
+                $rows = $query->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                    ->get();
 
-            $adjQuery = DB::table('od_adjustments')
-                ->where('office_id', $officeId)
-                ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::adjustments('val'))
-                ->whereBetween('AdjDate', [$start, $end]);
+                $adjQuery = DB::table('od_adjustments')
+                    ->where('office_id', $officeId)
+                    ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::adjustments('val'))
+                    ->whereBetween('AdjDate', [$start, $end]);
 
-            if (! empty($scopedClinics)) {
-                $adjQuery->whereIn('ClinicNum', $scopedClinics);
-            }
+                if (! empty($scopedClinics)) {
+                    $adjQuery->whereIn('ClinicNum', $scopedClinics);
+                }
 
-            $adjustments = $adjQuery->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
-                ->pluck('val', 'ClinicNum')
-                ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
+                $adjustments = $adjQuery->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                    ->pluck('val', 'ClinicNum')
+                    ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
 
-            $woQuery = DB::table('od_claim_procs')
-                ->where('office_id', $officeId)
-                ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::writeOffs('val'))
-                ->whereBetween('ProcDate', [$start, $end]);
+                $woQuery = DB::table('od_claim_procs')
+                    ->where('office_id', $officeId)
+                    ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::writeOffs('val'))
+                    ->whereBetween('ProcDate', [$start, $end]);
 
-            if (! empty($scopedClinics)) {
-                $woQuery->whereIn('ClinicNum', $scopedClinics);
-            }
+                if (! empty($scopedClinics)) {
+                    $woQuery->whereIn('ClinicNum', $scopedClinics);
+                }
 
-            $writeoffs = $woQuery->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
-                ->pluck('val', 'ClinicNum')
-                ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
+                $writeoffs = $woQuery->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                    ->pluck('val', 'ClinicNum')
+                    ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
 
-            $clinicNames = $this->clinics->all($officeId);
-            $clinicNumsToInclude = ! empty($scopedClinics)
-                ? collect($scopedClinics)
-                : collect(array_keys($clinicNames))->merge($rows->pluck('ClinicNum'))->map(fn ($k) => (int) $k)->unique()->values();
+                $clinicNames = $this->clinics->all($officeId);
+                $clinicNumsToInclude = ! empty($scopedClinics)
+                    ? collect($scopedClinics)
+                    : collect(array_keys($clinicNames))->merge($rows->pluck('ClinicNum'))->map(fn ($k) => (int) $k)->unique()->values();
 
-            $rowsMap = $rows->keyBy(fn ($r) => (int) $r->ClinicNum);
+                $rowsMap = $rows->keyBy(fn ($r) => (int) $r->ClinicNum);
 
-            foreach ($clinicNumsToInclude as $cNum) {
-                $row = $rowsMap->get((int) $cNum);
-                $gross = $row ? (float) $row->total_production : 0.0;
-                $adj = (float) ($adjustments->get((int) $cNum, 0));
-                $wo = (float) ($writeoffs->get((int) $cNum, 0));
-                $patientCount = $row ? (int) $row->patient_count : 0;
+                foreach ($clinicNumsToInclude as $cNum) {
+                    $row = $rowsMap->get((int) $cNum);
+                    $gross = $row ? (float) $row->total_production : 0.0;
+                    $adj = (float) ($adjustments->get((int) $cNum, 0));
+                    $wo = (float) ($writeoffs->get((int) $cNum, 0));
+                    $patientCount = $row ? (int) $row->patient_count : 0;
 
-                $net = $this->production->netFrom($gross, $adj, $wo);
-                $avg = $patientCount > 0 ? round($net / $patientCount, 2) : 0;
+                    $net = $this->production->netFrom($gross, $adj, $wo);
+                    $avg = $patientCount > 0 ? round($net / $patientCount, 2) : 0;
 
-                $locObj = $this->clinics->locationFor($officeId, (int) $cNum);
+                    $locObj = $this->clinics->locationFor($officeId, (int) $cNum);
 
-                $allRows->push([
-                    'office_id' => $officeId,
-                    'clinic_num' => (int) $cNum,
-                    'location_key' => $locObj->key(),
-                    'location' => $locObj->name,
-                    'total_production' => round($gross, 2),
-                    'net_production' => $net,
-                    'patient_count' => $patientCount,
-                    'avg_production' => $avg,
-                ]);
-            }
+                    $officeRows[] = [
+                        'office_id' => $officeId,
+                        'clinic_num' => (int) $cNum,
+                        'location_key' => $locObj->key(),
+                        'location' => $locObj->name,
+                        'total_production' => round($gross, 2),
+                        'net_production' => $net,
+                        'patient_count' => $patientCount,
+                        'avg_production' => $avg,
+                    ];
+                }
+
+                return $officeRows;
+            });
+
+            $allRows = $allRows->concat($officeRows);
         }
 
         $result = $allRows->sortByDesc('total_production')->values()->map(function ($item, $i) {
@@ -362,114 +383,122 @@ class DashboardController extends Controller
         $allProviders = collect();
 
         foreach ($locations->scopes() as $officeId => $scopedClinics) {
-            $grossSub = DB::table('od_procedure_logs')->select('ProvNum', DB::raw('SUM(ProcFee) AS gross'))
-                ->where('office_id', $officeId)
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->whereBetween('ProcDate', [$start, $end]);
-            if (! empty($scopedClinics)) {
-                $grossSub->whereIn('ClinicNum', $scopedClinics);
-            }
-            $grossSub->groupBy('ProvNum');
+            $mapped = $this->metricCache->remember('dashboard.providers', [$officeId], [$start, $end, $scopedClinics, $search], function () use ($start, $end, $officeId, $scopedClinics, $search) {
+                $grossSub = DB::table('od_procedure_logs')->select('ProvNum', DB::raw('SUM(ProcFee) AS gross'))
+                    ->where('office_id', $officeId)
+                    ->whereIn('ProcStatus', ProcStatus::completed())
+                    ->whereBetween('ProcDate', [$start, $end]);
+                if (! empty($scopedClinics)) {
+                    $grossSub->whereIn('ClinicNum', $scopedClinics);
+                }
+                $grossSub->groupBy('ProvNum');
 
-            $adjSub = DB::table('od_adjustments')->select('ProvNum', DB::raw('SUM(AdjAmt) AS adjustments'))
-                ->where('office_id', $officeId)
-                ->whereBetween('AdjDate', [$start, $end]);
-            if (! empty($scopedClinics)) {
-                $adjSub->whereIn('ClinicNum', $scopedClinics);
-            }
-            $adjSub->groupBy('ProvNum');
+                $adjSub = DB::table('od_adjustments')->select('ProvNum', DB::raw('SUM(AdjAmt) AS adjustments'))
+                    ->where('office_id', $officeId)
+                    ->whereBetween('AdjDate', [$start, $end]);
+                if (! empty($scopedClinics)) {
+                    $adjSub->whereIn('ClinicNum', $scopedClinics);
+                }
+                $adjSub->groupBy('ProvNum');
 
-            $writeoffSub = DB::table('od_claim_procs')->select('ProvNum', DB::raw('SUM(WriteOff) AS writeoffs'))
-                ->where('office_id', $officeId)
-                ->whereBetween('ProcDate', [$start, $end]);
-            if (! empty($scopedClinics)) {
-                $writeoffSub->whereIn('ClinicNum', $scopedClinics);
-            }
-            $writeoffSub->groupBy('ProvNum');
+                $writeoffSub = DB::table('od_claim_procs')->select('ProvNum', DB::raw('SUM(WriteOff) AS writeoffs'))
+                    ->where('office_id', $officeId)
+                    ->whereBetween('ProcDate', [$start, $end]);
+                if (! empty($scopedClinics)) {
+                    $writeoffSub->whereIn('ClinicNum', $scopedClinics);
+                }
+                $writeoffSub->groupBy('ProvNum');
 
-            $patCollSub = DB::table('od_pay_splits')
-                ->select('ProvNum', DB::raw('SUM(SplitAmt) AS amt'))
-                ->where('office_id', $officeId)
-                ->whereBetween('DatePay', [$start, $end]);
-            if (! empty($scopedClinics)) {
-                $patCollSub->whereIn('ClinicNum', $scopedClinics);
-            }
-            $patCollSub->groupBy('ProvNum');
+                $patCollSub = DB::table('od_pay_splits')
+                    ->select('ProvNum', DB::raw('SUM(SplitAmt) AS amt'))
+                    ->where('office_id', $officeId)
+                    ->whereBetween('DatePay', [$start, $end]);
+                if (! empty($scopedClinics)) {
+                    $patCollSub->whereIn('ClinicNum', $scopedClinics);
+                }
+                $patCollSub->groupBy('ProvNum');
 
-            $insCollSub = DB::table('od_claim_procs')
-                ->select('ProvNum', DB::raw('SUM(InsPayAmt) AS amt'))
-                ->where('office_id', $officeId)
-                ->whereBetween('DateCP', [$start, $end])
-                ->where('Status', '!=', 0);
-            if (! empty($scopedClinics)) {
-                $insCollSub->whereIn('ClinicNum', $scopedClinics);
-            }
-            $insCollSub->groupBy('ProvNum');
+                $insCollSub = DB::table('od_claim_procs')
+                    ->select('ProvNum', DB::raw('SUM(InsPayAmt) AS amt'))
+                    ->where('office_id', $officeId)
+                    ->whereBetween('DateCP', [$start, $end])
+                    ->where('Status', '!=', 0);
+                if (! empty($scopedClinics)) {
+                    $insCollSub->whereIn('ClinicNum', $scopedClinics);
+                }
+                $insCollSub->groupBy('ProvNum');
 
-            $collSub = DB::query()->fromSub(
-                $patCollSub->unionAll($insCollSub),
-                'c_unioned'
-            )->select('ProvNum', DB::raw('SUM(amt) AS collections'))->groupBy('ProvNum');
+                $collSub = DB::query()->fromSub(
+                    $patCollSub->unionAll($insCollSub),
+                    'c_unioned'
+                )->select('ProvNum', DB::raw('SUM(amt) AS collections'))->groupBy('ProvNum');
 
-            $aptsSub = DB::table('od_appointments')
-                ->select('ProvNum', DB::raw('COUNT(*) AS appointment_count'))
-                ->where('office_id', $officeId)
-                ->whereIn('AptStatus', [1, 2])
-                ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
-            if (! empty($scopedClinics)) {
-                $aptsSub->whereIn('ClinicNum', $scopedClinics);
-            }
-            $aptsSub->groupBy('ProvNum');
+                $aptsSub = DB::table('od_appointments')
+                    ->select('ProvNum', DB::raw('COUNT(*) AS appointment_count'))
+                    ->where('office_id', $officeId)
+                    ->whereIn('AptStatus', [1, 2])
+                    ->whereBetween('AptDateTime', [$start.' 00:00:00', $end.' 23:59:59']);
+                if (! empty($scopedClinics)) {
+                    $aptsSub->whereIn('ClinicNum', $scopedClinics);
+                }
+                $aptsSub->groupBy('ProvNum');
 
-            $providers = DB::table('od_providers as p')
-                ->select(
-                    'p.ProvNum',
-                    'p.LName',
-                    'p.PName',
-                    'p.Abbr',
-                    'p.Specialty',
-                    DB::raw('COALESCE(g.gross, 0) AS gross_production'),
-                    DB::raw('(COALESCE(a.adjustments, 0) - COALESCE(w.writeoffs, 0)) AS adjustments'),
-                    DB::raw('COALESCE(w.writeoffs, 0) AS writeoffs'),
-                    DB::raw('COALESCE(c.collections, 0) AS collections'),
-                    DB::raw('COALESCE(apt.appointment_count, 0) AS appointment_count')
-                )
-                ->where('p.office_id', $officeId)
-                ->leftJoinSub($grossSub, 'g', 'p.ProvNum', '=', 'g.ProvNum')
-                ->leftJoinSub($adjSub, 'a', 'p.ProvNum', '=', 'a.ProvNum')
-                ->leftJoinSub($writeoffSub, 'w', 'p.ProvNum', '=', 'w.ProvNum')
-                ->leftJoinSub($collSub, 'c', 'p.ProvNum', '=', 'c.ProvNum')
-                ->leftJoinSub($aptsSub, 'apt', 'p.ProvNum', '=', 'apt.ProvNum')
-                ->where(function ($q) {
-                    $q->whereRaw('COALESCE(g.gross, 0) != 0')
-                        ->orWhereRaw('COALESCE(a.adjustments, 0) != 0')
-                        ->orWhereRaw('COALESCE(w.writeoffs, 0) != 0')
-                        ->orWhereRaw('COALESCE(c.collections, 0) != 0')
-                        ->orWhereRaw('COALESCE(apt.appointment_count, 0) != 0');
-                })
-                ->when($search !== '', function ($q) use ($search) {
-                    $q->where(function ($q2) use ($search) {
-                        $q2->where('p.LName', 'like', "%{$search}%")
-                            ->orWhere('p.PName', 'like', "%{$search}%")
-                            ->orWhere('p.Abbr', 'like', "%{$search}%");
-                    });
-                })
-                ->get();
+                $providers = DB::table('od_providers as p')
+                    ->select(
+                        'p.ProvNum',
+                        'p.LName',
+                        'p.PName',
+                        'p.Abbr',
+                        'p.Specialty',
+                        DB::raw('COALESCE(g.gross, 0) AS gross_production'),
+                        DB::raw('(COALESCE(a.adjustments, 0) - COALESCE(w.writeoffs, 0)) AS adjustments'),
+                        DB::raw('COALESCE(w.writeoffs, 0) AS writeoffs'),
+                        DB::raw('COALESCE(c.collections, 0) AS collections'),
+                        DB::raw('COALESCE(apt.appointment_count, 0) AS appointment_count')
+                    )
+                    ->where('p.office_id', $officeId)
+                    ->leftJoinSub($grossSub, 'g', 'p.ProvNum', '=', 'g.ProvNum')
+                    ->leftJoinSub($adjSub, 'a', 'p.ProvNum', '=', 'a.ProvNum')
+                    ->leftJoinSub($writeoffSub, 'w', 'p.ProvNum', '=', 'w.ProvNum')
+                    ->leftJoinSub($collSub, 'c', 'p.ProvNum', '=', 'c.ProvNum')
+                    ->leftJoinSub($aptsSub, 'apt', 'p.ProvNum', '=', 'apt.ProvNum')
+                    ->where(function ($q) {
+                        $q->whereRaw('COALESCE(g.gross, 0) != 0')
+                            ->orWhereRaw('COALESCE(a.adjustments, 0) != 0')
+                            ->orWhereRaw('COALESCE(w.writeoffs, 0) != 0')
+                            ->orWhereRaw('COALESCE(c.collections, 0) != 0')
+                            ->orWhereRaw('COALESCE(apt.appointment_count, 0) != 0');
+                    })
+                    ->when($search !== '', function ($q) use ($search) {
+                        $q->where(function ($q2) use ($search) {
+                            $q2->where('p.LName', 'like', "%{$search}%")
+                                ->orWhere('p.PName', 'like', "%{$search}%")
+                                ->orWhere('p.Abbr', 'like', "%{$search}%");
+                        });
+                    })
+                    ->get();
 
-            $officeObj = Office::find($officeId);
-            $officeDisplayName = $officeObj?->name ?: 'Office #'.$officeId;
+                $officeObj = Office::find($officeId);
+                $officeDisplayName = $officeObj?->name ?: 'Office #'.$officeId;
 
-            $mapped = $providers->map(function ($p) use ($officeId, $officeDisplayName) {
-                $p->office_id = $officeId;
-                $p->specialty = $this->specialtyMap[(int) $p->Specialty] ?? 'General Dentistry';
-                $p->location = $this->clinics->name((int) ($p->ClinicNum ?? 0), $officeId) ?: $officeDisplayName;
-                $p->net_production = $this->production->netFrom(
-                    (float) $p->gross_production,
-                    (float) $p->adjustments,
-                    0.0
-                );
+                $mapped = $providers->map(function ($p) use ($officeId, $officeDisplayName) {
+                    // DECIMAL sums arrive as strings; the table and its sort need numbers.
+                    foreach (['gross_production', 'adjustments', 'writeoffs', 'collections'] as $money) {
+                        $p->{$money} = (float) $p->{$money};
+                    }
+                    $p->office_id = $officeId;
+                    $p->specialty = $this->specialtyMap[(int) $p->Specialty] ?? 'General Dentistry';
+                    $p->location = $this->clinics->name((int) ($p->ClinicNum ?? 0), $officeId) ?: $officeDisplayName;
+                    $p->net_production = $this->production->netFrom(
+                        (float) $p->gross_production,
+                        (float) $p->adjustments,
+                        0.0
+                    );
 
-                return $p;
+                    return $p;
+                });
+
+                return $mapped->all();
             });
 
             $allProviders = $allProviders->merge($mapped);
@@ -492,120 +521,127 @@ class DashboardController extends Controller
         $result = [];
 
         foreach ($locations->scopes() as $officeId => $scopedClinics) {
-            $buildLocationStats = function ($s, $e) use ($officeId, $scopedClinics) {
-                $grossQ = DB::table('od_procedure_logs')
-                    ->where('office_id', $officeId)
-                    ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::grossProduction('val'))
-                    ->whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$s, $e]);
-                if (! empty($scopedClinics)) {
-                    $grossQ->whereIn('ClinicNum', $scopedClinics);
+            $officeRows = $this->metricCache->remember('dashboard.financials-per-location', [$officeId], [$start, $end, $scopedClinics], function () use ($start, $end, $startLastYear, $endLastYear, $officeId, $scopedClinics) {
+                $officeRows = [];
+                $buildLocationStats = function ($s, $e) use ($officeId, $scopedClinics) {
+                    $grossQ = DB::table('od_procedure_logs')
+                        ->where('office_id', $officeId)
+                        ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::grossProduction('val'))
+                        ->whereIn('ProcStatus', ProcStatus::completed())->whereBetween('ProcDate', [$s, $e]);
+                    if (! empty($scopedClinics)) {
+                        $grossQ->whereIn('ClinicNum', $scopedClinics);
+                    }
+                    $gross = $grossQ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                        ->pluck('val', 'ClinicNum')
+                        ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
+
+                    $adjQ = DB::table('od_adjustments')
+                        ->where('office_id', $officeId)
+                        ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::adjustments('val'))
+                        ->whereBetween('AdjDate', [$s, $e]);
+                    if (! empty($scopedClinics)) {
+                        $adjQ->whereIn('ClinicNum', $scopedClinics);
+                    }
+                    $adj = $adjQ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                        ->pluck('val', 'ClinicNum')
+                        ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
+
+                    $woQ = DB::table('od_claim_procs')
+                        ->where('office_id', $officeId)
+                        ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::writeOffs('val'))
+                        ->whereBetween('ProcDate', [$s, $e]);
+                    if (! empty($scopedClinics)) {
+                        $woQ->whereIn('ClinicNum', $scopedClinics);
+                    }
+                    $writeoffs = $woQ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                        ->pluck('val', 'ClinicNum')
+                        ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
+
+                    $patCollQ = DB::table('od_pay_splits')
+                        ->where('office_id', $officeId)
+                        ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, SUM(SplitAmt) as val')
+                        ->whereBetween('DatePay', [$s, $e]);
+                    if (! empty($scopedClinics)) {
+                        $patCollQ->whereIn('ClinicNum', $scopedClinics);
+                    }
+                    $patColl = $patCollQ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                        ->pluck('val', 'ClinicNum')
+                        ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
+
+                    $insCollQ = DB::table('od_claim_procs')
+                        ->where('office_id', $officeId)
+                        ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, SUM(InsPayAmt) as val')
+                        ->whereBetween('DateCP', [$s, $e])
+                        ->where('Status', '!=', 0);
+                    if (! empty($scopedClinics)) {
+                        $insCollQ->whereIn('ClinicNum', $scopedClinics);
+                    }
+                    $insColl = $insCollQ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                        ->pluck('val', 'ClinicNum')
+                        ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
+
+                    $coll = collect();
+                    foreach ($patColl->keys()->merge($insColl->keys())->map(fn ($k) => (int) $k)->unique() as $cNum) {
+                        $coll->put((int) $cNum, (float) ($patColl->get((int) $cNum, 0) + $insColl->get((int) $cNum, 0)));
+                    }
+
+                    return compact('gross', 'adj', 'writeoffs', 'coll');
+                };
+
+                $currentStats = $buildLocationStats($start, $end);
+                $lastYearStats = $buildLocationStats($startLastYear, $endLastYear);
+
+                $clinicNames = $this->clinics->all($officeId);
+
+                $allClinicNums = ! empty($scopedClinics)
+                    ? collect($scopedClinics)
+                    : collect(array_keys($clinicNames))
+                        ->merge($currentStats['gross']->keys())
+                        ->merge($currentStats['adj']->keys())
+                        ->merge($currentStats['writeoffs']->keys())
+                        ->merge($currentStats['coll']->keys())
+                        ->merge($lastYearStats['gross']->keys())
+                        ->merge($lastYearStats['adj']->keys())
+                        ->merge($lastYearStats['writeoffs']->keys())
+                        ->merge($lastYearStats['coll']->keys())
+                        ->map(fn ($k) => (int) $k)
+                        ->unique()
+                        ->sort()
+                        ->values();
+
+                foreach ($allClinicNums as $cNum) {
+                    $cg = (float) $currentStats['gross']->get((int) $cNum, 0);
+                    $ca = (float) $currentStats['adj']->get((int) $cNum, 0) - (float) $currentStats['writeoffs']->get((int) $cNum, 0);
+                    $cc = (float) $currentStats['coll']->get((int) $cNum, 0);
+                    $cn = $cg + $ca;
+
+                    $lg = (float) $lastYearStats['gross']->get((int) $cNum, 0);
+                    $la = (float) $lastYearStats['adj']->get((int) $cNum, 0) - (float) $lastYearStats['writeoffs']->get((int) $cNum, 0);
+                    $lc = (float) $lastYearStats['coll']->get((int) $cNum, 0);
+                    $ln = $lg + $la;
+
+                    $locObj = $this->clinics->locationFor($officeId, (int) $cNum);
+
+                    $officeRows[] = [
+                        'office_id' => $officeId,
+                        'clinic_num' => (int) $cNum,
+                        'location_key' => $locObj->key(),
+                        'location' => $locObj->name,
+                        'gross_production' => round($cg, 2),
+                        'gross_production_last' => round($lg, 2),
+                        'adjustments' => round($ca, 2),
+                        'adjustments_last' => round($la, 2),
+                        'collections' => round($cc, 2),
+                        'collections_last' => round($lc, 2),
+                        'net_production' => round($cn, 2),
+                        'net_production_last' => round($ln, 2),
+                    ];
                 }
-                $gross = $grossQ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
-                    ->pluck('val', 'ClinicNum')
-                    ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
 
-                $adjQ = DB::table('od_adjustments')
-                    ->where('office_id', $officeId)
-                    ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::adjustments('val'))
-                    ->whereBetween('AdjDate', [$s, $e]);
-                if (! empty($scopedClinics)) {
-                    $adjQ->whereIn('ClinicNum', $scopedClinics);
-                }
-                $adj = $adjQ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
-                    ->pluck('val', 'ClinicNum')
-                    ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
+                return $officeRows;
+            });
 
-                $woQ = DB::table('od_claim_procs')
-                    ->where('office_id', $officeId)
-                    ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::writeOffs('val'))
-                    ->whereBetween('ProcDate', [$s, $e]);
-                if (! empty($scopedClinics)) {
-                    $woQ->whereIn('ClinicNum', $scopedClinics);
-                }
-                $writeoffs = $woQ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
-                    ->pluck('val', 'ClinicNum')
-                    ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
-
-                $patCollQ = DB::table('od_pay_splits')
-                    ->where('office_id', $officeId)
-                    ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, SUM(SplitAmt) as val')
-                    ->whereBetween('DatePay', [$s, $e]);
-                if (! empty($scopedClinics)) {
-                    $patCollQ->whereIn('ClinicNum', $scopedClinics);
-                }
-                $patColl = $patCollQ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
-                    ->pluck('val', 'ClinicNum')
-                    ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
-
-                $insCollQ = DB::table('od_claim_procs')
-                    ->where('office_id', $officeId)
-                    ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, SUM(InsPayAmt) as val')
-                    ->whereBetween('DateCP', [$s, $e])
-                    ->where('Status', '!=', 0);
-                if (! empty($scopedClinics)) {
-                    $insCollQ->whereIn('ClinicNum', $scopedClinics);
-                }
-                $insColl = $insCollQ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
-                    ->pluck('val', 'ClinicNum')
-                    ->mapWithKeys(fn ($val, $k) => [(int) $k => (float) $val]);
-
-                $coll = collect();
-                foreach ($patColl->keys()->merge($insColl->keys())->map(fn ($k) => (int) $k)->unique() as $cNum) {
-                    $coll->put((int) $cNum, (float) ($patColl->get((int) $cNum, 0) + $insColl->get((int) $cNum, 0)));
-                }
-
-                return compact('gross', 'adj', 'writeoffs', 'coll');
-            };
-
-            $currentStats = $buildLocationStats($start, $end);
-            $lastYearStats = $buildLocationStats($startLastYear, $endLastYear);
-
-            $clinicNames = $this->clinics->all($officeId);
-
-            $allClinicNums = ! empty($scopedClinics)
-                ? collect($scopedClinics)
-                : collect(array_keys($clinicNames))
-                    ->merge($currentStats['gross']->keys())
-                    ->merge($currentStats['adj']->keys())
-                    ->merge($currentStats['writeoffs']->keys())
-                    ->merge($currentStats['coll']->keys())
-                    ->merge($lastYearStats['gross']->keys())
-                    ->merge($lastYearStats['adj']->keys())
-                    ->merge($lastYearStats['writeoffs']->keys())
-                    ->merge($lastYearStats['coll']->keys())
-                    ->map(fn ($k) => (int) $k)
-                    ->unique()
-                    ->sort()
-                    ->values();
-
-            foreach ($allClinicNums as $cNum) {
-                $cg = (float) $currentStats['gross']->get((int) $cNum, 0);
-                $ca = (float) $currentStats['adj']->get((int) $cNum, 0) - (float) $currentStats['writeoffs']->get((int) $cNum, 0);
-                $cc = (float) $currentStats['coll']->get((int) $cNum, 0);
-                $cn = $cg + $ca;
-
-                $lg = (float) $lastYearStats['gross']->get((int) $cNum, 0);
-                $la = (float) $lastYearStats['adj']->get((int) $cNum, 0) - (float) $lastYearStats['writeoffs']->get((int) $cNum, 0);
-                $lc = (float) $lastYearStats['coll']->get((int) $cNum, 0);
-                $ln = $lg + $la;
-
-                $locObj = $this->clinics->locationFor($officeId, (int) $cNum);
-
-                $result[] = [
-                    'office_id' => $officeId,
-                    'clinic_num' => (int) $cNum,
-                    'location_key' => $locObj->key(),
-                    'location' => $locObj->name,
-                    'gross_production' => round($cg, 2),
-                    'gross_production_last' => round($lg, 2),
-                    'adjustments' => round($ca, 2),
-                    'adjustments_last' => round($la, 2),
-                    'collections' => round($cc, 2),
-                    'collections_last' => round($lc, 2),
-                    'net_production' => round($cn, 2),
-                    'net_production_last' => round($ln, 2),
-                ];
-            }
+            array_push($result, ...$officeRows);
         }
 
         return response()->json($result);
@@ -623,62 +659,69 @@ class DashboardController extends Controller
         $result = [];
 
         foreach ($locations->scopes() as $officeId => $scopedClinics) {
-            $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
+            $officeRows = $this->metricCache->remember('dashboard.patient-visits-per-location', [$officeId], [$start, $end, $scopedClinics], function () use ($start, $end, $startLastYear, $endLastYear, $officeId, $scopedClinics) {
+                $officeRows = [];
+                $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
 
-            $getStats = function ($s, $e) use ($officeId, $scopedClinics, $excludedCodes) {
-                $pvQ = DB::table('od_procedure_logs')
-                    ->where('office_id', $officeId)
-                    ->whereIn('ProcStatus', ProcStatus::completed())
-                    ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('CodeNum', $excludedCodes))
-                    ->whereBetween('ProcDate', [$s, $e]);
+                $getStats = function ($s, $e) use ($officeId, $scopedClinics, $excludedCodes) {
+                    $pvQ = DB::table('od_procedure_logs')
+                        ->where('office_id', $officeId)
+                        ->whereIn('ProcStatus', ProcStatus::completed())
+                        ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('CodeNum', $excludedCodes))
+                        ->whereBetween('ProcDate', [$s, $e]);
 
-                if (! empty($scopedClinics)) {
-                    $pvQ->whereIn('ClinicNum', $scopedClinics);
+                    if (! empty($scopedClinics)) {
+                        $pvQ->whereIn('ClinicNum', $scopedClinics);
+                    }
+
+                    $patientVisits = $pvQ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::patientVisits('val'))
+                        ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
+                        ->pluck('val', 'ClinicNum')
+                        ->mapWithKeys(fn ($val, $k) => [(int) $k => (int) $val]);
+
+                    $newVisits = collect($this->patientVisits->newPatientVisits($s, $e, $scopedClinics, [], $officeId))
+                        ->groupBy(fn ($item) => (int) ($item['clinic_num'] ?? 0))
+                        ->map(fn ($g) => $g->count());
+
+                    return compact('patientVisits', 'newVisits');
+                };
+
+                $currentStats = $getStats($start, $end);
+                $lastYearStats = $getStats($startLastYear, $endLastYear);
+
+                $clinicNames = $this->clinics->all($officeId);
+
+                $allClinicNums = ! empty($scopedClinics)
+                    ? collect($scopedClinics)
+                    : collect(array_keys($clinicNames))
+                        ->merge($currentStats['patientVisits']->keys())
+                        ->merge($currentStats['newVisits']->keys())
+                        ->merge($lastYearStats['patientVisits']->keys())
+                        ->merge($lastYearStats['newVisits']->keys())
+                        ->map(fn ($k) => (int) $k)
+                        ->unique()
+                        ->sort()
+                        ->values();
+
+                foreach ($allClinicNums as $cNum) {
+                    $locObj = $this->clinics->locationFor($officeId, (int) $cNum);
+
+                    $officeRows[] = [
+                        'office_id' => $officeId,
+                        'clinic_num' => (int) $cNum,
+                        'location_key' => $locObj->key(),
+                        'location' => $locObj->name,
+                        'patient_visits' => (int) $currentStats['patientVisits']->get((int) $cNum, 0),
+                        'patient_visits_last' => (int) $lastYearStats['patientVisits']->get((int) $cNum, 0),
+                        'new_patient_visits' => (int) ($currentStats['newVisits']->get((int) $cNum, 0)),
+                        'new_patient_visits_last' => (int) ($lastYearStats['newVisits']->get((int) $cNum, 0)),
+                    ];
                 }
 
-                $patientVisits = $pvQ->selectRaw('COALESCE(ClinicNum + 0, 0) as ClinicNum, '.MetricDefinitions::patientVisits('val'))
-                    ->groupBy(DB::raw('COALESCE(ClinicNum + 0, 0)'))
-                    ->pluck('val', 'ClinicNum')
-                    ->mapWithKeys(fn ($val, $k) => [(int) $k => (int) $val]);
+                return $officeRows;
+            });
 
-                $newVisits = collect($this->patientVisits->newPatientVisits($s, $e, $scopedClinics, [], $officeId))
-                    ->groupBy(fn ($item) => (int) ($item['clinic_num'] ?? 0))
-                    ->map(fn ($g) => $g->count());
-
-                return compact('patientVisits', 'newVisits');
-            };
-
-            $currentStats = $getStats($start, $end);
-            $lastYearStats = $getStats($startLastYear, $endLastYear);
-
-            $clinicNames = $this->clinics->all($officeId);
-
-            $allClinicNums = ! empty($scopedClinics)
-                ? collect($scopedClinics)
-                : collect(array_keys($clinicNames))
-                    ->merge($currentStats['patientVisits']->keys())
-                    ->merge($currentStats['newVisits']->keys())
-                    ->merge($lastYearStats['patientVisits']->keys())
-                    ->merge($lastYearStats['newVisits']->keys())
-                    ->map(fn ($k) => (int) $k)
-                    ->unique()
-                    ->sort()
-                    ->values();
-
-            foreach ($allClinicNums as $cNum) {
-                $locObj = $this->clinics->locationFor($officeId, (int) $cNum);
-
-                $result[] = [
-                    'office_id' => $officeId,
-                    'clinic_num' => (int) $cNum,
-                    'location_key' => $locObj->key(),
-                    'location' => $locObj->name,
-                    'patient_visits' => (int) $currentStats['patientVisits']->get((int) $cNum, 0),
-                    'patient_visits_last' => (int) $lastYearStats['patientVisits']->get((int) $cNum, 0),
-                    'new_patient_visits' => (int) ($currentStats['newVisits']->get((int) $cNum, 0)),
-                    'new_patient_visits_last' => (int) ($lastYearStats['newVisits']->get((int) $cNum, 0)),
-                ];
-            }
+            array_push($result, ...$officeRows);
         }
 
         return response()->json($result);

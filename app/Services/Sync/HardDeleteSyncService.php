@@ -2,6 +2,8 @@
 
 namespace App\Services\Sync;
 
+use App\Domain\Patient\PatientVisitDays;
+use App\Domain\Support\MetricCache;
 use App\Models\Office;
 use App\Models\SyncLogPrune;
 use App\Services\OpenDental\QueryService;
@@ -194,7 +196,11 @@ class HardDeleteSyncService
                 }
 
                 if (! $dryRun && $orphans !== []) {
-                    DB::table($tableKey)->where('office_id', $officeId)->whereIn($table->primaryKey, $orphans)->delete();
+                    app(PatientVisitDays::class)->deletingRows(
+                        $tableKey, (int) $officeId, $table->primaryKey, $orphans,
+                        fn () => DB::table($tableKey)->where('office_id', $officeId)->whereIn($table->primaryKey, $orphans)->delete(),
+                    );
+                    app(MetricCache::class)->invalidateOffice((int) $officeId);
                 }
 
                 $result['local_count'] += count($chunk);

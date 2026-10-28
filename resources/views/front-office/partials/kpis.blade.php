@@ -89,7 +89,7 @@
                 { id: 'resched', title: 'Re-scheduled', type: 'percent', color: 'blue' },
                 { id: 'new_pat_a', title: 'New Patients A', type: 'percent', color: 'blue' },
                 { id: 'no_show', title: 'No-Show Rate', type: 'percent', color: 'blue' },
-                { id: 'pat_react', title: 'Patient Re-activation', type: 'percent', color: 'blue' },
+                { id: 'pat_react', title: 'Patient Re-activation', type: 'number', color: 'blue' },
                 { id: 'pat_added', title: 'Patients Added', type: 'number', color: 'blue' },
                 { id: 'pat_viewed', title: 'Patient Viewed', type: 'number', color: 'blue' },
                 { id: 'new_pat_rev', title: 'New Patient Revenue', type: 'currency', color: 'blue' },

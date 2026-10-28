@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Domain\Patient\PatientVisitService;
 use App\Domain\Production\ProductionService;
+use App\Domain\Scheduling\NewPatientsScheduledService;
 use App\Domain\Support\ClinicRegistry;
+use App\Domain\Support\DateRange;
 use App\Domain\Support\LocationSelection;
+use App\Domain\Support\MetricCache;
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcStatus;
 use App\Helpers\MetricDefinitions;
@@ -15,6 +18,8 @@ use App\Models\Office;
 use App\Services\OpenDental\FinancialAnalyticsService;
 use App\Services\OpenDental\PatientAnalyticsService;
 use Carbon\CarbonPeriod;
+use Closure;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -28,9 +33,24 @@ class FinancialController extends Controller
         protected PatientAnalyticsService $patientAnalytics,
         protected ProductionService $production,
         protected PatientVisitService $patientVisits,
-        protected ClinicRegistry $clinics
+        protected ClinicRegistry $clinics,
+        protected MetricCache $metricCache,
     ) {
         $this->completedIn = ProcStatus::inList(ProcStatus::completed());
+    }
+
+    /**
+     * Cached report payload for a location selection (MetricCache): reused until a sync or a
+     * report-setting change touches one of its offices. $params must hold every input the
+     * payload depends on besides the selection.
+     *
+     * @param  list<mixed>  $params
+     */
+    private function cachedJson(string $name, LocationSelection $selection, array $params, Closure $compute): JsonResponse
+    {
+        return response()->json($this->metricCache->remember(
+            "financials.{$name}", array_keys($selection->scopes()), [$selection->keys(), ...$params], $compute
+        ));
     }
 
     private function resolveLocations(Request $request): LocationSelection
@@ -105,8 +125,13 @@ class FinancialController extends Controller
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
         $selection = $this->resolveLocations($request);
-        $scopes = $selection->scopes();
 
+        return $this->cachedJson('revenue', $selection, [$start, $end], fn () => $this->revenuePayload($start, $end, $selection->scopes()));
+    }
+
+    /** @param  array<int, int[]>  $scopes */
+    private function revenuePayload(string $start, string $end, array $scopes): array
+    {
         $gross = 0.0;
         $net = 0.0;
         $adj = 0.0;
@@ -129,7 +154,7 @@ class FinancialController extends Controller
         $prodForRate = $metricBasis === 'gross' ? $gross : $net;
         $collRate = $prodForRate > 0 ? round(($coll / $prodForRate) * 100, 2) : 0;
 
-        return response()->json([
+        return [
             'gross_production' => round($gross, 2),
             'net_production' => round($net, 2),
             'adjustments' => round($adj, 2),
@@ -139,7 +164,7 @@ class FinancialController extends Controller
             'collection' => round($coll, 2),
             'adjustment_rate' => $adjRate,
             'collection_rate' => $collRate,
-        ]);
+        ];
     }
 
     public function data(Request $request)
@@ -148,8 +173,14 @@ class FinancialController extends Controller
         $end = $request->input('end_date', now()->toDateString());
         $section = $request->input('section', 'all');
         $selection = $this->resolveLocations($request);
-        $scopes = $selection->scopes();
 
+        return $this->cachedJson('data', $selection, [$start, $end, $section],
+            fn () => $this->dataPayload($start, $end, $section, $selection->scopes()));
+    }
+
+    /** @param  array<int, int[]>  $scopes */
+    private function dataPayload(string $start, string $end, string $section, array $scopes): array
+    {
         $response = [];
 
         if (in_array($section, ['all', 'revenue-kpis', 'revenue'])) {
@@ -299,30 +330,41 @@ class FinancialController extends Controller
                 ->groupBy('d.DefNum', 'd.ItemName')
                 ->orderByRaw('ABS(SUM(a.AdjAmt)) DESC');
 
-            $response['adjustments_breakdown'] = $adjQuery->get();
+            // DECIMAL sums arrive as strings; the chart needs numbers.
+            $response['adjustments_breakdown'] = $adjQuery->get()
+                ->map(fn ($r) => ['label' => $r->label, 'value' => (float) $r->value]);
         }
 
         // Top Services Chart
         if (in_array($section, ['all', 'top-services-chart'])) {
             [$scopeSql, $scopeBindings] = $this->buildScopeSql($scopes, 'pl');
-            $topServicesQuery = DB::table('od_procedure_logs as pl')
+            // Fees are summed per office + code first (index-only), then joined to the small
+            // code / definition tables. Joined directly, MySQL started from the definitions
+            // and paired each with every procedure in the period (4.4 s).
+            $feesByCode = DB::table('od_procedure_logs as pl')
+                ->whereIn('pl.ProcStatus', ProcStatus::completed())
+                ->whereBetween('pl.ProcDate', [$start, $end])
+                ->whereRaw($scopeSql, $scopeBindings)
+                ->groupBy('pl.office_id', 'pl.CodeNum')
+                ->select('pl.office_id', 'pl.CodeNum', DB::raw('SUM(pl.ProcFee) AS fee'));
+
+            $topServicesQuery = DB::query()->fromSub($feesByCode, 'f')
                 ->join('od_procedures as pc', function ($join) {
-                    $join->on('pl.CodeNum', '=', 'pc.CodeNum')
-                        ->on('pl.office_id', '=', 'pc.office_id');
+                    $join->on('f.CodeNum', '=', 'pc.CodeNum')
+                        ->on('f.office_id', '=', 'pc.office_id');
                 })
                 ->join('od_definitions as d', function ($join) {
                     $join->on('pc.ProcCat', '=', 'd.DefNum')
                         ->on('pc.office_id', '=', 'd.office_id');
                 })
-                ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->whereBetween('pl.ProcDate', [$start, $end])
-                ->whereRaw($scopeSql, $scopeBindings)
-                ->select('d.ItemName as label', DB::raw('SUM(pl.ProcFee) as value'))
+                ->select('d.ItemName as label', DB::raw('SUM(f.fee) as value'))
                 ->groupBy('d.DefNum', 'd.ItemName')
-                ->orderByRaw('SUM(pl.ProcFee) DESC')
+                ->orderByRaw('SUM(f.fee) DESC')
+                ->orderBy('d.ItemName')
                 ->limit(5);
 
-            $response['top_services'] = $topServicesQuery->get();
+            $response['top_services'] = $topServicesQuery->get()
+                ->map(fn ($r) => ['label' => $r->label, 'value' => (float) $r->value]);
         }
 
         // Daily Revenue Data
@@ -448,7 +490,7 @@ class FinancialController extends Controller
             })->values();
         }
 
-        return response()->json($response);
+        return $response;
     }
 
     // ── Score Cards ───────────────────────────────────────────────────────────
@@ -459,13 +501,10 @@ class FinancialController extends Controller
         $tab = $request->input('tab', 'production');
         $provNum = $request->input('provider_num', '');
         $selection = $this->resolveLocations($request);
-        $scopes = $selection->scopes();
 
-        return response()->json(
-            $tab === 'collection'
-            ? $this->scoreCardsCollection($start, $end, $provNum, $scopes)
-            : $this->scoreCardsProduction($start, $end, $provNum, $scopes)
-        );
+        return $this->cachedJson('score-cards', $selection, [$start, $end, $tab, $provNum], fn () => $tab === 'collection'
+            ? $this->scoreCardsCollection($start, $end, $provNum, $selection->scopes())
+            : $this->scoreCardsProduction($start, $end, $provNum, $selection->scopes()));
     }
 
     private function providerExpr(string $alias): string
@@ -488,6 +527,7 @@ class FinancialController extends Controller
         }
 
         $provExpr = $this->providerExpr('pr');
+        [$dateSql, $dateBindings] = DateRange::withinSql('pl.ProcDate', $start, $end);
 
         $rows = DB::select("
             SELECT
@@ -503,11 +543,11 @@ class FinancialController extends Controller
             LEFT JOIN od_providers pr ON pl.ProvNum = pr.ProvNum AND pr.office_id = pl.office_id
             WHERE {$scopeSql}
               AND pl.ProcStatus IN ({$this->completedIn})
-              AND DATE(REPLACE(pl.ProcDate, 'T', ' ')) BETWEEN ? AND ?
+              AND {$dateSql}
               {$provFilter}
             GROUP BY pr.ProvNum, pr.Abbr, pr.LName, pr.PName, pc.CodeNum, pc.ProcCode, pc.Descript, CAST(pl.ProcFee AS DECIMAL(12,2)), pl.CodeNum
             ORDER BY total_production DESC, cnt DESC
-        ", array_merge($scopeBindings, [$start, $end], $provBindings));
+        ", array_merge($scopeBindings, $dateBindings, $provBindings));
 
         $n = count($rows);
         $topCut = max(1, (int) ceil($n * 0.2));
@@ -557,7 +597,7 @@ class FinancialController extends Controller
                 'tier' => $r->tier,
             ], $rows),
             'providers' => $providers->map(fn ($p) => [
-                'id' => $p->ProvNum,
+                'id' => (string) $p->ProvNum, // the filter sends it back as text
                 'name' => $p->Abbr ?: $p->LName,
             ])->values(),
         ];
@@ -657,7 +697,7 @@ class FinancialController extends Controller
                 'tier' => $r->tier,
             ], $rows),
             'providers' => $providers->map(fn ($p) => [
-                'id' => $p->ProvNum,
+                'id' => (string) $p->ProvNum, // the filter sends it back as text
                 'name' => $p->Abbr ?: $p->LName,
             ])->values(),
         ];
@@ -1029,58 +1069,10 @@ class FinancialController extends Controller
     }
 
     // ── New Patients Scheduled ────────────────────────────────────────────────
+    /** Delegates to the single source of the definition. */
     private function bkNewPatientsScheduledScopes(string $start, string $end, array $scopes): array
     {
-        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
-        $nameExpr = $isSqlite
-            ? "COALESCE(p.LName || ', ' || p.FName, '')"
-            : "COALESCE(CONCAT(p.LName, ', ', p.FName), '')";
-        $dateExpr = $isSqlite
-            ? "strftime('%Y-%m-%d', MIN(a.AptDateTime))"
-            : "DATE_FORMAT(MIN(a.AptDateTime), '%Y-%m-%d')";
-
-        [$scopeSql, $scopeBindings] = $this->buildScopeSql($scopes, 'a');
-
-        $rows = DB::select("
-            SELECT
-                a.PatNum                                             AS patient_id,
-                a.office_id                                          AS office_id,
-                {$nameExpr}                                          AS patient_name,
-                {$dateExpr}                                          AS dates,
-                1                                                   AS count
-            FROM od_appointments a
-            LEFT JOIN od_patients p ON a.PatNum = p.PatNum AND p.office_id = a.office_id
-            WHERE {$scopeSql}
-              AND a.AptDateTime BETWEEN ? AND ?
-              AND a.AptStatus IN (1, 2)
-              AND a.IsNewPatient IN (1, '1', true, 'true')
-              AND a.PatNum NOT IN (21216, 21231, 21254)
-              AND NOT EXISTS (
-                  SELECT 1 FROM od_appointments a_old
-                  WHERE a_old.office_id = a.office_id
-                    AND a_old.PatNum = a.PatNum
-                    AND a_old.AptStatus IN (1, 2)
-                    AND a_old.IsNewPatient IN (1, '1', true, 'true')
-                    AND a_old.AptDateTime < ?
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM od_procedure_logs pl_old
-                  WHERE pl_old.office_id = a.office_id
-                    AND pl_old.PatNum = a.PatNum
-                    AND pl_old.ProcDate < ?
-                    AND pl_old.ProcStatus IN ('C', '2', 'D')
-              )
-            GROUP BY a.PatNum, a.office_id, p.LName, p.FName
-            ORDER BY p.LName
-        ", array_merge($scopeBindings, [$start.' 00:00:00', $end.' 23:59:59', $start.' 00:00:00', $start]));
-
-        return array_map(fn ($r) => [
-            'patient_id' => $r->patient_id,
-            'office_id' => (int) $r->office_id,
-            'patient_name' => $r->patient_name,
-            'dates' => $r->dates,
-            'count' => (int) $r->count,
-        ], $rows);
+        return app(NewPatientsScheduledService::class)->patients($start, $end, $scopes);
     }
 
     // ── Average Production Per Patient ────────────────────────────────────────

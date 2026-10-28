@@ -2,6 +2,8 @@
 
 namespace App\Services\Sync\Explorer;
 
+use App\Domain\Patient\PatientVisitDays;
+use App\Domain\Support\MetricCache;
 use App\Models\Office;
 use App\Services\OpenDental\QueryService;
 use App\Services\Sync\BaseQuerySyncService;
@@ -93,10 +95,17 @@ class RowRepairService
         $deleted = 0;
 
         foreach (array_chunk($confirmedDeleted, 500) as $chunk) {
-            $deleted += DB::table($table->localTable)
-                ->where('office_id', (int) $office->id)
-                ->whereIn($table->primaryKey, $chunk)
-                ->delete();
+            $deleted += app(PatientVisitDays::class)->deletingRows(
+                $table->localTable, (int) $office->id, $table->primaryKey, $chunk,
+                fn () => DB::table($table->localTable)
+                    ->where('office_id', (int) $office->id)
+                    ->whereIn($table->primaryKey, $chunk)
+                    ->delete(),
+            );
+        }
+
+        if ($deleted > 0) {
+            app(MetricCache::class)->invalidateOffice((int) $office->id);
         }
 
         return [

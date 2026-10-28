@@ -2,6 +2,7 @@
 
 namespace App\Services\Sync;
 
+use App\Domain\Support\MetricCache;
 use App\Models\Office;
 use App\Models\SyncLog;
 use App\Services\OpenDental\QueryService;
@@ -679,6 +680,7 @@ abstract class BaseQuerySyncService
 
             $columnCount = max(1, max(array_map('count', $rowsToUpsert)));
             $chunkSize = max(1, intdiv(self::MAX_UPSERT_PLACEHOLDERS, $columnCount));
+            $persistContext = $this->beforePersist((int) $officeId, $rowsToUpsert);
 
             foreach (array_chunk($rowsToUpsert, $chunkSize) as $chunk) {
                 try {
@@ -718,10 +720,35 @@ abstract class BaseQuerySyncService
             }
 
             $log->increment('total_processed', count($rowsToUpsert));
+
+            $this->afterPersist((int) $officeId, $rowsToUpsert, $persistContext);
+
+            // Every upsert path (sync runs, row repairs) lands here, so this one call keeps
+            // cached report results from outliving the data they were computed from.
+            app(MetricCache::class)->invalidateOffice((int) $officeId);
         }
 
         return [$lastSync, $lastId];
     }
+
+    /**
+     * Hook for modules that maintain derived data (summary tables): runs before a batch is
+     * written, so it can read the rows' current state. Whatever it returns is handed to
+     * afterPersist().
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    protected function beforePersist(int $officeId, array $rows): mixed
+    {
+        return null;
+    }
+
+    /**
+     * Hook that runs after a batch is written, before cached report results are invalidated.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    protected function afterPersist(int $officeId, array $rows, mixed $context): void {}
 
 
     /**

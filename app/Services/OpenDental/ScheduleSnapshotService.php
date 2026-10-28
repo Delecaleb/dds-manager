@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenDental;
 
+use App\Domain\Support\MetricCache;
 use App\Models\Office;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -250,6 +251,9 @@ class ScheduleSnapshotService
                 DB::table('od_daily_schedule_snapshots')->insert($dailyRows);
             }
         });
+
+        // After the transaction commits, so the new version only ever sees the new snapshot.
+        app(MetricCache::class)->invalidateOffice((int) $officeId);
 
         return [
             'status' => 'success',

@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\InvalidatesMetricCache;
 use Illuminate\Database\Eloquent\Model;
 
 class Office extends Model
 {
+    // Reports embed office names, so a rename invalidates that office's cached results.
+    use InvalidatesMetricCache;
+
     protected $fillable = [
         'name',
         'developer_key',
@@ -19,6 +23,11 @@ class Office extends Model
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    protected function metricCacheOfficeIds(): array
+    {
+        return $this->id === null ? [] : [(int) $this->id];
     }
 
     /**
