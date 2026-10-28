@@ -99,6 +99,46 @@ class PatientVisitService
         );
     }
 
+    /**
+     * Which of $patNums had a completed, non-broken procedure at this office (any clinic or
+     * provider) before $before. Shared by the new-patient rule and the Operations retention
+     * columns. On the raw tables this reads the patients' whole procedure history (~7 s for
+     * a large office on live); the summary has one row per visit day.
+     *
+     * @param  list<int|string>  $patNums
+     * @return array<int|string, true>  PatNum => true
+     */
+    public function patientsSeenBefore(int $officeId, array $patNums, string $before): array
+    {
+        $before = substr($before, 0, 10);
+        $excludedCodes = ProcCode::brokenAppointmentCodeNums($officeId);
+        $summary = $this->useSummary($officeId);
+        $seen = [];
+
+        foreach (array_chunk($patNums, 1000) as $chunk) {
+            $found = $summary
+                ? $this->summaryVisits($officeId)
+                    ->whereIn('pat_num', $chunk)
+                    ->where('visit_date', '<', $before)
+                    ->distinct()
+                    ->pluck('pat_num')
+                : DB::table('od_procedure_logs')
+                    ->where('office_id', $officeId)
+                    ->whereIn('PatNum', $chunk)
+                    ->whereIn('ProcStatus', ProcStatus::completed())
+                    ->where('ProcDate', '<', $before)
+                    ->when(! empty($excludedCodes), fn ($q) => $q->whereNotIn('CodeNum', $excludedCodes))
+                    ->distinct()
+                    ->pluck('PatNum');
+
+            foreach ($found as $patNum) {
+                $seen[$patNum] = true;
+            }
+        }
+
+        return $seen;
+    }
+
     /** @return array<int, array<string, mixed>> */
     private function computeNewPatientVisits(string $start, string $end, array $clinics, array $providers, int $officeId): array
     {
@@ -142,27 +182,7 @@ class PatientVisitService
 
         // Step 2: Eliminate patients who had ANY completed procedure prior to start
         // (any clinic or provider: "new" means new to the office).
-        if ($summary) {
-            $priorPatNums = $this->summaryVisits($officeId)
-                ->whereIn('pat_num', $candidatePatNums)
-                ->where('visit_date', '<', $start)
-                ->distinct()
-                ->pluck('pat_num')
-                ->all();
-        } else {
-            $priorPatQ = DB::table('od_procedure_logs')
-                ->where('office_id', $officeId)
-                ->whereIn('PatNum', $candidatePatNums)
-                ->whereIn('ProcStatus', ProcStatus::completed())
-                ->where('ProcDate', '<', $start);
-
-            if (! empty($excludedCodes)) {
-                $priorPatQ->whereNotIn('CodeNum', $excludedCodes);
-            }
-
-            $priorPatNums = $priorPatQ->distinct()->pluck('PatNum')->all();
-        }
-        $priorSet = array_fill_keys($priorPatNums, true);
+        $priorSet = $this->patientsSeenBefore($officeId, $candidatePatNums, $start);
 
         $newPatNums = array_values(array_filter($candidatePatNums, fn ($pn) => ! isset($priorSet[$pn])));
         if (empty($newPatNums)) {

@@ -1726,19 +1726,8 @@ class OperationsAnalyticsService
             ->distinct()
             ->get();
 
-        $curPatNums = $patsCur->pluck('PatNum')->unique()->map('strval')->values()->all();
-        $patsWithPriorProc = [];
-        if (! empty($curPatNums)) {
-            $qPriorCheck = DB::table('od_procedure_logs as pl')
-                ->where('pl.office_id', $officeId)
-                ->whereIn('pl.PatNum', $curPatNums)
-                ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->where('pl.ProcDate', '<', substr($start18m, 0, 10).' 00:00:00');
-            if (! empty($excludedCodes)) {
-                $qPriorCheck->whereNotIn('pl.CodeNum', $excludedCodes);
-            }
-            $patsWithPriorProc = $qPriorCheck->distinct()->pluck('pl.PatNum')->flip()->all();
-        }
+        $curPatNums = $patsCur->pluck('PatNum')->unique()->values()->all();
+        $patsWithPriorProc = $this->patientVisits->patientsSeenBefore($officeId, $curPatNums, $start18m);
 
         $curByProv = [];
         $newByProv = [];
@@ -2238,20 +2227,9 @@ class OperationsAnalyticsService
         }
         $patsPrior = $qPrior->select('pl.ClinicNum', 'pl.PatNum')->distinct()->get();
 
-        // 3. Fast check: which of the current active patients had ANY completed procedure prior to 18m
-        $curPatNums = $patsCur->pluck('PatNum')->unique()->map('strval')->values()->all();
-        $patsWithPriorProc = [];
-        if (! empty($curPatNums)) {
-            $qPriorCheck = DB::table('od_procedure_logs as pl')
-                ->where('pl.office_id', $officeId)
-                ->whereIn('pl.PatNum', $curPatNums)
-                ->whereIn('pl.ProcStatus', ProcStatus::completed())
-                ->where('pl.ProcDate', '<', $start18m.' 00:00:00');
-            if (! empty($excludedCodes)) {
-                $qPriorCheck->whereNotIn('pl.CodeNum', $excludedCodes);
-            }
-            $patsWithPriorProc = $qPriorCheck->distinct()->pluck('pl.PatNum')->flip()->all();
-        }
+        // 3. Which of the current active patients had ANY completed procedure prior to 18m
+        $curPatNums = $patsCur->pluck('PatNum')->unique()->values()->all();
+        $patsWithPriorProc = $this->patientVisits->patientsSeenBefore($officeId, $curPatNums, $start18m);
 
         $curByClinic = [];
         $newByClinic = [];
