@@ -101,10 +101,11 @@ return [
         // Delay before a budget-paused job continues.
         'continue_delay' => (int) env('SYNC_JOB_CONTINUE_DELAY', 5),
 
-        // Real failures (exceptions) tolerated before the job lands in failed_jobs.
-        'max_exceptions' => (int) env('SYNC_JOB_MAX_EXCEPTIONS', 3),
+        // Real failures (exceptions) tolerated before the job lands in failed_jobs
+        // and the failure alert is emailed: 4 = first attempt + 3 retries.
+        'max_exceptions' => (int) env('SYNC_JOB_MAX_EXCEPTIONS', 4),
 
-        // Seconds to wait before retrying after a failure.
+        // Seconds to wait before each retry after a failure (one entry per retry).
         'backoff' => [60, 300, 900],
 
         // Upper bound for a job's lifetime including continuations — large
@@ -114,6 +115,16 @@ return [
         // Prevents the same (office, module) job piling up in the queue when
         // workers fall behind.
         'unique_for' => (int) env('SYNC_JOB_UNIQUE_FOR', 3600),
+    ],
+
+    /*
+    | Failure alerts: emailed to the recipients a super admin sets on the Sync
+    | Manager page once a sync or prune job fails for good (see max_exceptions).
+    | One outage fails many jobs, so the same problem at the same location is
+    | emailed at most once per cooldown.
+    */
+    'alerts' => [
+        'cooldown_minutes' => (int) env('SYNC_ALERT_COOLDOWN_MINUTES', 240),
     ],
 
 ];

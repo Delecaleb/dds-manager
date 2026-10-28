@@ -92,7 +92,18 @@ class SummaryParityCommand extends Command
      */
     private function visitFigures(PatientVisitService $visits, MetricFilter $f, bool $raw): array
     {
+        // Patients seen in the period, checked for history before it (the Operations retention lookup).
+        $periodPatNums = DB::table('patient_visit_days')->where('office_id', $f->officeId)
+            ->when($f->clinics !== [], fn ($q) => $q->whereIn('clinic_num', $f->clinics))
+            ->whereBetween('visit_date', [$f->start, $f->end])->distinct()->pluck('pat_num')->all();
+
         $compute = fn (PatientVisitService $s) => [
+            'patientsSeenBefore' => (function () use ($s, $f, $periodPatNums) {
+                $seen = array_keys($s->patientsSeenBefore($f->officeId, $periodPatNums, $f->start));
+                sort($seen);
+
+                return md5(implode(',', $seen)).' ('.count($seen).')';
+            })(),
             'patientVisits' => $s->patientVisits($f),
             'newPatientVisits' => json_encode($s->newPatientVisits($f->start, $f->end, $f->clinics, [], $f->officeId)),
             'dailyStats' => json_encode($s->dailyStats($f->start, $f->end, $f->clinics, [], $f->officeId)),

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Office;
+use App\Services\Sync\SyncFailureNotifier;
 use App\Services\Sync\SyncLeaseLostException;
 use App\Services\Sync\SyncReportService;
 use DateTimeInterface;
@@ -112,6 +113,8 @@ class SyncOfficeModule implements ShouldBeUnique, ShouldQueue
             'window' => [$this->windowStart, $this->windowEnd],
             'exception' => $e,
         ]);
+
+        app(SyncFailureNotifier::class)->jobFailed($this->officeId, $this->module, null, $e);
     }
 
     /**

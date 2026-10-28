@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\DeveloperApiController;
+use App\Http\Controllers\Admin\SyncAlertController;
 use App\Http\Controllers\AgingController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ConfigurationController;
@@ -87,6 +88,10 @@ Route::middleware('auth')->group(function () {
     Route::middleware('super_admin')->prefix('admin')->name('admin.')->group(function () {
         Route::patch('users/{user}/toggle-status', [AdminUserController::class, 'toggleStatus'])->name('users.toggle-status');
         Route::resource('users', AdminUserController::class);
+
+        // Sync failure alert recipients (edited on the Sync Manager page).
+        Route::put('sync-alerts', [SyncAlertController::class, 'update'])->name('sync-alerts.update');
+        Route::post('sync-alerts/test', [SyncAlertController::class, 'test'])->middleware('throttle:5,1')->name('sync-alerts.test');
 
         // Oversight of every Developer API key. Developers create keys in the Developer Portal.
         Route::prefix('developers')->name('developers.')->controller(DeveloperApiController::class)->group(function () {
