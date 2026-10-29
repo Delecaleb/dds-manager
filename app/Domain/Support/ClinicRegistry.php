@@ -17,12 +17,16 @@ class ClinicRegistry
     /** @var array<int, array<int, string>> lazily-built officeId => (ClinicNum => name) */
     private array $maps = [];
 
+    /** @var array<int, string> officeId => office name, filled alongside $maps */
+    private array $officeNames = [];
+
     /** @var array<string, Location>|null lazily-built reportable locations across active offices */
     private ?array $locations = null;
 
     public function flush(): void
     {
         $this->maps = [];
+        $this->officeNames = [];
         $this->locations = null;
     }
 
@@ -36,7 +40,7 @@ class ClinicRegistry
         }
 
         $activeOffice = Office::find($officeId);
-        $primaryName = $activeOffice?->name ?: config('clinics.primary_name', 'Main Office');
+        $primaryName = $this->officeNames[$officeId] = $activeOffice?->name ?: config('clinics.primary_name', 'Main Office');
 
         $map = [];
 
@@ -62,10 +66,24 @@ class ClinicRegistry
         return $this->maps[$officeId] = $map;
     }
 
-    /** Display name for a clinic; falls back to "Location N" for unknown clinics. */
+    /**
+     * Display name for a clinic; falls back to "Location N" for unknown clinics.
+     *
+     * In an office with clinics, ClinicNum 0 means no clinic is assigned to the record
+     * (confirmed with OpenDental 2026-10-28), so those rows read "<Office> - Unassigned".
+     */
     public function name(int $clinicNum, ?int $officeId = null): string
     {
-        return $this->all($officeId)[$clinicNum] ?? ('Location '.$clinicNum);
+        $officeId = $officeId ?? Office::getActiveOfficeId();
+        $clinics = $this->all($officeId);
+
+        if (isset($clinics[$clinicNum])) {
+            return $clinics[$clinicNum];
+        }
+
+        return $clinicNum === 0
+            ? $this->officeNames[$officeId].' - Unassigned'
+            : 'Location '.$clinicNum;
     }
 
     /** @return int[] all known ClinicNums */

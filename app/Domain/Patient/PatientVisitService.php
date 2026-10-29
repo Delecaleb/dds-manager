@@ -2,6 +2,7 @@
 
 namespace App\Domain\Patient;
 
+use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\MetricCache;
 use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcCode;
@@ -21,6 +22,7 @@ class PatientVisitService
     public function __construct(
         private readonly PatientVisitDays $visitDays,
         private readonly MetricCache $metricCache,
+        private readonly ClinicRegistry $clinics,
     ) {
         $this->completedIn = ProcStatus::inList(ProcStatus::completed());
     }
@@ -547,7 +549,7 @@ class PatientVisitService
         foreach ($allClinicNums as $cNum) {
             $result[] = [
                 'clinic_num' => (int) $cNum,
-                'location' => $clinicNames[(int) $cNum] ?? 'Location '.$cNum,
+                'location' => $clinicNames[(int) $cNum] ?? $this->clinics->name((int) $cNum, $officeId),
                 'patient_visits' => (int) $currentStats['patientVisits']->get((int) $cNum, 0),
                 'patient_visits_last' => (int) $lastYearStats['patientVisits']->get((int) $cNum, 0),
                 'new_patient_visits' => (int) $currentStats['newVisits']->get((int) $cNum, 0),
