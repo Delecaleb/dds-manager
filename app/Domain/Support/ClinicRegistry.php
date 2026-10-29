@@ -159,12 +159,9 @@ class ClinicRegistry
             $clinics = $this->all($office->id);
 
             if (count($clinics) > 1) {
+                // A clinic is shown by its own name, without the office name in front.
                 foreach ($clinics as $clinicNum => $clinicName) {
-                    $displayName = $clinicName;
-                    if (! empty($office->name) && ! str_contains(strtolower($clinicName), strtolower($office->name))) {
-                        $displayName = "{$office->name} - {$clinicName}";
-                    }
-                    $location = new Location($office->id, $clinicNum, $displayName);
+                    $location = new Location($office->id, $clinicNum, $clinicName);
                     $locations[$location->key()] = $location;
                 }
             } else {
