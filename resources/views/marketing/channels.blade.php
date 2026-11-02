@@ -15,8 +15,9 @@
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             @foreach ($channels['rows'] as $row)
                 @php
-                    [$status, $tone] = $row['channel'] === 'paid_search'
-                        ? ($channels['googleAdsConnected'] ? ['Google Ads connected', 'emerald'] : ['Google Ads not connected', 'slate'])
+                    $platform = $row['provider'] !== null ? \App\Models\MarketingAdConnection::PLATFORMS[$row['provider']] : null;
+                    [$status, $tone] = $platform !== null
+                        ? (in_array($row['provider'], $channels['connectedProviders'], true) ? [$platform . ' connected', 'emerald'] : [$platform . ' not connected', 'slate'])
                         : ($channels['verifiedSites'] > 0 ? [$reporting, 'emerald'] : [$reporting, 'slate']);
                 @endphp
                 <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
@@ -34,9 +35,9 @@
                     </div>
 
                     <dl class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-100">
-                        @foreach ([['Sessions', number_format($row['sessions'])], ['Signups', number_format($row['signups'])], ['Rate', $row['signup_rate'] . '%']] as [$metric, $value])
+                        @foreach ([['visits', number_format($row['sessions'])], ['signups', number_format($row['signups'])], ['signup_rate', $row['signup_rate'] . '%']] as [$metric, $value])
                             <div>
-                                <dt class="text-[10px] text-slate-400 font-semibold">{{ $metric }}</dt>
+                                <dt class="text-[10px] text-slate-500 font-semibold flex items-center gap-1" title="{{ \App\Domain\Marketing\MarketingMetric::help($metric) }}"><i data-lucide="{{ \App\Domain\Marketing\MarketingMetric::icon($metric) }}" class="w-3 h-3 {{ \App\Domain\Marketing\MarketingMetric::TONES[\App\Domain\Marketing\MarketingMetric::tone($metric)]['icon'] }}"></i>{{ \App\Domain\Marketing\MarketingMetric::label($metric) }}</dt>
                                 <dd class="text-sm font-extrabold text-slate-900 tabular-nums">{{ $value }}</dd>
                             </div>
                         @endforeach
@@ -44,9 +45,9 @@
 
                     @if($row['spend'] !== null)
                         <dl class="grid grid-cols-3 gap-2 mt-3">
-                            @foreach ([['Spend', ops_fmt($row['spend'], 'money')], ['Ad clicks', number_format($row['clicks'])], ['Cost / signup', ops_fmt($row['cost_per_signup'], 'money')]] as [$metric, $value])
+                            @foreach ([['ad_spend', ops_fmt($row['spend'], 'money')], ['ad_clicks', number_format($row['clicks'])], ['cost_per_signup', ops_fmt($row['cost_per_signup'], 'money')]] as [$metric, $value])
                                 <div>
-                                    <dt class="text-[10px] text-slate-400 font-semibold">{{ $metric }}</dt>
+                                    <dt class="text-[10px] text-slate-500 font-semibold flex items-center gap-1" title="{{ \App\Domain\Marketing\MarketingMetric::help($metric) }}"><i data-lucide="{{ \App\Domain\Marketing\MarketingMetric::icon($metric) }}" class="w-3 h-3 {{ \App\Domain\Marketing\MarketingMetric::TONES[\App\Domain\Marketing\MarketingMetric::tone($metric)]['icon'] }}"></i>{{ \App\Domain\Marketing\MarketingMetric::label($metric) }}</dt>
                                     <dd class="text-sm font-extrabold text-slate-900 tabular-nums">{{ $value }}</dd>
                                 </div>
                             @endforeach
@@ -61,12 +62,12 @@
                 <x-slot:head>
                     <tr>
                         <th class="px-4 py-3">Channel</th>
-                        <th class="px-4 py-3 text-right">Visitors</th>
-                        <th class="px-4 py-3 text-right">Sessions</th>
-                        <th class="px-4 py-3 text-right">Signups</th>
-                        <th class="px-4 py-3 text-right">Signup Rate</th>
-                        <th class="px-4 py-3 text-right">Ad Spend</th>
-                        <th class="px-4 py-3 text-right">Cost / Signup</th>
+                        <x-marketing.th metric="visitors" align="right" />
+                        <x-marketing.th metric="visits" align="right" />
+                        <x-marketing.th metric="signups" align="right" />
+                        <x-marketing.th metric="signup_rate" align="right" />
+                        <x-marketing.th metric="ad_spend" align="right" />
+                        <x-marketing.th metric="cost_per_signup" align="right" />
                     </tr>
                 </x-slot:head>
                 @foreach ($channels['rows'] as $row)
@@ -83,8 +84,9 @@
             </x-data-table>
             <p class="mt-3 text-[11px] text-slate-500">
                 A visit is Paid Search when it carries a Google or Microsoft click id or a cpc / ppc medium; Paid Social on a Meta or TikTok click id;
-                Organic Search, Social and Referral from the referring site; Direct when there is no referrer. Spend is Google Ads only, so
-                Paid Social and Microsoft clicks show traffic but no cost.
+                Organic Search, Social and Referral from the referring site; Direct when there is no referrer. Paid Search spend is Google Ads and
+                Paid Social spend is Meta Ads; Microsoft and TikTok clicks are counted as traffic but their cost is not, so cost per signup
+                is understated when those platforms run.
             </p>
         </x-marketing.panel>
     </div>

@@ -3,14 +3,14 @@
   Expects $account (AdCampaignReportService::accounts row) and $locations (ClinicRegistry).
 --}}
 @if (! $account['active'])
-    <span class="text-[11px] text-slate-500">Closed at Google — not synced</span>
+    <span class="text-[11px] text-slate-500">Closed at {{ $account['platform'] }} — not synced</span>
 @else
     <details class="relative">
         <summary class="cursor-pointer list-none text-[11px] rounded-lg border {{ $account['location_keys'] === [] ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-700' }} px-2 py-1 inline-flex items-center gap-1.5">
             {{ $account['locations'] === [] ? 'Assign locations…' : implode(', ', $account['locations']) }}
             <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i>
         </summary>
-        <form method="POST" action="{{ route('marketing.google-ads.accounts.update', $account['id']) }}"
+        <form method="POST" action="{{ route('marketing.ad-accounts.update', $account['id']) }}"
             class="absolute z-20 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg p-3 space-y-2">
             @csrf @method('PATCH')
             <div class="max-h-56 overflow-y-auto space-y-1">

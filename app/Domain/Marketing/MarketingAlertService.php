@@ -31,7 +31,7 @@ class MarketingAlertService
     /** A verified, active site with no events for this long has lost its snippet. */
     public const SITE_SILENT_HOURS = 48;
 
-    /** The scheduler syncs Google Ads every three hours; four misses is a problem. */
+    /** The scheduler syncs each ad platform every three hours; four misses is a problem. */
     public const ADS_STALE_HOURS = 12;
 
     /** Spend in the period before "no conversions" is worth a warning. */
@@ -108,7 +108,7 @@ class MarketingAlertService
             }
 
             $out[] = $this->item('warning', "{$campaign['name']} is spending without conversions",
-                sprintf('%s spent between %s and %s with no conversion recorded by Google Ads.', ops_fmt($campaign['spend'], 'money'), $filter->start, $filter->end),
+                sprintf('%s spent between %s and %s with no conversion recorded by %s.', ops_fmt($campaign['spend'], 'money'), $filter->start, $filter->end, MarketingAdConnection::PLATFORMS[$campaign['provider']] ?? 'the ad platform'),
                 'marketing.campaigns', 'location');
         }
 
@@ -121,11 +121,12 @@ class MarketingAlertService
         $out = [];
 
         // Logins serve the whole organization, so their health shows whatever is selected.
-        foreach (MarketingAdConnection::query()->googleAds()->get() as $connection) {
+        foreach (MarketingAdConnection::query()->get() as $connection) {
             $where = $connection->label();
+            $platform = $connection->platform();
 
             if ($connection->hasUnreadableToken()) {
-                $out[] = $this->item('critical', "Google Ads needs reconnecting ({$where})",
+                $out[] = $this->item('critical', "{$platform} needs reconnecting ({$where})",
                     'Its stored credentials cannot be read on this server (saved under a different app key).', 'marketing.integrations', 'organization');
 
                 continue;
@@ -136,15 +137,15 @@ class MarketingAlertService
             }
 
             if ($connection->status === MarketingAdConnection::STATUS_ERROR) {
-                $out[] = $this->item('critical', "Google Ads needs reconnecting ({$where})",
-                    $connection->last_error ?: 'Google rejected the stored credentials.', 'marketing.integrations', 'location');
+                $out[] = $this->item('critical', "{$platform} needs reconnecting ({$where})",
+                    $connection->last_error ?: 'The platform rejected the stored credentials.', 'marketing.integrations', 'location');
 
                 continue;
             }
 
             $synced = $connection->last_synced_at;
             if ($synced === null || $synced->diffInHours(CarbonImmutable::now()) >= self::ADS_STALE_HOURS) {
-                $out[] = $this->item('warning', "Google Ads has not synced recently ({$where})",
+                $out[] = $this->item('warning', "{$platform} has not synced recently ({$where})",
                     $synced === null ? 'No sync has completed since the connection was made.' : "Last sync {$synced->diffForHumans()}; it is scheduled every three hours.",
                     'marketing.integrations', 'location');
             }
@@ -166,7 +167,7 @@ class MarketingAlertService
 
         $waiting = MarketingAdAccount::query()->advertising()->whereDoesntHave('locations')->count();
         if ($waiting > 0) {
-            $out[] = $this->item('warning', $waiting === 1 ? 'A Google Ads account is waiting for a location' : "{$waiting} Google Ads accounts are waiting for a location",
+            $out[] = $this->item('warning', $waiting === 1 ? 'An ad account is waiting for a location' : "{$waiting} ad accounts are waiting for a location",
                 'It is not synced or reported until it is assigned to a location on the Integrations page. Leave accounts of other businesses unassigned.', 'marketing.integrations', 'organization');
         }
 
@@ -177,7 +178,7 @@ class MarketingAlertService
             ->whereHas('account', fn ($q) => $q->advertising()->has('locations', '>', 1))
             ->count();
         if ($unassigned > 0) {
-            $out[] = $this->item('warning', $unassigned === 1 ? 'A Google Ads campaign is not credited to any location' : "{$unassigned} Google Ads campaigns are not credited to any location",
+            $out[] = $this->item('warning', $unassigned === 1 ? 'An ad campaign is not credited to any location' : "{$unassigned} ad campaigns are not credited to any location",
                 'They belong to accounts shared by several locations, and are left out of every report until each is assigned. Assign them from the account on the Integrations page.', 'marketing.integrations', 'organization');
         }
 

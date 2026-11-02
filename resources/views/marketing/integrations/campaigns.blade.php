@@ -1,6 +1,6 @@
 <x-marketing-layout>
     <x-slot:title>{{ $account->name ?: $account->external_id }}</x-slot:title>
-    <x-slot:subtitle>Google Ads account {{ $account->external_id }} · credit each campaign to one of its locations</x-slot:subtitle>
+    <x-slot:subtitle>{{ \App\Models\MarketingAdConnection::PLATFORMS[$account->provider] ?? 'Ad' }} account {{ $account->external_id }} · credit each campaign to one of its locations</x-slot:subtitle>
 
     <div class="p-4 sm:p-6 space-y-6 max-w-[1200px]">
 
@@ -38,7 +38,7 @@
                                 <td class="px-4 py-3 text-right tabular-nums" data-order="{{ $campaign['recent_spend'] }}">{{ ops_fmt($campaign['recent_spend'], 'money') }}</td>
                                 <td class="px-4 py-3">
                                     @if (count($accountLocations) > 1)
-                                        <form method="POST" action="{{ route('marketing.google-ads.campaigns.update', $campaign['id']) }}">
+                                        <form method="POST" action="{{ route('marketing.ad-campaigns.update', $campaign['id']) }}">
                                             @csrf @method('PATCH')
                                             <select name="location" aria-label="Credited to" onchange="this.form.submit()"
                                                 class="text-[11px] rounded-lg border {{ $campaign['location_key'] === null ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white' }} px-2 py-1 cursor-pointer">

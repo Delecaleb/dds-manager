@@ -9,11 +9,11 @@
     <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <x-marketing.stat label="Leads" icon="user-plus" tone="emerald" :value="number_format($summary['leads'])" hint="Visitors who gave contact details in the period" />
-            <x-marketing.stat label="With Email" icon="mail" :value="number_format($summary['with_email'])" />
-            <x-marketing.stat label="With Phone" icon="phone" :value="number_format($summary['with_phone'])" />
-            <x-marketing.stat label="From Ads" icon="megaphone" :value="number_format($summary['paid'])" hint="First visit arrived with an ad click id" />
-            <x-marketing.stat label="Returning Visitors" icon="repeat" :value="number_format($summary['returning'])" hint="Visited more than once before signing up" />
+            <x-marketing.stat metric="leads" :value="number_format($summary['leads'])" />
+            <x-marketing.stat metric="leads_with_email" :value="number_format($summary['with_email'])" />
+            <x-marketing.stat metric="leads_with_phone" :value="number_format($summary['with_phone'])" />
+            <x-marketing.stat metric="leads_from_ads" :value="number_format($summary['paid'])" />
+            <x-marketing.stat metric="leads_returning" :value="number_format($summary['returning'])" />
         </div>
 
         <x-marketing.panel title="Lead list" subtitle="Newest first. Each lead stays linked to the visit that first brought them." icon="users">

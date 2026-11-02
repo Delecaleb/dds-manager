@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdAccountController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\DeveloperApiController;
 use App\Http\Controllers\Admin\SyncAlertController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\GoogleAdsController;
 use App\Http\Controllers\HygieneRecallController;
 use App\Http\Controllers\KpisController;
 use App\Http\Controllers\MarketingController;
+use App\Http\Controllers\MetaAdsController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\OpenDentalExplorerController;
 use App\Http\Controllers\OperationsController;
@@ -197,10 +199,20 @@ Route::middleware('auth')->group(function () {
         Route::prefix('integrations/google-ads')->name('google-ads.')->controller(GoogleAdsController::class)->group(function () {
             Route::get('connect', 'connect')->name('connect');
             Route::get('callback', 'callback')->name('callback');
-            Route::patch('accounts/{account}', 'updateAccount')->name('accounts.update');
-            Route::get('accounts/{account}/campaigns', 'campaigns')->name('accounts.campaigns');
-            Route::patch('campaigns/{campaign}', 'updateCampaign')->name('campaigns.update');
             Route::delete('{connection}', 'disconnect')->name('disconnect');
+        });
+
+        // Meta Ads connection: a Business Manager system user token, pasted once.
+        Route::prefix('integrations/meta-ads')->name('meta-ads.')->controller(MetaAdsController::class)->group(function () {
+            Route::post('/', 'store')->name('store');
+            Route::delete('{connection}', 'disconnect')->name('disconnect');
+        });
+
+        // Ad accounts of every platform: which locations each serves, and per-campaign credit.
+        Route::controller(AdAccountController::class)->group(function () {
+            Route::patch('integrations/ad-accounts/{account}', 'update')->name('ad-accounts.update');
+            Route::get('integrations/ad-accounts/{account}/campaigns', 'campaigns')->name('ad-accounts.campaigns');
+            Route::patch('integrations/ad-campaigns/{campaign}', 'updateCampaign')->name('ad-campaigns.update');
         });
 
         // AI Front Desk umbrella — call answering, booking and intake.

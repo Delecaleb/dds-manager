@@ -1,6 +1,6 @@
 <x-marketing-layout>
     <x-slot:title>Integrations</x-slot:title>
-    <x-slot:subtitle>Connect Google Ads once, then assign each ad account to the locations it serves</x-slot:subtitle>
+    <x-slot:subtitle>Connect Google Ads and Meta Ads once, then assign each ad account to the locations it serves</x-slot:subtitle>
 
     @php
         $pill = fn (\App\Models\MarketingAdConnection $c) => match (true) {
@@ -10,6 +10,8 @@
             default => ['Connected', 'emerald'],
         };
         $waiting = count(array_filter($accounts, fn ($a) => $a['state'] === 'waiting'));
+        $googleConnections = array_values(array_filter($connections, fn ($c) => $c->provider === \App\Models\MarketingAdConnection::PROVIDER_GOOGLE_ADS));
+        $metaConnections = array_values(array_filter($connections, fn ($c) => $c->provider === \App\Models\MarketingAdConnection::PROVIDER_META_ADS));
     @endphp
 
     <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
@@ -32,12 +34,12 @@
                 @endif
             </x-slot:actions>
 
-            @if ($connections === [])
+            @if ($googleConnections === [])
                 <x-marketing.empty icon="plug" title="No Google Ads login connected"
                     message="Connect with a Google login that can see your ad accounts. Every account it can see is listed below, once, for you to assign." />
             @else
                 <ul class="divide-y divide-slate-100">
-                    @foreach ($connections as $c)
+                    @foreach ($googleConnections as $c)
                         @php [$label, $tone] = $pill($c); @endphp
                         <li class="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div class="min-w-0">
@@ -74,12 +76,75 @@
             @endif
         </x-marketing.panel>
 
+        {{-- Meta system users: a token pasted once; like a Google login, it belongs to no location. --}}
+        <x-marketing.panel title="Meta Ads system users" subtitle="Read-only access to Facebook and Instagram campaigns, spend, link clicks and leads. A system user belongs to no location." icon="thumbs-up">
+            @if ($metaConnections !== [])
+                <ul class="divide-y divide-slate-100 mb-5 border-b border-slate-100">
+                    @foreach ($metaConnections as $c)
+                        @php [$label, $tone] = $pill($c); @endphp
+                        <li class="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[13px] font-semibold text-slate-800 truncate">{{ $c->label() }}</span>
+                                    <x-front-desk.pill :label="$label" :tone="$tone" />
+                                </div>
+                                <p class="text-[11px] text-slate-500 mt-0.5">
+                                    {{ $c->accounts_count }} {{ \Illuminate\Support\Str::plural('account', $c->accounts_count) }} read through this system user ·
+                                    {{ $c->last_synced_at ? 'last synced '.$c->last_synced_at->diffForHumans() : 'not synced yet' }}
+                                    @if ($c->connected_at) · connected {{ $c->connected_at->diffForHumans() }} @endif
+                                </p>
+                                @if ($c->hasUnreadableToken())
+                                    <p class="mt-1 text-xs text-amber-700">Its stored token cannot be read on this server (it was saved under a different app key). Paste the token again below.</p>
+                                @elseif ($c->last_error)
+                                    <p class="mt-1 text-xs text-amber-700">{{ $c->last_error }}</p>
+                                @endif
+                            </div>
+                            @if ($c->isUsable())
+                                <form method="POST" action="{{ route('marketing.meta-ads.disconnect', $c) }}" class="shrink-0"
+                                    onsubmit="return confirm(@js('Disconnect '.$c->label().'? Imported campaign history is kept.'));">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50">Disconnect</button>
+                                </form>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <form method="POST" action="{{ route('marketing.meta-ads.store') }}" class="space-y-2">
+                    @csrf
+                    <label for="metaToken" class="block text-[12px] font-bold text-slate-900">
+                        {{ $metaConnections === [] ? 'System user token' : 'Add a system user, or replace a token' }}
+                    </label>
+                    <input id="metaToken" name="token" type="password" autocomplete="off" required minlength="20"
+                        placeholder="EAAG…"
+                        class="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 font-mono">
+                    @error('token') <p class="text-[11px] text-rose-700">{{ $message }}</p> @enderror
+                    <button type="submit" class="px-3 py-1.5 text-[11px] font-bold rounded-lg border border-[#00bfa5] text-white bg-[#00bfa5] hover:opacity-90">Connect Meta Ads</button>
+                    <p class="text-[11px] text-slate-500">The token is checked with Meta, then stored encrypted. Saving the same system user's token again replaces the old one.</p>
+                </form>
+
+                <details class="text-[11px] text-slate-600" @if ($metaConnections === []) open @endif>
+                    <summary class="cursor-pointer text-[12px] font-bold text-slate-900">How to get a token (about 15 minutes, once)</summary>
+                    <ol class="mt-2 space-y-1.5 list-decimal pl-4 leading-relaxed">
+                        <li>At <span class="font-semibold">developers.facebook.com</span> → My Apps → Create app → type <span class="font-semibold">Business</span>, owned by your Business Manager. Add the <span class="font-semibold">Marketing API</span> product.</li>
+                        <li>In <span class="font-semibold">business.facebook.com</span> → Business Settings → Users → <span class="font-semibold">System users</span> → Add. Role: Employee is enough.</li>
+                        <li>Select the system user → <span class="font-semibold">Assign assets</span> → Ad accounts → tick each clinic's ad account with <span class="font-semibold">View performance</span>. Also assign the app from step 1.</li>
+                        <li><span class="font-semibold">Generate new token</span> → choose the app → expiration <span class="font-semibold">Never</span> → permissions <span class="font-semibold">ads_read</span> (and read_insights if offered) → Generate.</li>
+                        <li>Paste the token here. Every ad account it can see is listed under Ad accounts below. Assign each to its location; nothing syncs until you do.</li>
+                    </ol>
+                    <p class="mt-2 text-slate-500">If the app has "Require app secret" switched on, set <code class="text-[10px]">META_ADS_APP_SECRET</code> on the server first.</p>
+                </details>
+            </div>
+        </x-marketing.panel>
+
         {{-- Every ad account once. Nothing is synced or reported until it has a location. --}}
         <x-marketing.panel title="Ad accounts"
             :subtitle="$waiting > 0 ? $waiting.' waiting for a location — not synced until assigned. Leave other businesses\' accounts unassigned.' : 'Each account is synced and reported for the locations it is assigned to.'"
             icon="briefcase">
             @if ($accounts === [])
-                <x-marketing.empty icon="briefcase" title="No ad accounts yet" message="Accounts appear here once a Google Ads login is connected." />
+                <x-marketing.empty icon="briefcase" title="No ad accounts yet" message="Accounts appear here once a Google Ads login or a Meta system user is connected." />
             @else
                 <div class="p-3">
                     @include('marketing.integrations._accounts', ['accounts' => $accounts, 'locations' => $locations, 'id' => 'mkAccounts'])

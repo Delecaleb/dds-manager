@@ -78,6 +78,20 @@ final class MarketingFilter
         return $this->selection->keys();
     }
 
+    /** The same period over every reportable location, without touching the saved choice. */
+    public function everyLocation(ClinicRegistry $clinics): self
+    {
+        return $this->allLocations
+            ? $this
+            : new self($this->start, $this->end, $clinics->select('all', false), true, $this->siteId);
+    }
+
+    /** Whether a location is part of the user's selection. */
+    public function includes(Location $location): bool
+    {
+        return in_array($location->key(), $this->keys(), true);
+    }
+
     public function withSite(?int $siteId): self
     {
         return new self($this->start, $this->end, $this->selection, $this->allLocations, $siteId);
@@ -92,6 +106,21 @@ final class MarketingFilter
             $this->allLocations => 'All locations',
             count($locations) === 1 => $locations[0]->name,
             default => count($locations).' locations',
+        };
+    }
+
+    /**
+     * What a headline number covers, said plainly: "all locations combined",
+     * "Grand Rapids only", or "3 locations combined (A, B, C)".
+     */
+    public function scopeLabel(): string
+    {
+        $locations = $this->locations();
+
+        return match (true) {
+            $this->allLocations => 'all locations combined',
+            count($locations) === 1 => $locations[0]->name.' only',
+            default => count($locations).' locations combined ('.implode(', ', array_map(fn (Location $l) => $l->name, $locations)).')',
         };
     }
 

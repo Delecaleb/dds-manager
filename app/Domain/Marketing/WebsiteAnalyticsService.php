@@ -117,7 +117,7 @@ class WebsiteAnalyticsService
     /**
      * Headline numbers for the filter's sites.
      *
-     * @return array{visitors: int, sessions: int, signups: int, signup_rate: float, avg_seconds_to_signup: ?int}
+     * @return array{visitors: int, sessions: int, pageviews: int, signups: int, signup_rate: float, avg_seconds_to_signup: ?int}
      */
     public function summary(MarketingFilter $filter): array
     {
@@ -139,6 +139,7 @@ class WebsiteAnalyticsService
         return [
             'visitors' => (int) ($totals->visitors ?? 0),
             'sessions' => $sessionCount,
+            'pageviews' => $this->pageviewQuery($filter)->count(),
             'signups' => $signups,
             'signup_rate' => $sessionCount > 0 ? round($signups / $sessionCount * 100, 1) : 0.0,
             'avg_seconds_to_signup' => $timeToSignup->isEmpty() ? null : (int) round($timeToSignup->avg()),
@@ -271,36 +272,39 @@ class WebsiteAnalyticsService
     }
 
     /**
-     * Most viewed pages, and how many landings each one took.
+     * Most viewed pages, and how many landings each one took. A page is a path on one site,
+     * so the same path on two sites stays two rows. Only the path is stored, so the full
+     * URL is rebuilt from the site's domain, assuming https.
      *
      * @return list<array<string, mixed>>
      */
     public function topPages(MarketingFilter $filter, int $limit = 15): array
     {
         $landings = $this->sessionQuery($filter)
-            ->selectRaw('landing_path, COUNT(*) as landings')
-            ->groupBy('landing_path')
-            ->pluck('landings', 'landing_path');
+            ->selectRaw('site_id, landing_path, COUNT(*) as landings')
+            ->groupBy('site_id', 'landing_path')
+            ->get()
+            ->mapWithKeys(fn ($row) => [$row->site_id.'|'.$row->landing_path => (int) $row->landings]);
 
-        // A page view counts for the location its visit is credited to.
-        $views = DB::table('marketing_events as e')
-            ->join('marketing_sessions as ms', 'ms.id', '=', 'e.session_id')
-            ->where('e.type', MarketingEvent::TYPE_PAGEVIEW)
-            ->whereBetween('e.occurred_at', $this->range($filter));
-        $this->scope($views, $filter, 'ms');
-
-        return $views
-            ->selectRaw('e.path as path, COUNT(*) as views, COUNT(DISTINCT e.visitor_id) as visitors')
-            ->groupBy('e.path')
+        $rows = $this->pageviewQuery($filter)
+            ->selectRaw('e.site_id as site_id, e.path as path, COUNT(*) as views, COUNT(DISTINCT e.visitor_id) as visitors')
+            ->groupBy('e.site_id', 'e.path')
             ->orderByDesc('views')
             ->limit($limit)
-            ->get()
-            ->map(fn ($row) => [
-                'path' => $row->path,
-                'views' => (int) $row->views,
-                'visitors' => (int) $row->visitors,
-                'landings' => (int) ($landings[$row->path] ?? 0),
-            ])->all();
+            ->get();
+
+        $domains = MarketingSite::query()->whereIn('id', $rows->pluck('site_id')->unique())->pluck('domain', 'id');
+
+        return $rows->map(fn ($row) => [
+            'path' => $row->path,
+            // A path that is not site-relative (e.g. a file:// test page) is shown as recorded.
+            'url' => isset($domains[$row->site_id]) && str_starts_with((string) $row->path, '/')
+                ? 'https://'.$domains[$row->site_id].$row->path
+                : $row->path,
+            'views' => (int) $row->views,
+            'visitors' => (int) $row->visitors,
+            'landings' => $landings[$row->site_id.'|'.$row->path] ?? 0,
+        ])->all();
     }
 
     /**
@@ -566,6 +570,18 @@ class WebsiteAnalyticsService
     {
         $query = DB::table('marketing_sessions')->whereBetween('started_at', $this->range($filter));
         $this->scope($query, $filter);
+
+        return $query;
+    }
+
+    /** Page views in the period, aliased `e`; a view counts for the location its visit is credited to. */
+    private function pageviewQuery(MarketingFilter $filter)
+    {
+        $query = DB::table('marketing_events as e')
+            ->join('marketing_sessions as ms', 'ms.id', '=', 'e.session_id')
+            ->where('e.type', MarketingEvent::TYPE_PAGEVIEW)
+            ->whereBetween('e.occurred_at', $this->range($filter));
+        $this->scope($query, $filter, 'ms');
 
         return $query;
     }

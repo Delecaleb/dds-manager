@@ -17,7 +17,7 @@
         <x-marketing.panel title="Open alerts" subtitle="Checked against the tracking and ad data every time this page loads" icon="bell-ring">
             @if($alerts['items'] === [])
                 <x-marketing.empty icon="bell-off" title="Nothing needs attention"
-                    message="Every tracked site is reporting, Google Ads is in sync, and no enabled campaign is spending without conversions." />
+                    message="Every tracked site is reporting, the ad platforms are in sync, and no enabled campaign is spending without conversions." />
             @else
                 <ul class="divide-y divide-slate-100">
                     @foreach ($alerts['items'] as $item)
@@ -51,10 +51,10 @@
                     ['Site never reported', 'A site was added over '.$svc::SITE_VERIFY_HOURS.' hours ago and no page view has arrived', 'Warning', 'Location'],
                     ['Site stopped reporting', 'A verified site has sent nothing for '.$svc::SITE_SILENT_HOURS.' hours', 'Critical', 'Location'],
                     ['Spend without conversions', 'An enabled campaign spent at least '.ops_fmt($svc::MIN_SPEND_FOR_CONVERSION_ALERT, 'money').' in the period with zero conversions', 'Warning', 'Location'],
-                    ['Google Ads needs reconnecting', 'Google rejected the stored credentials', 'Critical', 'Organization'],
-                    ['Google Ads not synced', 'No sync for '.$svc::ADS_STALE_HOURS.' hours (it runs every three)', 'Warning', 'Organization'],
+                    ['Ad platform needs reconnecting', 'Google or Meta rejected the stored credentials', 'Critical', 'Organization'],
+                    ['Ad platform not synced', 'No sync for '.$svc::ADS_STALE_HOURS.' hours (it runs every three)', 'Warning', 'Organization'],
                     ['Site not assigned to a location', 'A tracked site has no location, so it is missing from every per-office view', 'Warning', 'Organization'],
-                    ['Ad account waiting for a location', 'A Google Ads account has no location, so it is not synced or reported', 'Warning', 'Organization'],
+                    ['Ad account waiting for a location', 'A Google or Meta ad account has no location, so it is not synced or reported', 'Warning', 'Organization'],
                     ['Campaign not credited', 'A campaign in an account shared by several locations has not been assigned to one, so it counts for none', 'Warning', 'Organization'],
                 ] as [$rule, $when, $severity, $scope])
                     <tr>
