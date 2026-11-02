@@ -13,9 +13,11 @@
                     <div class="space-y-2">
                         @foreach ($stages as $i => $stage)
                             <div class="flex items-center gap-4 border border-slate-200 rounded-xl px-4 py-3">
-                                <span class="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center shrink-0 text-[11px] font-bold">{{ $i + 1 }}</span>
+                                <span class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ \App\Domain\Marketing\MarketingMetric::TONES[\App\Domain\Marketing\MarketingMetric::tone($stage['metric'])]['chip'] }}">
+                                    <i data-lucide="{{ \App\Domain\Marketing\MarketingMetric::icon($stage['metric']) }}" class="w-4 h-4"></i>
+                                </span>
                                 <div class="min-w-0 flex-1">
-                                    <div class="text-[13px] font-bold text-slate-900">{{ $stage['label'] }}</div>
+                                    <div class="text-[13px] font-bold text-slate-900"><span class="text-slate-400 font-semibold">{{ $i + 1 }}.</span> {{ $stage['label'] }}</div>
                                     <div class="text-[11px] text-slate-500">{{ $stage['meaning'] }}</div>
                                 </div>
                                 <div class="text-right">
@@ -31,18 +33,18 @@
             @endforeach
         </div>
 
-        <x-marketing.panel title="By source" subtitle="Visitors → sessions → signups for every source / medium" icon="share-2">
+        <x-marketing.panel title="By source" subtitle="Unique visitors → visits → signups for every source. Hover a column for its meaning." icon="share-2">
             @if($funnel['sources'] === [])
                 <x-marketing.empty icon="share-2" title="No traffic in this period" />
             @else
                 <x-data-table id="mkSources" min-width="800px">
                     <x-slot:head>
                         <tr>
-                            <th class="px-4 py-3">Source / Medium</th>
-                            <th class="px-4 py-3 text-right">Visitors</th>
-                            <th class="px-4 py-3 text-right">Sessions</th>
-                            <th class="px-4 py-3 text-right">Signups</th>
-                            <th class="px-4 py-3 text-right">Signup Rate</th>
+                            <x-marketing.th metric="source" />
+                            <x-marketing.th metric="visitors" align="right" />
+                            <x-marketing.th metric="visits" align="right" />
+                            <x-marketing.th metric="signups" align="right" />
+                            <x-marketing.th metric="signup_rate" align="right" />
                         </tr>
                     </x-slot:head>
                     @foreach($funnel['sources'] as $row)
@@ -69,9 +71,9 @@
                             <th class="px-4 py-3">Platform</th>
                             <th class="px-4 py-3">Campaign</th>
                             <th class="px-4 py-3">Ad / Keyword</th>
-                            <th class="px-4 py-3 text-right">Visitors</th>
-                            <th class="px-4 py-3 text-right">Sessions</th>
-                            <th class="px-4 py-3 text-right">Signups</th>
+                            <x-marketing.th metric="visitors" align="right" />
+                            <x-marketing.th metric="visits" align="right" />
+                            <x-marketing.th metric="signups" align="right" />
                         </tr>
                     </x-slot:head>
                     @foreach($funnel['adSources'] as $row)

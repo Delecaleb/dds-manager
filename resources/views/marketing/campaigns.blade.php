@@ -16,12 +16,12 @@
 
         {{-- Headline numbers: exactly what the ad platform reports for the period. --}}
         <div class="grid grid-cols-2 lg:grid-cols-6 gap-3">
-            <x-marketing.stat label="Active Campaigns" icon="megaphone" :value="number_format($summary['active_campaigns'])" hint="Enabled on the platform right now" />
-            <x-marketing.stat label="Spend" icon="wallet" :value="ops_fmt($summary['spend'], 'money')" hint="As reported by each ad platform" />
-            <x-marketing.stat label="Impressions" icon="eye" :value="number_format($summary['impressions'])" hint="Times an ad was shown" />
-            <x-marketing.stat label="Clicks" icon="mouse-pointer-click" :value="number_format($summary['clicks'])" hint="Ad clicks (Meta: link clicks)" />
-            <x-marketing.stat label="Conversions" icon="target" :value="ops_fmt($summary['conversions'], 'number')" hint="As counted by each platform's own conversion tracking" />
-            <x-marketing.stat label="Cost / Conversion" icon="calculator" :value="ops_fmt($summary['cost_per_conversion'], 'money')" hint="Spend ÷ conversions" />
+            <x-marketing.stat metric="active_campaigns" :value="number_format($summary['active_campaigns'])" />
+            <x-marketing.stat metric="ad_spend" :value="ops_fmt($summary['spend'], 'money')" />
+            <x-marketing.stat metric="impressions" :value="number_format($summary['impressions'])" />
+            <x-marketing.stat metric="ad_clicks" :value="number_format($summary['clicks'])" />
+            <x-marketing.stat metric="conversions" :value="ops_fmt($summary['conversions'], 'number')" />
+            <x-marketing.stat metric="cost_per_conversion" :value="ops_fmt($summary['cost_per_conversion'], 'money')" />
         </div>
 
         <x-marketing.panel title="All campaigns" subtitle="One row per campaign, credited to its own location or its ad account's" icon="megaphone">
@@ -52,14 +52,14 @@
                             <th class="px-4 py-3">Channel</th>
                             <th class="px-4 py-3">Location</th>
                             <th class="px-4 py-3">Status</th>
-                            <th class="px-4 py-3 text-right">Spend</th>
-                            <th class="px-4 py-3 text-right">Impressions</th>
-                            <th class="px-4 py-3 text-right">Clicks</th>
-                            <th class="px-4 py-3 text-right">CTR</th>
-                            <th class="px-4 py-3 text-right">Avg. CPC</th>
-                            <th class="px-4 py-3 text-right">Conversions</th>
-                            <th class="px-4 py-3 text-right">Cost / Conv.</th>
-                            <th class="px-4 py-3 text-right">Daily Budget</th>
+                            <x-marketing.th metric="ad_spend" align="right" />
+                            <x-marketing.th metric="impressions" align="right" />
+                            <x-marketing.th metric="ad_clicks" align="right" />
+                            <x-marketing.th metric="ctr" align="right" />
+                            <x-marketing.th metric="cpc" align="right" />
+                            <x-marketing.th metric="conversions" align="right" />
+                            <x-marketing.th metric="cost_per_conversion" align="right" />
+                            <x-marketing.th metric="daily_budget" align="right" />
                         </tr>
                     </x-slot:head>
                     @foreach($rows as $row)

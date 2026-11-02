@@ -117,7 +117,7 @@ class WebsiteAnalyticsService
     /**
      * Headline numbers for the filter's sites.
      *
-     * @return array{visitors: int, sessions: int, signups: int, signup_rate: float, avg_seconds_to_signup: ?int}
+     * @return array{visitors: int, sessions: int, pageviews: int, signups: int, signup_rate: float, avg_seconds_to_signup: ?int}
      */
     public function summary(MarketingFilter $filter): array
     {
@@ -139,6 +139,7 @@ class WebsiteAnalyticsService
         return [
             'visitors' => (int) ($totals->visitors ?? 0),
             'sessions' => $sessionCount,
+            'pageviews' => $this->pageviewQuery($filter)->count(),
             'signups' => $signups,
             'signup_rate' => $sessionCount > 0 ? round($signups / $sessionCount * 100, 1) : 0.0,
             'avg_seconds_to_signup' => $timeToSignup->isEmpty() ? null : (int) round($timeToSignup->avg()),
@@ -285,14 +286,7 @@ class WebsiteAnalyticsService
             ->get()
             ->mapWithKeys(fn ($row) => [$row->site_id.'|'.$row->landing_path => (int) $row->landings]);
 
-        // A page view counts for the location its visit is credited to.
-        $views = DB::table('marketing_events as e')
-            ->join('marketing_sessions as ms', 'ms.id', '=', 'e.session_id')
-            ->where('e.type', MarketingEvent::TYPE_PAGEVIEW)
-            ->whereBetween('e.occurred_at', $this->range($filter));
-        $this->scope($views, $filter, 'ms');
-
-        $rows = $views
+        $rows = $this->pageviewQuery($filter)
             ->selectRaw('e.site_id as site_id, e.path as path, COUNT(*) as views, COUNT(DISTINCT e.visitor_id) as visitors')
             ->groupBy('e.site_id', 'e.path')
             ->orderByDesc('views')
@@ -576,6 +570,18 @@ class WebsiteAnalyticsService
     {
         $query = DB::table('marketing_sessions')->whereBetween('started_at', $this->range($filter));
         $this->scope($query, $filter);
+
+        return $query;
+    }
+
+    /** Page views in the period, aliased `e`; a view counts for the location its visit is credited to. */
+    private function pageviewQuery(MarketingFilter $filter)
+    {
+        $query = DB::table('marketing_events as e')
+            ->join('marketing_sessions as ms', 'ms.id', '=', 'e.session_id')
+            ->where('e.type', MarketingEvent::TYPE_PAGEVIEW)
+            ->whereBetween('e.occurred_at', $this->range($filter));
+        $this->scope($query, $filter, 'ms');
 
         return $query;
     }

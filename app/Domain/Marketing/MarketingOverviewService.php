@@ -68,15 +68,15 @@ class MarketingOverviewService
 
         return [
             'ad' => $this->stages([
-                ['Impressions', 'Ads shown, as Google Ads reports', $ads['impressions']],
-                ['Clicks', 'Ad clicks, as Google Ads reports', $ads['clicks']],
-                ['Paid visits', 'Tracked visits that arrived with an ad click id', $paid['sessions']],
-                ['Paid signups', 'Those visits that gave contact details', $paid['signups']],
+                ['impressions', $ads['impressions']],
+                ['ad_clicks', $ads['clicks']],
+                ['paid_visits', $paid['sessions']],
+                ['paid_signups', $paid['signups']],
             ]),
             'site' => $this->stages([
-                ['Visitors', 'Unique browsers on the tracked sites', $site['visitors']],
-                ['Sessions', 'Visits, split after 30 minutes idle', $site['sessions']],
-                ['Signups', 'Visits where contact details were given', $site['signups']],
+                ['visitors', $site['visitors']],
+                ['visits', $site['sessions']],
+                ['signups', $site['signups']],
             ]),
             'sources' => $this->web->trafficSources($filter),
             'adSources' => $this->web->adSources($filter),
@@ -191,19 +191,20 @@ class MarketingOverviewService
     }
 
     /**
-     * Stage rows with the step-to-step conversion into each.
+     * Stage rows with the step-to-step conversion into each, named from the glossary.
      *
-     * @param  list<array{0: string, 1: string, 2: int}>  $stages
-     * @return list<array{label: string, meaning: string, value: int, rate: ?float}>
+     * @param  list<array{0: string, 1: int}>  $stages  [MarketingMetric key, value]
+     * @return list<array{metric: string, label: string, meaning: string, value: int, rate: ?float}>
      */
     private function stages(array $stages): array
     {
         $out = [];
         $previous = null;
-        foreach ($stages as [$label, $meaning, $value]) {
+        foreach ($stages as [$metric, $value]) {
             $out[] = [
-                'label' => $label,
-                'meaning' => $meaning,
+                'metric' => $metric,
+                'label' => MarketingMetric::label($metric),
+                'meaning' => MarketingMetric::help($metric),
                 'value' => $value,
                 'rate' => $previous !== null && $previous > 0 ? round($value / $previous * 100, 1) : null,
             ];
