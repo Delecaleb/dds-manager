@@ -16,8 +16,20 @@
         </form>
     </x-slot:toolbar>
 
+    @php
+        // Who each block covers: the sites table always lists every site in the locations;
+        // the cards and the tables below narrow to one site when the dropdown picks one.
+        $where = $filter->allLocations ? 'all locations' : implode(', ', array_map(fn ($l) => $l->name, $filter->locations()));
+        $numbersFor = $selected ? $selected['name'] . ' (' . $selected['domain'] . ')' : $where;
+        $period = $filter->start . ' → ' . $filter->end;
+    @endphp
+
     <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
+        <div>
+        <x-marketing.scope title="Website traffic"
+            :scope="$selected ? $numbersFor . ' only' : 'All tracked sites, ' . $filter->scopeLabel()"
+            :period="$period" />
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <x-marketing.stat label="Visitors" icon="users" :value="number_format($summary['visitors'])" hint="Unique browsers in the period" />
             <x-marketing.stat label="Sessions" icon="mouse-pointer-click" :value="number_format($summary['sessions'])" hint="Visits, split after 30 min idle" />
@@ -27,8 +39,9 @@
                 :value="$summary['avg_seconds_to_signup'] === null ? '—' : \Carbon\CarbonInterval::seconds($summary['avg_seconds_to_signup'])->cascade()->forHumans(['short' => true, 'parts' => 2])"
                 hint="First visit → signup" />
         </div>
+        </div>
 
-        <x-marketing.panel title="Tracked sites" subtitle="Every site in the selected locations; each reports under its own key" icon="globe">
+        <x-marketing.panel :title="'Tracked sites for ' . $where" :subtitle="'Every site in ' . $where . ', whichever site is picked above; each reports under its own key · ' . $period" icon="globe">
             <x-slot:actions>
                 <a href="{{ route('marketing.tracking') }}"
                     class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-lg border border-emerald-500 text-emerald-700 hover:bg-emerald-50">
@@ -91,7 +104,7 @@
         </x-marketing.panel>
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <x-marketing.panel title="Traffic sources" subtitle="Read from UTM tags, ad click ids and the referrer" icon="share-2">
+            <x-marketing.panel :title="'Traffic sources for ' . $numbersFor" subtitle="Read from UTM tags, ad click ids and the referrer" icon="share-2">
                 <div class="overflow-x-auto">
                     <table class="dds-table w-full text-left text-xs whitespace-nowrap">
                         <thead>
@@ -124,7 +137,7 @@
                 </div>
             </x-marketing.panel>
 
-            <x-marketing.panel title="Ad sources" subtitle="Visits that arrived with an ad click id" icon="megaphone">
+            <x-marketing.panel :title="'Ad sources for ' . $numbersFor" subtitle="Visits that arrived with an ad click id" icon="megaphone">
                 <div class="overflow-x-auto">
                     <table class="dds-table w-full text-left text-xs whitespace-nowrap">
                         <thead>
@@ -161,7 +174,7 @@
             </x-marketing.panel>
         </div>
 
-        <x-marketing.panel title="Top pages" subtitle="Views, unique visitors, and how often the page was the entry point" icon="file-text">
+        <x-marketing.panel :title="'Top pages for ' . $numbersFor" subtitle="Views, unique visitors, and how often the page was the entry point" icon="file-text">
             <div class="overflow-x-auto">
                 <table class="dds-table w-full text-left text-xs whitespace-nowrap">
                     <thead>
@@ -175,7 +188,13 @@
                     <tbody>
                         @forelse($topPages as $page)
                             <tr>
-                                <td class="py-3 px-4 text-slate-700 font-medium">{{ $page['path'] }}</td>
+                                <td class="py-3 px-4 text-slate-700 font-medium">
+                                    @if(str_starts_with((string) $page['url'], 'https://'))
+                                        <a href="{{ $page['url'] }}" target="_blank" rel="noopener noreferrer" class="hover:text-emerald-700 hover:underline">{{ $page['url'] }}</a>
+                                    @else
+                                        {{ $page['url'] ?? '—' }}
+                                    @endif
+                                </td>
                                 <td class="py-3 px-4 text-right tabular-nums">{{ number_format($page['views']) }}</td>
                                 <td class="py-3 px-4 text-right tabular-nums">{{ number_format($page['visitors']) }}</td>
                                 <td class="py-3 px-4 text-right tabular-nums">{{ number_format($page['landings']) }}</td>

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Marketing;
 
+use App\Domain\Support\ClinicRegistry;
 use App\Domain\Support\Location;
 use App\Models\MarketingAdConnection;
 
@@ -17,22 +18,30 @@ use App\Models\MarketingAdConnection;
  */
 class MarketingOverviewService
 {
+    /** The ad platform whose spend a channel carries. */
+    private const CHANNEL_PROVIDERS = [
+        'paid_search' => MarketingAdConnection::PROVIDER_GOOGLE_ADS,
+        'paid_social' => MarketingAdConnection::PROVIDER_META_ADS,
+    ];
+
     public function __construct(
         private readonly WebsiteAnalyticsService $web,
         private readonly AdCampaignReportService $ads,
+        private readonly ClinicRegistry $clinics,
     ) {}
 
     /**
      * @return array{
      *   website: array<string, mixed>, paid: array<string, mixed>, ads: array<string, mixed>,
      *   sites: list<array<string, mixed>>, byLocation: list<array<string, mixed>>,
-     *   googleAdsConnected: bool
+     *   adsConnected: bool, adPlatforms: string
      * }
      */
     public function overview(MarketingFilter $filter): array
     {
         $sites = $this->web->siteSummaries($filter);
         $campaigns = $this->ads->campaignRows($filter);
+        $providers = MarketingAdConnection::connectedProviders();
 
         return [
             'website' => $this->web->summary($filter),
@@ -40,7 +49,8 @@ class MarketingOverviewService
             'ads' => $this->ads->summarize($campaigns),
             'sites' => $sites,
             'byLocation' => $this->byLocation($filter, $campaigns),
-            'googleAdsConnected' => MarketingAdConnection::googleAdsConnected(),
+            'adsConnected' => $providers !== [],
+            'adPlatforms' => MarketingAdConnection::platformNames($providers),
         ];
     }
 
@@ -75,44 +85,47 @@ class MarketingOverviewService
 
     /**
      * One row per channel: traffic and signups from web tracking, plus ad spend where a
-     * connected platform reports it (Google Ads → Paid Search).
+     * connected platform reports it (Google Ads → Paid Search, Meta Ads → Paid Social).
      *
-     * @return array{rows: list<array<string, mixed>>, googleAdsConnected: bool, sites: int, verifiedSites: int}
+     * @return array{rows: list<array<string, mixed>>, connectedProviders: list<string>, sites: int, verifiedSites: int}
      */
     public function channels(MarketingFilter $filter): array
     {
-        $ads = $this->ads->summarize($this->ads->campaignRows($filter));
+        $ads = $this->ads->summarizeByProvider($this->ads->campaignRows($filter));
         $sites = $this->web->sites($filter);
+        $connected = MarketingAdConnection::connectedProviders();
 
-        $rows = array_map(function (array $row) use ($ads) {
-            $spend = $row['channel'] === 'paid_search' ? $ads['spend'] : null;
+        $rows = array_map(function (array $row) use ($ads, $connected) {
+            $provider = self::CHANNEL_PROVIDERS[$row['channel']] ?? null;
+            $reported = $provider !== null && in_array($provider, $connected, true);
+            $spend = $reported ? $ads[$provider]['spend'] : null;
 
             return $row + [
+                'provider' => $provider,
                 'spend' => $spend,
-                'clicks' => $row['channel'] === 'paid_search' ? $ads['clicks'] : null,
+                'clicks' => $reported ? $ads[$provider]['clicks'] : null,
                 'cost_per_signup' => $spend !== null && $row['signups'] > 0 ? round($spend / $row['signups'], 2) : null,
-                'source' => match ($row['channel']) {
-                    'paid_search' => 'Google Ads + site tracking',
-                    default => 'Site tracking',
-                },
+                'source' => $provider !== null
+                    ? MarketingAdConnection::PLATFORMS[$provider].' + site tracking'
+                    : 'Site tracking',
             ];
         }, $this->web->channels($filter));
 
         return [
             'rows' => $rows,
-            'googleAdsConnected' => MarketingAdConnection::googleAdsConnected(),
+            'connectedProviders' => $connected,
             'sites' => $sites->count(),
             'verifiedSites' => $sites->filter(fn ($s) => $s->isVerified())->count(),
         ];
     }
 
     /**
-     * Per selected location: the traffic credited to it and its campaigns' spend. Traffic
-     * or a campaign credited to a whole multi-clinic office counts for each of its clinics.
-     * Visits on a shared site that could not be placed yet get their own row, shown only
-     * when every location is selected.
+     * Every location, whatever the picker says, so locations can be compared side by side;
+     * `selected` marks the ones the headline cards cover. Traffic or a campaign credited to
+     * a whole multi-clinic office counts for each of its clinics. Visits on a shared site
+     * that could not be placed yet, and unassigned sites and campaigns, get their own row.
      *
-     * @param  list<array<string, mixed>>  $campaigns
+     * @param  list<array<string, mixed>>  $campaigns  campaign rows for the selection
      * @return list<array<string, mixed>>
      */
     private function byLocation(MarketingFilter $filter, array $campaigns): array
@@ -120,28 +133,32 @@ class MarketingOverviewService
         $belongs = fn (?int $officeId, ?int $clinicNum, Location $l) => $officeId === $l->officeId
             && ($clinicNum === null || $clinicNum === $l->clinicNum);
 
-        $traffic = $this->web->byLocation($filter);
-        $sites = $this->web->sites($filter);
+        $every = $filter->everyLocation($this->clinics);
+        if ($every !== $filter) {
+            $campaigns = $this->ads->campaignRows($every);
+        }
+
+        $traffic = $this->web->byLocation($every);
+        $sites = $this->web->sites($every);
 
         $rows = [];
-        foreach ($filter->locations() as $location) {
+        foreach ($every->locations() as $location) {
             $rows[] = $this->locationRow(
                 $location->key(),
                 $location->name,
                 $sites->filter(fn ($site) => $site->locations->contains(fn ($l) => $belongs((int) $l->office_id, $l->clinic_num === null ? null : (int) $l->clinic_num, $location)))->count(),
                 array_filter($traffic, fn ($t) => $t['office_id'] !== null && $belongs($t['office_id'], $t['clinic_num'], $location)),
                 array_filter($campaigns, fn ($c) => $belongs($c['office_id'], $c['clinic_num'], $location)),
-            );
+            ) + ['selected' => $filter->allLocations || $filter->includes($location)];
         }
 
-        if ($filter->allLocations) {
-            $unplacedTraffic = array_filter($traffic, fn ($t) => $t['office_id'] === null);
-            $unassignedCampaigns = array_filter($campaigns, fn ($c) => $c['office_id'] === null);
-            $unassignedSites = $sites->filter(fn ($site) => $site->locations->isEmpty())->count();
+        $unplacedTraffic = array_filter($traffic, fn ($t) => $t['office_id'] === null);
+        $unassignedCampaigns = array_filter($campaigns, fn ($c) => $c['office_id'] === null);
+        $unassignedSites = $sites->filter(fn ($site) => $site->locations->isEmpty())->count();
 
-            if ($unplacedTraffic !== [] || $unassignedCampaigns !== [] || $unassignedSites > 0) {
-                $rows[] = $this->locationRow(null, 'Location not known', $unassignedSites, $unplacedTraffic, $unassignedCampaigns);
-            }
+        if ($unplacedTraffic !== [] || $unassignedCampaigns !== [] || $unassignedSites > 0) {
+            $rows[] = $this->locationRow(null, 'Location not known', $unassignedSites, $unplacedTraffic, $unassignedCampaigns)
+                + ['selected' => $filter->allLocations];
         }
 
         return $rows;

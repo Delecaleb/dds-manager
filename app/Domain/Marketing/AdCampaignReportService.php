@@ -130,13 +130,30 @@ class AdCampaignReportService
     }
 
     /**
-     * Google logins that have been connected, newest first.
+     * Headline totals per platform, e.g. ['google_ads' => summarize(...), 'meta' => summarize(...)].
+     * Every known platform is present, with zeros when it has no rows.
+     *
+     * @param  list<array<string, mixed>>  $rows  from campaignRows()
+     * @return array<string, array<string, mixed>>
+     */
+    public function summarizeByProvider(array $rows): array
+    {
+        $out = [];
+        foreach (array_keys(MarketingAdConnection::PLATFORMS) as $provider) {
+            $out[$provider] = $this->summarize(array_values(array_filter($rows, fn (array $row) => $row['provider'] === $provider)));
+        }
+
+        return $out;
+    }
+
+    /**
+     * Ad platform logins that have been connected (every platform), newest first.
      *
      * @return list<MarketingAdConnection>
      */
     public function connections(): array
     {
-        return MarketingAdConnection::query()->googleAds()->withCount('accounts')->latest('connected_at')->get()->all();
+        return MarketingAdConnection::query()->withCount('accounts')->latest('connected_at')->get()->all();
     }
 
     /**
@@ -165,6 +182,8 @@ class AdCampaignReportService
                     'id' => $account->id,
                     'name' => $account->name ?: $account->external_id,
                     'external_id' => $account->external_id,
+                    'provider' => $account->provider,
+                    'platform' => MarketingAdConnection::PLATFORMS[$account->provider] ?? $account->provider,
                     'currency_code' => $account->currency_code,
                     'status' => $account->status,
                     'active' => $active,

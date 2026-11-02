@@ -190,6 +190,16 @@ $inBackground(Schedule::command('marketing:google-ads-sync')
     ->onOneServer());
 
 /*
+| META ADS (Growth Engine) — same as Google Ads, for the connected Meta system users.
+| Offset from the Google run so the two never start together. Exits immediately when
+| Meta Ads is not connected.
+*/
+$inBackground(Schedule::command('marketing:meta-ads-sync')
+    ->cron('30 */3 * * *')
+    ->withoutOverlapping(60)
+    ->onOneServer());
+
+/*
 | SHARED-WEBSITE LEADS (Growth Engine) — credit leads from a website several locations share
 | to the location where they are an OpenDental patient. Local tables only; no OpenDental call.
 */

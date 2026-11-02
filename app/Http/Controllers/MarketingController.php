@@ -100,7 +100,7 @@ class MarketingController extends Controller
     {
         $filter = $this->filter($request);
         $rows = $report->campaignRows($filter);
-        $connections = MarketingAdConnection::query()->googleAds()->get()->filter(fn ($c) => $c->isUsable());
+        $connections = MarketingAdConnection::query()->get()->filter(fn ($c) => $c->isUsable());
 
         return view('marketing.campaigns', [
             'filter' => $filter,

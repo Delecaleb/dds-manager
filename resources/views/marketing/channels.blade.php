@@ -15,8 +15,9 @@
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             @foreach ($channels['rows'] as $row)
                 @php
-                    [$status, $tone] = $row['channel'] === 'paid_search'
-                        ? ($channels['googleAdsConnected'] ? ['Google Ads connected', 'emerald'] : ['Google Ads not connected', 'slate'])
+                    $platform = $row['provider'] !== null ? \App\Models\MarketingAdConnection::PLATFORMS[$row['provider']] : null;
+                    [$status, $tone] = $platform !== null
+                        ? (in_array($row['provider'], $channels['connectedProviders'], true) ? [$platform . ' connected', 'emerald'] : [$platform . ' not connected', 'slate'])
                         : ($channels['verifiedSites'] > 0 ? [$reporting, 'emerald'] : [$reporting, 'slate']);
                 @endphp
                 <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
@@ -83,8 +84,9 @@
             </x-data-table>
             <p class="mt-3 text-[11px] text-slate-500">
                 A visit is Paid Search when it carries a Google or Microsoft click id or a cpc / ppc medium; Paid Social on a Meta or TikTok click id;
-                Organic Search, Social and Referral from the referring site; Direct when there is no referrer. Spend is Google Ads only, so
-                Paid Social and Microsoft clicks show traffic but no cost.
+                Organic Search, Social and Referral from the referring site; Direct when there is no referrer. Paid Search spend is Google Ads and
+                Paid Social spend is Meta Ads; Microsoft and TikTok clicks are counted as traffic but their cost is not, so cost per signup
+                is understated when those platforms run.
             </p>
         </x-marketing.panel>
     </div>

@@ -10,7 +10,7 @@
             <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                     <div class="text-[13px] font-semibold text-slate-800">{{ $account['name'] }}</div>
-                    <div class="text-[11px] text-slate-500 tabular-nums break-all">{{ $account['external_id'] }}@if ($account['connection']) · via {{ $account['connection'] }}@endif</div>
+                    <div class="text-[11px] text-slate-500 tabular-nums break-all">{{ $account['platform'] }} · {{ $account['external_id'] }}@if ($account['connection']) · via {{ $account['connection'] }}@endif</div>
                 </div>
                 <div class="shrink-0">
                     @switch($account['state'])
@@ -27,7 +27,7 @@
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
                 <span>{{ $account['campaigns'] }} {{ \Illuminate\Support\Str::plural('campaign', $account['campaigns']) }}</span>
                 @if (count($account['location_keys']) > 1)
-                    <a href="{{ route('marketing.google-ads.accounts.campaigns', $account['id']) }}"
+                    <a href="{{ route('marketing.ad-accounts.campaigns', $account['id']) }}"
                         class="font-semibold {{ $account['unassigned_campaigns'] > 0 ? 'text-amber-700' : 'text-slate-600' }} hover:underline">
                         {{ $account['unassigned_campaigns'] > 0 ? $account['unassigned_campaigns'].' to assign' : 'Assign campaigns' }}
                     </a>
@@ -55,7 +55,7 @@
         <tr class="hover:bg-slate-50 align-top {{ $account['active'] ? '' : 'opacity-60' }}">
             <td class="px-4 py-3">
                 <div class="text-[13px] font-semibold text-slate-800">{{ $account['name'] }}</div>
-                <div class="text-[11px] text-slate-500 tabular-nums">{{ $account['external_id'] }}@if ($account['connection']) · via {{ $account['connection'] }}@endif</div>
+                <div class="text-[11px] text-slate-500 tabular-nums">{{ $account['platform'] }} · {{ $account['external_id'] }}@if ($account['connection']) · via {{ $account['connection'] }}@endif</div>
                 @if ($account['last_error'])
                     <div class="text-[11px] text-amber-700">{{ $account['last_error'] }}</div>
                 @endif
@@ -74,7 +74,7 @@
                 {{ $account['campaigns'] }}
                 @if (count($account['location_keys']) > 1)
                     <div>
-                        <a href="{{ route('marketing.google-ads.accounts.campaigns', $account['id']) }}"
+                        <a href="{{ route('marketing.ad-accounts.campaigns', $account['id']) }}"
                             class="text-[11px] font-semibold {{ $account['unassigned_campaigns'] > 0 ? 'text-amber-700' : 'text-slate-600' }} hover:underline">
                             {{ $account['unassigned_campaigns'] > 0 ? $account['unassigned_campaigns'].' to assign' : 'Assign campaigns' }}
                         </a>

@@ -6,14 +6,17 @@
         $web = $data['website'];
         $ads = $data['ads'];
         $paid = $data['paid'];
-        $adsOn = $data['googleAdsConnected'];
+        $adsOn = $data['adsConnected'];
         $money = fn ($v) => $adsOn ? ops_fmt($v, 'money') : '—';
         $count = fn ($v) => $adsOn ? number_format($v) : '—';
+        $period = $filter->start . ' → ' . $filter->end;
     @endphp
 
     <div class="p-4 sm:p-6 space-y-6 max-w-[1500px]">
 
         {{-- Website: what the tracked sites in these locations did. --}}
+        <div>
+        <x-marketing.scope title="Website traffic" :scope="$filter->scopeLabel()" :period="$period" />
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <x-marketing.stat label="Visitors" icon="users" :value="number_format($web['visitors'])" hint="Unique browsers on the tracked sites" />
             <x-marketing.stat label="Sessions" icon="mouse-pointer-click" :value="number_format($web['sessions'])" hint="Visits, split after 30 min idle" />
@@ -23,18 +26,24 @@
                 :value="$web['avg_seconds_to_signup'] === null ? '—' : \Carbon\CarbonInterval::seconds($web['avg_seconds_to_signup'])->cascade()->forHumans(['short' => true, 'parts' => 2])"
                 hint="First visit → signup" />
         </div>
+        </div>
 
-        {{-- Ads: what Google Ads reports for the campaigns credited to these locations. --}}
+        {{-- Ads: what the connected ad platforms report for the campaigns credited to these locations. --}}
+        <div>
+        <x-marketing.scope :title="($adsOn ? $data['adPlatforms'] : 'Ads') . ' & paid visits'" :scope="$filter->scopeLabel()" :period="$period" />
         <div class="grid grid-cols-2 lg:grid-cols-6 gap-3">
-            <x-marketing.stat label="Ad Spend" icon="wallet" :value="$money($ads['spend'])" :hint="$adsOn ? 'Google Ads, selected period' : 'Google Ads not connected'" />
+            <x-marketing.stat label="Ad Spend" icon="wallet" :value="$money($ads['spend'])" :hint="$adsOn ? $data['adPlatforms'] . ', selected period' : 'No ad platform connected'" />
             <x-marketing.stat label="Impressions" icon="eye" :value="$count($ads['impressions'])" hint="Ads shown" />
             <x-marketing.stat label="Clicks" icon="mouse-pointer-click" :value="$count($ads['clicks'])" hint="Ad clicks" />
             <x-marketing.stat label="Avg. CPC" icon="receipt" :value="$money($ads['avg_cpc'])" hint="Spend ÷ clicks" />
             <x-marketing.stat label="Paid Visits" icon="megaphone" :value="number_format($paid['sessions'])" hint="Tracked visits that arrived with an ad click id" />
             <x-marketing.stat label="Paid Signups" icon="badge-check" tone="emerald" :value="number_format($paid['signups'])" hint="Signups among the paid visits" />
         </div>
+        </div>
 
-        <x-marketing.panel title="By location" subtitle="Each selected location, with its sites' traffic and its campaigns' spend" icon="map-pin">
+        <x-marketing.panel title="By location"
+            :subtitle="'Every location, with its sites\' traffic and its campaigns\' spend · ' . $period . ($filter->allLocations ? '' : ' · highlighted rows are the ones counted in the cards above')"
+            icon="map-pin">
             <x-slot:actions>
                 <a href="{{ route('marketing.funnel', $filter->query()) }}" class="text-[11px] font-bold text-emerald-700 hover:text-emerald-800">Funnel →</a>
                 <a href="{{ route('marketing.channels', $filter->query()) }}" class="text-[11px] font-bold text-emerald-700 hover:text-emerald-800">Channels →</a>
@@ -60,12 +69,15 @@
                         </tr>
                     </x-slot:head>
                     @foreach($data['byLocation'] as $row)
-                        <tr class="hover:bg-slate-50">
+                        <tr class="{{ $row['selected'] && ! $filter->allLocations ? 'bg-emerald-50/60' : '' }} hover:bg-slate-50">
                             <td class="px-4 py-3 text-[13px] font-semibold {{ $row['key'] === null ? 'text-amber-700' : 'text-slate-800' }}">
                                 @if($row['key'] !== null)
                                     <a href="{{ route('marketing.overview', $filter->query(['locations' => $row['key']])) }}" class="hover:text-emerald-700">{{ $row['name'] }}</a>
                                 @else
                                     {{ $row['name'] }}
+                                @endif
+                                @if($row['selected'] && ! $filter->allLocations)
+                                    <span class="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700">Selected</span>
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-right tabular-nums">{{ $row['sites'] }}</td>
@@ -112,7 +124,7 @@
 
         @unless($adsOn)
             <p class="text-[11px] text-slate-500">
-                Ad figures appear once Google Ads is connected under
+                Ad figures appear once Google Ads or Meta Ads is connected under
                 <a href="{{ route('marketing.integrations') }}" class="font-bold text-emerald-700 hover:text-emerald-800">Integrations</a>
                 and each ad account is assigned to a location.
             </p>

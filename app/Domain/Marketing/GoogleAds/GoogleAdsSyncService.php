@@ -2,11 +2,10 @@
 
 namespace App\Domain\Marketing\GoogleAds;
 
+use App\Domain\Marketing\AdSyncWriter;
 use App\Models\MarketingAdAccount;
-use App\Models\MarketingAdCampaign;
 use App\Models\MarketingAdConnection;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -23,9 +22,10 @@ class GoogleAdsSyncService
     /** Days per stats request: keeps one response to a manageable size on busy accounts. */
     private const WINDOW_DAYS = 90;
 
-    private const UPSERT_CHUNK = 500;
-
-    public function __construct(private readonly GoogleAdsClient $client) {}
+    public function __construct(
+        private readonly GoogleAdsClient $client,
+        private readonly AdSyncWriter $writer,
+    ) {}
 
     /**
      * Record every account the connection can reach, including those under a manager.
@@ -85,27 +85,7 @@ class GoogleAdsSyncService
         }
 
         foreach ($found as $externalId => $attributes) {
-            $account = MarketingAdAccount::firstOrNew([
-                'provider' => MarketingAdConnection::PROVIDER_GOOGLE_ADS,
-                'external_id' => (string) $externalId,
-            ]);
-
-            if (! $account->exists) {
-                // New accounts get no location: an admin assigns one before anything syncs.
-                $account->forceFill([
-                    'connection_id' => $connection->id,
-                    'history_from' => CarbonImmutable::today()->subDays($this->historyDays())->toDateString(),
-                ]);
-            } elseif ((int) $account->connection_id !== $connection->id) {
-                // Another login already reads this account: keep it unless that login is gone.
-                $current = $account->connection;
-                if ($current !== null && $current->isUsable()) {
-                    continue;
-                }
-                $account->connection_id = $connection->id;
-            }
-
-            $account->fill($attributes)->save();
+            $this->writer->recordAccount($connection, (string) $externalId, $attributes, $this->historyDays());
         }
 
         return count($found);
@@ -192,7 +172,6 @@ class GoogleAdsSyncService
             WHERE campaign.status != 'REMOVED'
         ", $account->login_customer_id);
 
-        $now = now()->format('Y-m-d H:i:s');
         $campaigns = [];
 
         foreach ($rows as $row) {
@@ -203,24 +182,14 @@ class GoogleAdsSyncService
             }
 
             $campaigns[(string) $campaign['id']] = [
-                'account_id' => $account->id,
-                'external_id' => (string) $campaign['id'],
                 'name' => mb_substr((string) ($campaign['name'] ?? ''), 0, 255),
                 'status' => $campaign['status'] ?? null,
                 'channel_type' => $campaign['advertisingChannelType'] ?? null,
                 'daily_budget_micros' => isset($row['campaignBudget']['amountMicros']) ? (int) $row['campaignBudget']['amountMicros'] : null,
-                'created_at' => $now,
-                'updated_at' => $now,
             ];
         }
 
-        foreach (array_chunk(array_values($campaigns), self::UPSERT_CHUNK) as $chunk) {
-            DB::table('marketing_ad_campaigns')->upsert(
-                $chunk,
-                ['account_id', 'external_id'],
-                ['name', 'status', 'channel_type', 'daily_budget_micros', 'updated_at']
-            );
-        }
+        $this->writer->upsertCampaigns($account, $campaigns);
     }
 
     /** One row per campaign per day in the window. Removed campaigns keep their past spend. */
@@ -238,7 +207,6 @@ class GoogleAdsSyncService
             return;
         }
 
-        $now = now()->format('Y-m-d H:i:s');
         $campaigns = [];
 
         foreach ($rows as $row) {
@@ -246,29 +214,15 @@ class GoogleAdsSyncService
 
             if (filled($campaign['id'] ?? null)) {
                 $campaigns[(string) $campaign['id']] = [
-                    'account_id' => $account->id,
-                    'external_id' => (string) $campaign['id'],
                     'name' => mb_substr((string) ($campaign['name'] ?? ''), 0, 255),
                     'status' => $campaign['status'] ?? null,
                     'channel_type' => $campaign['advertisingChannelType'] ?? null,
-                    'created_at' => $now,
-                    'updated_at' => $now,
                 ];
             }
         }
 
         // Covers campaigns since removed, which the campaign list no longer returns.
-        foreach (array_chunk(array_values($campaigns), self::UPSERT_CHUNK) as $chunk) {
-            DB::table('marketing_ad_campaigns')->upsert(
-                $chunk,
-                ['account_id', 'external_id'],
-                ['name', 'status', 'channel_type', 'updated_at']
-            );
-        }
-
-        $campaignIds = MarketingAdCampaign::where('account_id', $account->id)
-            ->whereIn('external_id', array_keys($campaigns))
-            ->pluck('id', 'external_id');
+        $campaignIds = $this->writer->upsertCampaigns($account, $campaigns);
 
         $stats = [];
 
@@ -291,17 +245,9 @@ class GoogleAdsSyncService
                 'cost_micros' => (int) ($metrics['costMicros'] ?? 0),
                 'conversions' => round((float) ($metrics['conversions'] ?? 0), 4),
                 'conversions_value' => round((float) ($metrics['conversionsValue'] ?? 0), 4),
-                'created_at' => $now,
-                'updated_at' => $now,
             ];
         }
 
-        foreach (array_chunk(array_values($stats), self::UPSERT_CHUNK) as $chunk) {
-            DB::table('marketing_ad_campaign_stats')->upsert(
-                $chunk,
-                ['campaign_id', 'date'],
-                ['impressions', 'clicks', 'cost_micros', 'conversions', 'conversions_value', 'updated_at']
-            );
-        }
+        $this->writer->upsertStats(array_values($stats));
     }
 }

@@ -17,10 +17,10 @@
         {{-- Headline numbers: exactly what the ad platform reports for the period. --}}
         <div class="grid grid-cols-2 lg:grid-cols-6 gap-3">
             <x-marketing.stat label="Active Campaigns" icon="megaphone" :value="number_format($summary['active_campaigns'])" hint="Enabled on the platform right now" />
-            <x-marketing.stat label="Spend" icon="wallet" :value="ops_fmt($summary['spend'], 'money')" hint="As reported by Google Ads" />
+            <x-marketing.stat label="Spend" icon="wallet" :value="ops_fmt($summary['spend'], 'money')" hint="As reported by each ad platform" />
             <x-marketing.stat label="Impressions" icon="eye" :value="number_format($summary['impressions'])" hint="Times an ad was shown" />
-            <x-marketing.stat label="Clicks" icon="mouse-pointer-click" :value="number_format($summary['clicks'])" hint="Clicks on an ad" />
-            <x-marketing.stat label="Conversions" icon="target" :value="ops_fmt($summary['conversions'], 'number')" hint="As counted by Google Ads conversion tracking" />
+            <x-marketing.stat label="Clicks" icon="mouse-pointer-click" :value="number_format($summary['clicks'])" hint="Ad clicks (Meta: link clicks)" />
+            <x-marketing.stat label="Conversions" icon="target" :value="ops_fmt($summary['conversions'], 'number')" hint="As counted by each platform's own conversion tracking" />
             <x-marketing.stat label="Cost / Conversion" icon="calculator" :value="ops_fmt($summary['cost_per_conversion'], 'money')" hint="Spend ÷ conversions" />
         </div>
 
@@ -31,14 +31,14 @@
                         {{ $lastSynced ? 'Synced '.$lastSynced->diffForHumans() : 'Not synced yet' }}
                     </span>
                 @endif
-                <a href="{{ route('marketing.integrations') }}" class="text-[11px] font-bold text-emerald-700 hover:text-emerald-800">Google Ads connection →</a>
+                <a href="{{ route('marketing.integrations') }}" class="text-[11px] font-bold text-emerald-700 hover:text-emerald-800">Ad connections →</a>
             </x-slot:actions>
 
             @if(! $connected)
                 <x-marketing.empty
                     icon="plug"
-                    title="Google Ads is not connected"
-                    message="Connect a Google login under Integrations, then assign each ad account to its locations. Campaigns and their daily spend, impressions, clicks and conversions are then synced every three hours." />
+                    title="No ad platform is connected"
+                    message="Connect Google Ads or Meta Ads under Integrations, then assign each ad account to its locations. Campaigns and their daily spend, impressions, clicks and conversions are then synced every three hours." />
             @elseif($rows === [])
                 <x-marketing.empty
                     icon="megaphone"
@@ -67,7 +67,7 @@
                         <tr class="hover:bg-slate-50">
                             <td class="px-4 py-3">
                                 <div class="text-[13px] font-semibold text-slate-800">{{ $row['name'] }}</div>
-                                <div class="text-[11px] text-slate-400">{{ $row['account_name'] ?? $row['account_external_id'] }}</div>
+                                <div class="text-[11px] text-slate-400">{{ \App\Models\MarketingAdConnection::PLATFORMS[$row['provider']] ?? $row['provider'] }} · {{ $row['account_name'] ?? $row['account_external_id'] }}</div>
                             </td>
                             <td class="px-4 py-3 text-slate-600">{{ $channel($row['channel_type']) }}</td>
                             <td class="px-4 py-3 {{ $row['location'] ? 'text-slate-600' : 'text-amber-700' }}">{{ $row['location'] ?? 'Not assigned' }}</td>
