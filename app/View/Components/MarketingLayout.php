@@ -5,6 +5,7 @@ namespace App\View\Components;
 use App\Domain\FrontDesk\FrontDeskSource;
 use App\Domain\Marketing\MarketingFilter;
 use App\Domain\Support\ClinicRegistry;
+use App\Models\User;
 use Illuminate\View\Component;
 use Illuminate\View\View;
 
@@ -139,9 +140,44 @@ class MarketingLayout extends Component
         };
     }
 
+    /**
+     * The umbrellas as one user sees them: nav items they have no page permission for are
+     * dropped, an umbrella whose home they cannot open lands on its first page they can,
+     * and an umbrella with no page left for them is dropped.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function umbrellasFor(User $user): array
+    {
+        $visible = [];
+
+        foreach (self::UMBRELLAS as $key => $umbrella) {
+            $groups = [];
+            foreach ($umbrella['nav'] as $group) {
+                $group['items'] = array_values(array_filter($group['items'], fn (array $item) => $user->canOpenRoute('marketing', $item['route'])));
+                if ($group['items'] !== []) {
+                    $groups[] = $group;
+                }
+            }
+
+            if ($groups === []) {
+                continue;
+            }
+
+            if (! $user->canOpenRoute('marketing', $umbrella['home'])) {
+                $umbrella['home'] = $groups[0]['items'][0]['route'];
+            }
+            $umbrella['nav'] = $groups;
+            $visible[$key] = $umbrella;
+        }
+
+        return $visible;
+    }
+
     public function render(): View
     {
-        $current = $this->umbrella !== null ? self::UMBRELLAS[$this->umbrella] : null;
+        $umbrellas = self::umbrellasFor(request()->user());
+        $current = $this->umbrella !== null ? ($umbrellas[$this->umbrella] ?? self::UMBRELLAS[$this->umbrella]) : null;
         $office = null;
         $offices = [];
         $source = null;
@@ -168,7 +204,7 @@ class MarketingLayout extends Component
         $filter = $withLocations ? MarketingFilter::fromRequest(request(), $clinics, persist: false) : null;
 
         return view('layouts.marketing', [
-            'umbrellas' => self::UMBRELLAS,
+            'umbrellas' => $umbrellas,
             'umbrellaKey' => $this->umbrella,
             'current' => $current,
             'office' => $office,

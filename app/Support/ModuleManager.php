@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Str;
+
 class ModuleManager
 {
     /**
@@ -40,10 +42,18 @@ class ModuleManager
         ],
     ];
 
+    /** Joins a module key and one of its page keys into a page permission, e.g. "marketing:leads". */
+    public const PAGE_SEPARATOR = ':';
+
     /**
      * Get all module definitions organized by category.
      *
-     * @return array<string, array{label: string, modules: array<string, array{name: string, description: string, icon: string, route: string}>}>
+     * A module may declare `pages`: permissions for parts of it, each covering route-name
+     * patterns. A user then needs the module and the page. Every route of such a module
+     * must be covered by a page or listed in `open_routes` (pages anyone with the module
+     * may open); any other route is refused, so a new route stays closed until mapped.
+     *
+     * @return array<string, array{label: string, modules: array<string, array{name: string, description: string, icon: string, route: string, open_routes?: list<string>, pages?: array<string, array{name: string, routes: list<string>}>}>}>
      */
     public static function getCategories(): array
     {
@@ -172,6 +182,21 @@ class ModuleManager
                         'description' => 'Per-office website tracking, attribution, Google Ads campaigns, leads and alerts; AI Front Desk; AI Website Builder',
                         'icon' => 'trending-up',
                         'route' => 'marketing.index',
+                        'open_routes' => ['marketing.index'],
+                        'pages' => [
+                            'overview' => ['name' => 'Overview', 'routes' => ['marketing.overview']],
+                            'websites' => ['name' => 'Websites', 'routes' => ['marketing.websites']],
+                            'journeys' => ['name' => 'Visitor Journeys', 'routes' => ['marketing.journeys']],
+                            'funnel' => ['name' => 'Attribution Funnel', 'routes' => ['marketing.funnel']],
+                            'channels' => ['name' => 'Channels', 'routes' => ['marketing.channels']],
+                            'campaigns' => ['name' => 'Campaigns', 'routes' => ['marketing.campaigns']],
+                            'leads' => ['name' => 'Leads', 'routes' => ['marketing.leads']],
+                            'alerts' => ['name' => 'Alerts', 'routes' => ['marketing.alerts']],
+                            'tracking' => ['name' => 'Tracking Script & sites', 'routes' => ['marketing.tracking', 'marketing.sites.*']],
+                            'integrations' => ['name' => 'Integrations (ad accounts)', 'routes' => ['marketing.integrations', 'marketing.google-ads.*', 'marketing.meta-ads.*', 'marketing.ad-accounts.*', 'marketing.ad-campaigns.*']],
+                            'front-desk' => ['name' => 'AI Front Desk', 'routes' => ['marketing.front-desk.*']],
+                            'site-builder' => ['name' => 'AI Website Builder', 'routes' => ['marketing.site-builder.*']],
+                        ],
                     ],
                 ],
             ],
@@ -241,11 +266,77 @@ class ModuleManager
     }
 
     /**
-     * Check if a module key exists.
+     * Check if a key is an assignable permission: a module or a module page.
      */
     public static function isValid(string $key): bool
     {
-        return array_key_exists($key, self::all());
+        return array_key_exists($key, self::all()) || in_array($key, self::pageKeys(), true);
+    }
+
+    /**
+     * Every assignable permission key: modules, then module pages.
+     *
+     * @return list<string>
+     */
+    public static function permissionKeys(): array
+    {
+        return [...self::keys(), ...self::pageKeys()];
+    }
+
+    /**
+     * Page definitions of a module ([] when it is not split into pages).
+     *
+     * @return array<string, array{name: string, routes: list<string>}>
+     */
+    public static function pages(string $module): array
+    {
+        return self::all()[$module]['pages'] ?? [];
+    }
+
+    public static function pageKey(string $module, string $page): string
+    {
+        return $module.self::PAGE_SEPARATOR.$page;
+    }
+
+    /**
+     * Every page permission key, e.g. "marketing:leads".
+     *
+     * @return list<string>
+     */
+    public static function pageKeys(): array
+    {
+        $keys = [];
+        foreach (array_keys(self::all()) as $module) {
+            foreach (array_keys(self::pages($module)) as $page) {
+                $keys[] = self::pageKey($module, $page);
+            }
+        }
+
+        return $keys;
+    }
+
+    /** The module a page permission belongs to, or null for a plain module key. */
+    public static function moduleOfPage(string $key): ?string
+    {
+        return str_contains($key, self::PAGE_SEPARATOR) ? strstr($key, self::PAGE_SEPARATOR, true) : null;
+    }
+
+    /** True when the route is open to anyone holding the module (e.g. its hub). */
+    public static function isOpenRoute(string $module, string $routeName): bool
+    {
+        return in_array($routeName, self::all()[$module]['open_routes'] ?? [], true);
+    }
+
+    /** The page of a module that covers a route name, or null when none does. */
+    public static function pageForRoute(string $module, string $routeName): ?string
+    {
+        foreach (self::pages($module) as $page => $meta) {
+            if (Str::is($meta['routes'], $routeName)) {
+                return $page;
+            }
+        }
+
+        return null;
     }
 
     /**

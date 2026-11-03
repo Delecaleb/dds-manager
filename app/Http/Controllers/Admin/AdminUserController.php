@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Users\UserAccessService;
 use App\Support\ModuleManager;
+use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -96,8 +97,8 @@ class AdminUserController extends Controller
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
             'name' => ['nullable', 'string', 'max:255'],
             'role' => ['required', 'string', Rule::in(array_keys(ModuleManager::ROLES))],
-            'modules' => ['nullable', 'array'],
-            'modules.*' => ['string', Rule::in(ModuleManager::keys())],
+            'modules' => ['nullable', 'array', $this->eachPagedModuleHasAPage(...)],
+            'modules.*' => ['string', Rule::in(ModuleManager::permissionKeys())],
         ]);
 
         $user = User::create([
@@ -149,8 +150,8 @@ class AdminUserController extends Controller
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'role' => ['required', 'string', Rule::in(array_keys(ModuleManager::ROLES))],
             'is_active' => ['nullable', 'boolean'],
-            'modules' => ['nullable', 'array'],
-            'modules.*' => ['string', Rule::in(ModuleManager::keys())],
+            'modules' => ['nullable', 'array', $this->eachPagedModuleHasAPage(...)],
+            'modules.*' => ['string', Rule::in(ModuleManager::permissionKeys())],
         ]);
 
         // Safety Guard: Cannot demote oneself from Super Admin
@@ -272,6 +273,32 @@ class AdminUserController extends Controller
 
         return redirect()->route('admin.users.index')
             ->with('success', "User '{$userName}' deleted successfully.");
+    }
+
+    /**
+     * Validation rule: a module split into pages (the Growth Engine) is granted with at least
+     * one of its pages, else the user would hold a module with nothing in it to open.
+     * Super admins are exempt; their permissions are not stored.
+     *
+     * @param  Closure(string): void  $fail
+     */
+    private function eachPagedModuleHasAPage(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (request('role') === 'super_admin' || ! is_array($value)) {
+            return;
+        }
+
+        foreach ($value as $module) {
+            $pages = is_string($module) ? ModuleManager::pages($module) : [];
+            if ($pages === []) {
+                continue;
+            }
+
+            $granted = array_filter(array_keys($pages), fn (string $page) => in_array(ModuleManager::pageKey($module, $page), $value, true));
+            if ($granted === []) {
+                $fail('Choose at least one '.ModuleManager::get($module)['name'].' page, or untick '.ModuleManager::get($module)['name'].'.');
+            }
+        }
     }
 
     /** Send the invitation; false (and the error reported) when mail could not be sent. */

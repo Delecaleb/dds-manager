@@ -31,6 +31,17 @@ class EnsureModuleAccess
             abort(403, 'Access denied. You do not have permission to access the "'.$module.'" module.');
         }
 
+        // Modules split into pages (ModuleManager `pages`) also need the page's permission.
+        if (! $user->canOpenRoute($module, $request->route()?->getName())) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Forbidden: You do not have permission to access this page.',
+                ], 403);
+            }
+
+            abort(403, 'Access denied. You do not have permission to access this page. Ask an administrator to grant it.');
+        }
+
         return $next($request);
     }
 }

@@ -2,10 +2,15 @@
     <x-slot:title>Growth Engine</x-slot:title>
     <x-slot:subtitle>Bring patients in, turn their calls into appointments, and build the sites they land on</x-slot:subtitle>
 
-    {{-- One card per umbrella; everything on a card comes from MarketingLayout::UMBRELLAS. --}}
+    {{-- One card per umbrella the user has a page in; everything on a card comes from MarketingLayout::UMBRELLAS. --}}
+    @php $umbrellas = \App\View\Components\MarketingLayout::umbrellasFor(auth()->user()); @endphp
     <div class="p-4 sm:p-6 max-w-[1400px]">
+        @if ($umbrellas === [])
+            <x-marketing.empty icon="lock" title="No Growth Engine pages assigned"
+                message="Your account has the Growth Engine but no pages in it yet. Ask an administrator to grant the pages you need." />
+        @endif
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            @foreach (\App\View\Components\MarketingLayout::UMBRELLAS as $umbrella)
+            @foreach ($umbrellas as $umbrella)
                 <a href="{{ route($umbrella['home']) }}"
                     class="group flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm p-6 transition hover:border-emerald-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
                     <div class="flex items-start justify-between gap-4">

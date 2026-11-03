@@ -187,19 +187,23 @@
                                         </span>
                                     @else
                                         @php
-                                            $modCount = $u->modules->count();
+                                            // Page permissions (e.g. "marketing:leads") are shown as a count on their module.
+                                            $userModules = $u->modules->filter(fn ($um) => isset($allModules[$um->module_key]));
+                                            $modCount = $userModules->count();
                                         @endphp
                                         @if ($modCount > 0)
                                             <div class="flex flex-wrap gap-1 items-center max-w-md">
                                                 <span class="bg-slate-100 text-slate-800 font-bold px-2 py-0.5 rounded text-[10px] border border-slate-200">
                                                     {{ $modCount }} {{ Str::plural('Module', $modCount) }}
                                                 </span>
-                                                @foreach ($u->modules->take(4) as $um)
-                                                    @if (isset($allModules[$um->module_key]))
-                                                        <span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-medium border border-blue-100">
-                                                            {{ $allModules[$um->module_key]['name'] }}
-                                                        </span>
-                                                    @endif
+                                                @foreach ($userModules->take(4) as $um)
+                                                    @php
+                                                        $pageTotal = count($allModules[$um->module_key]['pages'] ?? []);
+                                                        $pageCount = $pageTotal > 0 ? $u->modules->filter(fn ($p) => \App\Support\ModuleManager::moduleOfPage($p->module_key) === $um->module_key)->count() : 0;
+                                                    @endphp
+                                                    <span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-medium border border-blue-100">
+                                                        {{ $allModules[$um->module_key]['name'] }}@if ($pageTotal > 0) ({{ $pageCount === $pageTotal ? 'all pages' : $pageCount.' of '.$pageTotal.' pages' }})@endif
+                                                    </span>
                                                 @endforeach
                                                 @if ($modCount > 4)
                                                     <span class="text-[10px] text-slate-400">+{{ $modCount - 4 }} more</span>
