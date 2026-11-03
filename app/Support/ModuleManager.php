@@ -52,6 +52,8 @@ class ModuleManager
      * patterns. A user then needs the module and the page. Every route of such a module
      * must be covered by a page or listed in `open_routes` (pages anyone with the module
      * may open); any other route is refused, so a new route stays closed until mapped.
+     * `own_shell` marks a module that runs as its own app with its own nav (the Growth
+     * Engine), so it cannot lead users to the other modules.
      *
      * @return array<string, array{label: string, modules: array<string, array{name: string, description: string, icon: string, route: string, open_routes?: list<string>, pages?: array<string, array{name: string, routes: list<string>}>}>}>
      */
@@ -182,6 +184,7 @@ class ModuleManager
                         'description' => 'Per-office website tracking, attribution, Google Ads campaigns, leads and alerts; AI Front Desk; AI Website Builder',
                         'icon' => 'trending-up',
                         'route' => 'marketing.index',
+                        'own_shell' => true,
                         'open_routes' => ['marketing.index'],
                         'pages' => [
                             'overview' => ['name' => 'Overview', 'routes' => ['marketing.overview']],

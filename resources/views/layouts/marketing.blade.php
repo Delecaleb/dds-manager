@@ -114,13 +114,18 @@
                 </div>
             @endif
 
-            <div class="p-3 border-t border-slate-200">
-                <a href="{{ route(auth()->user()->homeRoute()) }}"
-                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
-                    <img src="{{ asset('public/images/logo-mark.png') }}" alt="" class="w-5 h-5">
-                    <span>Back to Marcelo Analytics</span>
-                </a>
-            </div>
+            {{-- Into the main app, where the menu reaches the user's other modules. Hidden
+                 when the Growth Engine is the only module they have. --}}
+            @php $appHome = auth()->user()->appHomeRoute(); @endphp
+            @if ($appHome)
+                <div class="p-3 border-t border-slate-200">
+                    <a href="{{ route($appHome) }}"
+                        class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <img src="{{ asset('public/images/logo-mark.png') }}" alt="" class="w-5 h-5">
+                        <span>Back to Marcelo Analytics</span>
+                    </a>
+                </div>
+            @endif
         </aside>
 
         <div class="flex flex-col flex-1 min-w-0 overflow-hidden">

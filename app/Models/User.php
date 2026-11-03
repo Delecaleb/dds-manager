@@ -191,20 +191,36 @@ class User extends Authenticatable
 
     /**
      * Route name of the user's landing page: the first module they can access, in
-     * ModuleManager order (so Dashboard wins when permitted). Users with no modules
-     * land on their profile, the only page that needs no module permission.
+     * ModuleManager order (so Dashboard wins when permitted). Modules that run as their
+     * own app (the Growth Engine) come last: their nav cannot reach the other modules,
+     * while the main app's menu reaches them. Users with no modules land on their
+     * profile, the only page that needs no module permission.
      */
     public function homeRoute(): string
+    {
+        return $this->appHomeRoute() ?? $this->firstModuleRoute(ownShell: true) ?? 'profile.edit';
+    }
+
+    /**
+     * Route name of the first main-app module the user can access (not one running as
+     * its own app), or null when they have none. Where "Back to Marcelo Analytics" goes.
+     */
+    public function appHomeRoute(): ?string
+    {
+        return $this->firstModuleRoute(ownShell: false);
+    }
+
+    private function firstModuleRoute(bool $ownShell): ?string
     {
         $accessible = $this->is_active ? $this->getAccessibleModuleKeys() : [];
 
         foreach (ModuleManager::all() as $key => $meta) {
-            if (in_array($key, $accessible, true) && Route::has($meta['route'])) {
+            if (($meta['own_shell'] ?? false) === $ownShell && in_array($key, $accessible, true) && Route::has($meta['route'])) {
                 return $meta['route'];
             }
         }
 
-        return 'profile.edit';
+        return null;
     }
 
     /**
