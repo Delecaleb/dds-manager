@@ -66,6 +66,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Invited but has not set a password yet. Accepting the invitation verifies the email;
+     * last_login_at keeps accounts created before invitations (some never verified) from
+     * reading as pending.
+     */
+    public function isInvitationPending(): bool
+    {
+        return $this->email_verified_at === null && $this->last_login_at === null;
+    }
+
+    /**
      * Determine if the user has the Super Admin role.
      */
     public function isSuperAdmin(): bool

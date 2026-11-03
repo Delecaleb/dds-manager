@@ -89,6 +89,8 @@ Route::middleware('auth')->group(function () {
     // Super Admin: User and Access Privilege Management
     Route::middleware('super_admin')->prefix('admin')->name('admin.')->group(function () {
         Route::patch('users/{user}/toggle-status', [AdminUserController::class, 'toggleStatus'])->name('users.toggle-status');
+        Route::post('users/{user}/invitation', [AdminUserController::class, 'resendInvite'])->name('users.resend-invite');
+        Route::post('users/{user}/password-reset', [AdminUserController::class, 'sendPasswordReset'])->name('users.password-reset');
         Route::resource('users', AdminUserController::class);
 
         // Sync failure alert recipients (edited on the Sync Manager page).

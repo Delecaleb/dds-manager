@@ -17,7 +17,7 @@
                 <a href="{{ route('admin.users.create') }}"
                     class="inline-flex items-center gap-2 bg-[#001f3f] hover:bg-[#002b57] text-white px-4 py-2.5 rounded-lg text-xs font-semibold shadow-sm transition-all tracking-wide">
                     <i data-lucide="user-plus" class="w-4 h-4 text-emerald-400"></i>
-                    <span>Add New User</span>
+                    <span>Invite New User</span>
                 </a>
             </div>
         </div>
@@ -48,7 +48,7 @@
         @endif
 
         <!-- Metric Stat Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Users</p>
@@ -81,11 +81,21 @@
 
             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                 <div>
-                    <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Inactive Accounts</p>
-                    <h3 class="text-2xl font-bold text-slate-500 mt-1">{{ number_format($stats['inactive']) }}</h3>
+                    <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Access Revoked</p>
+                    <h3 class="text-2xl font-bold text-rose-600 mt-1">{{ number_format($stats['inactive']) }}</h3>
                 </div>
-                <div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
-                    <i data-lucide="user-x" class="w-5 h-5"></i>
+                <div class="w-10 h-10 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                    <i data-lucide="shield-off" class="w-5 h-5"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Invitations Pending</p>
+                    <h3 class="text-2xl font-bold text-amber-600 mt-1">{{ number_format($stats['pending']) }}</h3>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <i data-lucide="mail" class="w-5 h-5"></i>
                 </div>
             </div>
         </div>
@@ -113,7 +123,8 @@
                 <select name="status" onchange="this.form.submit()" class="app-input text-xs w-full sm:w-36 cursor-pointer">
                     <option value="">All Statuses</option>
                     <option value="1" {{ $statusFilter === '1' ? 'selected' : '' }}>Active</option>
-                    <option value="0" {{ $statusFilter === '0' ? 'selected' : '' }}>Inactive</option>
+                    <option value="pending" {{ $statusFilter === 'pending' ? 'selected' : '' }}>Invitation pending</option>
+                    <option value="0" {{ $statusFilter === '0' ? 'selected' : '' }}>Access revoked</option>
                 </select>
 
                 <button type="submit" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-2 rounded-md text-xs transition-colors">
@@ -200,13 +211,18 @@
                                     @endif
                                 </td>
                                 <td class="py-3.5 px-4">
-                                    @if ($u->is_active)
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+                                    @if (! $u->is_active)
+                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Access revoked
+                                        </span>
+                                    @elseif ($u->isInvitationPending())
+                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200"
+                                            title="Invited {{ $u->created_at?->diffForHumans() }}; has not set a password yet">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Invitation pending
                                         </span>
                                     @else
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Inactive
+                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
                                         </span>
                                     @endif
                                 </td>
@@ -225,23 +241,36 @@
                                         </a>
 
                                         @if ($u->id !== auth()->id())
-                                            <form method="POST" action="{{ route('admin.users.toggle-status', $u) }}" class="inline">
+                                            @if ($u->is_active && $u->isInvitationPending())
+                                                <form method="POST" action="{{ route('admin.users.resend-invite', $u) }}" class="inline">
+                                                    @csrf
+                                                    <button type="submit" class="p-1.5 rounded-md text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Resend invitation email">
+                                                        <i data-lucide="send" class="w-4 h-4"></i>
+                                                    </button>
+                                                </form>
+                                            @elseif ($u->is_active)
+                                                <form method="POST" action="{{ route('admin.users.password-reset', $u) }}" class="inline"
+                                                    onsubmit="return confirm(@js('Email '.$u->email.' a link to choose a new password?'));">
+                                                    @csrf
+                                                    <button type="submit" class="p-1.5 rounded-md text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Send password reset email">
+                                                        <i data-lucide="key-round" class="w-4 h-4"></i>
+                                                    </button>
+                                                </form>
+                                            @endif
+
+                                            <form method="POST" action="{{ route('admin.users.toggle-status', $u) }}" class="inline"
+                                                onsubmit="return confirm(@js($u->is_active ? 'Revoke access for '.$u->email.'? They are signed out immediately and cannot sign in.' : 'Restore access for '.$u->email.'?'));">
                                                 @csrf
                                                 @method('PATCH')
                                                 <button type="submit"
                                                     class="p-1.5 rounded-md transition-colors {{ $u->is_active ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50' }}"
-                                                    title="{{ $u->is_active ? 'Deactivate User' : 'Activate User' }}"
-                                                    onclick="return confirm('Are you sure you want to {{ $u->is_active ? 'deactivate' : 'activate' }} this user?')">
-                                                    @if ($u->is_active)
-                                                        <i data-lucide="user-x" class="w-4 h-4"></i>
-                                                    @else
-                                                        <i data-lucide="user-check" class="w-4 h-4"></i>
-                                                    @endif
+                                                    title="{{ $u->is_active ? 'Revoke access' : 'Restore access' }}">
+                                                    <i data-lucide="{{ $u->is_active ? 'shield-off' : 'shield-check' }}" class="w-4 h-4"></i>
                                                 </button>
                                             </form>
 
                                             <form method="POST" action="{{ route('admin.users.destroy', $u) }}" class="inline"
-                                                onsubmit="return confirm('Are you sure you want to permanently delete user {{ $u->name }}? This action cannot be undone.');">
+                                                onsubmit="return confirm(@js('Permanently delete '.$u->email.'? This cannot be undone.'));">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Delete User">
