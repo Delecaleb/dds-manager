@@ -130,18 +130,7 @@
 
                             <div class="space-y-2.5">
                                 @foreach ($category['modules'] as $modKey => $mod)
-                                    <label class="flex items-start gap-3 p-2 rounded-lg bg-white border border-slate-200/80 hover:border-blue-200 cursor-pointer transition-colors">
-                                        <input type="checkbox" name="modules[]" value="{{ $modKey }}" data-category="{{ $catKey }}"
-                                            {{ in_array($modKey, old('modules', [])) ? 'checked' : '' }}
-                                            class="module-checkbox mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-0 accent-blue-600">
-                                        <div class="flex-1">
-                                            <div class="flex items-center gap-1.5">
-                                                <i data-lucide="{{ $mod['icon'] }}" class="w-3.5 h-3.5 text-blue-600 shrink-0"></i>
-                                                <span class="text-xs font-bold text-slate-900">{{ $mod['name'] }}</span>
-                                            </div>
-                                            <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">{{ $mod['description'] }}</p>
-                                        </div>
-                                    </label>
+                                    @include('admin.users._module-option', ['checked' => old('modules', [])])
                                 @endforeach
                             </div>
                         </div>
