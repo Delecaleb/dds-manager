@@ -9,7 +9,26 @@
             $c->status === \App\Models\MarketingAdConnection::STATUS_ERROR => ['Needs attention', 'amber'],
             default => ['Connected', 'emerald'],
         };
-        $waiting = count(array_filter($accounts, fn ($a) => $a['state'] === 'waiting'));
+        // One accounts table per platform, in the same order as the connection panels above.
+        $accountPlatforms = [
+            [
+                'provider' => \App\Models\MarketingAdConnection::PROVIDER_GOOGLE_ADS,
+                'icon' => 'search',
+                'empty' => 'Accounts appear here once a Google Ads login is connected.',
+                'history_days' => (int) config('marketing.google_ads.history_days', 90),
+            ],
+            [
+                'provider' => \App\Models\MarketingAdConnection::PROVIDER_META_ADS,
+                'icon' => 'thumbs-up',
+                'empty' => 'Accounts appear here once a Meta system user is connected.',
+                'history_days' => (int) config('marketing.meta_ads.history_days', 90),
+            ],
+        ];
+        foreach ($accountPlatforms as &$platform) {
+            $platform['name'] = \App\Models\MarketingAdConnection::PLATFORMS[$platform['provider']];
+            $platform['accounts'] = array_values(array_filter($accounts, fn ($a) => $a['provider'] === $platform['provider']));
+        }
+        unset($platform);
         $googleConnections = array_values(array_filter($connections, fn ($c) => $c->provider === \App\Models\MarketingAdConnection::PROVIDER_GOOGLE_ADS));
         $metaConnections = array_values(array_filter($connections, fn ($c) => $c->provider === \App\Models\MarketingAdConnection::PROVIDER_META_ADS));
     @endphp
@@ -132,29 +151,32 @@
                         <li>In <span class="font-semibold">business.facebook.com</span> → Business Settings → Users → <span class="font-semibold">System users</span> → Add. Role: Employee is enough.</li>
                         <li>Select the system user → <span class="font-semibold">Assign assets</span> → Ad accounts → tick each clinic's ad account with <span class="font-semibold">View performance</span>. Also assign the app from step 1.</li>
                         <li><span class="font-semibold">Generate new token</span> → choose the app → expiration <span class="font-semibold">Never</span> → permissions <span class="font-semibold">ads_read</span> (and read_insights if offered) → Generate.</li>
-                        <li>Paste the token here. Every ad account it can see is listed under Ad accounts below. Assign each to its location; nothing syncs until you do.</li>
+                        <li>Paste the token here. Every ad account it can see is listed under Meta Ads accounts below. Assign each to its location; nothing syncs until you do.</li>
                     </ol>
                     <p class="mt-2 text-slate-500">If the app has "Require app secret" switched on, set <code class="text-[10px]">META_ADS_APP_SECRET</code> on the server first.</p>
                 </details>
             </div>
         </x-marketing.panel>
 
-        {{-- Every ad account once. Nothing is synced or reported until it has a location. --}}
-        <x-marketing.panel title="Ad accounts"
-            :subtitle="$waiting > 0 ? $waiting.' waiting for a location — not synced until assigned. Leave other businesses\' accounts unassigned.' : 'Each account is synced and reported for the locations it is assigned to.'"
-            icon="briefcase">
-            @if ($accounts === [])
-                <x-marketing.empty icon="briefcase" title="No ad accounts yet" message="Accounts appear here once a Google Ads login or a Meta system user is connected." />
-            @else
-                <div class="p-3">
-                    @include('marketing.integrations._accounts', ['accounts' => $accounts, 'locations' => $locations, 'id' => 'mkAccounts'])
-                </div>
-                <p class="px-5 pb-4 text-[11px] text-slate-500">
-                    One location: every campaign counts for it. Several locations: assign each campaign to one of them — until then it counts for none.
-                    History is pulled from 90 days before an account was first connected.
-                </p>
-            @endif
-        </x-marketing.panel>
+        {{-- Ad accounts, one table per platform. Nothing is synced or reported until an account has a location. --}}
+        @foreach ($accountPlatforms as $platform)
+            @php $waiting = count(array_filter($platform['accounts'], fn ($a) => $a['state'] === 'waiting')); @endphp
+            <x-marketing.panel :title="$platform['name'].' accounts'"
+                :subtitle="$waiting > 0 ? $waiting.' waiting for a location — not synced until assigned. Leave other businesses\' accounts unassigned.' : 'Each account is synced and reported for the locations it is assigned to.'"
+                :icon="$platform['icon']">
+                @if ($platform['accounts'] === [])
+                    <x-marketing.empty :icon="$platform['icon']" :title="'No '.$platform['name'].' accounts yet'" :message="$platform['empty']" />
+                @else
+                    <div class="p-3">
+                        @include('marketing.integrations._accounts', ['accounts' => $platform['accounts'], 'locations' => $locations, 'id' => 'mkAccounts-'.$platform['provider']])
+                    </div>
+                    <p class="px-5 pb-4 text-[11px] text-slate-500">
+                        One location: every campaign counts for it. Several locations: assign each campaign to one of them — until then it counts for none.
+                        History is pulled from {{ $platform['history_days'] }} days before an account was first connected.
+                    </p>
+                @endif
+            </x-marketing.panel>
+        @endforeach
     </div>
 
     <script>

@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
+use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
@@ -27,6 +28,14 @@ Route::middleware('guest')->group(function () {
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
+
+    // New users choose their own password from the link in their invitation email.
+    Route::get('invitation/{token}', [InvitationController::class, 'show'])
+        ->name('invitation.show');
+
+    Route::post('invitation', [InvitationController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('invitation.store');
 });
 
 Route::middleware('auth')->group(function () {

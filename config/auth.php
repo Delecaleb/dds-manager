@@ -99,6 +99,16 @@ return [
             'expire' => 60,
             'throttle' => 60,
         ],
+
+        // New-user invitations: the same token table, but the link lasts long enough for
+        // someone to find the email (UserAccessService::invite). A later "forgot password"
+        // request replaces an unused invite token, which also lets the user in.
+        'invites' => [
+            'provider' => 'users',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => (int) env('AUTH_INVITE_EXPIRE_MINUTES', 60 * 24 * 7),
+            'throttle' => 0,
+        ],
     ],
 
     /*

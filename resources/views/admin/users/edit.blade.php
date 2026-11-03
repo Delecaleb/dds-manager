@@ -10,7 +10,7 @@
                 </a>
                 <div>
                     <h1 class="text-xl font-bold text-slate-900 tracking-tight">Edit User: {{ $user->name }}</h1>
-                    <p class="text-xs text-slate-500 mt-0.5">Update credentials, role assignments, and module access permissions.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Update their details, role and module access. Passwords are reset by email from Account access below.</p>
                 </div>
             </div>
 
@@ -41,6 +41,8 @@
                 </ul>
             </div>
         @endif
+
+        @include('admin.users._access-card', ['user' => $user])
 
         <form method="POST" action="{{ route('admin.users.update', $user) }}" class="space-y-6">
             @csrf
@@ -77,15 +79,6 @@
                         </label>
                         <input type="email" id="email" name="email" value="{{ old('email', $user->email) }}"
                             class="app-input w-full text-xs" required>
-                    </div>
-
-                    <!-- Password (Optional Reset) -->
-                    <div class="space-y-1.5">
-                        <label for="password" class="block font-bold text-slate-700 text-xs">
-                            Change Password <span class="text-slate-400 font-normal">(leave blank to keep current)</span>
-                        </label>
-                        <input type="password" id="password" name="password" placeholder="••••••••"
-                            class="app-input w-full text-xs" minlength="8">
                     </div>
 
                     <!-- Role Selector -->

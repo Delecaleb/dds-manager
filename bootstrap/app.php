@@ -3,6 +3,7 @@
 use App\Http\Middleware\AuthenticateApiKey;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\EnsureUserIsActive;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,6 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'super_admin' => EnsureSuperAdmin::class,
             'api.key' => AuthenticateApiKey::class,
         ]);
+
+        // A user whose access is revoked mid-session is signed out on their next request.
+        $middleware->web(append: [EnsureUserIsActive::class]);
 
         // The Developer API's rate limit is per key, so the key must be resolved first.
         // Without this, Laravel's priority list runs throttling before it.

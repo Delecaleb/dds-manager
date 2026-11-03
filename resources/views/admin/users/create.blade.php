@@ -9,8 +9,8 @@
                     <i data-lucide="arrow-left" class="w-4 h-4"></i>
                 </a>
                 <div>
-                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Add New User</h1>
-                    <p class="text-xs text-slate-500 mt-0.5">Provision a new user account, select role, and grant module privileges.</p>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Invite New User</h1>
+                    <p class="text-xs text-slate-500 mt-0.5">Enter their email and what they may access. They set their own password from the invitation email.</p>
                 </div>
             </div>
         </div>
@@ -36,35 +36,17 @@
             <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5">
                 <div class="border-b border-slate-100 pb-3 flex items-center gap-2">
                     <i data-lucide="user" class="w-4 h-4 text-blue-600"></i>
-                    <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wide">Account Profile & Role</h2>
+                    <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wide">Who to invite</h2>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <!-- Full Name -->
-                    <div class="space-y-1.5">
-                        <label for="name" class="block font-bold text-slate-700 text-xs">
-                            Full Name <span class="text-rose-500">*</span>
-                        </label>
-                        <input type="text" id="name" name="name" value="{{ old('name') }}" placeholder="e.g. Jane Doe"
-                            class="app-input w-full text-xs" required autofocus>
-                    </div>
-
                     <!-- Email Address -->
                     <div class="space-y-1.5">
                         <label for="email" class="block font-bold text-slate-700 text-xs">
                             Email Address <span class="text-rose-500">*</span>
                         </label>
-                        <input type="email" id="email" name="email" value="{{ old('email') }}" placeholder="jane.doe@marcelo.local"
-                            class="app-input w-full text-xs" required>
-                    </div>
-
-                    <!-- Initial Password -->
-                    <div class="space-y-1.5">
-                        <label for="password" class="block font-bold text-slate-700 text-xs">
-                            Account Password <span class="text-rose-500">*</span>
-                        </label>
-                        <input type="password" id="password" name="password" placeholder="Minimum 8 characters"
-                            class="app-input w-full text-xs" required minlength="8">
+                        <input type="email" id="email" name="email" value="{{ old('email') }}" placeholder="jane.doe@example.com"
+                            class="app-input w-full text-xs" required autofocus>
                     </div>
 
                     <!-- Role Selector -->
@@ -80,16 +62,23 @@
                             @endforeach
                         </select>
                     </div>
+
+                    <!-- Name (optional) -->
+                    <div class="space-y-1.5">
+                        <label for="name" class="block font-bold text-slate-700 text-xs">
+                            Full Name <span class="text-slate-400 font-normal">(optional — they confirm it when they accept)</span>
+                        </label>
+                        <input type="text" id="name" name="name" value="{{ old('name') }}" placeholder="e.g. Jane Doe"
+                            class="app-input w-full text-xs">
+                    </div>
                 </div>
 
-                <!-- Account Status Checkbox -->
-                <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" name="is_active" value="1" {{ old('is_active', '1') == '1' ? 'checked' : '' }}
-                            class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-0 accent-emerald-600">
-                        <span class="text-xs font-semibold text-slate-800">Account is Active</span>
-                    </label>
-                    <span class="text-[11px] text-slate-400">Inactive accounts are blocked from signing in.</span>
+                <div class="pt-3 border-t border-slate-100 flex items-start gap-2 text-[11px] text-slate-500">
+                    <i data-lucide="mail" class="w-4 h-4 text-blue-600 shrink-0"></i>
+                    <span>
+                        They get an email with a link to choose their own password and sign in. The link works for {{ $inviteDays }} days;
+                        you can resend it from the user list. You never see or set their password.
+                    </span>
                 </div>
             </div>
 
@@ -168,8 +157,8 @@
                 </a>
                 <button type="submit"
                     class="px-5 py-2.5 rounded-lg bg-[#001f3f] hover:bg-[#002b57] text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer">
-                    <i data-lucide="user-check" class="w-4 h-4 text-emerald-400"></i>
-                    <span>Create User & Assign Privileges</span>
+                    <i data-lucide="send" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Send Invitation</span>
                 </button>
             </div>
 
