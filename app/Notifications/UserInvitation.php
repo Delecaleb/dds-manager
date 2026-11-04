@@ -29,15 +29,19 @@ class UserInvitation extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $app = (string) config('app.name');
-        $url = route('invitation.show', ['token' => $this->token, 'email' => $notifiable->getEmailForPasswordReset()]);
+        $email = $notifiable->getEmailForPasswordReset();
+        $url = route('invitation.show', ['token' => $this->token, 'email' => $email]);
+        // First name only; until they accept, the name is the one the admin typed or one made from the email.
+        $firstName = trim(strtok((string) $notifiable->name, ' ') ?: '');
+        $days = $this->expiresInDays.' '.($this->expiresInDays === 1 ? 'day' : 'days');
 
         return (new MailMessage)
-            ->subject("You've been invited to {$app}")
-            ->greeting('Hello,')
-            ->line("{$this->invitedBy} has created an account for you on {$app}.")
-            ->line('Click the button below to choose your password and sign in.')
-            ->action('Set my password', $url)
-            ->line('This link works for '.$this->expiresInDays.' '.($this->expiresInDays === 1 ? 'day' : 'days').'. If it has expired, ask your administrator to send a new one.')
-            ->line('If you were not expecting this invitation, you can ignore this email.');
+            ->subject("Your {$app} account is ready")
+            ->greeting($firstName !== '' ? "Hello {$firstName}," : 'Hello,')
+            ->line("{$this->invitedBy} has given you access to {$app}.")
+            ->line("To get started, set a password for your account. You will sign in with this email address ({$email}) and the password you choose.")
+            ->action('Set your password', $url)
+            ->line("For your security, this link can be used once and expires in {$days}. If it has expired, ask {$this->invitedBy} to send you a new invitation.")
+            ->line('Not expecting this email? You can ignore it. No one can sign in to the account until a password is set.');
     }
 }
