@@ -17,4 +17,10 @@ return [
     'per_page' => 100,
     'max_per_page' => 500,
 
+    // The most people or patients one matching or procedures request may name.
+    'max_batch' => 100,
+
+    // The longest start..end window one procedures request may ask for: a membership year.
+    'max_procedure_range_days' => 366,
+
 ];

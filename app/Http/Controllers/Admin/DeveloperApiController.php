@@ -28,7 +28,7 @@ class DeveloperApiController extends Controller
     public function index(Request $request): View
     {
         $usageDays = ApiUsageService::period($request->query('days'));
-        $locations = $this->clinics->locations();
+        $locations = $this->clinics->apiKeyLocations();
         $keys = ApiKey::with('creator:id,name,email')->withCount('requests')->latest()->get();
 
         // Keys under their location, in the registry's order; keys whose location is gone last.

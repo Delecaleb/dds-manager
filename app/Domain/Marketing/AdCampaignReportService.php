@@ -177,6 +177,7 @@ class AdCampaignReportService
             ->map(function (MarketingAdAccount $account) {
                 $locations = $account->locations;
                 $active = $account->status === null || $account->status === 'ENABLED';
+                $state = $this->syncState($account, $active);
 
                 return [
                     'id' => $account->id,
@@ -193,16 +194,32 @@ class AdCampaignReportService
                     'locations' => $locations->map(fn (MarketingAdAccountLocation $l) => $this->clinics->labelFor((int) $l->office_id, $l->clinic_num))->all(),
                     // Only meaningful when the account is shared: then these count for no location.
                     'unassigned_campaigns' => $locations->count() > 1 ? (int) $account->unassigned_campaigns_count : 0,
-                    'state' => match (true) {
-                        ! $active => 'closed',
-                        $locations->isEmpty() => 'waiting',
-                        default => 'assigned',
-                    },
+                    'state' => $state,
                     'history_from' => $account->history_from?->toDateString(),
                     'last_synced_at' => $account->last_synced_at?->toDateTimeString(),
-                    'last_error' => $account->last_error,
+                    'last_error' => $state === 'blocked'
+                        ? 'Not syncing: its '.(MarketingAdConnection::PLATFORMS[$account->provider] ?? 'ad platform').' connection needs attention (see above).'
+                        : $account->last_error,
                 ];
             })->all();
+    }
+
+    /**
+     * Where an account really stands, from what the last sync did. "blocked" comes first: a
+     * rejected token stops every account, and is recorded on the connection, not on them.
+     */
+    private function syncState(MarketingAdAccount $account, bool $active): string
+    {
+        $connection = $account->connection;
+
+        return match (true) {
+            ! $active => 'closed',
+            $account->locations->isEmpty() => 'waiting',
+            $connection === null || ! $connection->isUsable() || $connection->status === MarketingAdConnection::STATUS_ERROR => 'blocked',
+            filled($account->last_error) => 'failed',
+            $account->last_synced_at === null => 'pending',
+            default => 'synced',
+        };
     }
 
     /**

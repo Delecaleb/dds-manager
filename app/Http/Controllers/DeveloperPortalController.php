@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\DeveloperApi\ApiDocumentation;
 use App\Domain\DeveloperApi\ApiUsageService;
 use App\Domain\Support\ClinicRegistry;
 use App\Models\ApiKey;
@@ -27,11 +28,12 @@ class DeveloperPortalController extends Controller
     public function __construct(
         private readonly ClinicRegistry $clinics,
         private readonly ApiUsageService $usage,
+        private readonly ApiDocumentation $docs,
     ) {}
 
     public function index(Request $request): View
     {
-        $locations = $this->clinics->locations();
+        $locations = $this->clinics->apiKeyLocations();
         $keys = ApiKey::where('created_by', $request->user()->id)->withCount('requests')->latest()->get();
         $usageDays = ApiUsageService::period($request->query('days'));
 
@@ -42,26 +44,47 @@ class DeveloperPortalController extends Controller
             'locations' => $locations,
             'locationNames' => $keys->mapWithKeys(fn (ApiKey $key) => [$key->id => $this->locationName($key)])->all(),
             'abilities' => ApiKey::ABILITIES,
-            'maxRangeDays' => (int) config('developer_api.max_range_days'),
-            'maxPerPage' => (int) config('developer_api.max_per_page'),
+            'apiEndpoints' => $this->docs->endpoints(),
             'apiBase' => url('/api/v1'),
+        ]);
+    }
+
+    /** How to use the API: every endpoint, what it is for, and worked examples. */
+    public function docs(): View
+    {
+        return view('developer.docs', [
+            'docs' => $this->docs,
+            'groups' => $this->docs->groups(),
+            'abilities' => ApiKey::ABILITIES,
+            'apiBase' => url('/api/v1'),
+            'maxPerPage' => (int) config('developer_api.max_per_page'),
+            'maxBatch' => (int) config('developer_api.max_batch'),
+            'defaultRateLimit' => (int) config('developer_api.default_rate_limit'),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $locations = $this->clinics->locations();
+        $locations = $this->clinics->apiKeyLocations();
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'location' => ['required', 'string', Rule::in(array_keys($locations))],
             'patient_contact' => ['nullable', 'boolean'],
+            'patient_match' => ['nullable', 'boolean'],
+            'procedures' => ['nullable', 'boolean'],
             'expires_at' => ['nullable', 'date', 'after:today'],
         ]);
 
         $abilities = [ApiKey::ABILITY_BOOKINGS];
         if ($request->boolean('patient_contact')) {
             $abilities[] = ApiKey::ABILITY_PATIENT_CONTACT;
+        }
+        if ($request->boolean('patient_match')) {
+            $abilities[] = ApiKey::ABILITY_PATIENT_MATCH;
+        }
+        if ($request->boolean('procedures')) {
+            $abilities[] = ApiKey::ABILITY_PROCEDURES;
         }
 
         [$key] = ApiKey::issue((new ApiKey([

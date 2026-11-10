@@ -3,6 +3,7 @@
 namespace App\Domain\Support;
 
 use App\Models\Office;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -17,7 +18,7 @@ class ClinicRegistry
     /** @var array<int, array<int, string>> lazily-built officeId => (ClinicNum => name) */
     private array $maps = [];
 
-    /** @var array<int, string> officeId => office name, filled alongside $maps */
+    /** @var array<int, string> officeId => office name, filled alongside */
     private array $officeNames = [];
 
     /** @var array<string, Location>|null lazily-built reportable locations across active offices */
@@ -64,6 +65,23 @@ class ClinicRegistry
         }
 
         return $this->maps[$officeId] = $map;
+    }
+
+    /**
+     * Name and contact details of an office's visible clinics, in OpenDental's order.
+     *
+     * @param  list<int>  $clinicNums  empty = every clinic of the office
+     * @return Collection<int, object>
+     */
+    public function contacts(int $officeId, array $clinicNums = []): Collection
+    {
+        return DB::table('od_clinics')
+            ->where('office_id', $officeId)
+            ->where('IsHidden', false)
+            ->when($clinicNums !== [], fn ($q) => $q->whereIn('ClinicNum', $clinicNums))
+            ->orderBy('ItemOrder')
+            ->orderBy('ClinicNum')
+            ->get(['ClinicNum', 'Description', 'Abbr', 'Phone', 'Address', 'Address2', 'City', 'State', 'Zip']);
     }
 
     /**
@@ -171,6 +189,27 @@ class ClinicRegistry
         }
 
         return $this->locations = $locations;
+    }
+
+    /**
+     * What a Developer API key can be issued for: every location, plus each multi-clinic
+     * office as a whole, for systems following a person across its clinics.
+     *
+     * @return array<string, Location>
+     */
+    public function apiKeyLocations(): array
+    {
+        $locations = $this->locations();
+
+        foreach (Office::where('is_active', true)->orderBy('name')->get(['id']) as $office) {
+            $key = (string) $office->id;
+
+            if (! isset($locations[$key])) {
+                $locations[$key] = new Location($office->id, null, $this->labelFor($office->id, null));
+            }
+        }
+
+        return $locations;
     }
 
     /**

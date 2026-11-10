@@ -27,9 +27,17 @@ class ApiKey extends Model
     /** Also read the patient's name, email, phone numbers and address on each booking. */
     public const ABILITY_PATIENT_CONTACT = 'patients:contact';
 
+    /** Match people to patients by name and birth date, and look a patient up by id. */
+    public const ABILITY_PATIENT_MATCH = 'patients:match';
+
+    /** Read patients' completed procedures and fees, and the procedure code list. */
+    public const ABILITY_PROCEDURES = 'procedures:read';
+
     public const ABILITIES = [
         self::ABILITY_BOOKINGS => 'Bookings — appointment time, length, provider, operatory and status',
         self::ABILITY_PATIENT_CONTACT => 'Patient contact details — full name, email, phone numbers and address',
+        self::ABILITY_PATIENT_MATCH => 'Patient matching — find a patient by name and birth date; read their name, birth date and status',
+        self::ABILITY_PROCEDURES => 'Procedures — patients\' completed procedures and fees, and the procedure code list',
     ];
 
     protected $fillable = [

@@ -9,14 +9,21 @@
                 </div>
                 <div>
                     <h1 class="text-xl font-bold text-slate-900 tracking-tight">Developer Portal</h1>
-                    <p class="text-xs text-slate-500 mt-0.5">Your read-only API keys. Each key reads one location's bookings.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Your read-only API keys. Each key reads one location.</p>
                 </div>
             </div>
-            <button type="button" data-open-create-key
-                class="inline-flex justify-center items-center gap-2 bg-[#001f3f] hover:bg-[#002b57] text-white px-4 py-2.5 rounded-lg text-xs font-semibold shadow-sm tracking-wide">
-                <i data-lucide="plus" class="w-4 h-4 text-emerald-400"></i>
-                <span>Create API key</span>
-            </button>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <a href="{{ route('developer.docs') }}"
+                    class="inline-flex justify-center items-center gap-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-lg text-xs font-semibold">
+                    <i data-lucide="book-open" class="w-4 h-4"></i>
+                    <span>API documentation</span>
+                </a>
+                <button type="button" data-open-create-key
+                    class="inline-flex justify-center items-center gap-2 bg-[#001f3f] hover:bg-[#002b57] text-white px-4 py-2.5 rounded-lg text-xs font-semibold shadow-sm tracking-wide">
+                    <i data-lucide="plus" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Create API key</span>
+                </button>
+            </div>
         </div>
 
         @if (session('success'))
@@ -106,6 +113,14 @@
                         <span>{{ $abilities[\App\Models\ApiKey::ABILITY_PATIENT_CONTACT] }}
                             <span class="block text-[11px] text-amber-700">Protected health information. Leave off for keys that only need open/busy time.</span></span>
                     </label>
+                    @foreach (['patient_match' => \App\Models\ApiKey::ABILITY_PATIENT_MATCH, 'procedures' => \App\Models\ApiKey::ABILITY_PROCEDURES] as $field => $ability)
+                        <label class="flex items-start gap-2 text-xs text-slate-700">
+                            <input type="hidden" name="{{ $field }}" value="0">
+                            <input type="checkbox" name="{{ $field }}" value="1" @checked(old($field) === '1') class="mt-0.5 accent-emerald-600">
+                            <span>{{ $abilities[$ability] }}
+                                <span class="block text-[11px] text-amber-700">Protected health information. Only for systems that link members to their patient record.</span></span>
+                        </label>
+                    @endforeach
                 </fieldset>
 
                 <button type="submit" class="w-full inline-flex justify-center items-center gap-2 bg-[#001f3f] hover:bg-[#002b57] text-white px-4 py-2.5 rounded-lg text-xs font-semibold">
@@ -118,30 +133,20 @@
 
         <!-- Quick reference -->
         <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4 text-xs text-slate-700">
-            <h2 class="text-sm font-bold text-slate-900">Quick reference</h2>
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-sm font-bold text-slate-900">Quick reference</h2>
+                <a href="{{ route('developer.docs') }}" class="font-semibold text-emerald-700 hover:underline">Read the full documentation</a>
+            </div>
             <p>Send the key as a Bearer token from your server. Data is the synced copy of OpenDental (not live); times are the office's local time, without an offset.</p>
 <pre class="bg-slate-900 text-slate-100 rounded-lg p-4 overflow-x-auto"><code>curl -H "Authorization: Bearer dds_…" "{{ $apiBase }}/bookings?start={{ now()->toDateString() }}&end={{ now()->addDays(13)->toDateString() }}&status=scheduled"</code></pre>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                    <p class="font-bold text-slate-900 mb-1">Endpoints</p>
-                    <ul class="space-y-1 font-mono">
-                        <li>GET /api/v1/me</li>
-                        <li>GET /api/v1/bookings</li>
-                        <li>GET /api/v1/bookings/{id}</li>
-                    </ul>
-                </div>
-                <div>
-                    <p class="font-bold text-slate-900 mb-1">/bookings parameters</p>
-                    <ul class="space-y-1">
-                        <li><code>start</code>, <code>end</code> — required, YYYY-MM-DD, at most {{ $maxRangeDays }} days</li>
-                        <li><code>status</code> — comma list: {{ implode(', ', array_map(fn ($s) => $s->slug(), \App\Enums\AppointmentStatus::cases())) }}</li>
-                        <li><code>provider</code> — comma list of provider ids</li>
-                        <li><code>updated_since</code> — YYYY-MM-DDTHH:MM:SS (office time); only bookings changed after it</li>
-                        <li><code>per_page</code> — up to {{ $maxPerPage }}; follow <code>links.next</code> for the next page</li>
-                    </ul>
-                </div>
-            </div>
-            <p class="text-slate-500">Bookings deleted in OpenDental disappear from results; a caller reading only <code>updated_since</code> changes is not told about them.</p>
+            <ul class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-1.5">
+                @foreach ($apiEndpoints as $endpoint)
+                    <li class="flex flex-wrap items-baseline gap-x-2">
+                        <a href="{{ route('developer.docs') }}#{{ str_replace('.', '-', substr($endpoint['route'], strlen('api.v1.'))) }}" class="font-mono text-slate-900 hover:text-emerald-700">{{ $endpoint['method'] }} /api/v1{{ $endpoint['path'] }}</a>
+                        <span class="text-slate-500">{{ $endpoint['title'] }}</span>
+                    </li>
+                @endforeach
+            </ul>
         </div>
     </div>
 
