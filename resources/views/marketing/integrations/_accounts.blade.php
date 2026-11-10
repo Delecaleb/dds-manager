@@ -13,11 +13,7 @@
                     <div class="text-[11px] text-slate-500 tabular-nums break-all">{{ $account['external_id'] }}@if ($account['connection']) · via {{ $account['connection'] }}@endif</div>
                 </div>
                 <div class="shrink-0">
-                    @switch($account['state'])
-                        @case('waiting') <x-front-desk.pill label="Waiting" tone="amber" /> @break
-                        @case('closed') <x-front-desk.pill :label="ucfirst(strtolower((string) $account['status']))" tone="slate" /> @break
-                        @default <x-front-desk.pill label="Syncing" tone="emerald" />
-                    @endswitch
+                    @include('marketing.integrations._account-status')
                 </div>
             </div>
             @if ($account['last_error'])
@@ -60,12 +56,8 @@
                     <div class="text-[11px] text-amber-700">{{ $account['last_error'] }}</div>
                 @endif
             </td>
-            <td class="px-4 py-3" data-order="{{ ['waiting' => 0, 'assigned' => 1, 'closed' => 2][$account['state']] }}">
-                @switch($account['state'])
-                    @case('waiting') <x-front-desk.pill label="Waiting for a location" tone="amber" /> @break
-                    @case('closed') <x-front-desk.pill :label="ucfirst(strtolower((string) $account['status']))" tone="slate" /> @break
-                    @default <x-front-desk.pill label="Syncing" tone="emerald" />
-                @endswitch
+            <td class="px-4 py-3" data-order="{{ ['blocked' => 0, 'failed' => 1, 'waiting' => 2, 'pending' => 3, 'synced' => 4, 'closed' => 5][$account['state']] }}">
+                @include('marketing.integrations._account-status')
             </td>
             <td class="px-4 py-3">
                 @include('marketing.integrations._account-locations')

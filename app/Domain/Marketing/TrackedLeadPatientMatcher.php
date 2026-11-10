@@ -63,7 +63,7 @@ class TrackedLeadPatientMatcher
 
         $patients = DB::table('od_patients')
             ->whereIn('office_id', $siteLocations->pluck('office_id')->unique()->values())
-            ->where(fn (Builder $q) => $q->whereNull('PatStatus')->orWhereNotIn('PatStatus', [(string) PatientStatus::Deleted->value, 'Deleted']))
+            ->where(fn (Builder $q) => $q->whereNull('PatStatus')->orWhereNotIn('PatStatus', PatientStatus::deletedValues()))
             ->where(function (Builder $q) use ($email, $phones) {
                 if ($email !== null && $email !== '') {
                     $q->orWhere('Email', $email);

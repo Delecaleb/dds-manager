@@ -44,9 +44,11 @@
             <td class="px-4 py-3 font-mono text-[11px] text-slate-600" data-key-masked="{{ $key->id }}">{{ $key->maskedKey() }}</td>
             <td class="px-4 py-3 text-[11px] text-slate-600">
                 Bookings
-                @if ($key->allows(\App\Models\ApiKey::ABILITY_PATIENT_CONTACT))
-                    <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800">+ patient contact</span>
-                @endif
+                @foreach ([\App\Models\ApiKey::ABILITY_PATIENT_CONTACT => '+ patient contact', \App\Models\ApiKey::ABILITY_PATIENT_MATCH => '+ patient matching', \App\Models\ApiKey::ABILITY_PROCEDURES => '+ procedures'] as $ability => $label)
+                    @if ($key->allows($ability))
+                        <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800">{{ $label }}</span>
+                    @endif
+                @endforeach
             </td>
             <td class="px-4 py-3 text-right tabular-nums">{{ $key->rate_limit_per_minute }}</td>
             <td class="px-4 py-3 text-slate-500" data-order="{{ $key->last_used_at?->timestamp ?? 0 }}">{{ $key->last_used_at?->diffForHumans() ?? 'Never' }}</td>

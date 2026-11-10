@@ -6,6 +6,7 @@ use App\Domain\Support\MetricFilter;
 use App\Domain\Support\ProcCode;
 use App\Domain\Support\ProcStatus;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -207,6 +208,32 @@ class ProductionService
     }
 
     /** Completed procedure-log rows for the filter — the base every procedure metric builds on. */
+    /**
+     * The completed procedures of these patients in the period, oldest first, each with its
+     * code, description and category from OpenDental's own lists.
+     *
+     * @param  list<int>  $patNums
+     * @return Collection<int, object>
+     */
+    public function completedProceduresFor(MetricFilter $filter, array $patNums): Collection
+    {
+        return $this->completedProcedures($filter)
+            // PatNum is a VARCHAR locally; compare as strings so the index stays usable.
+            ->whereIn('pl.PatNum', array_map('strval', $patNums))
+            ->leftJoin('od_procedures as code', function ($join) {
+                $join->on('pl.CodeNum', '=', 'code.CodeNum')->on('pl.office_id', '=', 'code.office_id');
+            })
+            ->leftJoin('od_definitions as category', function ($join) {
+                $join->on('code.ProcCat', '=', 'category.DefNum')->on('code.office_id', '=', 'category.office_id');
+            })
+            ->orderBy('pl.ProcDate')
+            ->orderBy('pl.ProcNum')
+            ->get([
+                'pl.PatNum', 'pl.ProcNum', 'pl.ProcDate', 'pl.ProcFee', 'pl.ClinicNum', 'pl.ProvNum',
+                'code.ProcCode', 'code.Descript', 'category.ItemName as category',
+            ]);
+    }
+
     protected function completedProcedures(MetricFilter $filter): Builder
     {
         $q = DB::table('od_procedure_logs as pl')

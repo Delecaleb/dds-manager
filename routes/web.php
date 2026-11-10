@@ -109,6 +109,7 @@ Route::middleware('auth')->group(function () {
     // regenerating it need the password every time; both are throttled against guessing.
     Route::middleware('module:developer-portal')->prefix('developer')->name('developer.')->controller(DeveloperPortalController::class)->group(function () {
         Route::get('/', 'index')->name('index');
+        Route::get('docs', 'docs')->name('docs');
         Route::post('keys', 'store')->name('keys.store');
         Route::get('keys/{apiKey}', 'show')->name('keys.show');
         Route::delete('keys/{apiKey}', 'destroy')->name('keys.destroy');
