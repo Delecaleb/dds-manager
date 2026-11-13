@@ -154,6 +154,38 @@ class DeveloperPortalController extends Controller
         return response()->json(['key' => $plain, 'masked' => $apiKey->maskedKey()]);
     }
 
+    public function updatePermissions(Request $request, ApiKey $apiKey): JsonResponse
+    {
+        $this->authorizeOwner($request, $apiKey);
+
+        if ($apiKey->revoked_at !== null) {
+            return response()->json(['message' => 'A revoked key cannot be edited.'], 422);
+        }
+
+        $request->validate([
+            'patient_contact' => ['nullable', 'boolean'],
+            'patient_match'   => ['nullable', 'boolean'],
+            'procedures'      => ['nullable', 'boolean'],
+        ]);
+
+        $abilities = [ApiKey::ABILITY_BOOKINGS];
+        if ($request->boolean('patient_contact')) {
+            $abilities[] = ApiKey::ABILITY_PATIENT_CONTACT;
+        }
+        if ($request->boolean('patient_match')) {
+            $abilities[] = ApiKey::ABILITY_PATIENT_MATCH;
+        }
+        if ($request->boolean('procedures')) {
+            $abilities[] = ApiKey::ABILITY_PROCEDURES;
+        }
+
+        $apiKey->update(['abilities' => $abilities]);
+
+        Log::info('Developer API key permissions updated.', ['api_key_id' => $apiKey->id, 'user_id' => $request->user()->id]);
+
+        return response()->json(['ok' => true]);
+    }
+
     public function destroy(Request $request, ApiKey $apiKey): RedirectResponse
     {
         $this->authorizeOwner($request, $apiKey);

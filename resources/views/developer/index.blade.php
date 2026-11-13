@@ -211,6 +211,75 @@
                 var btn = e.target.closest('[data-key-action]');
                 if (!btn) return;
 
+                if (btn.getAttribute('data-key-action') === 'permissions') {
+                    var abilities = JSON.parse(btn.getAttribute('data-key-abilities') || '[]');
+                    var permName = btn.getAttribute('data-key-name');
+                    var permUrl  = btn.getAttribute('data-url');
+
+                    function permRow(field, ability, label, hint) {
+                        var checked = abilities.indexOf(ability) !== -1 ? 'checked' : '';
+                        return '<label class="flex items-start gap-2.5 cursor-pointer">' +
+                            '<input type="checkbox" name="' + field + '" value="1" ' + checked + ' class="mt-0.5 accent-emerald-600">' +
+                            '<span class="text-xs text-slate-700">' + esc(label) +
+                            '<span class="block text-[11px] text-amber-700 mt-0.5">' + esc(hint) + '</span></span></label>';
+                    }
+
+                    var permHtml =
+                        '<div class="dds-modal" role="dialog" aria-modal="true">' +
+                        '<div class="dds-modal-panel w-full max-w-md">' +
+                        '<div class="flex justify-between items-center p-5 border-b border-gray-100">' +
+                        '<h4 class="text-sm font-bold text-gray-900">Edit permissions — ' + esc(permName) + '</h4>' +
+                        '<button type="button" data-dds-close class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>' +
+                        '</div>' +
+                        '<form class="p-5 space-y-4" data-perm-form>' +
+                        '<p class="text-xs text-slate-500">Bookings (appointment times, providers, status) is always included.</p>' +
+                        '<div class="space-y-3">' +
+                        permRow('patient_contact', 'patients:contact', 'Patient contact details', 'PHI — full name, email, phone and address on each booking.') +
+                        permRow('patient_match',   'patients:match',   'Patient matching',        'PHI — find a patient by name + birth date; read their record.') +
+                        permRow('procedures',      'procedures:read',  'Procedures',              'PHI — completed procedures, fees, and the procedure code list.') +
+                        '</div>' +
+                        '<p class="text-xs text-rose-700 hidden" data-perm-error></p>' +
+                        '<button type="submit" class="w-full inline-flex justify-center items-center gap-2 bg-[#001f3f] hover:bg-[#002b57] text-white px-4 py-2.5 rounded-lg text-xs font-semibold">Save permissions</button>' +
+                        '</form></div></div>';
+
+                    var permModal = DDS.modal.openHtml(permHtml);
+                    var permForm  = permModal.querySelector('[data-perm-form]');
+                    var permError = permModal.querySelector('[data-perm-error]');
+
+                    permForm.addEventListener('submit', function (ev) {
+                        ev.preventDefault();
+                        var submit = permForm.querySelector('button[type="submit"]');
+                        submit.disabled = true;
+                        permError.classList.add('hidden');
+
+                        fetch(permUrl, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                            body: JSON.stringify({
+                                patient_contact: permForm.querySelector('[name="patient_contact"]').checked ? 1 : 0,
+                                patient_match:   permForm.querySelector('[name="patient_match"]').checked ? 1 : 0,
+                                procedures:      permForm.querySelector('[name="procedures"]').checked ? 1 : 0,
+                            })
+                        })
+                        .then(function (r) {
+                            return r.json().catch(function () { return {}; }).then(function (body) { return { status: r.status, body: body }; });
+                        })
+                        .then(function (res) {
+                            if (res.status === 200) { window.location.reload(); return; }
+                            permError.textContent = (res.body && res.body.message) || 'Something went wrong. Please try again.';
+                            permError.classList.remove('hidden');
+                            submit.disabled = false;
+                        })
+                        .catch(function () {
+                            permError.textContent = 'Could not reach the server. Please try again.';
+                            permError.classList.remove('hidden');
+                            submit.disabled = false;
+                        });
+                    });
+
+                    return;
+                }
+
                 var regenerate = btn.getAttribute('data-key-action') === 'regenerate';
                 var name = btn.getAttribute('data-key-name');
                 var html =
