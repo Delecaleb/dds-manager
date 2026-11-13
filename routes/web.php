@@ -117,6 +117,7 @@ Route::middleware('auth')->group(function () {
             Route::post('keys/{apiKey}/reveal', 'reveal')->name('keys.reveal');
             Route::post('keys/{apiKey}/regenerate', 'regenerate')->name('keys.regenerate');
         });
+        Route::patch('keys/{apiKey}/permissions', 'updatePermissions')->name('keys.updatePermissions');
     });
 
     // Dashboard Module

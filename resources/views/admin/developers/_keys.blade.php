@@ -66,25 +66,90 @@
                 @endif
             </td>
             <td class="px-4 py-3">
-                <div class="flex items-center justify-end gap-2 whitespace-nowrap">
-                    @if ($developer && $active)
-                        <button type="button" data-key-action="reveal" data-url="{{ route('developer.keys.reveal', $key) }}" data-key-name="{{ $key->name }}"
-                            class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50">Copy key</button>
-                    @endif
-                    @if ($developer && $key->revoked_at === null)
-                        <button type="button" data-key-action="regenerate" data-url="{{ route('developer.keys.regenerate', $key) }}" data-key-id="{{ $key->id }}" data-key-name="{{ $key->name }}"
-                            class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-amber-200 text-amber-800 bg-white hover:bg-amber-50">Regenerate</button>
-                    @endif
-                    <a href="{{ route($routes.'show', $key) }}" class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50">Activity</a>
-                    @if ($key->revoked_at === null)
-                        <form method="POST" action="{{ route($routes.'destroy', $key) }}"
-                            onsubmit="return confirm(@js('Revoke '.$key->name.'? Anything using it stops working immediately.'));">
-                            @csrf @method('DELETE')
-                            <button type="submit" class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-rose-200 text-rose-700 bg-white hover:bg-rose-50">Revoke</button>
-                        </form>
-                    @endif
+                <div class="relative flex justify-end">
+                    <button type="button" data-kebab-trigger
+                        class="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 focus:outline-none"
+                        aria-haspopup="true" aria-expanded="false" aria-label="More actions">
+                        <i data-lucide="more-vertical" class="w-4 h-4 pointer-events-none"></i>
+                    </button>
+                    <div data-kebab-menu class="hidden absolute right-0 top-8 z-30 w-48 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden" role="menu">
+                        @if ($developer && $active)
+                            <button type="button" role="menuitem" data-key-action="reveal"
+                                data-url="{{ route('developer.keys.reveal', $key) }}"
+                                data-key-name="{{ $key->name }}"
+                                class="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-slate-700 hover:bg-slate-50">
+                                <i data-lucide="copy" class="w-3.5 h-3.5 shrink-0 text-slate-400 pointer-events-none"></i>Copy key
+                            </button>
+                        @endif
+                        @if ($developer && $key->revoked_at === null)
+                            <button type="button" role="menuitem" data-key-action="regenerate"
+                                data-url="{{ route('developer.keys.regenerate', $key) }}"
+                                data-key-id="{{ $key->id }}"
+                                data-key-name="{{ $key->name }}"
+                                class="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-amber-700 hover:bg-amber-50">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5 shrink-0 text-amber-400 pointer-events-none"></i>Regenerate
+                            </button>
+                        @endif
+                        <a href="{{ route($routes.'show', $key) }}" role="menuitem"
+                            class="flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-slate-700 hover:bg-slate-50">
+                            <i data-lucide="activity" class="w-3.5 h-3.5 shrink-0 text-slate-400"></i>Activity
+                        </a>
+                        @if ($developer && $key->revoked_at === null)
+                            <button type="button" role="menuitem" data-key-action="permissions"
+                                data-key-id="{{ $key->id }}"
+                                data-key-name="{{ $key->name }}"
+                                data-key-abilities="{{ json_encode($key->abilities) }}"
+                                data-url="{{ route('developer.keys.updatePermissions', $key) }}"
+                                class="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-slate-700 hover:bg-slate-50">
+                                <i data-lucide="shield" class="w-3.5 h-3.5 shrink-0 text-slate-400 pointer-events-none"></i>Edit permissions
+                            </button>
+                        @endif
+                        @if ($key->revoked_at === null)
+                            <div class="border-t border-slate-100 mx-3 my-1"></div>
+                            <form method="POST" action="{{ route($routes.'destroy', $key) }}">
+                                @csrf @method('DELETE')
+                                <button type="submit" role="menuitem"
+                                    onclick="return confirm(@js('Revoke '.$key->name.'? Anything using it stops working immediately.'))"
+                                    class="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-rose-700 hover:bg-rose-50">
+                                    <i data-lucide="ban" class="w-3.5 h-3.5 shrink-0 text-rose-400 pointer-events-none"></i>Revoke
+                                </button>
+                            </form>
+                        @endif
+                    </div>
                 </div>
             </td>
         </tr>
     @endforeach
 </x-data-table>
+
+@once
+<script>
+(function () {
+    document.addEventListener('click', function (e) {
+        var trigger = e.target.closest('[data-kebab-trigger]');
+        document.querySelectorAll('[data-kebab-menu]:not(.hidden)').forEach(function (menu) {
+            if (!trigger || !menu.parentElement.contains(trigger)) {
+                menu.classList.add('hidden');
+                var t = menu.parentElement.querySelector('[data-kebab-trigger]');
+                if (t) t.setAttribute('aria-expanded', 'false');
+            }
+        });
+        if (trigger) {
+            var menu = trigger.parentElement.querySelector('[data-kebab-menu]');
+            if (menu) {
+                var nowOpen = menu.classList.toggle('hidden') === false;
+                trigger.setAttribute('aria-expanded', nowOpen ? 'true' : 'false');
+            }
+        }
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        document.querySelectorAll('[data-kebab-menu]:not(.hidden)').forEach(function (menu) {
+            menu.classList.add('hidden');
+            var t = menu.parentElement.querySelector('[data-kebab-trigger]');
+            if (t) { t.setAttribute('aria-expanded', 'false'); t.focus(); }
+        });
+    });
+})();
+</script>
+@endonce
