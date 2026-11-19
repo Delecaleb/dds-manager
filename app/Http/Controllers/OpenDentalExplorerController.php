@@ -211,7 +211,7 @@ class OpenDentalExplorerController extends Controller
         }
 
         try {
-            $result = $repair->pruneConfirmedDeleted($table, $office, array_map('intval', $validated['keys']));
+            $result = $repair->pruneConfirmedDeleted($table, $office, array_map('intval', $validated['keys']), force: true);
         } catch (InvalidArgumentException $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         } catch (Throwable $e) {

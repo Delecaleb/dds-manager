@@ -56,9 +56,11 @@ class RowRepairService
      * If the lookup fails, nothing is deleted (the exception propagates).
      *
      * @param  list<int|string>  $keys
+     * @param  bool  $force  Skip the "all missing = broken connection" circuit breaker.
+     *                       Use only when keys were pre-validated by a fresh reconciliation diff.
      * @return array{requested: int, deleted: int, still_in_opendental: list<int>}
      */
-    public function pruneConfirmedDeleted(OpenDentalTable $table, Office $office, array $keys): array
+    public function pruneConfirmedDeleted(OpenDentalTable $table, Office $office, array $keys, bool $force = false): array
     {
         $this->assertRepairable($table);
 
@@ -86,9 +88,10 @@ class RowRepairService
             }
         }
 
-        // Same circuit breaker as reconciliation: OpenDental "missing" every one of
-        // many rows points at a wrong connection, not a mass deletion.
-        if (count($confirmedDeleted) >= self::SUSPICIOUS_DELETE_MINIMUM && count($confirmedDeleted) === count($keys)) {
+        // Circuit breaker: if every submitted key is absent and the batch is large,
+        // it likely means a wrong API connection rather than a genuine mass deletion.
+        // Skipped for force-delete where keys were pre-validated by a reconciliation diff.
+        if (! $force && count($confirmedDeleted) >= self::SUSPICIOUS_DELETE_MINIMUM && count($confirmedDeleted) === count($keys)) {
             throw new RuntimeException('OpenDental returned none of the '.count($keys).' records. Nothing was deleted — check this office\'s API connection.');
         }
 
