@@ -392,6 +392,7 @@ Route::middleware('auth')->group(function () {
         Route::post('open-dental-explorer/trigger-date-sync', [OpenDentalExplorerController::class, 'triggerDateSync'])->name('od-explorer.trigger-date-sync');
         Route::post('open-dental-explorer/reconcile-diff', [OpenDentalExplorerController::class, 'reconcileDiff'])->name('od-explorer.reconcile-diff');
         Route::post('open-dental-explorer/prune-orphans', [OpenDentalExplorerController::class, 'pruneOrphans'])->name('od-explorer.prune-orphans');
+        Route::post('open-dental-explorer/force-delete-orphans', [OpenDentalExplorerController::class, 'forceDeleteOrphans'])->name('od-explorer.force-delete-orphans');
         Route::post('open-dental-explorer/cancel-sync-request', [OpenDentalExplorerController::class, 'cancelSyncRequest'])->name('od-explorer.cancel-sync-request');
     });
 
