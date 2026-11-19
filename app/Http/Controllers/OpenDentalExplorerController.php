@@ -181,6 +181,55 @@ class OpenDentalExplorerController extends Controller
         return $this->repair($request, RepairOpenDentalRows::ACTION_PRUNE);
     }
 
+    /**
+     * Force-delete orphans immediately regardless of count — no queue.
+     *
+     * Every key is still re-confirmed against OpenDental before deletion;
+     * this only skips the queue dispatch for large batches.
+     */
+    public function forceDeleteOrphans(Request $request, RowRepairService $repair): JsonResponse
+    {
+        $validated = $request->validate([
+            'table' => ['required', 'string'],
+            'keys'  => ['required', 'array', 'min:1', 'max:'.RowRepairService::MAX_KEYS],
+            'keys.*' => ['integer', 'min:1'],
+        ]);
+
+        $table = $this->catalog->resolve($validated['table']);
+        $office = $this->activeOffice();
+
+        if ($table === null) {
+            return response()->json(['error' => self::INVALID_TABLE], 400);
+        }
+
+        if ($office === null) {
+            return response()->json(['error' => 'No office is configured.'], 422);
+        }
+
+        if (! $table->isRepairable()) {
+            return response()->json(['error' => "'{$table->key}' cannot be repaired from OpenDental."], 422);
+        }
+
+        try {
+            $result = $repair->pruneConfirmedDeleted($table, $office, array_map('intval', $validated['keys']));
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            return response()->json(['error' => 'OpenDental could not be reached; nothing was changed. '.$e->getMessage()], 502);
+        }
+
+        $kept = count($result['still_in_opendental']);
+
+        return response()->json([
+            'success'                 => true,
+            'queued'                  => false,
+            'table'                   => $table->localTable,
+            'deleted_count'           => $result['deleted'],
+            'still_in_opendental_keys' => $result['still_in_opendental'],
+            'message'                 => "Force-deleted {$result['deleted']} record(s) confirmed absent in OpenDental.".($kept > 0 ? " {$kept} still exist in OpenDental and were kept." : ''),
+        ]);
+    }
+
     public function syncCheckpoints(SyncCheckpointService $checkpoints): JsonResponse
     {
         return response()->json(['logs' => $checkpoints->forOffice($this->activeOfficeId())]);

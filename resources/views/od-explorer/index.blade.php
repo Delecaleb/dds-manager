@@ -241,6 +241,10 @@
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Prune Orphans
             </button>
 
+            <button type="button" id="btnForceDeleteAll" onclick="forceDeleteAllOrphans()" disabled class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-slate-400 rounded-lg cursor-not-allowed transition shadow-2xs disabled:opacity-60" title="Delete all orphans immediately (no queue) — each record is re-confirmed against OpenDental first">
+              <i data-lucide="zap" class="w-3.5 h-3.5"></i> Force Delete
+            </button>
+
             <button type="button" id="btnSyncAll" onclick="syncAllMissing()" disabled class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-slate-400 rounded-lg cursor-not-allowed transition shadow-2xs disabled:opacity-60">
               <i data-lucide="download-cloud" class="w-3.5 h-3.5"></i> Sync Missing
             </button>
@@ -604,6 +608,7 @@
 
       var discBtn = document.getElementById('btnSyncDiscrepancies');
       var pruneBtn = document.getElementById('btnPruneAll');
+      var forceBtn = document.getElementById('btnForceDeleteAll');
       var syncBtn = document.getElementById('btnSyncAll');
       var exportBtn = document.getElementById('btnExportDiff');
 
@@ -621,10 +626,16 @@
         pruneBtn.disabled = false;
         pruneBtn.innerHTML = '<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Prune Orphans';
         pruneBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-2xs transition cursor-pointer';
+        forceBtn.disabled = false;
+        forceBtn.innerHTML = '<i data-lucide="zap" class="w-3.5 h-3.5"></i> Force Delete';
+        forceBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-red-700 hover:bg-red-800 rounded-lg shadow-2xs transition cursor-pointer';
       } else {
         pruneBtn.disabled = true;
         pruneBtn.innerHTML = '<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Prune Orphans';
         pruneBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-slate-400 rounded-lg cursor-not-allowed transition shadow-2xs disabled:opacity-60';
+        forceBtn.disabled = true;
+        forceBtn.innerHTML = '<i data-lucide="zap" class="w-3.5 h-3.5"></i> Force Delete';
+        forceBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-slate-400 rounded-lg cursor-not-allowed transition shadow-2xs disabled:opacity-60';
       }
 
       if ((sum.missing_count || 0) > 0) {
@@ -827,6 +838,36 @@
     function pruneSingleOrphan(pk) {
       if (!pk || !confirm('Delete record #' + pk + ' from the local database? It is re-checked against OpenDental first.')) return;
       postRepair('{{ route("od-explorer.prune-orphans") }}', _diffResult.table, [pk], null, '');
+    }
+
+    function forceDeleteAllOrphans() {
+      var keys = keysWithStatus('orphan');
+      if (!keys.length) return;
+      if (!confirm(
+        'FORCE DELETE — ' + keys.length + ' orphan record(s) from "' + _diffResult.local_table + '".\n\n' +
+        'Every record is re-confirmed against OpenDental before deletion.\n' +
+        'Records that still exist in OpenDental are kept.\n\n' +
+        'This runs immediately — no queue. Continue?'
+      )) return;
+
+      var btn = document.getElementById('btnForceDeleteAll');
+      btn.disabled = true;
+      btn.innerHTML = SPINNER + ' Deleting...';
+
+      fetch('{{ route("od-explorer.force-delete-orphans") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ table: _diffResult.table, keys: keys })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          alert(res.error ? 'Error: ' + res.error : (res.message || 'Done.'));
+          executeCompare();
+        })
+        .catch(function (err) {
+          alert('Request failed: ' + err.message);
+          executeCompare();
+        });
     }
 
     function exportDiffCsv() {
