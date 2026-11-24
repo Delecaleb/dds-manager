@@ -293,23 +293,150 @@
                     loadTab(current.tab, sub.dataset.opsSubtab, true);
                 }
             });
-            content.addEventListener('input', e => {
-                if (e.target.matches('[data-ops-search]')) {
-                    const q = e.target.value;
-                    const card = e.target.closest('.bg-white, .border') || content;
-                    const table = card.querySelector('table');
-                    if (table && window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(table)) {
+            function getOpsTable(input) {
+                const card = input.parentElement?.closest('.bg-white, .border') || content;
+                return card.querySelector('table') || content.querySelector('table.dds-datatable, table.dds-sortable, table');
+            }
+
+            function handleOpsSearch(e) {
+                if (!e.target.matches('[data-ops-search]')) return;
+                const q = e.target.value;
+                const table = getOpsTable(e.target);
+                if (!table) return;
+
+                const isDt = window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(table);
+
+                if (isDt) {
+                    try {
                         jQuery(table).DataTable().search(q).draw();
-                    } else {
-                        const qLower = q.toLowerCase();
-                        content.querySelectorAll('tbody tr').forEach(tr => {
-                            tr.style.display = tr.textContent.toLowerCase().includes(qLower) ? '' : 'none';
+                    } catch (err) {
+                        console.error('[ops-search] draw() error:', err);
+                    }
+                    recomputeOpsFooter(table, q);
+                } else {
+                    const qLower = q.toLowerCase();
+                    table.querySelectorAll('tbody tr').forEach(tr => {
+                        tr.style.display = tr.textContent.toLowerCase().includes(qLower) ? '' : 'none';
+                    });
+                    recomputeOpsFooter(table, q);
+                }
+            }
+
+            content.addEventListener('input', handleOpsSearch);
+            content.addEventListener('search', handleOpsSearch);
+
+            function recomputeOpsFooter(table, q) {
+                const tfoot = table.querySelector('tfoot');
+                if (!tfoot) return;
+
+                const avgRow   = tfoot.querySelector('[data-footer-row="average"]');
+                const totalRow = tfoot.querySelector('[data-footer-row="total"]');
+                if (!avgRow && !totalRow) return;
+
+                // Cache original server-rendered HTML for all numeric footer cells
+                [avgRow, totalRow].forEach(row => {
+                    if (!row) return;
+                    row.querySelectorAll('td[data-col-type]').forEach(td => {
+                        if (!td.dataset.origHtml) {
+                            td.dataset.origHtml = td.innerHTML;
+                        }
+                    });
+                });
+
+                // If search query is empty, restore exact original server-rendered values
+                if (!q || !q.trim()) {
+                    if (avgRow) {
+                        avgRow.querySelectorAll('td[data-col-type]').forEach(td => {
+                            if (td.dataset.origHtml) td.innerHTML = td.dataset.origHtml;
                         });
                     }
+                    if (totalRow) {
+                        totalRow.querySelectorAll('td[data-col-type]').forEach(td => {
+                            if (td.dataset.origHtml) td.innerHTML = td.dataset.origHtml;
+                        });
+                    }
+                    return;
                 }
-            });
+
+                // Build column map from data-col-type and data-col-agg attributes
+                const refRow = avgRow || totalRow;
+                const colMap = [...refRow.querySelectorAll('td[data-col-type]')].map(td => ({
+                    idx:  td.cellIndex,
+                    type: td.dataset.colType,
+                    agg:  td.dataset.colAgg || '',
+                }));
+                if (!colMap.length) return;
+
+                const sums = {}, counts = {};
+                colMap.forEach(({ idx }) => { sums[idx] = 0; counts[idx] = 0; });
+
+                const isDt = window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(table);
+                const matchingRows = isDt
+                    ? jQuery(table).DataTable().rows({ search: 'applied' }).nodes().toArray()
+                    : [...table.querySelectorAll('tbody tr')].filter(tr => tr.style.display !== 'none' && !tr.classList.contains('dataTables_empty'));
+
+                matchingRows.forEach(tr => {
+                    if (tr.classList.contains('dataTables_empty')) return;
+                    colMap.forEach(({ idx }) => {
+                        const cell = tr.cells[idx];
+                        if (!cell) return;
+                        let raw = cell.getAttribute('data-order');
+                        if (raw === null || raw === '') {
+                            const txt = cell.textContent.trim();
+                            if (txt && txt !== '--' && txt !== '—') {
+                                const cleaned = txt.replace(/[^0-9.-]+/g, '');
+                                if (cleaned !== '') raw = cleaned;
+                            }
+                        }
+                        const val = parseFloat(raw);
+                        if (isFinite(val)) {
+                            sums[idx] += val;
+                            counts[idx]++;
+                        }
+                    });
+                });
+
+                const fmt = (val, type) => {
+                    if (val === null || val === undefined || isNaN(val)) return '—';
+                    if (window.DDS && DDS.fmt) {
+                        if (type === 'money') return DDS.fmt.money(val);
+                        if (type === 'percent') return DDS.fmt.percent(val, 2);
+                        if (type === 'percent_0') return DDS.fmt.percent(val, 0);
+                        if (type === 'number_3') return Number(val).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                        if (type === 'number_2') return Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        return DDS.fmt.number(val);
+                    }
+                    return Number(val).toLocaleString('en-US', { maximumFractionDigits: 2 });
+                };
+
+                if (avgRow) {
+                    colMap.forEach(({ idx, type }) => {
+                        const td = avgRow.cells[idx];
+                        if (!td) return;
+                        const n = counts[idx];
+                        td.textContent = n > 0 ? fmt(sums[idx] / n, type) : '—';
+                    });
+                }
+
+                if (totalRow) {
+                    colMap.forEach(({ idx, type, agg }) => {
+                        const td = totalRow.cells[idx];
+                        if (!td) return;
+                        const colAgg = td.dataset.colAgg || agg;
+                        const n = counts[idx];
+                        if (colAgg === 'sum') {
+                            td.textContent = n > 0 ? fmt(sums[idx], type) : (matchingRows.length === 0 ? '--' : fmt(0, type));
+                        } else if (colAgg === 'avg') {
+                            td.textContent = n > 0 ? fmt(sums[idx] / n, type) : '—';
+                        } else {
+                            td.textContent = '--';
+                        }
+                    });
+                }
+            }
             content.addEventListener('click', e => {
-                if (e.target.closest('[data-ops-export]')) exportCsv();
+                const exportBtn = e.target.closest('[data-ops-export]');
+                if (exportBtn) exportCsv(exportBtn);
             });
             // Grouping toggles (e.g. Production Details Date/Provider)
             content.addEventListener('change', e => {
@@ -320,8 +447,9 @@
                 }
             });
 
-            function exportCsv() {
-                const table = content.querySelector('table');
+            function exportCsv(btn) {
+                const card = btn ? (btn.parentElement?.closest('.bg-white, .border') || content) : content;
+                const table = card.querySelector('table') || content.querySelector('table.dds-datatable, table.dds-sortable, table');
                 if (!table) return;
 
                 const thead = table.querySelector('thead');
@@ -398,8 +526,13 @@
                 }
 
                 // Process tbody and tfoot rows
+                const isTableDt = window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(table);
+                const exportedBodyRows = isTableDt
+                    ? jQuery(table).DataTable().rows({ search: 'applied' }).nodes().toArray()
+                    : [...(tbody ? tbody.querySelectorAll('tr') : [])].filter(tr => tr.style.display !== 'none');
+
                 const bodyRows = [
-                    ...(tbody ? tbody.querySelectorAll('tr') : []),
+                    ...exportedBodyRows,
                     ...(tfoot ? tfoot.querySelectorAll('tr') : [])
                 ];
 

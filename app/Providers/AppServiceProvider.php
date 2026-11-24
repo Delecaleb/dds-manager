@@ -16,6 +16,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\Looping;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
@@ -51,6 +52,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Block migrate:fresh, migrate:reset, migrate:refresh, db:wipe in production.
+        // Throws even when --force is passed — no agent or deploy script can bypass this.
+        DB::prohibitDestructiveCommands($this->app->isProduction());
+
         // Grant all gates automatically to Super Admin
         Gate::before(function (User $user) {
             if ($user->isSuperAdmin()) {

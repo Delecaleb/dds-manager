@@ -259,24 +259,27 @@
                         </tr>
                     @endforeach
                 @else
+                    @php $isPercentDiff = ($activeSubtab ?? '') === 'percent-diff-last-year'; @endphp
                     @if (!empty($spec['average']))
-                        <tr class="bg-gray-50 text-gray-900 font-bold text-xs text-right">
+                        <tr class="bg-gray-50 text-gray-900 font-bold text-xs text-right" data-footer-row="average">
                             @foreach ($columns as $col)
                                 @if ($loop->first)
                                     <td class="px-4 py-3.5 border-r border-gray-300 text-right {{ $stickyClass($loop->index) }} bg-gray-50" @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;" @endif>Average:</td>
                                 @else
-                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['average'][$col['key']] ?? null, $col['type']) !!}</td>
+                                    @php $isNumeric = in_array($col['type'] ?? 'text', ['money','percent','number','number_2','number_3'], true); @endphp
+                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}"@if($isNumeric) data-col-type="{{ $col['type'] }}" data-col-agg="avg"@endif>{!! ops_fmt($spec['average'][$col['key']] ?? null, $col['type']) !!}</td>
                                 @endif
                             @endforeach
                         </tr>
                     @endif
                     @if (!empty($spec['total']))
-                        <tr class="bg-gray-200 text-gray-900 font-bold text-xs text-right border-t border-gray-300">
+                        <tr class="bg-gray-200 text-gray-900 font-bold text-xs text-right border-t border-gray-300" data-footer-row="total">
                             @foreach ($columns as $col)
                                 @if ($loop->first)
                                     <td class="px-4 py-3.5 border-r border-gray-300 text-right {{ $stickyClass($loop->index) }} bg-gray-200" @if (!empty($col['sticky'])) style="min-width:12rem; max-width:16rem;" @endif>Total:</td>
                                 @else
-                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}">{!! ops_fmt($spec['total'][$col['key']] ?? null, $col['type']) !!}</td>
+                                    @php $isNumeric = in_array($col['type'] ?? 'text', ['money','percent','number','number_2','number_3'], true); @endphp
+                                    <td class="px-4 py-3.5 border-r border-gray-300 {{ $stickyClass($loop->index) }} {{ $col['class'] ?? '' }}"@if($isNumeric) data-col-type="{{ $col['type'] }}" data-col-agg="{{ $isPercentDiff ? 'avg' : ($col['agg'] ?? '') }}"@endif>{!! ops_fmt($spec['total'][$col['key']] ?? null, $col['type']) !!}</td>
                                 @endif
                             @endforeach
                         </tr>

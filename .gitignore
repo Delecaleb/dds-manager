@@ -34,3 +34,6 @@ tests/
 test/
 /docs
 /arini-ui
+.env.testing
+phpunit.xml
+phpunit.xml
